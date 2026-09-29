@@ -42,9 +42,11 @@ runs on `warrior`.
 
 ## The student's three steps
 
-Once, before the first run: install the extension from the store, read and accept the agreement on its
-setup page, and paste the licence key (it must name the student's AccessID, which the portal's
-dashboard confirms).
+Once, before the first run: install the extension from the store and read and accept the agreement on
+its setup page. There is no key to paste: the extension reads the AccessID the portal's dashboard shows
+for the signed-in session and asks Licensor's access service whether that account is on the approved
+list. A student not yet on it presses *Ask for access* (the request page opens with the AccessID
+filled in); the maintainer approves in the admin console, and the next click of the icon re-checks.
 
 1. **Open the portal tab.** Connect the VPN, sign in at `ondemand.grid.wayne.edu`, and keep the tab
    open.
@@ -133,7 +135,7 @@ measured: `default` reaches `warrior`).
 
 ## The two written answers still needed
 
-Both precede any paid key; neither blocks the free, approved-list pilot on the maintainer's own account.
+Both precede any paid edition; neither blocks the free, approved-list pilot on the maintainer's own account.
 
 1. **Wayne State C&IT:** written approval of Ashley Bridge as a supervised, user-run Claude Code inside
    a batch job, under the generative-AI guideline, with the data restrictions above. Ask also whether

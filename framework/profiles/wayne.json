@@ -1,7 +1,6 @@
 {
  "schema_version": 1,
  "site": "wayne",
- "email_domain": "wayne.edu",
  "display_name": "Wayne State University HPC grid",
  "scheduler": "slurm",
  "submit_host": "warrior",

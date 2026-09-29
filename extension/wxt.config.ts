@@ -52,15 +52,17 @@ export default defineConfig({
         gecko: {
           id: 'ashley-bridge@openspineconsortium.com',
           strict_min_version: '140.0',
-          // Required by AMO for every new extension since 2025-11-03. "none" is the truthful answer:
-          // the extension sends nothing to the vendor. The licence key is checked inside the browser
-          // against the public keys in src/licensing/keys.json (no activation request exists), there
-          // is no error or crash reporting in the code, and the one request to the vendor's site is
-          // the daily GET of the signed kill-list (src/licensing/killlist.ts), sent without cookies
-          // and carrying no data. An earlier declaration named an activation ping and optional
-          // reports that were never built; if either is ever added, this must change with it.
+          // Required by AMO for every new extension since 2025-11-03. Since 4.0.0 the truthful answer
+          // is personallyIdentifyingInfo: the approval check sends the vendor's access service the
+          // institutional account name the portal's dashboard shows (with the portal hostname, the
+          // product and the version) to learn whether that account is approved. Nothing else leaves
+          // the device towards the vendor: there is no error or crash reporting in the code and no
+          // usage data (so no technicalAndInteraction), and the two daily GETs of services.json and
+          // the signed kill-list are sent without cookies and carry no data. Until 3.0.0 this said
+          // "none", which was true of a build that checked a licence key inside the browser; if any
+          // other data is ever sent, this must change with it, together with PRIVACY.md.
           data_collection_permissions: {
-            required: ['none'],
+            required: ['personallyIdentifyingInfo'],
           },
         },
       },

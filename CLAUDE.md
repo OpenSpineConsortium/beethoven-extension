@@ -37,7 +37,14 @@ licensor when it exists). The product name and identifier carry no university na
   automated login; the MFA step is never touched.
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
-  refuses only on a verified revocation.
+  refuses only on a verified revocation. Since 4.0.0 the list withdraws versions only.
+- **No licence keys in Ashley Bridge (decided 2026-09-29).** Authentication is the student's own
+  sign-in to their Open OnDemand portal; authorization is the vendor's approved list, asked through
+  the access service (`access_check` in `services.json`) for the account name the portal's dashboard
+  shows for the session, never a typed one. The extension never reads a cookie. Requests to the vendor
+  happen only after the agreement is accepted (the kill-list gate in `background.ts` is the model); a
+  confirmed approval is kept 24 h (7 days when the service is unreachable), a refusal 10 minutes. The
+  Ashley VS Code extension keeps its own key flow and the same approved list serves both.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
   action; no container command on the login node and nothing of ours under its `/tmp`; container temp
   and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne State
@@ -65,10 +72,12 @@ licensor when it exists). The product name and identifier carry no university na
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-09-29 `LICENSE.txt` is version 3 and `PRIVACY.md` version 4; both describe the
-  software as built (no activation step, no error reports, one daily request for the withdrawn-keys
-  list, made only after acceptance); `TERMS_VERSION` in `extension/src/core/terms.ts` is 3 to
-  match, and the framework's `VERSION` file is 2). The copies the extension ships in
+  Edition; since 2026-09-29 and extension 4.0.0 `LICENSE.txt` is version 4 and `PRIVACY.md` version
+  5; both describe the software as built (no keys; the approval check against the access service
+  with the account name the portal shows; the daily fetch of `services.json` and the
+  withdrawn-versions list; no activation step, no error reports; all requests only after acceptance);
+  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match, and the framework's `VERSION` file
+  is 2). The copies the extension ships in
   `extension/public/` must be byte-identical to them at build time. Change a text and its version
   together (integer). Never pre-tick a box; the button label is part of the record; a changed
   agreement is shown again and accepted again.
@@ -88,7 +97,7 @@ licensor when it exists). The product name and identifier carry no university na
   `bin/hpcworker` (the one command) and `tests/` (`run.sh`, three unittest files, fixtures).
 - `extension/`: WXT 0.21 plus TypeScript, `browser.*` with Promises, no polyfill; `wxt.config.ts` holds
   the manifest exactly as the report's permission table specifies it; `src/core/` (audit chokepoint,
-  net, redact, shell driver), `src/licensing/` (key and kill-list verification), `src/entrypoints/`
+  net, redact, shell driver), `src/licensing/` (kill-list verification; no licence keys since 4.0.0), `src/entrypoints/`
   (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock portal), `scripts/sync-framework.mjs`
   (copies `../framework/**` into `public/framework/` with a hashed manifest before every build and zip).
 - `docs/`: the report, the design documents, the pilot plan, open questions and measurements.

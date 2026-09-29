@@ -48,15 +48,16 @@ Ashley Bridge extension ──▶ https://ondemand.<university>.edu ──▶ lo
                               └────────── shared storage <state_dir>/<run>/ ◀──────────────────────────┘
 ```
 
-What a student does, in order, after installing the extension from the browser's store, accepting
-the agreement once on its setup page and pasting the key their lead sent, once (the panel asks for it
-on the first click if it is not saved yet):
+What a student does, in order, after installing the extension from the browser's store and accepting
+the agreement once on its setup page (there is no key and nothing to paste: their own sign-in to the
+portal identifies them, and the extension confirms with the vendor's access service that the account
+the portal shows is approved; if it is not, the panel's one button is *Ask for access*):
 
 1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
    university requires it) and keep the tab open.
 2. **Click the Ashley Bridge icon.** The first click asks the browser once for access to that one
    site. Then the extension does the rest by itself, in order, and says in one line what it is doing:
-   wakes the portal up, checks it is signed in, asks for the licence key if none is saved, installs
+   wakes the portal up, checks it is signed in, confirms your account is approved, installs
    the framework in your account if it is not there, checks a compute node once (a short job,
    the first time only), signs you in to Claude if the cluster is not signed in (step 3), shows where
    your work goes and takes your statement about it (once per workspace), starts your worker through
@@ -128,8 +129,11 @@ From the report's "deliberately absent" list and its security controls:
 - No durable secret in extension storage. Connection state lives in `storage.session`; the audit log
   of every portal request stays on the device and is never transmitted.
 - No transmission of command text, file paths, prompts, job output, portal cookies or tokens to the
-  vendor. Nothing is collected off the device: the only request to the vendor's site is the daily
-  download of the signed withdrawn-keys list, made after the agreement is accepted.
+  vendor. The only thing sent to the vendor about the student is the approval check (the account name
+  the portal's dashboard shows, the portal hostname, the product and the version), answered yes or no
+  by the access service; the only other requests to the vendor's site are the daily downloads of the
+  service address (`services.json`) and the signed withdrawn-versions list. All of them are made only
+  after the agreement is accepted. There is no licence key: see `docs/TESTERS.md` for the flow.
 
 ## Status
 
@@ -151,11 +155,12 @@ cluster is not signed in; sign in from the panel (or run: hpcworker claude login
 asks again every minute." Their fixes and the three-step flow above are being built this week;
 `docs/OPEN_QUESTIONS.md` records what was measured and `docs/ARCHITECTURE.md` what is being built. The
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
-written answer from Anthropic precede any paid key.
+written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 3
-and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is 3 to match; `PRIVACY.md` is
-version 4. All integers; a changed text moves its version with it.
+Versions in this tree: the extension is 4.0.0 (the first version without licence keys); the
+framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 4 and the extension's
+`TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
+integers; a changed text moves its version with it.
 
 ## Documents
 
@@ -173,8 +178,9 @@ version 4. All integers; a changed text moves its version with it.
 - `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
 - `docs/MAC_AND_SAFARI.md`: what the Safari edition needs.
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 3; the extension's
-  `TERMS_VERSION` is 3) and the privacy statement (version 4).
+- `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; nothing to paste.
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 4; the extension's
+  `TERMS_VERSION` is 4) and the privacy statement (version 5).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

@@ -36,8 +36,8 @@ yet measured under the new flow").
 |---|---|---|---|
 | Framework (`framework/`, `hpcworker`) | Shell plus Python installed in the student's home or group volume: site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job, the sign-in sitting | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix; the plain sign-in sitting and its line contract (4.1) |
 | Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.ashley/claude` on Wayne State) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
-| Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The signed-key licence gate (`grid/license.js`: `ASHLEY1.<b64url payload>.<b64url sig>`, Ed25519, revocation list `ASHLEYREV1`, public keys `k1` and `trial`); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
-| Licence and access service | Keys issued off-line with Ashley's vendor tool and verified in the browser (no activation endpoint), plus a signed JSON document carrying revocations and the kill-list, served over HTTPS | Key issuance, AccessID binding, merchant of record | Kill-list signing key under hardware-key custody; daily fetch |
+| Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The Ed25519 token verifier (`grid/license.js` `open()`, `ASHLEYREV1` tokens, public keys `k1` and `trial`), used for the signed kill-list only since 4.0.0 (Bridge has no licence keys); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
+| Access service | The vendor's access service (the Cloudflare Worker behind Ashley's request page) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/ashley/services.json`, body `{v, access_id, portal, product, version}`), from the same approved list the admin console manages for Ashley; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
 
 Two things are deliberately absent (report, "Components and what each reuses"): any code on claude.ai
@@ -468,7 +468,7 @@ the Safari build for Apple's packager. `browser.*` with Promises, no polyfill (t
 
 The `alarms` API enforces the ≥60-second scheduler-facing floor by construction, since Chrome will not
 honour periods under 30 seconds. `storage.local` holds the portal hostname and granted origin,
-preferences, the acceptance record, the licence key and institutional identifier, the statement made
+preferences, the acceptance record, the account name the portal's dashboard showed and the last approval answer with its time, the access service's address from `services.json`, the statement made
 about each worker's workspace (`bridge.statements`), the small notes the strip keeps so it does not
 repeat itself (`bridge.opened`: the environment links it already opened; `bridge.loginSeen`: when the
 login terminal last reported `SIGNED-IN` and what that line said; `bridge.probe`: the probe job it
@@ -481,7 +481,7 @@ holds the run record (`bridge.run`: the run's name and state directory, job numb
 whose page script answers (`bridge.portalTab`), the tab the icon was last clicked from
 (`bridge.click`), when check 4 last passed (`bridge.sessionSeen`), what the last automatic start did
 (`bridge.autoStart`) and the last check results (`bridge.checks`); there is no durable secret (`PRIVACY.md` and `SECURITY.md` carry the same list; the report's own
-sentence names four items and says "only", but the licence key, the audit log and the last good
+sentence names four items and says "only", but the approval answer, the audit log and the last good
 kill-list that its security controls also require are durable, so the list here is the complete one).
 The content script is registered programmatically with `scripting.registerContentScripts` for the one
 granted origin after the click-time grant, because the host is not known at build time. The tab the
@@ -520,7 +520,7 @@ the student is offered, never both. It is driven by a pure decision function (`d
 `core/steps.ts`) over facts gathered from storage, the browser and the cluster through the page script
 (`gatherFacts` in `core/facts.ts`, reads only). Steps come in a fixed order and the first one not
 satisfied is the step: `portal` (connected, granted, the page script answering), `warm` (the PUN
-warm-up), `terms`, `licence`, `install` (the framework files by `PUT` and one install line, when
+warm-up), `terms`, `access` (the cached answer of the approval check for the account name the dashboard shows; while it is no, the one button is *Ask for access*, which opens the request page with that name filled in; while it is being asked, the strip is busy; nothing below runs until it is yes, which is how a withdrawn approval stops every start), `install` (the framework files by `PUT` and one install line, when
 `profile.json` is absent by the existence rule or `~/.hpcworker/VERSION` is older than the `VERSION`
 this build carries; the tool keeps the profile and says "upgraded"), `probe` (submitted once, in the background, when
 `probe.json` is absent; up to fifteen minutes of patience; its verdict on the compute node), `login`
@@ -551,23 +551,24 @@ earlier decision of 2026-09-29 had the first off by default, and the maintainer'
 ships. The options page explains each in one sentence where it is switched.
 
 **The panel** (`ui/strip.ts`, `ui/terminal.ts`, `ui/details.ts`): the strip, with the step's own
-input when it has one (the key box, the statement, the sign-in terminal with its one box and *Open the
+input when it has one (the statement, the sign-in terminal with its one box and *Open the
 sign-in page again*); when the run is green, the *Open in Claude* button, *Copy link*, *Stop* and the
 session name; and under *Details*: the worker card (job, node, state, the sign-in and consent the
 heartbeat reports, the chain), the buttons *Set up the cluster again*, *Run the probe job again*, *Sign
 in on the cluster*, *Start worker*, *Stop* and *Read status now*, the seventeen checks with *Run the
-checks* and *Quick checks*, the `rc.log` tail, the audit log (view, export, clear), the licence and
+checks* and *Quick checks*, the `rc.log` tail, the audit log (view, export, clear), the approval and
 agreement line, the settings, and the Google Drive step. The footer names the one host it talks to.
 
 **The options page** (`options_ui`; `entrypoints/options`, `ui/options.ts`; opened on install, from
 the browser's extension menu and from the strip): 1. the agreement (the signing dialog, or the
-acceptance record with export and print), 2. the licence key and the identifier (the portal's own
-username wins over a typed one; a link to ask for access), 3. the portal (connect by address, or
-disconnect; the usual way in is the icon on the portal's tab), 4. *Where your work goes* (the
-statement for the current worker name, which can be made again), 5. the settings (shell host, site
-profile name, permission mode with the sentence saying why supervised is the default, the two automatic
-behaviours), 6. the audit log with its export, 7. the optional Google Drive step. Nothing on it is
-needed for the three steps once the agreement and the key are in place.
+acceptance record with export and print), 2. the portal (connect by address, or disconnect; the usual
+way in is the icon on the portal's tab), 3. *Where your work goes* (the statement for the current
+worker name, which can be made again), 4. the settings (shell host, site profile name, permission
+mode with the sentence saying why supervised is the default, the two automatic behaviours), 5. the
+audit log with its export, 6. the optional Google Drive step. There is no key card and nothing to
+type: approval is confirmed by the background against the access service for the account name the
+portal shows, and the strip and *Details* say what the last answer was. Nothing on the setup page is
+needed for the three steps once the agreement is in place.
 
 **Two further panel items** decided on 2026-09-29 and unchanged since: *Open in Claude* and *Copy
 link* (shown when the files carry `environment_url`, opening it with `browser.tabs.create`, no `tabs`
@@ -587,10 +588,10 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 | `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab; access is requested at that click for that one origin only, and the extension refuses to work until it is granted |
 | `host_permissions` | none | |
 | `action` / `browser_action` | `{ default_title: "Ashley Bridge" }`, no `default_popup` | a click runs the steps and opens the panel |
-| `options_ui` | the setup page | the agreement, the key, the portal by address, the statement, the settings, the audit log, the Drive step |
+| `options_ui` | the setup page | the agreement, the portal by address, the statement, the settings, the audit log, the Drive step |
 | never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger`, `identity`, `clipboardRead`, any `claude.ai`, `anthropic.com` or `claude.com` origin | stated in the negative in the listing and the privacy policy |
 | `minimum_chrome_version` | `"148"` | `browser.*` namespace, Promise-returning `onMessage` |
-| `browser_specific_settings.gecko` | `id`; `data_collection_permissions: { required: ["none"] }` | nothing is collected: no activation ping and no crash reports |
+| `browser_specific_settings.gecko` | `id`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }` | the approval check sends the institutional account name the portal shows (with the portal hostname, product and version); no crash reports and no usage data |
 | `content_security_policy` | MV3 default; no remote script sources | remote code: no |
 | Firefox target | `firefox-mv2` or `firefox-mv3` with alarms | Firefox still accepts MV2 |
 
@@ -635,7 +636,17 @@ From the report's "Security controls", in the order a reviewer will look for the
   fallback below Chrome 137, Firefox 130 and Safari 17) against a public key compiled into the
   bundle. A revoked version refuses to send commands and tells the student why. Offline, the last good
   list applies; the extension refuses only on a verified revocation, so an outage of a one-person
-  vendor does not strand a campus. Licence revocations travel in the same document.
+  vendor does not strand a campus. Since 4.0.0 the document withdraws versions only; its
+  `revoked_lids` field stays in the file for compatibility and the extension ignores it.
+- **Approval, not keys.** Authentication is the student's own portal sign-in; authorization is the
+  vendor's approved list. After acceptance, once the portal is connected and the dashboard's account
+  name is on record, the background asks the access service (`access_check` from `services.json`,
+  cached 24 h) whether that account is approved, on every icon click and once a day; a yes is kept
+  24 h and up to 7 days when the service is unreachable, a no for 10 minutes. The strip's `access`
+  step sits before `install`, so an unapproved or withdrawn account starts nothing, by the strip or
+  by the automatic start, and the one button is *Ask for access*. The name asked about is only the
+  one the dashboard page shows (`SessionInfo.username`), never a typed one and never the
+  home-directory fallback. Nothing is read from a cookie.
 - **Per-job token.** The worker carries its own random token so that a request reaching the proxy with
   a valid portal session cannot drive another student's worker (the `/rnode/` handler does no job or
   ownership lookup).

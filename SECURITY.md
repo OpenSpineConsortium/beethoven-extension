@@ -39,7 +39,14 @@ The other adversaries considered:
   filtering step, polling by `sleep`). The framework runs supervised by default and enforces a task
   manifest (working directory, allowed partitions, allowed egress hosts) independently of the agent.
 - The vendor's own outage. A one-person vendor must not be able to strand a campus: the extension
-  works offline on the last good signed list and refuses only on a verified revocation.
+  works offline on the last good signed list and refuses only on a verified revocation, and it keeps a
+  confirmed approval for up to seven days when the access service cannot be reached (a day when it
+  can; a refusal for ten minutes).
+- A person who is not approved, or whose approval was withdrawn. There is no key to share or steal:
+  the extension asks the access service about the account name the portal's own dashboard shows for
+  the signed-in session (never a typed name), so being approved means holding that institutional
+  account. Withdrawal is one removal in the admin console; the extension stops starting workers at its
+  next check and says so. A worker already running is not stopped by it.
 
 Out of scope by construction: anything on claude.ai (the extension has no presence there) and any
 Claude credential (none is handled).
@@ -64,7 +71,8 @@ Extension:
   transmitted; the same function enforces the ≥60-second scheduler-facing poll floor and the
   shell-single-use rule.
 - No durable secret. `storage.local` holds the portal hostname and granted origin, preferences, the
-  acceptance record, the licence key and institutional identifier, the statement made about each
+  acceptance record, the account name the portal's dashboard showed and the last approval answer
+  with its time, the address of the access service read from `services.json`, the statement made about each
   worker's workspace (workspace, text and its version, time), the notes the strip keeps so it does
   not repeat itself (the last sign-in it saw with the account and plan Claude Code reported, the
   session links it opened, the probe job it submitted, the install it ran), the audit log, the last good copy of the
@@ -137,9 +145,9 @@ Release pipeline and keys:
 - Lockfile and `npm ci`; GitHub Actions pinned by commit SHA; a build attestation from a hosted builder
   (SLSA level 2 at minimum; signing material inaccessible to build steps as the level 3 target);
   reproducible-build instructions published for all stores.
-- No long-lived store API key in CI. The publisher accounts and the kill-list and licence signing keys
-  sit behind a hardware security key with no third-party OAuth grants; private keys never enter the
-  repository.
+- No long-lived store API key in CI. The publisher accounts and the kill-list signing key sit behind a
+  hardware security key with no third-party OAuth grants; private keys never enter the repository.
+  The access service's admin token lives in the vendor folder and is never on a command line.
 
 ## Incident record
 
@@ -154,8 +162,9 @@ Release pipeline and keys:
 
 ## What Ashley Bridge holds, and where
 
-- In the browser: portal hostname and granted origin, preferences, licence key and institutional
-  identifier, the acceptance record, the statement made about each worker's workspace, the strip's
+- In the browser: portal hostname and granted origin, preferences, the account name the portal's
+  dashboard showed and the last approval answer with its time, the access service's address, the
+  acceptance record, the statement made about each worker's workspace, the strip's
   notes (last sign-in seen with the account and plan Claude Code reported, links opened, the probe
   job it submitted, the install it ran), the audit log, the last good kill-list, a random
   installation identifier,
@@ -164,16 +173,18 @@ Release pipeline and keys:
   claude.ai link, the last 4,000 characters of `rc.log`), the portal tab, the tab the icon was clicked
   from, when the portal sign-in was last seen, what the last automatic start did, and the last check
   results. Never the pasted sign-in code.
-- In the student's cluster account: the framework, the licence key, job files, `status.json`,
+- In the student's cluster account: the framework, job files, `status.json`,
   `connection.json` (the session name and its claude.ai link), `rc.log`, the per-job token (0600), the
   successor job's id and the stop file, the consent marker `~/.hpcworker/consent` (one line: yes, the
   time, the browser's random installation identifier), and Claude Code's own sign-in (written by
   Claude Code, never read by Ashley Bridge). On a compute node, for a sign-in sitting only: the
   sitting's transcript under `/dev/shm`, mode 0600, removed with the sitting.
-- With the maintainer: the licence record made when a key is issued (key id, the identifier or
-  domain it is bound to, name, e-mail, dates, approval and withdrawal decisions); nothing from the
-  extension itself except the daily withdrawn-keys request's network address in the web host's
-  ordinary server logs. There are no error reports and no activation step.
+- With the maintainer: the access record (the account name, name and e-mail given on the request
+  page, the approval and withdrawal decisions with their dates) and one line per approval check from
+  the extension (account name, portal hostname, product, version, time, a salted hash of the network
+  address, the answer); from the two daily file downloads (`services.json`, the kill-list), only the
+  network address in the web host's ordinary server logs. There are no error reports, no activation
+  step and no licence key.
 - On Anthropic's servers, under the student's own account: the session transcript while Remote
   Control is connected, retained under Anthropic's data-usage terms.
 
