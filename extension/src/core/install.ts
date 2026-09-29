@@ -160,8 +160,8 @@ export async function installFramework(portal: PortalApi, o: InstallOptions): Pr
     log.push(note);
     show();
   }
-  const res = await o.fetchAsset('/framework/manifest.json');
-  if (!res.ok) throw new Error('this build carries no framework files (framework/manifest.json missing)');
+  const res = await o.fetchAsset('/framework/files.json');
+  if (!res.ok) throw new Error('this build carries no framework files (framework/files.json missing)');
   const manifest = (await res.json()) as FrameworkManifest;
   if (!manifest.files.length) throw new Error('this build carries no framework files: the framework/ folder was empty when the extension was built, so there is nothing to install yet');
   const root = paths.root(home);

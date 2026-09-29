@@ -160,8 +160,8 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 5.0.0 (4.0.0 was the first version without licence keys;
-5.0.0 sets up the lab's shared copy of the framework where a site has one); the framework's `VERSION`
+Versions in this tree: the extension is 6.0.0 (4.0.0 was the first version without licence keys;
+6.0.0 sets up the lab's shared copy of the framework where a site has one); the framework's `VERSION`
 file is 5; the agreement `LICENSE.txt` is version 4 and the extension's
 `TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
 integers; a changed text moves its version with it.
@@ -246,7 +246,7 @@ from there, not from here.
    `bash tools/deploy_shared.sh`, before the extension that needs it reaches students: the extension
    runs whatever the lab's copy is.
 3. Copy the zips into `release/<version>/`, write `SHA256SUMS.txt` (`sha256sum *.zip > SHA256SUMS.txt`)
-   and a short `README.md` there (see `release/5.0.0/`), commit, tag `v<version>`, push both remotes:
+   and a short `README.md` there (see `release/6.0.0/`), commit, tag `v<version>`, push both remotes:
    `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
    (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
    maintainer's machine that is WSL). Attach the zips and `SHA256SUMS.txt` to a GitHub release named

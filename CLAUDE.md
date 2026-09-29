@@ -76,7 +76,7 @@ licensor when it exists). The product name and identifier carry no university na
   5; both describe the software as built (no keys; the approval check against the access service
   with the account name the portal shows; the daily fetch of `services.json` and the
   withdrawn-versions list; no activation step, no error reports; all requests only after acceptance);
-  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match; extension 5.0.0 keeps all three, and
+  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match; extension 6.0.0 keeps all three, and
   the framework's `VERSION` file is 5). The copies the extension ships in
   `extension/public/` must be byte-identical to them at build time. Change a text and its version
   together (integer). Never pre-tick a box; the button label is part of the record; a changed

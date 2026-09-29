@@ -2,7 +2,8 @@
 // Bundle the cluster-side framework into the extension so "Set up the cluster" can upload it
 // through the portal's Files routes. Copies ../framework/** (text files only; nothing under a
 // test, node_modules or .git folder) into public/framework/files/ and writes
-// public/framework/manifest.json listing each file with its size, SHA-256 and mode. Runs before
+// (named files.json, not manifest.json: the Chrome Web Store refuses a package with a second manifest.json anywhere inside)
+// public/framework/files.json listing each file with its size, SHA-256 and mode. Runs before
 // every build and zip (prebuild, prezip). An empty framework folder yields an empty manifest and
 // the extension says so instead of pretending to install something.
 import { createHash } from 'node:crypto';
@@ -60,7 +61,7 @@ for (const rel of await walk(source)) {
   files.push({ path: rel, bytes: Buffer.byteLength(text), sha256: createHash('sha256').update(text).digest('hex'), mode: executable ? '0755' : '0644' });
 }
 const manifest = { v: 1, generated: new Date().toISOString(), source: 'framework/', files };
-await fs.writeFile(path.join(target, 'manifest.json'), JSON.stringify(manifest, null, 1) + '\n');
+await fs.writeFile(path.join(target, 'files.json'), JSON.stringify(manifest, null, 1) + '\n');
 console.log(`sync-framework: ${files.length} file(s) bundled from ${source}`);
 
 // The agreement texts the extension ships must be byte-identical to the canonical ones at the

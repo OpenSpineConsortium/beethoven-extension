@@ -1,6 +1,6 @@
-# Testing Ashley Bridge 5.0.0 by hand before the store uploads
+# Testing Ashley Bridge 6.0.0 by hand before the store uploads
 
-One person, one afternoon, three browsers. Written 2026-09-29 for 4.0.0 and brought up to date for 5.0.0 the
+One person, one afternoon, three browsers. Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0 the
 same evening. The builds are in `extension/.output/`:
 `chrome-mv3/` (Chrome and Edge), `firefox-mv2/` (Firefox); the zips beside them are what the stores get.
 To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
@@ -77,7 +77,7 @@ portal" means the portal session expired, sign in in the tab; a probe waiting in
    (the same build as Chrome).
 2. Pin: *Extensions* menu, the eye icon next to *Ashley Bridge*.
 3. The panel is Edge's sidebar; otherwise identical to Chrome. Run the full pass.
-4. Edge Add-ons takes the same `ashley-bridge-5.0.0-chrome.zip`.
+4. Edge Add-ons takes the same `ashley-bridge-6.0.0-chrome.zip`.
 
 ## Firefox
 
@@ -94,12 +94,12 @@ portal" means the portal session expired, sign in in the tab; a probe waiting in
    approval check); the sidebar is readable at its narrow width; the audit export downloads.
 6. Optional lint, the same check AMO runs on upload: `npx web-ext lint --source-dir .output/firefox-mv2`
    (fetches web-ext once).
-7. AMO takes `ashley-bridge-5.0.0-firefox.zip` and, on the source-code question, `ashley-bridge-5.0.0-sources.zip`
+7. AMO takes `ashley-bridge-6.0.0-firefox.zip` and, on the source-code question, `ashley-bridge-6.0.0-sources.zip`
    with the build note from `LISTING.md`.
 
 ## Just before uploading
 
-- `unzip -p extension/.output/ashley-bridge-5.0.0-chrome.zip manifest.json` shows version 5.0.0 and the
+- `unzip -p extension/.output/ashley-bridge-6.0.0-chrome.zip manifest.json` shows version 6.0.0 and the
   permissions `storage, alarms, scripting, activeTab, sidePanel`, optional host `https://*/*`, nothing else.
 - The three public pages open: `https://openspineconsortium.com/ashley/bridge/`, `privacy.html`, `terms.html`;
   `services.json` on the site carries `access_check`.

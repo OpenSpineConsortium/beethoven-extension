@@ -44,7 +44,7 @@ function assets(shared?: string) {
     'profiles/mock.json': JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', shared_state_dir: '$HOME/.hpcworker/state', ...(shared ? { shared_install: shared } : {}) }),
   };
   return async (p: string): Promise<Response> => {
-    if (p === '/framework/manifest.json') return Response.json({ v: 1, generated: 'test', files: Object.entries(files).map(([path, body]) => ({ path, bytes: body.length, sha256: '', mode: path.startsWith('bin/') ? '0755' : '0644' })) });
+    if (p === '/framework/files.json') return Response.json({ v: 1, generated: 'test', files: Object.entries(files).map(([path, body]) => ({ path, bytes: body.length, sha256: '', mode: path.startsWith('bin/') ? '0755' : '0644' })) });
     const rel = p.replace(/^\/framework\/files\//, '');
     return rel in files ? new Response(files[rel]) : new Response('not found', { status: 404 });
   };

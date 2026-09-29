@@ -1,9 +1,9 @@
 # Store listing texts, per store
 
-The exact texts to paste into each store's dashboard for Ashley Bridge 5.0.0, and the answers to
+The exact texts to paste into each store's dashboard for Ashley Bridge 6.0.0, and the answers to
 each store's questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval
 of the account the portal shows, confirmed with the access service), `PRIVACY.md` version 5 and
-`LICENSE.txt` version 4, and brought up to date for 5.0.0 the same evening (the cluster-side tool may
+`LICENSE.txt` version 4, and brought up to date for 6.0.0 the same evening (the cluster-side tool may
 be one copy that the university's lab keeps for all its students); before anything is pasted, read
 the built extension (`extension/.output/`) once more for every `fetch`, `WebSocket` and
 `tabs.create` and confirm the facts below.
@@ -46,9 +46,9 @@ Facts every text below rests on:
   `https://openspineconsortium.com/ashley/bridge/terms.html`, support
   `https://openspineconsortium.com/ashley/support.html`, request page
   `https://openspineconsortium.com/ashley/request.html`.
-- The store packages are `extension/.output/ashley-bridge-5.0.0-chrome.zip` (Chrome Web Store and
-  Edge Add-ons), `extension/.output/ashley-bridge-5.0.0-firefox.zip` (Firefox) and
-  `extension/.output/ashley-bridge-5.0.0-sources.zip` (the source upload Firefox requires).
+- The store packages are `extension/.output/ashley-bridge-6.0.0-chrome.zip` (Chrome Web Store and
+  Edge Add-ons), `extension/.output/ashley-bridge-6.0.0-firefox.zip` (Firefox) and
+  `extension/.output/ashley-bridge-6.0.0-sources.zip` (the source upload Firefox requires).
 - Publisher, until the LLC exists: Gregory Schwing, trading as OpenSpineConsortium. The product
   name and identifier carry no university name.
 
@@ -204,7 +204,7 @@ the text in `SUBMISSION.md`, section 4.
 
 | Field | Text |
 |---|---|
-| Package | `ashley-bridge-5.0.0-chrome.zip` (the same Chromium package) |
+| Package | `ashley-bridge-6.0.0-chrome.zip` (the same Chromium package) |
 | Availability: Visibility | Hidden first (only people with the link can install), then Public |
 | Availability: Markets | United States |
 | Properties: Category | Developer tools |
@@ -245,7 +245,7 @@ What the extension never does: no code, host permission or content script on cla
 | Field | Text |
 |---|---|
 | Distribution | "On this site" (listed) for the public release; "On your own" (self-distributed, signed .xpi) is the equivalent of Chrome's unlisted channel and passes the same review (section 3 of `SUBMISSION.md`) |
-| Package | `ashley-bridge-5.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `ashley-bridge@openspineconsortium.com`) |
+| Package | `ashley-bridge-6.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `ashley-bridge@openspineconsortium.com`) |
 | Name | Ashley Bridge |
 | Add-on URL (slug) | `ashley-bridge` |
 | Summary (250 characters at most; this one is 241) | see below |
@@ -257,9 +257,9 @@ What the extension never does: no code, host permission or content script on cla
 | License | Custom license: paste `LICENSE.txt` (version 4); it is not an open-source licence |
 | "This add-on requires payment, non-free services or software, or additional hardware" | ticked, with the sentence: "Requires approval of your institutional account by the maintainer, asked for on the maintainer's request page; there is no key. The Trial Edition is free for approved accounts; no payment is taken in this version. It also needs an account on a university cluster with an Open OnDemand portal and the user's own Claude account (Pro or Max)." |
 | Data collection (from the manifest) | `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }`; AMO shows it as required data collection, and the privacy policy text names the one item (the institutional account name in the approval check) |
-| Source code | Yes, upload `ashley-bridge-5.0.0-sources.zip` with the build note below |
+| Source code | Yes, upload `ashley-bridge-6.0.0-sources.zip` with the build note below |
 | Notes to reviewer | the reviewer notes above, then the build note below |
-| Version notes (5.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped. Where your university's lab keeps one shared copy of the cluster-side tool, the extension points your account at it instead of uploading its own." |
+| Version notes (6.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped. Where your university's lab keeps one shared copy of the cluster-side tool, the extension points your account at it instead of uploading its own." |
 
 ### Summary (241 characters)
 
@@ -270,7 +270,7 @@ Starts, watches and stops your own Claude Code worker on your university's Open 
 ### Source-code upload note (the sources zip and how to rebuild)
 
 ```
-Source: ashley-bridge-5.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds, as text, the cluster-side scripts the extension uploads to the user's account where the university keeps no shared copy of them (with the site profiles, which say whether it does), and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
+Source: ashley-bridge-6.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds, as text, the cluster-side scripts the extension uploads to the user's account where the university keeps no shared copy of them (with the site profiles, which say whether it does), and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
 
 Build (Node 22, npm 10; we used Node 22.23.3):
   npm ci
@@ -283,9 +283,9 @@ That output is the content of the uploaded package: on 2026-09-29 a rebuild from
 hash every file under `.output/firefox-mv2` on both sides. Done for the 4.0.0 packages on
 2026-09-29 at 19:16 UTC with Node 22.23.3 and npm 10.9.9: the sources zip held 76 files; the rebuild gave 30
 files, every one SHA-256-identical to `.output/firefox-mv2` and to the content of
-`ashley-bridge-4.0.0-firefox.zip`. Done again for the 5.0.0 packages on 2026-09-29 at 22:26 UTC with the
+`ashley-bridge-4.0.0-firefox.zip`. Done again for the 6.0.0 packages on 2026-09-29 at 22:26 UTC with the
 same Node and npm: the sources zip held 76 files; the rebuild gave 30 files, every one SHA-256-identical to
-`.output/firefox-mv2` and to the content of `ashley-bridge-5.0.0-firefox.zip` (the file in `release/5.0.0/`).
+`.output/firefox-mv2` and to the content of `ashley-bridge-6.0.0-firefox.zip` (the file in `release/6.0.0/`).
 Repeat it if the packages are rebuilt before upload, and change the date in the note above.)
 
 ## Safari

@@ -25,7 +25,7 @@ function assets(shared?: string | null, extra: Record<string, string> = {}) {
   const asked: string[] = [];
   const fetchAsset = async (p: string): Promise<Response> => {
     asked.push(p);
-    if (p === '/framework/manifest.json') return Response.json({ v: 1, generated: 'test', files: Object.entries(files).map(([path, body]) => ({ path, bytes: body.length, sha256: '', mode: path.startsWith('bin/') ? '0755' : '0644' })) });
+    if (p === '/framework/files.json') return Response.json({ v: 1, generated: 'test', files: Object.entries(files).map(([path, body]) => ({ path, bytes: body.length, sha256: '', mode: path.startsWith('bin/') ? '0755' : '0644' })) });
     const rel = p.replace(/^\/framework\/files\//, '');
     return rel in files ? new Response(files[rel]) : new Response('not found', { status: 404 });
   };

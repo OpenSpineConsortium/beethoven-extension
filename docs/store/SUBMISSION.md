@@ -3,13 +3,13 @@
 For the maintainer. `LISTING.md` beside this file holds every text to paste; this file says where
 it goes and in what order. Written 2026-09-29 for version 4.0.0 (the first version without licence
 keys: the person's own portal sign-in identifies them and the extension confirms approval with the
-access service) and brought up to date for 5.0.0 the same evening. 5.0.0 changes how the cluster
+access service) and brought up to date for 6.0.0 the same evening. 6.0.0 changes how the cluster
 side is set up (where the university's lab keeps one shared copy of the cluster-side tool, the
 extension points the student's account at it instead of uploading its own); the permissions, the data
 and every answer to a store's questions stay as they were. The mock portal of the reviewer recipe
-changed with it: until 5.0.0 its home held only the stand-in command, so the strip uploaded the real
+changed with it: until 6.0.0 its home held only the stand-in command, so the strip uploaded the real
 tool, whose install refuses a mock site ("no profile named 'localhost'"), and the recipe stopped at
-"Setting up the cluster failed" (measured on the 5.0.0 build on 2026-09-29, `extension/store-assets/e2e/`
+"Setting up the cluster failed" (measured on the 6.0.0 build on 2026-09-29, `extension/store-assets/e2e/`
 run-D1; 4.0.0's mock and tool have the same code there, so its recipe had the same fault, not measured). Its command line now sets the stand-in up as the account's own copy, and the recipe reaches the
 green button (run-D2); the recipe's text did not change. Store dashboards move their fields
 around from time to time; the field names below are the ones in use at the time of writing, and
@@ -21,9 +21,9 @@ Have these in hand, and check each once:
 
 1. The packages, built from a clean tree with Node 22 in `extension/`:
    `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The three files are
-   `.output/ashley-bridge-5.0.0-chrome.zip` (Chrome and Edge), `.output/ashley-bridge-5.0.0-firefox.zip`
-   (Firefox) and `.output/ashley-bridge-5.0.0-sources.zip` (Firefox source upload). Confirm they are
-   release builds: `unzip -p .output/ashley-bridge-5.0.0-chrome.zip manifest.json` must show
+   `.output/ashley-bridge-6.0.0-chrome.zip` (Chrome and Edge), `.output/ashley-bridge-6.0.0-firefox.zip`
+   (Firefox) and `.output/ashley-bridge-6.0.0-sources.zip` (Firefox source upload). Confirm they are
+   release builds: `unzip -p .output/ashley-bridge-6.0.0-chrome.zip manifest.json` must show
    `"optional_host_permissions":["https://*/*"]` and no `localhost`, `"permissions":["storage","alarms","scripting","activeTab","sidePanel"]`,
    and no `host_permissions` key. The Firefox manifest must show
    `"data_collection_permissions":{"required":["personallyIdentifyingInfo"]}`.
@@ -44,7 +44,7 @@ Have these in hand, and check each once:
    must carry the `access_check` address, and a check for the mock's username must answer yes, since
    the reviewer recipe in `LISTING.md` runs the mock with `--user st1234`. From WSL (Windows sockets
    flake):
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"5.0.0"}' <the access_check address>`
+   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"6.0.0"}' <the access_check address>`
    must answer `{"approved":true,"access_id":"st1234",...}` with `access-control-allow-origin: *`.
    If it answers `approved:false`, add the account in the admin console (or
    `node tools/intake/admin.mjs add st1234 "Store reviewer (mock portal)" st1234@wayne.edu "store-reviewer mock username"`
@@ -72,7 +72,7 @@ Registration (once, about ten minutes):
 
 The item (about thirty minutes):
 
-4. Dashboard, **Items**, **New item**. Drag `ashley-bridge-5.0.0-chrome.zip` in. The item ID appears
+4. Dashboard, **Items**, **New item**. Drag `ashley-bridge-6.0.0-chrome.zip` in. The item ID appears
    in the URL and in the item header at once; note it, the landing page needs it (section 5).
 5. **Store listing** tab, from `LISTING.md`: the detailed description; Category Developer Tools;
    Language English (United States); store icon (`icon/128.png`); the five screenshots; the small promo
@@ -105,7 +105,7 @@ through Chrome's own update mechanism within hours of publication.
 1. Sign in at `https://partner.microsoft.com/dashboard/microsoftedge/public/login` with the
    Microsoft account (second factor on). Enrol in the Microsoft Edge program (free, no fee) and set the
    publisher display name.
-2. **Overview**, **Create new extension**. Upload the same `ashley-bridge-5.0.0-chrome.zip`; Edge
+2. **Overview**, **Create new extension**. Upload the same `ashley-bridge-6.0.0-chrome.zip`; Edge
    accepts the Chromium MV3 package unchanged and validates it. The product's store ID (the "CRX ID")
    appears on the overview page; note it for the landing page.
 3. **Availability**: Visibility **Hidden** first (the listing is reachable only by its link and is
@@ -139,8 +139,8 @@ the Edge Add-ons listing is what a student should be sent to: one click, no sett
    same automated checks, same policies, no listing page; the file comes back signed and can be handed to
    a campus). An add-on ID keeps one distribution state at a time; the choice can be changed later under
    Manage Status & Versions, but decide with that in mind.
-3. Upload `ashley-bridge-5.0.0-firefox.zip`. The validator runs; warnings are shown, errors block.
-4. "Do you need to submit source code?" **Yes**. Upload `ashley-bridge-5.0.0-sources.zip` and paste the
+3. Upload `ashley-bridge-6.0.0-firefox.zip`. The validator runs; warnings are shown, errors block.
+4. "Do you need to submit source code?" **Yes**. Upload `ashley-bridge-6.0.0-sources.zip` and paste the
    build note from `LISTING.md` (Node 22, `npm ci`, `npm run build:firefox`).
 5. Describe the add-on: Name Ashley Bridge; slug `ashley-bridge`; the summary (241 characters) and the
    description; categories Web Development and Other; support e-mail and website; homepage; the privacy

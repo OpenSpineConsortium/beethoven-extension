@@ -5,7 +5,7 @@ paste anywhere: your own sign-in to your university's Open OnDemand portal ident
 extension confirms with the maintainer's access service that your account is approved. If an
 instruction you were given earlier mentions a key, it is out of date; this page replaces it.
 
-Written 2026-09-29 for Ashley Bridge 4.0.0 and brought up to date for 5.0.0.
+Written 2026-09-29 for Ashley Bridge 4.0.0 and brought up to date for 6.0.0.
 
 ## What you need
 

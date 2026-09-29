@@ -2,7 +2,7 @@
   "name": "ashley-bridge",
   "displayName": "Ashley Bridge",
   "description": "Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "private": true,
   "type": "module",
   "license": "SEE LICENSE IN public/LICENSE.txt",
