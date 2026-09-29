@@ -2,19 +2,26 @@
 // its dependants with the root cause named, and with a fake portal serving the framework's files
 // (profile.json, probe.json in probe.sbatch's shape) the portal-side and compute-side checks pass.
 // Also: each floor class has its own clock (a full run never trips itself), the reverse-proxy
-// probe says which host it asked, the restricted marker refuses check 16, and the licence is
-// matched to the portal-observed username before anything typed.
+// probe says which host it asked, the restricted marker refuses check 16, and check 1 reads the
+// access service's record for the account the dashboard showed (nothing typed, nothing fetched).
 import { describe, expect, it } from 'vitest';
 import type { EndpointClass } from '../src/core/audit';
 import { buildNodes, CHECK_IDS, type DiagCtx, type DiagEnv } from '../src/core/checks';
 import { formatReport, order, runDiagnostics } from '../src/core/diagnostics';
 import { ackSubject, makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
-import { IDENTITY_KEY, LICENSE_KEY, PORTAL_KEY, type PortalSettings } from '../src/core/keys';
+import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
-import { issuer, memoryKV, NOW } from './helpers';
+import { APPROVED_TTL_MS, type AccessRecord } from '../src/licensing/access';
+import { memoryKV, NOW } from './helpers';
 
-const I = issuer();
+const NOW_MS = NOW * 1000;
+const iso = (ms: number) => new Date(ms).toISOString();
+/** the access service's last word, as the background records it */
+const record = (o: Partial<AccessRecord> & { agoMs?: number } = {}): AccessRecord => {
+  const { agoMs = 3_600_000, ...rest } = o;
+  return { v: 1, access_id: 'ab1234', portal: 'ood.example', approved: true, checked_at: iso(NOW_MS - agoMs), until: null, last_attempt_at: iso(NOW_MS - agoMs), ...rest };
+};
 const PROFILE = JSON.stringify({ schema_version: 1, site: 'wayne', scheduler: 'slurm', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker' });
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
 const DISCOVER_JSON = '{"version":1,"host":"warrior","scheduler":{"family":"slurm"},"runtime":{"candidates":[{"name":"apptainer"}],"modules":["apptainer/1.2.2"],"pyxis":false,"user_namespaces":{"max":15000}},"partitions":[{"name":"reqp","timelimit":"7-00:00:00","avail":"up"}],"tools":{"tmux":"/usr/bin/tmux","python3":"/usr/bin/python3"},"os":"CentOS Linux 7 (Core)"}';
@@ -63,12 +70,12 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
   };
 }
 
-async function ctxWith(opts: { terms?: boolean; key?: boolean; /** a key other than the personal one issued to ab1234 */ licence?: string; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; observed?: string; typed?: string; worker?: string }): Promise<DiagCtx> {
+async function ctxWith(opts: { terms?: boolean; /** the access record on file; null for none (default: approved an hour ago) */ access?: AccessRecord | null; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; /** the account name the dashboard showed; null for none (default ab1234) */ observed?: string | null; worker?: string }): Promise<DiagCtx> {
   const local = memoryKV();
   const session = memoryKV();
   if (opts.terms !== false) await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
-  if (opts.key !== false) await local.set(LICENSE_KEY, { key: opts.licence ?? I.license(), identity: { accessId: opts.typed ?? 'ab1234' }, saved_at: 'x' });
-  if (opts.observed) await local.set(IDENTITY_KEY, { username: opts.observed });
+  if (opts.access !== null) await local.set(ACCESS_KEY, opts.access ?? record());
+  if (opts.observed !== null) await local.set(IDENTITY_KEY, { username: opts.observed ?? 'ab1234' });
   const worker = opts.worker ?? 'worker';
   if (opts.ack) await local.set(STATEMENTS_KEY, { [ackSubject(worker)]: makeAcknowledgement(worker) } satisfies Statements);
   const settings: PortalSettings | undefined = opts.settings === false ? undefined : { origin: 'https://ood.example', hostname: 'ood.example', connected_at: '2026-09-28T00:00:00Z', shell_host: 'default', site: 'wayne' };
@@ -77,7 +84,6 @@ async function ctxWith(opts: { terms?: boolean; key?: boolean; /** a key other t
     now: () => new Date(NOW * 1000),
     local,
     session,
-    keys: I.keys,
     hasOriginPermission: async () => opts.granted !== false,
     portalAlive: async () => opts.alive !== false,
     portal: () => opts.portal,
@@ -138,8 +144,8 @@ describe('diagnostics', () => {
   it('with no portal connected, the portal checks are blocked and name the root cause', async () => {
     const rep = await runDiagnostics(buildNodes(), await ctxWith({ settings: false }));
     const by = byId(rep);
-    // a warn, not a fail: the key verifies but no kill-list has been fetched yet in this fresh store
-    expect(['ok', 'warn']).toContain(by['licence']!.status);
+    // a warn, not a fail: the approval on file stands but no kill-list has been fetched yet in this fresh store
+    expect(['ok', 'warn']).toContain(by['access']!.status);
     expect(by['origin-granted']!.status).toBe('fail');
     expect(by['origin-granted']!.fixAction).toBe('connect-portal');
     for (const id of ['portal-tab', 'signed-in', 'shell', 'files', 'active-jobs', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'session-lifetime']) {
@@ -152,49 +158,74 @@ describe('diagnostics', () => {
     expect(formatReport(rep)).toMatch(/2 thing\(s\) to fix/);
   });
 
-  it('without accepted terms the licence check fails and points at the setup page', async () => {
+  it('without accepted terms check 1 fails and points at the setup page; without an approval it fails and says what the service said', async () => {
     const rep = await runDiagnostics(buildNodes(), await ctxWith({ terms: false, portal: fakePortal() }));
-    const lic = rep.reports.find((r) => r.id === 'licence')!;
-    expect(lic.status).toBe('fail');
-    expect(lic.detail).toMatch(/not been accepted/);
-    expect(lic.fixAction).toBe('open-onboarding');
-    const rep2 = await runDiagnostics(buildNodes(), await ctxWith({ key: false, portal: fakePortal() }));
-    expect(rep2.reports.find((r) => r.id === 'licence')!.detail).toMatch(/no licence key/);
+    const acc = rep.reports.find((r) => r.id === 'access')!;
+    expect(acc.status).toBe('fail');
+    expect(acc.detail).toMatch(/not been accepted/);
+    expect(acc.fixAction).toBe('open-onboarding');
+    const none = byId(await runDiagnostics(buildNodes(), await ctxWith({ access: null, portal: fakePortal() })));
+    expect(none['access']!.status).toBe('fail');
+    expect(none['access']!.detail).toMatch(/not checked yet for ab1234 at ood\.example/);
+    const denied = byId(await runDiagnostics(buildNodes(), await ctxWith({ access: record({ approved: false, until: undefined }), portal: fakePortal() })));
+    expect(denied['access']!.status).toBe('fail');
+    expect(denied['access']!.detail).toMatch(/ab1234 at ood\.example is not on the approved list yet/);
+    // everything student-side downstream is blocked on it, and the portal checks are not
+    expect(denied['data-classification']!.status).toBe('blocked');
+    expect(denied['data-classification']!.rootCause).toBe('access');
+    expect(denied['signed-in']!.status).toBe('ok');
+    const withdrawn = byId(await runDiagnostics(buildNodes(), await ctxWith({ access: record({ approved: false, until: undefined, withdrawn: true }), portal: fakePortal() })));
+    expect(withdrawn['access']!.detail).toMatch(/^Access withdrawn: ask again/);
   });
 
-  it('matches the key to the portal-observed username first; a typed name is only a stand-in and says so', async () => {
-    // the key names ab1234; the portal shows zz9999: the typed ab1234 does not rescue it
-    const wrong = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'zz9999', typed: 'ab1234' })));
-    expect(wrong['licence']!.status).toBe('fail');
-    expect(wrong['licence']!.detail).toMatch(/not for zz9999/);
-    // no observed name yet: the typed one is used, with a warning that names the source
-    const typed = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), typed: 'ab1234', settings: false })));
-    expect(typed['licence']!.status).toBe('warn');
-    expect(typed['licence']!.detail).toMatch(/username you typed \(ab1234\)/);
-    // the portal shows the right name: no warning about the source
-    const seen = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', typed: 'someone-else' })));
-    expect(seen['licence']!.detail).toMatch(/matched to your portal username ab1234/);
-    expect(seen['licence']!.detail).not.toMatch(/typed/);
+  it('check 1 reads "Access approved for <account> at <portal> (checked <time>); kill-list of <date>", WARN past a day, FAIL past seven days or when the account is someone else', async () => {
+    const ctx = await ctxWith({ portal: fakePortal(), observed: 'ab1234' });
+    await ctx.env.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: [], revoked_lids: [], message: '' } });
+    const ok = byId(await runDiagnostics(buildNodes(), ctx));
+    expect(ok['access']!.status).toBe('ok');
+    expect(ok['access']!.detail).toBe(`Access approved for ab1234 at ood.example (checked ${iso(NOW_MS - 3_600_000).slice(0, 16).replace('T', ' ')} UTC); kill-list of 2026-09-21`);
+    // no kill-list fetched yet: a warn that says so
+    const noList = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal() })));
+    expect(noList['access']!.status).toBe('warn');
+    expect(noList['access']!.detail).toMatch(/kill-list not fetched yet/);
+    // an approval older than a day that the service has not confirmed since: WARN
+    const stale = await ctxWith({ portal: fakePortal(), access: record({ agoMs: APPROVED_TTL_MS + 1, last_error: 'ENETUNREACH' }) });
+    await stale.env.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: [], revoked_lids: [], message: '' } });
+    const staleBy = byId(await runDiagnostics(buildNodes(), stale));
+    expect(staleBy['access']!.status).toBe('warn');
+    expect(staleBy['access']!.detail).toMatch(/has not confirmed it since \(ENETUNREACH\); kept for seven days/);
+    // older than seven days: FAIL
+    const lapsed = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), access: record({ agoMs: 8 * 86_400_000, last_error: 'ENETUNREACH' }) })));
+    expect(lapsed['access']!.status).toBe('fail');
+    expect(lapsed['access']!.detail).toMatch(/has not answered for seven days/);
+    // the dashboard shows another account than the one approved: the record does not count
+    const other = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'zz9999' })));
+    expect(other['access']!.status).toBe('fail');
+    expect(other['access']!.detail).toMatch(/not checked yet for zz9999/);
+    // no account name on record at all
+    const noId = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: null })));
+    expect(noId['access']!.status).toBe('fail');
+    expect(noId['access']!.detail).toMatch(/cannot be checked until your portal shows who is signed in/);
+    // a withdrawn version
+    const rev = await ctxWith({ portal: fakePortal() });
+    await rev.env.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: ['1.0.0'], revoked_lids: [], message: 'update please' } });
+    const revBy = byId(await runDiagnostics(buildNodes(), rev));
+    expect(revBy['access']!.status).toBe('fail');
+    expect(revBy['access']!.detail).toBe('this version (1.0.0) has been withdrawn; update to continue. update please');
   });
 
-  it('matches a site key to the username at the portal\'s domain, refuses it from another domain, and remembers the profile\'s e-mail domain for the next run', async () => {
-    const siteKey = (domain: string) => I.license({ sub: undefined, email: undefined, domain, edition: 'site', name: 'testers' });
-    const ok = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', licence: siteKey('ood.example') })));
-    expect(['ok', 'warn']).toContain(ok['licence']!.status);
-    expect(ok['licence']!.detail).toMatch(/licensed to testers until .*; site key for ood\.example, matched to your portal username ab1234 at ood\.example;/);
-    const outside = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', licence: siteKey('wayne.edu') })));
-    expect(outside['licence']!.status).toBe('fail');
-    expect(outside['licence']!.detail).toBe('this is a site key for wayne.edu; your portal is in ood.example, not in that domain');
-    // the profile names wayne.edu: the licence check runs before any portal read, so the first run still refuses, but the
-    // read of the profile later in that run remembers the domain with the portal settings and the next run matches
-    const ctx = await ctxWith({ portal: fakePortal({}, { profile: JSON.stringify({ ...JSON.parse(PROFILE), email_domain: 'wayne.edu' }) }), observed: 'ab1234', licence: siteKey('wayne.edu') });
-    const first = byId(await runDiagnostics(buildNodes(), ctx));
-    expect(first['licence']!.status).toBe('fail');
-    const saved = await ctx.env.local.get<PortalSettings>(PORTAL_KEY);
-    expect(saved?.email_domain).toBe('wayne.edu');
-    const again = byId(await runDiagnostics(buildNodes(), { ...ctx, settings: saved, cache: {} }));
-    expect(['ok', 'warn']).toContain(again['licence']!.status);
-    expect(again['licence']!.detail).toMatch(/site key for wayne\.edu, matched to your portal username ab1234 at ood\.example \(the site profile names wayne\.edu as its e-mail domain\)/);
+  it('check 4 records the account name the dashboard shows, and nothing else ever writes it', async () => {
+    const ctx = await ctxWith({ portal: fakePortal(), observed: null, access: null });
+    await runDiagnostics(buildNodes(), ctx);
+    expect(await ctx.env.local.get(IDENTITY_KEY)).toMatchObject({ username: 'ab1234' });
+    const by = byId(await runDiagnostics(buildNodes(), { ...ctx, cache: {} }));
+    expect(by['signed-in']!.detail).toMatch(/signed in as ab1234/);
+    // a dashboard without a username says so, and does not write one
+    const anon = await ctxWith({ portal: fakePortal({ session: async () => ({ ...(await fakePortal().session()), username: undefined }) }), observed: null });
+    const anonBy = byId(await runDiagnostics(buildNodes(), anon));
+    expect(anonBy['signed-in']!.status).toBe('warn');
+    expect(anonBy['signed-in']!.detail).toMatch(/your access cannot be checked until it does/);
+    expect(await anon.env.local.get(IDENTITY_KEY)).toBeUndefined();
   });
 
   it('with a portal and a good probe everything passes; the shell is opened once and its output feeds checks 9 and 10', async () => {

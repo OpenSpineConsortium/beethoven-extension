@@ -4,7 +4,7 @@
 // called by the caller, synchronously inside the click, and its promise handed in.
 import { browser } from 'wxt/browser';
 import { connectSequence, SCRIPT_FILE, SCRIPT_ID, type ConnectApi, type ConnectOutcome } from '../core/connect';
-import { IDENTITY_KEY, PORTAL_KEY, PORTAL_TAB_KEY, RUN_KEY, type PortalSettings } from '../core/keys';
+import { ACCESS_KEY, IDENTITY_KEY, PORTAL_KEY, PORTAL_TAB_KEY, RUN_KEY, type PortalSettings } from '../core/keys';
 import type { Answer } from '../core/messages';
 import { local, portalSettings, session } from './storage';
 
@@ -45,6 +45,8 @@ export async function disconnectPortal(): Promise<void> {
   if (settings) await browser.permissions.remove({ origins: [`${settings.origin}/*`] }).catch(() => undefined);
   await local.remove(PORTAL_KEY);
   await local.remove(IDENTITY_KEY);
+  // the approval was for this account at this portal; the next portal is asked about afresh
+  await local.remove(ACCESS_KEY);
   await session.remove(PORTAL_TAB_KEY);
   await session.remove(RUN_KEY);
 }

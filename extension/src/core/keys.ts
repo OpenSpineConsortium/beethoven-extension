@@ -1,13 +1,14 @@
 // Every storage key in one place, split by where it lives and how long it lasts.
 //
 // storage.local (survives restarts; nothing secret and no credential ever):
-export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site, email_domain?}
-export const LICENSE_KEY = 'bridge.license'; // {key, identity: {accessId}, saved_at}
+export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site}
 export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect}
 export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {fetched_at, list}
 export const REVOKED_KEY = 'bridge.revoked'; //  {revoked, message}: what the chokepoint consults before a command
+export const ACCESS_KEY = 'bridge.access'; //    the access service's last word on this account at this portal (licensing/access.ts AccessRecord)
+export const SERVICES_KEY = 'bridge.services'; // services.json as last read, {fetched_at, access_check, request_page}
 export const INSTALL_ID_KEY = 'bridge.install_id';
-export const IDENTITY_KEY = 'bridge.identity'; // {username}: the portal username last seen on the dashboard
+export const IDENTITY_KEY = 'bridge.identity'; // {username, seen_at}: the account name the portal's dashboard last showed for the signed-in session (never typed)
 export const CHECKLIST_KEY = 'bridge.checklist'; // {drive_connected_at}: the student's own "done" ticks for steps outside this extension
 export const STATEMENTS_KEY = 'bridge.statements'; // {[workspaces/<name>]: Acknowledgement}: the data statement, per workspace, with the text version it was made on
 export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment links this browser profile already opened by itself
@@ -32,12 +33,6 @@ export interface PortalSettings {
   shell_host: string;
   /** the site profile name handed to `hpcworker install --profile` and used in the session name */
   site: string;
-  /**
-   * the profile's email_domain as last read from ~/.hpcworker/profile.json (identity.ts withSiteDomain), so every
-   * place that checks a site key agrees; absent when the profile names none, and then the portal hostname's own
-   * domain is what a site key is matched under
-   */
-  email_domain?: string;
 }
 
 export interface Prefs {
@@ -50,10 +45,10 @@ export interface Prefs {
   open_claude_on_connect: boolean;
 }
 
-export interface LicenseState {
-  key: string;
-  identity: { accessId?: string };
-  saved_at: string;
+/** the account name the portal's dashboard showed ("Logged in as <name>"), and when; the only identity the extension ever uses */
+export interface IdentityNote {
+  username: string;
+  seen_at?: string;
 }
 
 export interface Checklist {

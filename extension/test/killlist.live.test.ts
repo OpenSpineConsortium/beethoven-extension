@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { KILLLIST_URL, killListVerdict, refreshKillList, verifyKillList } from '../src/licensing/killlist';
-import { BUNDLED_KEYS } from '../src/licensing/license';
+import { BUNDLED_KEYS } from '../src/licensing/signed';
 
 const SITE = process.env.ASHLEY_SITE_DIR ?? fileURLToPath(new URL('../../../openspineconsortium.github.io/', import.meta.url));
 const FILE = path.join(SITE, 'ashley', 'bridge-killlist.json');
@@ -46,10 +46,10 @@ describe.skipIf(!present)(present ? 'the kill-list published on the site' : `the
     expect(Object.keys(doc).sort()).toEqual([...FIELDS, 'sig'].sort());
   });
 
-  it('is accepted by the daily refresh and clears this version and any licence', async () => {
+  it('is accepted by the daily refresh and clears this version', async () => {
     const fetchFn = (async () => new Response(JSON.stringify(doc), { status: 200, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
     const out = await refreshKillList(undefined, BUNDLED_KEYS, fetchFn);
     expect(out.fresh, out.detail).toBe(true);
-    expect(killListVerdict(out.current, version, 'L-anyone')).toEqual({ versionRevoked: false, licenseRevoked: false, message: doc.message });
+    expect(killListVerdict(out.current, version)).toEqual({ versionRevoked: false, message: doc.message });
   });
 });

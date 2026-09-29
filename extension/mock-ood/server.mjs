@@ -16,6 +16,14 @@
 //   GET  /rnode/<host>/<port>/                 404 (proxy off) or 503 "Failed to connect to host:port" (--rnode enabled)
 //   GET  /nginx/init?redir=                    the cold-PUN redirect (--cold)
 //
+// Beside the portal, for tests only, a stand-in for Licensor's access service with the wire
+// contract the extension codes to (src/licensing/access.ts). No build points at it: the extension
+// reads the address from services.json on Licensor's site, and a test hands it this one instead.
+//   GET  /ashley/services.json                 {"access_check": "<origin>/ashley/access_check", ...}, CORS open
+//   POST /ashley/access_check                  text/plain JSON {v, access_id, portal, product, version} ->
+//                                              200 {"approved":true,...} for the ids in --approve (default st1234),
+//                                              200 {"approved":false,...} otherwise; 400 malformed; 429 past --access-limit
+//
 // Two behaviours measured on the live portal (ondemand.grid.wayne.edu, 2026-09-29) are reproduced:
 // the first /pun/ request after a while answers 500 "Error: Server Error ... try again in 30 seconds"
 // once (the per-user nginx starting; --cold-pun MS sets the idle time), and a ?download=1 of a file
@@ -76,6 +84,10 @@ export async function createMockPortal(opts = {}) {
     seedTool: true,
     /** the home the seeded tool prints and writes into its status files in place of the real one; default: the virtual home */
     displayHome: undefined,
+    /** the account names the access-service stand-in approves */
+    approved: ['st1234'],
+    /** answers past this many access checks are 429 (0 = no limit) */
+    accessLimit: 0,
     tls: undefined,
     log: () => {},
     ...opts,
@@ -92,8 +104,36 @@ export async function createMockPortal(opts = {}) {
   const bash = findBash();
   const railsToken = crypto.randomBytes(32).toString('base64');
   const shellSecret = crypto.randomBytes(24).toString('base64url');
-  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0, coldHits: 0, punWarmUntil: 0 };
+  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0, coldHits: 0, punWarmUntil: 0, accessChecks: 0, accessBodies: [], accessHeaders: [] };
   const log = o.log;
+
+  // the access-service stand-in: the D3 contract, byte for byte, so the extension's client is tested against it
+  const accessHeaders = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };
+  const accessJson = (res, status, body) => {
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...accessHeaders });
+    res.end(JSON.stringify(body));
+  };
+  const accessCheck = async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { ...accessHeaders, 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Max-Age': '600' });
+      return res.end();
+    }
+    if (req.method !== 'POST') return accessJson(res, 405, { error: 'POST an access check here' });
+    state.accessChecks++;
+    state.accessHeaders.push({ 'content-type': req.headers['content-type'] ?? '', origin: req.headers.origin ?? '', cookie: req.headers.cookie ?? '' });
+    if (o.accessLimit > 0 && state.accessChecks > o.accessLimit) return accessJson(res, 429, { error: 'too many requests from this connection today; try again tomorrow' });
+    let j;
+    try {
+      j = JSON.parse((await readBody(req)).toString('utf8'));
+    } catch {
+      return accessJson(res, 400, { error: 'not JSON' });
+    }
+    if (!j || typeof j !== 'object' || j.v !== 1 || typeof j.access_id !== 'string' || typeof j.portal !== 'string' || j.product !== 'bridge' || typeof j.version !== 'string') return accessJson(res, 400, { error: 'the body needs v, access_id, portal, product and version' });
+    state.accessBodies.push(j);
+    const id = j.access_id.toLowerCase();
+    if (o.approved.includes(id)) return accessJson(res, 200, { approved: true, access_id: id, checked: new Date().toISOString(), until: null });
+    return accessJson(res, 200, { approved: false, access_id: id, requestPage: 'https://openspineconsortium.com/ashley/request.html' });
+  };
 
   // the shell app's tokens: salt-hash, verified against a per-process secret (the csrf module's shape)
   const shellToken = () => {
@@ -205,6 +245,9 @@ export async function createMockPortal(opts = {}) {
       return redirect(res, '/login');
     }
     if (p === '/' ) return redirect(res, '/pun/sys/dashboard/');
+    // the access-service stand-in is not the portal: no portal cookie, CORS open, as Licensor's Worker answers
+    if (p === '/ashley/services.json') return send(res, 200, JSON.stringify({ access_check: `${serverOrigin(req)}/ashley/access_check`, request_page: 'https://openspineconsortium.com/ashley/request.html' }), { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'max-age=600' });
+    if (p === '/ashley/access_check') return accessCheck(req, res);
     // everything else sits behind the portal's authentication (Apache + mod_auth_openidc)
     if (!hasCookie(req)) return redirect(res, `/login?redirect=${encodeURIComponent(p)}`);
     if (p === '/nginx/init') {
@@ -423,6 +466,7 @@ export async function createMockPortal(opts = {}) {
     virtualHome,
     displayHome,
     user: o.user,
+    approved: o.approved,
     railsToken,
     state,
     cookie: `${COOKIE}=1`,
@@ -433,7 +477,7 @@ export async function createMockPortal(opts = {}) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--approve a,b] [--access-limit N] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   const val = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
@@ -443,6 +487,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     home: val('--home', undefined),
     displayHome: val('--display-home', undefined),
     user: val('--user', 'student'),
+    approved: String(val('--approve', 'st1234')).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    accessLimit: Number(val('--access-limit', 0)) || 0,
     rnode: val('--rnode', 'disabled'),
     noClusters: a.includes('--no-clusters'),
     cold: a.includes('--cold'),
@@ -457,5 +503,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome}; the seeded tool prints it as ${portal.displayHome})`);
   console.log(`  user:      ${portal.user}`);
   console.log(`  shell:     ${portal.origin}/pun/sys/shell/ssh/default`);
+  console.log(`  access:    ${portal.origin}/ashley/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'})`);
   console.log('  Ctrl-C to stop');
 }

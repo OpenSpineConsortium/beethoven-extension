@@ -1,5 +1,5 @@
-// Test helpers: an issuer that signs exactly as Ashley's grid/license.js does (so no vendor key is
-// needed), an in-memory KV, and a cookie-carrying network layer for the mock portal.
+// Test helpers: a signer that signs exactly as Ashley's grid/license.js does (so the kill-list tests
+// need no vendor key), an in-memory KV, and a cookie-carrying network layer for the mock portal.
 import { createPrivateKey, generateKeyPairSync, sign as nodeSign, type KeyObject } from 'node:crypto';
 import WsWebSocket from 'ws';
 import type { KV } from '../src/core/audit';
@@ -28,26 +28,7 @@ export function signToken(prefix: string, payload: unknown, priv: KeyObject | st
 export function issuer(kid = 'k1') {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
   const keys = { [kid]: rawFromPublicKey(publicKey) };
-  const license = (fields: Record<string, unknown> = {}, key: KeyObject = privateKey) =>
-    signToken(
-      'ASHLEY1',
-      {
-        v: 1,
-        kid,
-        lid: 'L-test0001',
-        product: 'ashley',
-        edition: 'trial',
-        sub: 'ab1234',
-        email: 'ab1234@wayne.edu',
-        name: 'A. Student',
-        iat: NOW - DAY,
-        nbf: NOW - DAY,
-        exp: NOW + 30 * DAY,
-        ...fields,
-      },
-      key,
-    );
-  return { privateKey, publicKey, keys, license };
+  return { privateKey, publicKey, keys };
 }
 
 export function memoryKV(): KV & { store: Map<string, unknown> } {

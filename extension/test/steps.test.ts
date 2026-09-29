@@ -1,12 +1,20 @@
 // The flight strip's state machine: the steps come in the report's order, the first one not
 // satisfied is the step, the extension advances by itself where nothing needs the student, the
-// one button appears only where a person must act, the key box never blocks anything read-only,
-// the scheduler floor makes an automatic start wait rather than skip, and the Claude link is
-// opened once by itself and then offered on the green button.
+// one button appears only where a person must act, the access step never blocks anything
+// read-only, the scheduler floor makes an automatic start wait rather than skip, and the Claude
+// link is opened once by itself and then offered on the green button.
 import { describe, expect, it } from 'vitest';
 import { CONSENT_PATIENCE_MS, decide, FRESH_RUN_MS, LOGIN_RECHECK_PATIENCE_MS, LOGIN_SEEN_FRESH_MS, PROBE_PATIENCE_MS, STEP_ORDER, type Facts, type StripView } from '../src/core/steps';
+import type { AccessFact } from '../src/licensing/access';
 
 const NOW = Date.parse('2026-09-29T12:00:00Z');
+const REQUEST = 'https://openspineconsortium.com/ashley/request.html?access_id=ab1234';
+
+/** an access fact as licensing/access.ts accessFact builds it, for one state */
+function access(state: AccessFact['state'], over: Partial<AccessFact> = {}): AccessFact {
+  const ok = state === 'approved' || state === 'stale';
+  return { ok, state, detail: `access: ${state}`, needsCheck: !ok && state === 'checking', warn: state === 'stale', accessId: 'ab1234', portal: 'ood.example', requestUrl: REQUEST, versionRevoked: state === 'version-revoked', ...over };
+}
 
 /** toMatchObject, except that an explicit undefined means "not set" */
 function same(v: StripView, want: Partial<Record<keyof StripView, unknown>>): void {
@@ -22,7 +30,7 @@ function green(): Facts {
     portal: { connected: true, granted: true, alive: true, hostname: 'ood.example' },
     warm: { state: 'warm' },
     terms: true,
-    licence: { ok: true, missing: false, detail: 'licensed to A. Student until 2026-10-21', revoked: false },
+    access: access('approved', { detail: 'Access approved for ab1234 at ood.example (checked 2026-09-29 11:00 UTC)' }),
     install: { installed: true },
     probe: { present: true, ok: true, detail: 'probe on asx15' },
     login: { loggedIn: true, detail: 'signed in' },
@@ -35,7 +43,7 @@ function green(): Facts {
 
 describe('the step machine', () => {
   it('lists the steps in order and ends green with the button', () => {
-    expect(STEP_ORDER).toEqual(['portal', 'warm', 'terms', 'licence', 'install', 'probe', 'login', 'statement', 'start', 'online', 'open']);
+    expect(STEP_ORDER).toEqual(['portal', 'warm', 'terms', 'access', 'install', 'probe', 'login', 'statement', 'start', 'online', 'open']);
     const v = decide(green(), NOW);
     expect(v.step).toBe('open');
     expect(v.done).toBe(true);
@@ -84,19 +92,47 @@ describe('the step machine', () => {
     same(decide(f, NOW), { step: 'warm', primary: { action: 'open-portal' }, tone: 'fail' });
   });
 
-  it('the agreement once, then the key box with the access link; a withdrawn version has no button at all', () => {
+  it('the agreement once, then the access step: checking by itself, "Ask for access" when refused, "ask again" when withdrawn, no button at all for a withdrawn version', () => {
     const f = green();
     f.terms = false;
     same(decide(f, NOW), { step: 'terms', primary: { action: 'accept-terms' } });
     f.terms = true;
-    f.licence = { ok: false, missing: true, detail: 'no licence key has been entered', revoked: false };
-    const v = decide(f, NOW);
-    same(v, { step: 'licence', input: 'key', primary: { action: 'save-key' } });
-    expect(v.status).toMatch(/Ask for access/);
-    f.licence = { ok: false, missing: false, detail: 'this licence is for zz9999, not for ab1234', revoked: false };
-    same(decide(f, NOW), { step: 'licence', input: 'key', tone: 'fail' });
-    f.licence = { ok: false, missing: false, detail: 'withdrawn', revoked: true };
-    same(decide(f, NOW), { step: 'licence', primary: undefined, auto: undefined, tone: 'fail' });
+    // nothing on record: the background is asked, and the strip says so with no button and no input
+    f.access = access('checking', { needsCheck: true });
+    const checking = decide(f, NOW);
+    same(checking, { step: 'access', auto: 'check-access', primary: undefined, input: undefined, tone: 'busy' });
+    expect(checking.status).toMatch(/Checking your access/);
+    // in flight (the strip's own attempt): busy, nothing automatic on top
+    f.access = access('checking', { needsCheck: false });
+    same(decide(f, NOW), { step: 'access', auto: undefined, primary: undefined, tone: 'busy' });
+    // refused: the one button opens the request page with the account name; nothing is typed
+    f.access = access('denied');
+    const denied = decide(f, NOW);
+    same(denied, { step: 'access', primary: { label: 'Ask for access', action: 'ask-access' }, input: undefined, auto: undefined, tone: 'info' });
+    expect(denied.status).toMatch(/ab1234 at ood\.example is not on the approved list yet/);
+    expect(denied.status).toMatch(/click the Ashley Bridge button again/);
+    // withdrawn: said as such, with "ask again"
+    f.access = access('withdrawn', { detail: 'Access withdrawn: ask again if you still need Ashley Bridge (your account ab1234 at ood.example is no longer on the approved list; checked 2026-09-29 11:50 UTC)' });
+    const withdrawn = decide(f, NOW);
+    same(withdrawn, { step: 'access', primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
+    expect(withdrawn.status).toMatch(/^Access withdrawn: ask again/);
+    // the service silent for seven days, or never reached: a person may try again
+    f.access = access('lapsed');
+    same(decide(f, NOW), { step: 'access', primary: { label: 'Check again', action: 'retry-access' }, tone: 'fail' });
+    f.access = access('unreachable');
+    same(decide(f, NOW), { step: 'access', primary: { label: 'Try again', action: 'retry-access' }, tone: 'fail' });
+    f.access = access('failed', { detail: 'Your portal has not shown who is signed in yet' });
+    same(decide(f, NOW), { step: 'access', primary: { action: 'retry-access' }, status: 'Your portal has not shown who is signed in yet' });
+    f.access = access('no-identity');
+    const noId = decide(f, NOW);
+    same(noId, { step: 'access', primary: { action: 'retry-access' }, tone: 'fail' });
+    expect(noId.status).toMatch(/does not show who is signed in/);
+    // a withdrawn version: no button, nothing automatic
+    f.access = access('version-revoked', { detail: 'This version of Ashley Bridge has been withdrawn; update to continue.' });
+    same(decide(f, NOW), { step: 'access', primary: undefined, auto: undefined, tone: 'fail' });
+    // an approval past its day but within seven: the strip goes on (the background re-asks quietly)
+    f.access = access('stale', { needsCheck: true });
+    expect(decide(f, NOW).step).toBe('open');
   });
 
   it('installs the tool by itself, runs the probe once and waits for it, and asks only when a job fails', () => {

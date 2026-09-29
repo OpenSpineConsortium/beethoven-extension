@@ -1,7 +1,9 @@
 // The kill-list: a signed JSON document; only the signed payload counts, offline keeps the last
-// good list, an older list never replaces a newer one.
+// good list, an older list never replaces a newer one, and since version 4 it withdraws versions
+// only (the ids an older list may carry are read for the comparison and never acted on).
 import { describe, expect, it } from 'vitest';
 import { killListVerdict, refreshKillList, verifyKillList, type StoredKillList } from '../src/licensing/killlist';
+import { BUNDLED_KEYS, open, REV_PREFIX } from '../src/licensing/signed';
 import { issuer, NOW, signToken } from './helpers';
 
 const I = issuer();
@@ -12,12 +14,28 @@ function doc(payload: Record<string, unknown>, extra: Record<string, unknown> = 
 const fetchOf = (status: number, body: unknown) => (async () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
 
 describe('kill-list', () => {
-  it('verifies a signed document and reads both spellings of the licence list', async () => {
+  it('verifies a signed document, reads both spellings of the compatibility id list, and counts only versions', async () => {
     const v = await verifyKillList(doc({ revoked_versions: ['0.9.0'], revoked_lids: ['L-a'], revoked: ['L-b'], message: 'update please' }), I.keys);
     expect(v.ok).toBe(true);
     expect(v.list?.revoked_versions).toEqual(['0.9.0']);
     expect(v.list?.revoked_lids).toEqual(['L-a', 'L-b']);
     expect(v.list?.message).toBe('update please');
+    expect(v.detail).toBe('1 withdrawn version(s), list of 2026-09-21');
+  });
+
+  it('the signed-token check: the prefix, the payload, an unknown key id and a bad signature', async () => {
+    const tok = signToken(REV_PREFIX, { v: 1, kid: 'k1', issued: NOW, revoked: [] }, I.privateKey);
+    expect((await open(REV_PREFIX, tok, I.keys)).payload).toMatchObject({ v: 1, kid: 'k1' });
+    expect((await open('OTHER1', tok, I.keys)).error).toBe('malformed');
+    expect((await open(REV_PREFIX, signToken(REV_PREFIX, { v: 1, kid: 'k9' }, I.privateKey), I.keys)).error).toBe('unknown-key');
+    expect((await open(REV_PREFIX, tok.slice(0, -4) + 'AAAA', I.keys)).error).toBe('bad-signature');
+    expect((await open(REV_PREFIX, 'ASHLEYREV1.nonsense', I.keys)).error).toBe('malformed');
+    expect((await open(REV_PREFIX, undefined as unknown as string, I.keys)).error).toBe('missing');
+  });
+
+  it('the bundled ring holds one raw 32-byte key, k1, the release key the published list is signed with', () => {
+    expect(Object.keys(BUNDLED_KEYS)).toEqual(['k1']);
+    for (const raw of Object.values(BUNDLED_KEYS)) expect(Buffer.from(raw, 'base64').length).toBe(32);
   });
 
   it('trusts only the signed payload: tampered outer fields are ignored, a tampered signature is rejected', async () => {
@@ -60,10 +78,10 @@ describe('kill-list', () => {
     expect(older.current?.list.revoked_versions).toContain('1.0.0');
   });
 
-  it('turns a list into a verdict for this install', () => {
+  it('turns a list into a verdict for this install: the version, and nothing about ids', () => {
     const stored: StoredKillList = { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: ['1.0.0'], revoked_lids: ['L-x'], message: 'why' } };
-    expect(killListVerdict(stored, '1.0.0', 'L-y')).toEqual({ versionRevoked: true, licenseRevoked: false, message: 'why' });
-    expect(killListVerdict(stored, '1.0.1', 'L-x')).toEqual({ versionRevoked: false, licenseRevoked: true, message: 'why' });
-    expect(killListVerdict(undefined, '1.0.0', 'L-x').versionRevoked).toBe(false);
+    expect(killListVerdict(stored, '1.0.0')).toEqual({ versionRevoked: true, message: 'why' });
+    expect(killListVerdict(stored, '1.0.1')).toEqual({ versionRevoked: false, message: 'why' });
+    expect(killListVerdict(undefined, '1.0.0')).toEqual({ versionRevoked: false, message: '' });
   });
 });

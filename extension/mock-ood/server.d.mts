@@ -16,6 +16,10 @@ export interface MockPortalOptions {
   seedTool?: boolean;
   /** the home the seeded tool prints and records in place of the real one (MOCK_DISPLAY_HOME); default: the virtual home */
   displayHome?: string;
+  /** the account names the access-service stand-in (/ashley/access_check, tests only) approves; default ['st1234'] */
+  approved?: string[];
+  /** access checks past this many answer 429; 0 = no limit */
+  accessLimit?: number;
   tls?: { cert: string; key: string };
   log?: (line: string) => void;
 }
@@ -30,11 +34,26 @@ export interface MockPortal {
   /** the home the seeded tool prints and writes into its status files (the virtual home unless set otherwise) */
   displayHome: string;
   user: string;
+  /** the account names the access-service stand-in approves */
+  approved: string[];
   /** the dashboard's <meta name="csrf-token"> */
   railsToken: string;
   /** the Cookie header value of a signed-in session */
   cookie: string;
-  state: { coldDone: boolean; shells: number; frames: number; fatal: number; coldHits: number; punWarmUntil: number };
+  state: {
+    coldDone: boolean;
+    shells: number;
+    frames: number;
+    fatal: number;
+    coldHits: number;
+    punWarmUntil: number;
+    /** POSTs the access-service stand-in has taken */
+    accessChecks: number;
+    /** their parsed bodies, in order */
+    accessBodies: Array<{ v: number; access_id: string; portal: string; product: string; version: string }>;
+    /** the content-type, origin and cookie headers each POST carried */
+    accessHeaders: Array<{ 'content-type': string; origin: string; cookie: string }>;
+  };
   close(): Promise<void>;
 }
 

@@ -1,11 +1,11 @@
 // browser.storage as the KV the core modules expect, plus the few typed reads the pages share.
 // storage.local holds only what the report allows to be durable (portal hostname and origin,
-// preferences, the acceptance record, the licence key, the audit log, the last good kill-list,
-// the per-workspace data statement and the small notes the strip keeps: links it opened, the
-// last sign-in it saw, the probe it submitted); storage.session holds connection state.
+// preferences, the acceptance record, the access service's last answer, the audit log, the last
+// good kill-list, the per-workspace data statement and the small notes the strip keeps: links it
+// opened, the last sign-in it saw, the probe it submitted); storage.session holds connection state.
 import { browser } from 'wxt/browser';
 import type { KV } from '../core/audit';
-import { DEFAULT_PREFS, INSTALL_ID_KEY, LICENSE_KEY, PORTAL_KEY, PREFS_KEY, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
+import { DEFAULT_PREFS, INSTALL_ID_KEY, PORTAL_KEY, PREFS_KEY, type PortalSettings, type Prefs } from '../core/keys';
 
 function area(a: { get(keys: string): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void>; remove(keys: string): Promise<void> }): KV & { remove(key: string): Promise<void> } {
   return {
@@ -31,10 +31,6 @@ export async function portalSettings(): Promise<PortalSettings | undefined> {
 
 export async function prefs(): Promise<Prefs> {
   return { ...DEFAULT_PREFS, ...((await local.get<Partial<Prefs>>(PREFS_KEY)) ?? {}) };
-}
-
-export async function license(): Promise<LicenseState | undefined> {
-  return local.get<LicenseState>(LICENSE_KEY);
 }
 
 /** a random id for the acceptance record and the consent marker; never an identity */

@@ -6,7 +6,7 @@
 // Rule carried over from Ashley: no feature integrates until its pieces are nodes here.
 // No browser import: the checks receive their environment, and the tests run the engine in Node.
 
-export type Layer = 'licence' | 'browser' | 'portal' | 'login-node' | 'compute-node' | 'claude' | 'student';
+export type Layer = 'access' | 'browser' | 'portal' | 'login-node' | 'compute-node' | 'claude' | 'student';
 
 export interface CheckResult {
   ok: boolean;

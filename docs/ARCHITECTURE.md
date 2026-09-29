@@ -580,8 +580,8 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 
 | Key | Value | Justification (one sentence, as the stores will see it) |
 |---|---|---|
-| `permissions` | `storage` | Remembers the portal hostname you connected, your preferences, your licence acceptance and your statement about each worker's workspace |
-| | `alarms` | Checks your running job no more than once a minute and reconnects after the browser suspends the extension |
+| `permissions` | `storage` | Remembers the portal hostname you connected, your preferences, your acceptance of the agreement, the last answer of the approval check and your statement about each worker's workspace |
+| | `alarms` | Checks your running job no more than once a minute, repeats the approval check and the withdrawn-versions download about once a day, and reconnects after the browser suspends the extension |
 | | `scripting` | Loads the extension's page script on your university portal, and only there, after you connect it, including into the tab you clicked from |
 | | `activeTab` | Lets a click on the icon read the address of the portal tab you clicked from, so it can connect that one site; no install warning |
 | | `sidePanel` (Chrome/Edge only) | Opens the job monitor beside your portal tab when you click the icon |
@@ -641,7 +641,7 @@ From the report's "Security controls", in the order a reviewer will look for the
 - **Approval, not keys.** Authentication is the student's own portal sign-in; authorization is the
   vendor's approved list. After acceptance, once the portal is connected and the dashboard's account
   name is on record, the background asks the access service (`access_check` from `services.json`,
-  cached 24 h) whether that account is approved, on every icon click and once a day; a yes is kept
+  cached 24 h) whether that account is approved, on an icon click once the last answer is a day old or was no and once a day; a yes is kept
   24 h and up to 7 days when the service is unreachable, a no for 10 minutes. The strip's `access`
   step sits before `install`, so an unapproved or withdrawn account starts nothing, by the strip or
   by the automatic start, and the one button is *Ask for access*. The name asked about is only the

@@ -84,13 +84,14 @@ describe('audit chokepoint', () => {
     expect(classifyCommand('echo hello')).toBe('shell');
   });
 
-  it('never stores a token: csrf query values, licence keys, sk-ant keys and bearer tokens are redacted', async () => {
+  it('never stores a token: csrf query values, signed tokens, sk-ant keys and bearer tokens are redacted', async () => {
     const { audit } = clockAudit();
     await audit.request({ method: 'WS', endpoint: 'wss://ood.example/pun/sys/shell/ssh/default?csrf=AbC-123_xyz', cls: 'shell' }, ok(1, 5, 'exit 0; printed ASHLEY1.eyJ2IjoxfQ.c2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJl and sk-ant-api03-SECRET and Bearer eyJhbGciOi'));
     const [r] = (await audit.records()) as AuditRecord[];
     expect(r!.endpoint).toBe('/pun/sys/shell/ssh/default?csrf=[redacted]');
     expect(r!.outcome).not.toMatch(/ASHLEY1\.|sk-ant-api03-SECRET|eyJhbGciOi/);
-    expect(r!.outcome).toMatch(/\[licence-key\]/);
+    expect(r!.outcome).toMatch(/\[signed-token\]/);
+    expect(redact('list ASHLEYREV1.eyJ2IjoxfQ.c2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJl ok')).toBe('list [signed-token] ok');
     expect(redact('token=abc123 password: hunter2 apikey=zz')).toBe('token=[redacted] password: [redacted] apikey=[redacted]');
     expect(redact('job 123456 on node01')).toBe('job 123456 on node01');
     expect(auditEndpoint('/pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user')).toBe('/pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user');

@@ -1,6 +1,6 @@
 // The kill-list: one signed JSON document, fetched once a day as data, that can withdraw a
-// release or a licence. Served at KILLLIST_URL with CORS open (the extension holds no host
-// permission for that origin, so the browser lets the fetch through only on the server's say-so).
+// release. Served at KILLLIST_URL with CORS open (the extension holds no host permission for
+// that origin, so the browser lets the fetch through only on the server's say-so).
 //
 // Document shape (the outer fields are for people; only the signed payload inside `sig` counts):
 //   {
@@ -8,19 +8,20 @@
 //     "kid": "k1",
 //     "issued": 1790000000,                 unix seconds
 //     "revoked_versions": ["1.0.0"],        extension versions that must stop sending commands
-//     "revoked_lids": ["L-abc"],            withdrawn licence ids
+//     "revoked_lids": [],                   kept for compatibility with older lists; read, never acted on
 //     "message": "why, in one sentence",    shown to the student
 //     "sig": "ASHLEYREV1.<base64url(JSON of the fields above, without sig)>.<base64url(Ed25519 signature)>"
 //   }
 // The signature is detached from the readable copy: `sig` is a complete ASHLEYREV1 token whose
 // payload repeats the fields, signed over "ASHLEYREV1.<payload part>" exactly like Ashley's
 // revocation list (grid/license.js signRevocationList), so the same issuing tool and the same
-// public keys serve both. Ashley's own list uses `revoked` for licence ids; both spellings are read.
+// public key serve both. Since version 4 the list withdraws versions only: access to Ashley Bridge
+// is granted and withdrawn by Licensor's access service (access.ts), not by anything in this file.
 //
 // Fail-safe by design: a fetch that fails keeps the last good list; a signature that fails is
 // ignored and reported; the extension refuses only on a verified revocation. A one-person vendor
 // going offline must never strand a campus.
-import { open, REV_PREFIX, type KeyRing } from './license';
+import { open, REV_PREFIX, type KeyRing } from './signed';
 
 export const KILLLIST_URL = 'https://openspineconsortium.com/ashley/bridge-killlist.json';
 /** how often the background asks (minutes); Chrome's alarms floor is irrelevant at this scale */
@@ -31,6 +32,7 @@ export interface KillListPayload {
   kid: string;
   issued: number;
   revoked_versions: string[];
+  /** older lists carry withdrawn ids here; kept so the readable copy can be compared with the signed one, never acted on */
   revoked_lids: string[];
   message: string;
 }
@@ -60,7 +62,7 @@ export async function verifyKillList(doc: unknown, keys: KeyRing): Promise<KillL
     revoked_lids: [...new Set([...strings(p.revoked_lids), ...strings(p.revoked)])].sort(),
     message: typeof p.message === 'string' ? p.message : '',
   };
-  return { ok: true, detail: `${list.revoked_versions.length} withdrawn version(s), ${list.revoked_lids.length} withdrawn licence(s), list of ${new Date(list.issued * 1000).toISOString().slice(0, 10)}`, list };
+  return { ok: true, detail: `${list.revoked_versions.length} withdrawn version(s), list of ${new Date(list.issued * 1000).toISOString().slice(0, 10)}`, list };
 }
 
 export interface StoredKillList {
@@ -95,10 +97,8 @@ export async function refreshKillList(previous: StoredKillList | undefined, keys
   return { current: { fetched_at: now().toISOString(), list: v.list }, fresh: true, detail: v.detail };
 }
 
-/** What a verified list means for this installation. */
-export function killListVerdict(stored: StoredKillList | undefined, version: string, lid: string | undefined): { versionRevoked: boolean; licenseRevoked: boolean; message: string } {
-  if (!stored) return { versionRevoked: false, licenseRevoked: false, message: '' };
-  const versionRevoked = stored.list.revoked_versions.includes(version);
-  const licenseRevoked = !!lid && stored.list.revoked_lids.includes(lid);
-  return { versionRevoked, licenseRevoked, message: stored.list.message };
+/** What a verified list means for this installation: is this version withdrawn, and what does the list say. */
+export function killListVerdict(stored: StoredKillList | undefined, version: string): { versionRevoked: boolean; message: string } {
+  if (!stored) return { versionRevoked: false, message: '' };
+  return { versionRevoked: stored.list.revoked_versions.includes(version), message: stored.list.message };
 }

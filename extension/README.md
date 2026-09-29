@@ -3,8 +3,9 @@
 One codebase (WXT + TypeScript, plain DOM) for Chrome and Edge (MV3 service worker + side panel),
 Firefox (MV2 persistent background + sidebar) and a Safari build for Apple's packager. It starts,
 monitors and stops a Claude Code worker on the student's own Open OnDemand cluster and hands them
-the worker's Claude environment link and session name. It talks to exactly one origin, the portal
-the student connects, and never to claude.ai.
+the worker's Claude environment link and session name. It talks to the portal the student connects
+and, after the agreement is accepted, to the maintainer's access service and site (below); never to
+claude.ai.
 
 ## What it never does
 
@@ -20,12 +21,14 @@ the student connects, and never to claude.ai.
   install-time host permission. The portal origin is requested from the toolbar click on a portal tab
   (or the setup page's Connect button); the page script is registered for that origin at runtime
   (`scripting.registerContentScripts`) and loaded into the already-open tab (`scripting.executeScript`).
-- No remote code. The kill-list is JSON, verified with WebCrypto Ed25519 against the bundled keys.
+- No remote code. The kill-list is JSON, verified with WebCrypto Ed25519 against the bundled public key.
+- No cookie read, anywhere (`test/hygiene.test.ts` checks the source), and no licence key: see *Access* below.
 - Nothing deleted on the cluster, ever: it writes files, touches the framework's stop file and the
   student's own `.restricted` marker, and types hpcworker's verbs. Removing a marker is the student's
   job in the portal's Files app.
 - Nothing durable beyond the portal hostname and origin, preferences, the acceptance record, the
-  licence key, the on-device audit log, the last good kill-list, the per-workspace data statement, the
+  account name the portal's dashboard showed with the access service's last answer (and the
+  `services.json` it read), the on-device audit log, the last good kill-list, the per-workspace data statement, the
   student's own checklist ticks, and three small notes the strip keeps (the Claude links it opened, the
   time of the last sign-in it saw, the probe job it submitted). Connection state lives in `storage.session`.
 
@@ -35,10 +38,11 @@ the student connects, and never to claude.ai.
 wxt.config.ts               the manifest (per the report's permission table; no default_popup: the toolbar button is the "go" button)
 src/entrypoints/
   background.ts             the toolbar click (open the strip, ask for the portal origin, load the page script into the tab, all in one gesture);
-                            alarms (status files every 60 s, kill-list daily); the message broker; the ONE worker-start path; the once-only opening of the Claude link
+                            alarms (status files every 60 s, kill-list and access check daily); the ONE place the access service is asked;
+                            the message broker; the ONE worker-start path; the once-only opening of the Claude link
   portal.content.ts         the page script on the portal origin: the ONLY network client; hosts the sign-in terminal behind a port
   sidepanel/                the flight strip (side panel / sidebar / a tab on Safari)
-  options/                  the setup page (options_ui, opened on install and from right-click > Options): agreement, key, connect/disconnect, statement, settings, audit export, Google Drive step
+  options/                  the setup page (options_ui, opened on install and from right-click > Options): agreement, access, connect/disconnect, statement, settings, audit export, Google Drive step
 src/core/
   steps.ts                  the strip's state machine: a pure function from facts to the one step (status line, one button or one automatic action)
   facts.ts                  gathering those facts from storage, the browser and the cluster (reads only)
@@ -50,19 +54,19 @@ src/core/
   audit.ts  redact.ts       the chokepoint: audit record per request, one floor clock per class, redaction, revocation
   diagnostics.ts checks.ts  the node model (id, title, dependsOn, assumption, manualFix, futureRisk, check, repair) and the 17 checks
   worker.ts                 start and stop (and the consent marker), shared by the strip, the Details buttons and the background
-  identity.ts               which username a key is matched to (the portal's own name wins over a typed one)
   contract.ts               files and commands shared with framework/ (paths, status.json, connection.json, probe.json, the registration block, the plain-login lines)
   terms.ts disclosure.ts    the agreement mechanics; the plan-class disclosure and the per-workspace data statement
   keys.ts messages.ts       storage keys; the message bus types and the login port's frames
 src/licensing/
-  license.ts keys.json      verifyLicense (port of Ashley grid/license.js), the two public keys
-  killlist.ts               the signed kill-list: shape, verification, fail-safe refresh
+  access.ts                 the approval check: services.json, the POST to access_check, the caches (24 h yes, 7 days' grace, 10 min no), the pure decision
+  signed.ts keys.json       the Ed25519 token verifier (port of Ashley grid/license.js) and the one public key the kill-list is signed with
+  killlist.ts               the signed kill-list: shape, verification, fail-safe refresh; withdraws versions only
 src/ext/                    storage.ts (browser.storage as the KV the core expects), connectApi.ts (the browser behind core/connect.ts)
 src/ui/                     strip.ts, terminal.ts, details.ts, options.ts, sections.ts, dom.ts, rpc.ts, style.css
 public/                     LICENSE.txt and PRIVACY.md (copied from the repository root by scripts/sync-framework.mjs at build time), icons
 scripts/sync-framework.mjs  bundles ../framework into public/framework/ and copies the agreement texts before every build and zip
 mock-ood/                   a mock Open OnDemand portal (server.mjs, only dependency: ws) with fake scheduler commands and a seeded hpcworker
-test/                       vitest: the step machine, connecting, the plain-login reader, the statement, licence, kill-list, audit, shell, diagnostics, worker, identity, integration against the mock
+test/                       vitest: the step machine, connecting, the plain-login reader, the statement, access, kill-list, audit, shell, diagnostics, worker, source hygiene, integration against the mock
 ```
 
 ## Build
@@ -88,8 +92,8 @@ mock portal can be connected over plain http; a release build never lists it.
 - Firefox: `about:debugging#/runtime/this-firefox`, "Load Temporary Add-on", pick `.output/firefox-mv2/manifest.json`.
 
 On install the setup page opens (manifest `options_ui`; also right-click the toolbar button, then Options):
-accept the agreement (scroll to the end, four statements, typed name, "Accept and Continue") and, if you have
-one already, paste the licence key. Everything else happens from the strip.
+accept the agreement (scroll to the end, four statements, typed name, "Accept and Continue"). There is nothing
+else to enter; everything else happens from the strip.
 
 ## Three steps: install, open your portal, click the button
 
@@ -105,7 +109,7 @@ only when a person must act:
 | 1 | portal tab open | | connect this portal / open my portal |
 | 2 | portal awake and signed in | GET the dashboard; on 5xx or `/nginx/init` wait 2 s, 5 s, 10 s ("waking up your portal...") | sign in to the portal in its tab |
 | 3 | agreement | | read and accept it, once per browser profile (the setup page) |
-| 4 | licence key | | paste it in the strip's box (or "Ask for access"): a personal key must name your portal username, a site key a domain your portal is in; read-only checks are never blocked on it |
+| 4 | access approved | the background asks the access service about the account the dashboard shows (cached: yes 24 h, no 10 min) | "Ask for access" when not approved: opens the request page with the account filled in; read-only checks are never blocked on it |
 | 5 | tool installed | upload the bundled framework, run `hpcworker install` once | |
 | 6 | probe run | submit the five-minute probe once, wait for `probe.json` | |
 | 7 | signed in to Claude on the cluster | open the sign-in terminal (below) | sign in on Anthropic's page, paste the code |
@@ -129,7 +133,7 @@ it is the credential boundary, and the extension never reads an Anthropic page o
 
 **Details** (collapsed under the strip) keeps the worker card with the buttons (set up the cluster again, run the
 probe again, sign in on the cluster, start, stop, read status now), the seventeen checks, `rc.log`, the audit log
-with its export, the licence line, the settings and the Google Drive step with its done box.
+with its export, the access line, the settings and the Google Drive step with its done box.
 
 ## What the strip and the buttons do on the cluster
 
@@ -161,7 +165,7 @@ with its export, the licence line, the settings and the Google Drive step with i
   the panel closes it after fifteen minutes at the latest (`SESSION_MAX_MS`, the privacy statement's number).
 - **Updating the tool**: `~/.hpcworker/VERSION` is compared with the bundled `framework/VERSION` on every look at
   the cluster; an older or missing one is set up again (upload, one `install` line; the tool keeps the profile and
-  prints `upgraded 1 -> 2`), and an update that ran and left the old number behind is reported once, not repeated.
+  prints `upgraded 2 -> 3`), and an update that ran and left the old number behind is reported once, not repeated.
 - **Open claude.ai when the worker connects** (Settings; on by default): the first time this browser sees the
   worker's link it opens it in a new tab; afterwards the green button does.
 - **Mark this workspace restricted** (in the statement) touches `<workspace>/.restricted`; check 16 and every start
@@ -192,16 +196,22 @@ To drive the extension by hand:
 
 ```
 npm run build:dev                                  # development build: http://localhost grantable
-node mock-ood/server.mjs --port 8080               # http://127.0.0.1:8080 ; sign in at /login
+node mock-ood/server.mjs --port 8080 --user st1234 # http://127.0.0.1:8080 ; sign in at /login
 ```
 
-Load `.output/chrome-mv3` unpacked, open `http://127.0.0.1:8080/login`, click "Sign in as student", then click the
-toolbar button on that tab: the strip opens, the browser asks to allow that one site, and the steps run. The mock
+Load `.output/chrome-mv3` unpacked, accept the agreement on the setup page, open `http://127.0.0.1:8080/login`, click
+"Sign in as st1234", then click the toolbar button on that tab: the strip opens, the browser asks to allow that one
+site, and the steps run. Every build asks the real access service, and `st1234` is on its approved list for exactly
+this purpose; with another `--user` (the default is `student`) the strip stops at *Ask for access*. A release build
+cannot connect plain http: use `--cert`/`--key` and `--host localhost` (the recipe in `../docs/store/LISTING.md`). The mock
 seeds a stand-in `hpcworker` into its home so the install, the probe, the sign-in terminal, "Start worker" and "Stop"
 produce the files the strip reads (`status.json`, `connection.json`, `rc.log` with the exact registration block of
 Claude Code 2.1.283). Its `claude login --plain` prints the framework's lines (`HPCW-LOGIN`, `AUTH-URL:`, `SIGNED-IN`,
 `HPCW-LOGIN-FAILED`) and takes the typed code on its standard input; any code of six or more letters, digits, `#`,
-`_` or `-` is accepted (no mock authorize page is needed: the URL is only opened). Flags: `--rnode enabled` (503
+`_` or `-` is accepted (no mock authorize page is needed: the URL is only opened). Flags: `--port N`, `--host H`
+(`127.0.0.1` by default), `--user NAME` (the account the dashboard shows; `student` by default), `--home DIR`,
+`--approve a,b` and `--access-limit N` (the mock's own stand-in for the access service at `/ashley/access_check`, for
+the tests only: no build points at it), `--rnode enabled` (503
 instead of 404 on `/rnode/`), `--no-clusters` (the shell closes 3146 "No clusters defined."), `--cold` (first request
 bounces through `/nginx/init`), `--cold-pun MS` (the first `/pun/` request after MS ms of quiet answers 500 once, as
 the live portal's per-user nginx does), `--job-composer`, `--no-cookie`, `--cert F --key F` (https with your own
@@ -227,7 +237,7 @@ real Shell app would crash there.
 
 ## The cluster-side contract
 
-`src/core/contract.ts` follows framework version 2 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
+`src/core/contract.ts` follows framework version 3 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
 `jobs/probe.sbatch`, `jobs/worker.sbatch.tpl`). The build (`scripts/sync-framework.mjs`, run before every build
 and zip) bundles `framework/**` as it is on disk, copies the root `LICENSE.txt` and `PRIVACY.md` over the shipped
 copies, and stops with exit 1 when the copied `LICENSE.txt`'s "Version N, date" line disagrees with `TERMS_VERSION`
@@ -259,32 +269,21 @@ LF endings) to `~/.hpcworker/` with `PUT files/fs`, then runs the install line o
 and copies nothing when it already runs from `~/.hpcworker`. If `framework/` was empty at build time the button
 says so instead of installing nothing.
 
-## Licence keys: personal and site
+## Access: who you are and whether you may
 
-Both are Ashley's `ASHLEY1.<payload>.<signature>` keys, verified offline in `src/licensing/license.ts` against the
-public keys in `keys.json`. A **personal key** names one person (`sub`): it verifies only when `sub` equals the
-portal username, and the username the portal's dashboard shows always wins over one typed on the setup page. A
-**site key** (`edition: "site"`, a `domain` such as `wayne.edu`, no `sub`) is one key for everyone at a university,
-the way the maintainer hands one key to all testers. The verifier matches such a key against an e-mail in that
-domain (subdomains count, look-alikes do not), so the extension builds one from what it has, never stores or
-sends it, and uses it for the comparison only (`src/core/identity.ts`):
-
-    <portal username>@<site e-mail domain>
-
-where the site e-mail domain is, in order: the site profile's `email_domain` field when `~/.hpcworker/profile.json`
-names one (an optional field of the framework's profile schema, read where the extension reads the profile anyway
-and remembered with the portal settings as `email_domain`, so the strip, the setup page and the checks agree; it
-matters at a site whose portal is not under its e-mail domain), else the registrable domain of the portal
-hostname: the last two labels (`ondemand.grid.wayne.edu` -> `wayne.edu`), three under a two-label public suffix
-such as `.ac.uk` or `.edu.au` (`ondemand.hpc.cam.ac.uk` -> `cam.ac.uk`; a short list in `identity.ts`). At Wayne
-State both rules give `wayne.edu`. The panel says what was matched: "site key for wayne.edu, matched to your portal
-username go2432 at ondemand.grid.wayne.edu". From a portal outside the domain the key is refused with "this is a
-site key for wayne.edu; your portal is in osc.edu, not in that domain"; a connected portal whose address yields no
-domain at all (the mock at `127.0.0.1`, a bare hostname) is outside every site and refused too, unless the profile
-it serves names the domain. Before a portal is connected there is nothing to compare with, and the key is matched
-once one is, as a typed username is. The kill-list withdraws a site key by its `lid` like any other, which is how a
-tester key is ended when the pilot ends. The key boxes on the strip and the setup page take a pasted site key as
-they take a personal one and ask for nothing else; the audit log redacts every key the same way.
+There are no licence keys (decided 2026-09-29; `src/licensing/access.ts` has the contract in its header). Who
+the student is comes from their own sign-in to their Open OnDemand portal: the account name the dashboard shows
+for the signed-in session ("Logged in as ...", read by `PortalClient.session()`), never a typed name, never a
+cookie, and never the home directory's owner (that fallback names paths only). Whether they may use Ashley
+Bridge is the maintainer's approved list, asked by the background alone: it reads `access_check` from
+`https://openspineconsortium.com/ashley/services.json` (cached a day) and POSTs
+`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"4.0.0"}` as
+`text/plain;charset=UTF-8` without cookies when the portal tab connects, about once a day, and on a toolbar click
+after a no or a failed attempt or once the last yes is a day old; never before the acceptance record is in
+storage (the same gate as the kill-list). A yes is kept 24 hours (up to 7 days while the service cannot be
+reached; check 1 turns WARN after the first day); a no is kept 10 minutes, and the strip's one button becomes *Ask for access*, which opens
+`https://openspineconsortium.com/ashley/request.html?access_id=<account>`. The one URL taken from an answer is a
+page on that site. Workers start only while the answer is yes; read-only checks never wait on it.
 
 ## The signed kill-list
 
@@ -292,8 +291,9 @@ Fetched once a day from `https://openspineconsortium.com/ashley/bridge-killlist.
 `Access-Control-Allow-Origin: *`: the extension holds no host permission for that origin). Shape and verification
 in `src/licensing/killlist.ts`: outer JSON `{v, kid, issued, revoked_versions, revoked_lids, message, sig}` where
 `sig` is `ASHLEYREV1.<base64url payload>.<base64url Ed25519 signature>` over `ASHLEYREV1.<payload>`, the same
-scheme and public keys as Ashley's revocation list. Only the signed payload is trusted; offline keeps the last good
+scheme and public key as Ashley's revocation list. Only the signed payload is trusted; offline keeps the last good
 list; a withdrawn version stops sending commands (the chokepoint refuses anything that mutates) and still reads status.
+Since 4.0.0 the list withdraws versions only; `revoked_lids` is read for older lists and never acted on.
 
 ## Store listing pointers
 

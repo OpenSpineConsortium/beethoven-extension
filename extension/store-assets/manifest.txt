@@ -1,62 +1,63 @@
-Ashley Bridge 3.0.0: store assets
+Ashley Bridge 4.0.0: store assets
 
-Made 2026-09-29 (screenshots recaptured the same day after review; the three rendered images are from the
-first capture). The screenshots are the real built extension (extension/.output/chrome-mv3, the 3.0.0 release
-build that the store zips are made from) loaded into Playwright's Chromium (Chrome for Testing) with a
-1280x800 viewport, light colour scheme, driven against the mock Open OnDemand portal (extension/mock-ood/server.mjs)
-served over https on localhost with a self-signed certificate, the mock user st1234, MOCK_LOGGED_IN=false so
-the Claude sign-in step is reached, and a three-day trial key issued for that username with the vendor tool.
-The mock home was seeded with .hpcworker/profile.json and .hpcworker/VERSION = 2 so the strip found the tool
-installed at the bundled version. The mock's seeded tool printed and recorded the portal's own home,
-/home/st1234, in place of the mock home's real path (the mock's MOCK_DISPLAY_HOME knob, which server.mjs sets
-to the virtual home by default; --display-home DIR overrides it), so the strip's grey output box shows the path
-a cluster user would see. The withdrawn-keys list was fetched by the extension itself from
-https://openspineconsortium.com/ashley/bridge-killlist.json once the agreement was accepted (the list issued
-2026-09-29 15:32 UTC, nothing withdrawn); no other request left for the maintainer's site, and none went to
-Anthropic: every claude.ai / claude.com navigation was answered locally by the test harness. The browser's
-native permission prompt was accepted through Windows UI Automation (the Allow button), not by editing any
-state. Nothing in the images was drawn by hand or composited. After each capture the whole page's text was
-checked for a machine path, a username or a neighbouring project's name; none was found (see the note on 01).
+Made 2026-09-29 (the screenshots between 19:03 and 19:08 UTC). The screenshots are the real release build
+(extension/.output/chrome-mv3, the 4.0.0 build in the store zips; the zips were made again afterwards for a
+README change in the sources zip, and the built files are the same except the "generated" time stamp in
+framework/manifest.json) loaded into Playwright's Chromium (Chrome for Testing 153) with a fresh profile, a 1280x800
+viewport and the light colour scheme, driven against the mock Open OnDemand portal
+(extension/mock-ood/server.mjs) served over https at localhost:8443 with a self-signed certificate, the mock
+user st1234 (--user st1234), and MOCK_LOGGED_IN=false so the Claude sign-in step is reached. There is no key:
+the extension read the account name the mock's dashboard shows ("Logged in as st1234") and asked the real
+access service (the access_check address in https://openspineconsortium.com/ashley/services.json), which
+answered approved:true for st1234. The withdrawn-versions list was fetched by the extension itself once the
+agreement was accepted (the list issued 2026-09-29 15:32 UTC, nothing withdrawn). The mock home was seeded
+with .hpcworker/profile.json and .hpcworker/VERSION = 3 (the bundled framework version) so the strip found the
+tool installed; the mock's tool prints and records the portal's own home, /home/st1234, in place of the mock
+home's real path.
+
+How the run was driven: the agreement was accepted on the setup page as a person does (scrolled to the end,
+four boxes ticked, a typed name, "Accept and Continue"). The toolbar button was pressed on the portal tab with
+the DevTools protocol's Extensions.triggerAction (the action a click runs), and the browser's own permission
+prompt was answered with Windows UI Automation (its Allow button); no extension state was edited. Before that
+click the side panel was switched off with chrome.sidePanel.setOptions, so the background's own fallback
+opened the strip as a tab, which is what is captured at 1280x800; in Chrome and Edge a person sees the same
+strip in the side panel beside the portal. The full request log of this run (and of the not-approved run with
+zz9999) is in e2e/. Nothing in the images was drawn by hand or composited. Each image was looked at: no machine
+path and no personal name appears in any of them.
 
 Screenshots (1280x800 PNG), in the order suggested for the stores:
-  04-worker-online-open-in-claude.png  (1280x800)  step 11: the worker is online; the green Open in Claude button, Copy link, Stop, the session name; the output box shows the probe submission with its cluster path
-  03-sign-in-to-claude.png  (1280x800)  step 7: the sign-in sitting is open on the cluster; the sign-in page opened in a tab; one box for the code
-  02-checks.png  (1280x800)  Details > Checks after "Run the checks" against the mock portal; tags in order: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK (all seventeen)
-  01-agreement-signing-dialog.png  (1280x800)  setup page (options.html) on first install: the signing dialog, summary and the full text
-  05-setup-page.png  (1280x800)  the setup page (options.html) after setup, from "3. Your portal" down: the connected portal, where the work goes, the settings (the page top is not captured after setup because the saved key is shown there)
+  04-worker-online-open-in-claude.png  step 11: the worker is online; the green Open in Claude button, Copy link, Stop, the session name; the output box shows the probe submission with its cluster path
+  03-sign-in-to-claude.png  step 7: the sign-in sitting is open on the cluster; the sign-in page opened in a tab; one box for the code
+  02-checks.png  Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip reopened afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-29 19:04 UTC); kill-list of 2026-09-29"
+  01-agreement-signing-dialog.png  the setup page (options.html) as it opens on install: the signing dialog, the summary ("In short") and the top of the full text
+  05-setup-page.png  the setup page after setup, from the top: the agreement accepted, "2. Your access" (Access approved for st1234 at localhost, the time the service answered, "Check my access now"; there is nothing to enter and no key card), the connected portal
 
 Extra screenshots (1280x800 PNG), optional for the stores:
-  01b-agreement-statements.png  (1280x800)  the same dialog scrolled to the four statements, the typed-name box and "Accept and Continue"
-  03b-where-your-work-goes.png  (1280x800)  step 8: where the work goes, and the statement about the workspace
-  04b-details-worker-card.png  (1280x800)  Details > Your worker: the job, the session name, Claude sign-in and Remote Control answer as the job reports them, and the checks below it, all OK; the strip above is settled (worker online, no notice line)
-  05b-setup-page-settings.png  (1280x800)  the setup page scrolled to the settings and the audit log
+  01b-agreement-statements.png  the same dialog scrolled to the four statements, the typed-name box, "Accept and Continue" (disabled until everything is done), and "2. Your access" before any portal is connected
+  03b-where-your-work-goes.png  step 8: where the work goes, and the statement about the workspace
+  04b-details-worker-card.png  Details > Your worker in a settled state (the strip reopened, so no notice line): the job, the session name, the Claude sign-in and Remote Control answer as the job reports them, the checks below
+  05b-setup-page-settings.png  the setup page scrolled to the settings and the audit log
 
-Note on 01 and 01b: the agreement text in the dialog names the licensor ("Copyright (c) 2026 Gregory Schwing,
-trading as OpenSpineConsortium"), as LICENSE.txt does; that is the contract's own text, not a machine detail.
-Note on 01b-agreement-statements.png: the licence card below the dialog names wayne.edu as its example of
-a site-key domain (extension source, src/ui/options.ts). Prefer 01 for the stores unless that example is
-changed; the product itself carries no university name.
-Note on 05-setup-page.png: captured from "3. Your portal" down. The page top after setup shows the saved key in
-the input field in the clear, so it is not captured; 01 shows the page top before setup.
-Note on 02-checks.png: check 1 reads "kill-list of 2026-09-29" and OK. On the first run of the checks in this
-fresh browser it read WARN although the list was already on file: check 1 also warns while the username it
-matched the key to was typed rather than seen on the portal's dashboard, and the dashboard's username is put
-on record by check 4 of the same run (src/core/checks.ts), so the first run warns once and the next is OK.
-The image is the second run, 82 s after the first.
-Note on the grey output box in 03, 03b and 04: it is the strip's own output box showing the last shell
-command's output (the mock's probe submission). The mock tool now prints the portal's home (/home/st1234) in
-place of the mock home's real path (see above); against a real portal the box shows the cluster's path.
-Nothing was hidden or cropped.
-Note on 04b-details-worker-card.png: the strip's notice line ("Running the checks...") stays after a Details
-action until the next one, so the image was taken from the panel reopened after the checks (the report is
-kept in session storage and is the same one as in 02).
-
-Rendered images (Edge headless, --headless=new --screenshot, from the HTML in src/; unchanged since the first capture):
-  promo-tile-440x280.png  (440x280)  Chrome Web Store small promo tile and Edge small promotional tile: the blue OpenSpineConsortium logo, "Ashley Bridge", one line
+Rendered images (Edge headless, --headless=new --screenshot, from the HTML in src/; unchanged since 3.0.0):
+  promo-tile-440x280.png  (440x280)  Chrome Web Store small promo tile and Edge small promotional tile
   marquee-1400x560.png  (1400x560)  Chrome Web Store marquee and Edge large promotional tile
   edge-store-logo-300x300.png  (300x300)  Edge Add-ons store logo (Partner Center requires 300x300)
-  src/tile-440x280.html, src/marquee-1400x560.html, src/edge-store-logo-300x300.html  the pages the three images were rendered from (logo embedded)
+  src/tile-440x280.html, src/marquee-1400x560.html, src/edge-store-logo-300x300.html  the pages they were rendered from
+
+Caveats
+- The strip is captured as a tab, not in the side panel (see above); the content is the same page.
+- 03b and 04 were captured again from the 4.0.0 build and came out byte-identical to the 3.0.0 images: those two
+  steps did not change.
+- The agreement text inside the dialog names the licensor (the copyright line and the parties clause of
+  LICENSE.txt, the first lines of PRIVACY.md); neither is inside the visible part of 01 or 01b.
+- 02, 04b: "Connected - phone - HEAD" and "student@example.edu" are the mock's stand-in Remote Control and
+  Claude sign-in values, not the reviewer's or anyone's account.
+- 04, 03: the claude.ai tabs the extension opened during the run (the mock's sign-in URL with a mock client id,
+  and the mock's environment link) loaded claude.ai itself; the harness stubbed their assets only (e2e/run-A-*.txt
+  says which requests). They are not in any image.
+- The time stamps in 02, 04b and 05 are this machine's local time (US Eastern) as the extension shows them; the
+  "checked ... UTC" in check 1 and the access card is UTC.
 
 Not here: the 128x128 store icon is extension/public/icon/128.png (also inside every package).
 This folder is outside the build (wxt publicDir is public/) and excluded from the AMO sources zip
-(zip.excludeSources in wxt.config.ts).
+(zip.excludeSources in wxt.config.ts), e2e/ included.

@@ -13,10 +13,9 @@ import type { KV } from './audit';
 import { statementFor, type Statements } from './disclosure';
 import { commands, consentSourceWords, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
-import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, withSiteDomain } from './identity';
-import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, PORTAL_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type LicenseState, type LoginSeen, type PortalSettings, type Prefs } from './keys';
+import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, SERVICES_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type IdentityNote, type LoginSeen, type PortalSettings, type Prefs } from './keys';
+import { accessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
-import { verifyLicense, type KeyRing } from '../licensing/license';
 import type { PortalApi, SessionInfo } from './portal';
 import { recordInForce, TERMS_KEY } from './terms';
 
@@ -25,7 +24,6 @@ export interface DiagEnv {
   now(): Date;
   local: KV;
   session: KV;
-  keys: KeyRing;
   hasOriginPermission(origin: string): Promise<boolean>;
   /** is a page script answering in a portal tab? */
   portalAlive(): Promise<boolean>;
@@ -72,13 +70,6 @@ async function stateDir(ctx: DiagCtx): Promise<string> {
   ctx.cache.user = user;
   const profile = await portalOf(ctx).readFileIfExists(paths.profile(h));
   ctx.cache.profile = profile;
-  // the profile's e-mail domain is remembered with the portal settings, so the licence check (which
-  // runs first, before any portal read) and the setup page match a site key the same way next time
-  const remembered = withSiteDomain(ctx.settings, profile);
-  if (remembered) {
-    await ctx.env.local.set(PORTAL_KEY, remembered);
-    ctx.settings = remembered;
-  }
   ctx.cache.stateDir = stateDirFrom(profile, { home: h, user });
   return ctx.cache.stateDir;
 }
@@ -107,30 +98,27 @@ export const SIGN_IN_INSTRUCTION = `Choose "Sign in on the cluster": the strip a
 export function buildNodes(): DiagNode<DiagCtx>[] {
   return [
     {
-      id: 'licence',
-      title: 'Licence and agreement',
-      layer: 'licence',
+      id: 'access',
+      title: 'Access and agreement',
+      layer: 'access',
       dependsOn: [],
-      assumption: 'the terms are accepted in this browser; the key verifies offline and names your portal username (the one the dashboard shows wins over anything typed) or, for a site key, a domain your portal is in (the site profile\'s e-mail domain when it names one, else the portal address\'s own); the kill-list is valid, the key is not withdrawn by its id and this version is not withdrawn',
-      manualFix: 'Open the setup page: accept the terms and enter your licence key.',
+      assumption: "the terms are accepted in this browser; Licensor's access service has confirmed, within the last day (an older answer is kept up to seven days when the service cannot be reached), that the account your portal's dashboard shows is on the approved list; the kill-list is valid and this version is not withdrawn",
+      manualFix: 'Open the setup page and accept the terms. If your account is not approved yet, ask for access with the button in the strip; once the maintainer has approved it, click the Ashley Bridge button again.',
       fixAction: 'open-onboarding',
-      futureRisk: 'a new signing key or a withdrawn release changes the answer without any change on the cluster',
+      futureRisk: 'an approval withdrawn from the list, a withdrawn release, or a service outage longer than seven days changes the answer without any change on the cluster',
       async check(ctx) {
         const terms = await ctx.env.local.get(TERMS_KEY);
-        if (!recordInForce(terms)) return { ok: false, detail: 'the licence terms have not been accepted in this browser' };
-        const lic = await ctx.env.local.get<LicenseState>(LICENSE_KEY);
+        if (!recordInForce(terms)) return { ok: false, detail: 'the agreement has not been accepted in this browser' };
         const stored = await ctx.env.local.get<StoredKillList>(KILLLIST_KEY);
-        const observed = (await ctx.env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-        const who = bindIdentity(observed, lic?.identity?.accessId);
-        // a site key is matched under the site's e-mail domain: the profile's when this run has read it
-        // or an earlier one remembered it in the settings, else the portal hostname's own
-        const site = siteEmailDomain(ctx.cache.profile, ctx.settings?.hostname, ctx.settings?.email_domain);
-        const v = await verifyLicense(lic?.key, { keys: ctx.env.keys, now: Math.floor(ctx.env.now().getTime() / 1000), identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
-        if (!v.ok) return { ok: false, detail: v.status === 'missing' ? 'no licence key entered yet (a trial key is free)' : v.detail };
-        const verdict = killListVerdict(stored, ctx.env.version, v.payload?.lid);
-        if (verdict.versionRevoked) return { ok: false, detail: `this version (${ctx.env.version}) has been withdrawn; update to continue. ${verdict.message}`.trim() };
+        const verdict = killListVerdict(stored, ctx.env.version);
+        const record = await ctx.env.local.get<AccessRecord>(ACCESS_KEY);
+        const services = await ctx.env.local.get<StoredServices>(SERVICES_KEY);
+        // the account name the dashboard showed (check 4 and the background record it); nothing typed
+        const observed = (await ctx.env.local.get<IdentityNote>(IDENTITY_KEY))?.username;
+        const a = accessFact({ record, services, accessId: observed, portal: ctx.settings?.hostname, now: ctx.env.now(), versionRevoked: verdict.versionRevoked, revokedMessage: verdict.message });
+        if (!a.ok) return { ok: false, detail: a.state === 'version-revoked' ? `this version (${ctx.env.version}) has been withdrawn; update to continue. ${verdict.message}`.trim() : a.detail };
         const listNote = stored ? `kill-list of ${new Date(stored.list.issued * 1000).toISOString().slice(0, 10)}` : 'kill-list not fetched yet (works offline on the last good list)';
-        return { ok: true, warn: !stored || v.status === 'grace' || who.source !== 'portal', detail: `${v.detail}; ${licenceNote(who, v.payload, site, ctx.settings?.hostname)}; ${listNote}` };
+        return { ok: true, warn: !stored || a.warn, detail: `${a.detail}; ${listNote}` };
       },
     },
     {
@@ -177,9 +165,9 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
           await ctx.env.session.set(SESSION_SEEN_KEY, { checked_at: s.checkedAt });
           if (s.username) {
             ctx.cache.user = s.username;
-            await ctx.env.local.set(IDENTITY_KEY, { username: s.username });
+            await ctx.env.local.set(IDENTITY_KEY, { username: s.username, seen_at: s.checkedAt } satisfies IdentityNote);
           }
-          return { ok: true, detail: `signed in${s.username ? ` as ${s.username}` : ' (the dashboard shows no username; the licence is matched to what you typed until it does)'}${s.isOnDemand ? '' : ' (the page does not say OnDemand; is this the right portal?)'}`, warn: !s.isOnDemand || !s.username };
+          return { ok: true, detail: `signed in${s.username ? ` as ${s.username}` : ' (the dashboard shows no username; your access cannot be checked until it does)'}${s.isOnDemand ? '' : ' (the page does not say OnDemand; is this the right portal?)'}`, warn: !s.isOnDemand || !s.username };
         }
         return { ok: false, detail: s.detail };
       },
@@ -400,7 +388,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       id: 'data-classification',
       title: 'Data classification acknowledged',
       layer: 'student',
-      dependsOn: ['licence'],
+      dependsOn: ['access'],
       assumption: 'the worker\'s workspace is not marked restricted (no .restricted file in it, read from the workspace\'s listing; no profile flag), and the student read where the transcript goes and made the data statement for this workspace on the text now in force (kept in this browser per workspace; asked again when the text or the workspace changes)',
       manualFix: 'Read the disclosure in the strip and tick the statement for the worker you will start. A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
       fixAction: 'acknowledge',
@@ -444,4 +432,4 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
 }
 
 /** the ids in the report's order; the test pins the graph to it */
-export const CHECK_IDS = ['licence', 'origin-granted', 'portal-tab', 'signed-in', 'shell', 'files', 'active-jobs', 'optional-routes', 'reverse-proxy', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'data-classification', 'session-lifetime'];
+export const CHECK_IDS = ['access', 'origin-granted', 'portal-tab', 'signed-in', 'shell', 'files', 'active-jobs', 'optional-routes', 'reverse-proxy', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'data-classification', 'session-lifetime'];

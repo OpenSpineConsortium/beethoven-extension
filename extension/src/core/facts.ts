@@ -1,21 +1,21 @@
-// Gathering the facts the strip's state machine decides on: from storage (terms, key, statement,
-// preferences), from the browser (the grant, the page script answering), and from the cluster
-// through the portal page script (the tool installed, probe.json, the restricted marker, the
-// scheduler clock). Reads only: nothing here starts, installs or writes. The transient part
-// (what the panel is doing right now) is handed in by the caller, so the same function serves
-// the panel and the background's automatic start.
+// Gathering the facts the strip's state machine decides on: from storage (terms, the access
+// service's last answer, statement, preferences), from the browser (the grant, the page script
+// answering), and from the cluster through the portal page script (the tool installed, probe.json,
+// the restricted marker, the scheduler clock). Reads only: nothing here starts, installs, writes
+// or asks the network; the access service is asked by the background alone, and only the record it
+// left is read here. The transient part (what the panel is doing right now) is handed in by the
+// caller, so the same function serves the panel and the background's automatic start.
 import type { KV } from './audit';
 import { isEnvironmentUrl, paths, probeVerdict, profileRestricts, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
 import { ackSubject, statementFor, type Statements } from './disclosure';
-import { bindIdentity, licenceIdentity, siteEmailDomain, type SiteDomain } from './identity';
 import { frameworkOlder } from './install';
-import { IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type InstallNote, type LicenseState, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
+import { ACCESS_KEY, IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, SERVICES_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type InstallNote, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
 import type { PortalApi } from './portal';
 import { LOGIN_SEEN_FRESH_MS, type Facts } from './steps';
 import { recordInForce, TERMS_KEY } from './terms';
 import { workerLive } from './worker';
+import { accessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
-import { verifyLicense, type KeyRing } from '../licensing/license';
 
 /** the run as the background keeps it (background.ts RunState), the part the facts need */
 export interface RunLike {
@@ -33,6 +33,10 @@ export interface RunLike {
 /** what the caller is doing right now, which no store records */
 export interface Transient {
   warm?: Facts['warm'];
+  /** the strip asked the background for an access check and waits for its answer */
+  accessChecking?: boolean;
+  /** the background could not ask the access service, in one sentence (cleared at the next attempt) */
+  accessFailed?: string;
   installing?: boolean;
   installFailed?: string;
   probeSubmitting?: boolean;
@@ -52,7 +56,6 @@ export interface FactsEnv {
   version: string;
   now(): number;
   local: KV;
-  keys: KeyRing;
   settings?: PortalSettings;
   prefs: Prefs;
   granted(origin: string): Promise<boolean>;
@@ -100,20 +103,13 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
 
   // the browser-side facts, whatever the portal says
   f.terms = recordInForce(await env.local.get(TERMS_KEY));
-  const lic = await env.local.get<LicenseState>(LICENSE_KEY);
   const stored = await env.local.get<StoredKillList>(KILLLIST_KEY);
-  const observed = (await env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  const who = bindIdentity(observed, lic?.identity?.accessId);
-  // a site key is matched under the site's e-mail domain: the profile's, as remembered in the settings,
-  // else the portal hostname's own; the profile itself is read further down, and the key is judged
-  // again there when the file says something else, so one call never leaves a stale verdict behind
-  const judge = async (site: SiteDomain) => {
-    const v = await verifyLicense(lic?.key, { keys: env.keys, now: Math.floor(now / 1000), identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
-    const verdict = killListVerdict(stored, env.version, v.payload?.lid);
-    f.licence = { ok: v.ok && !verdict.versionRevoked, missing: v.status === 'missing', detail: verdict.versionRevoked ? `This version of Ashley Bridge has been withdrawn; update to continue. ${verdict.message}`.trim() : v.detail, revoked: verdict.versionRevoked };
-  };
-  let site = siteEmailDomain(undefined, s?.hostname, s?.email_domain);
-  await judge(site);
+  const verdict = killListVerdict(stored, env.version);
+  // the account name the dashboard showed (check 4 and the background record it; nothing typed ever does)
+  const observed = (await env.local.get<IdentityNote>(IDENTITY_KEY))?.username;
+  const record = await env.local.get<AccessRecord>(ACCESS_KEY);
+  const services = await env.local.get<StoredServices>(SERVICES_KEY);
+  f.access = accessFact({ record, services, accessId: observed, portal: s?.hostname, now: new Date(now), versionRevoked: verdict.versionRevoked, revokedMessage: verdict.message, checking: t.accessChecking, failed: t.accessFailed });
   const statements = await env.local.get<Statements>(STATEMENTS_KEY);
   const ack = statementFor(statements, env.prefs.worker_name);
   f.statement.acknowledged = !!ack;
@@ -163,6 +159,7 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     f.run.schedulerWaitMs = await portal.auditWait('scheduler');
     const home = await portal.home();
     out.home = home;
+    // for paths only: the dashboard's name, else the directory's owner or its last segment
     const user = observed ?? (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
     out.user = user;
     f.install.installed = await portal.exists(paths.profile(home));
@@ -181,11 +178,6 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     }
     const profile = await portal.readFileIfExists(paths.profile(home));
     out.profile = profile;
-    const fromFile = siteEmailDomain(profile, s?.hostname);
-    if (fromFile.domain !== site.domain) {
-      site = fromFile;
-      await judge(site);
-    }
     const stateDir = stateDirFrom(profile, { home, user });
     out.stateDir = stateDir;
     const probeText = await portal.readFileIfExists(paths.probe(stateDir));
@@ -237,7 +229,7 @@ function emptyFacts(env: FactsEnv): Facts {
     portal: { connected: false, granted: false, alive: false },
     warm: { state: 'unknown' },
     terms: false,
-    licence: { ok: false, missing: true, detail: '', revoked: false },
+    access: accessFact({ now: new Date(env.now()) }),
     install: {},
     probe: {},
     login: {},

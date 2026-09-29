@@ -15,7 +15,7 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-framework.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 3;
+export const TERMS_VERSION = 4;
 export const TERMS_DATE = '2026-09-29';
 export const PRODUCT_NAME = 'Ashley Bridge';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
@@ -74,7 +74,7 @@ export const AFFIRMATIONS: Array<{ id: string; label: string }> = [
 /** The plain-words summary shown above the full text. */
 export const SUMMARY: string[] = [
   `This is the free Trial Edition. It is licensed, not sold: you receive a licence to use ${PRODUCT_NAME}, not the software itself. Nothing is paid, nothing converts into a paid licence, and no charge ever follows.`,
-  `${PRODUCT_NAME} talks to one website: your university's Open OnDemand portal, which you connect yourself. It runs nothing on claude.ai and never reads, stores or copies a Claude credential: you sign in to Claude Code yourself, once, on a compute node of your cluster.`,
+  `${PRODUCT_NAME} works only for an institutional account the licensor has approved, and your own sign-in to your university's Open OnDemand portal, which you connect yourself, is what identifies you; there is no key (section 3). It works with that one website; its only other requests go to the licensor: the approval check, which sends the account name your portal shows, the portal's address, the product and its version, and a daily download of the service's address and the signed list of withdrawn versions, which carries nothing about you (section 10). It runs nothing on claude.ai and never reads, stores or copies a Claude credential: you sign in to Claude Code yourself, once, on a compute node of your cluster.`,
   `Your Claude Code worker runs as a batch job on your cluster and is shown to you through Anthropic's Remote Control at claude.ai/code and in the Claude app. Files the worker reads and every command's output go to Anthropic; while you are connected the transcript is stored on Anthropic's servers under your own plan's terms.`,
   `${PRODUCT_NAME} depends on your university's cluster and portal and on Anthropic. Any of them can stop it working; because nothing is paid, nothing is refunded (sections 7 to 9).`,
   'Disputes: a signed written notice and 60 days to resolve it before any lawsuit; individual claims only (class-action waiver); Michigan courts, or small claims where you live; a jury waiver; one year to bring contract and warranty claims (sections 19 and 20). No arbitration in this version.',

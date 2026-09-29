@@ -1,0 +1,170 @@
+Ashley Bridge 4.0.0 end to end, run B (unapproved account zz9999), 2026-09-29
+
+Setup: the release build extension/.output/chrome-mv3 (4.0.0) in Playwright Chromium (Chrome for Testing
+153.0.8010.12), headless=false, a fresh persistent profile with the extension pinned; the mock portal
+(extension/mock-ood/server.mjs) over https at https://localhost:8443 with --user zz9999, MOCK_LOGGED_IN=false, the tool seeded at
+framework version 3; the REAL services.json and the REAL access service. The toolbar button was pressed on
+the portal tab with CDP Extensions.triggerAction (the action a click runs); the side panel was disabled first,
+so the background's own fallback opened the strip as a tab; the browser's permission prompt was answered with
+Windows UI Automation (Allow). The harness would have answered claude.ai / claude.com / anthropic.com requests
+locally; this run opened no such page.
+Times are UTC from this machine's clock; "+s" is seconds since the harness started. Headers are not logged
+(for the vendor requests only the content type and whether a Cookie header was present); the portal's form
+token in WebSocket URLs is redacted; the extension's own file loads (chrome-extension://) are counted, not listed.
+
+Summary
+  acceptance record written (accepted_at):     2026-09-29 19:10:11.725  + 149.5 s
+  vendor requests before that:                 0
+  first vendor request:                        2026-09-29 19:10:11.743  + 149.5 s  GET https://openspineconsortium.com/ashley/bridge-killlist.json  (0.02 s after the record)
+  access check:                                2026-09-29 19:10:26.792  POST https://ashley-service.openspineconsortium.workers.dev/access_check
+    content-type text/plain;charset=UTF-8; cookie header none
+    body   {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"4.0.0"}
+    answer 200 {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/ashley/request.html"}
+
+Events and requests, in order
+19:07:42.891 +   0.7 s  SETUP        mock portal at https://localhost:8443, dashboard user zz9999, MOCK_LOGGED_IN=false, tool seeded at framework version 3
+19:07:44.717 +   2.5 s  SETUP        Chromium 153.0.8010.12 with .output/chrome-mv3 (4.0.0), fresh profile
+19:07:44.963 +   2.8 s  SETUP        extension id ljkjllefjpjebnnghebkppmdfmnakjoo
+19:08:01.225 +  19.0 s  WAIT         B waits 130 s before accepting, so the kill-list alarm (1 min) and the access alarm (2 min) fire first
+19:10:11.254 + 149.1 s  ALARMS       bridge.poll next 2026-09-29T19:10:44.998Z every 1 min; bridge.killlist next 2026-09-30T19:08:45.043Z every 1440 min; bridge.access next 2026-09-30T19:09:45.058Z every 1440 min
+19:10:11.254 + 149.1 s  CHECK        vendor requests before the agreement was accepted: 0
+19:10:11.654 + 149.5 s  ACCEPT       pressed "Accept and Continue"
+19:10:11.743 + 149.5 s  REQUEST      GET https://openspineconsortium.com/ashley/bridge-killlist.json  [extension background (service worker); fetch] -> 200 answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+19:10:11.747 + 149.6 s  ROUTE        GET https://openspineconsortium.com/ashley/bridge-killlist.json
+19:10:11.752 + 149.6 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/bridge-killlist.json from extension background (service worker)
+19:10:11.869 + 149.7 s  ACCEPT       acceptance record in storage: terms_version 4, accepted_at 2026-09-29T19:10:11.725Z, button "Accept and Continue"
+19:10:23.001 + 160.8 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/bridge-killlist.json answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+19:10:23.030 + 160.8 s  KILLLIST     stored: issued 2026-09-29T15:32:36.000Z, revoked_versions []
+19:10:23.186 + 161.0 s  REQUEST      GET https://localhost:8443/login?go=1&redirect=%2Fpun%2Fsys%2Fdashboard%2F  [tab navigation; document] -> 302
+19:10:23.225 + 161.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [tab navigation; document] -> 200
+19:10:23.432 + 161.2 s  PORTAL       signed in; the dashboard says "Logged in as zz9999"
+19:10:23.444 + 161.2 s  HARNESS      side panel disabled (so the strip opens as a tab through the background fallback)
+19:10:23.961 + 161.8 s  CLICK        toolbar action on the portal tab (Extensions.triggerAction, tab target AF27EE2B...)
+19:10:26.720 + 164.5 s  PROMPT       pressed 'Allow' (invoke) in window 'Ashley Bridge - Google Chrome for Testing' (pid 26908)
+19:10:26.724 + 164.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:10:26.741 + 164.5 s  GRANT        origin https://localhost:8443 granted: true; strip tab opened: true
+19:10:26.751 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:10:26.753 + 164.6 s  ROUTE        GET https://openspineconsortium.com/ashley/services.json
+19:10:26.753 + 164.6 s  REQUEST      GET https://openspineconsortium.com/ashley/services.json  [extension background (service worker); fetch] -> 200 answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:10:26.756 + 164.6 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/services.json from extension background (service worker)
+19:10:26.792 + 164.6 s  REQUEST      POST https://ashley-service.openspineconsortium.workers.dev/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"4.0.0"} answer {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/ashley/request.html"}
+19:10:26.793 + 164.6 s  ROUTE        POST https://ashley-service.openspineconsortium.workers.dev/access_check
+19:10:26.798 + 164.6 s  VENDOR-REQ   POST https://ashley-service.openspineconsortium.workers.dev/access_check from extension background (service worker) body {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"4.0.0"}
+19:10:26.798 + 164.6 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/services.json answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:10:26.815 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:10:26.825 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+19:10:26.827 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:10:26.832 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:10:26.838 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+19:10:26.843 + 164.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+19:10:26.853 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:26.868 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:26.880 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:26.892 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.902 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.911 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.936 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.941 + 164.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.951 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.985 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:26.993 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.000 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.031 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:27.036 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:27.043 + 164.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:27.048 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:27.052 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:27.084 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.088 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.118 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.124 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.134 + 164.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:27.157 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.163 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.169 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.191 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:27.201 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:27.212 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.240 + 165.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:27.265 + 165.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.049 + 176.9 s  VENDOR-RES   200 https://ashley-service.openspineconsortium.workers.dev/access_check answer {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/ashley/request.html"}
+19:10:39.081 + 176.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:10:39.116 + 176.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.124 + 176.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.131 + 176.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.173 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.200 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.216 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.224 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.237 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.245 + 177.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.264 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.285 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.292 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.307 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.312 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.330 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.343 + 177.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.355 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.368 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.382 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.395 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.410 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.426 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.441 + 177.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.467 + 177.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.478 + 177.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.548 + 177.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:39.584 + 177.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.612 + 177.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.642 + 177.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:39.670 + 177.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:39.923 + 177.7 s  ACCESS       record: {"access_id":"zz9999","approved":false,"checked_at":"2026-09-29T19:10:26.748Z","last_attempt_at":"2026-09-29T19:10:26.748Z","portal":"localhost","request_page":"https://openspineconsortium.com/ashley/request.html","v":1}
+19:10:39.928 + 177.7 s  ACCESS       services on file: {"access_check":"https://ashley-service.openspineconsortium.workers.dev/access_check","fetched_at":"2026-09-29T19:10:26.787Z","request_page":"https://openspineconsortium.com/ashley/request.html"}
+19:10:39.931 + 177.7 s  ACCESS       identity on file (from the dashboard): {"seen_at":"2026-09-29T19:10:39.072Z","username":"zz9999"}
+19:10:39.960 + 177.8 s  STRIP        [access step] Your account zz9999 at localhost is not on the approved list yet. Ask for access; once it is approved, click the Ashley Bridge button again.
+19:10:39.965 + 177.8 s  STRIP        the one button reads "Ask for access"
+19:10:40.804 + 178.6 s  SHOT         B-strip-ask-for-access.png (page text clean)
+19:10:40.990 + 178.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:10:41.027 + 178.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:10:41.064 + 178.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:41.096 + 178.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:10:41.126 + 178.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:10:52.178 + 190.0 s  REQUEST      GET https://openspineconsortium.com/ashley/services.json  [tab openspineconsortium.com; fetch] -> 200 answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:10:52.179 + 190.0 s  ROUTE        GET https://openspineconsortium.com/ashley/services.json
+19:10:52.184 + 190.0 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/services.json from tab openspineconsortium.com
+19:10:52.232 + 190.0 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/services.json answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:10:54.721 + 192.5 s  REQUEST-PAGE opened https://openspineconsortium.com/ashley/request.html?access_id=zz9999
+19:10:54.731 + 192.5 s  REQUEST-PAGE first fields: input#accessId[name=accessId] value="zz9999" | input#name[name=name] value="" | input#email[name=email] value="zz9999@wayne.edu" | textarea#note[name=note] value=""
+19:10:55.688 + 193.5 s  SHOT         B-request-page.png (page text clean)
+19:10:55.688 + 193.5 s  WAIT         B waits 75 s (one poll alarm, where "start my worker when I open my portal" runs) before reading the job list
+19:11:45.026 + 242.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:11:45.099 + 242.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:11:45.111 + 242.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:11:45.144 + 242.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.155 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.186 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.199 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.230 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.240 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.271 + 243.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:11:45.282 + 243.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:11:45.355 + 243.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:11:45.389 + 243.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.422 + 243.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.452 + 243.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:11:45.483 + 243.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:12:10.701 + 268.5 s  JOBS         the mock's job list (no jobs.json: nothing was ever submitted): []
+19:12:10.706 + 268.5 s  JOBS         auto-start note: {"attempted_at":"2026-09-29T19:11:45.293Z","outcome":"not started: Your account zz9999 at localhost is not on the approved list yet. Ask for access; once it is approved, click the Ashley Bridge button again."}
+19:12:10.707 + 268.5 s  JOBS         state directory entries: []
+19:12:10.712 + 268.5 s  STRIP        still: Your account zz9999 at localhost is not on the approved list yet. Ask for access; once it is approved, click the Ashley Bridge button again.
+
+Extension file loads (chrome-extension://, not listed): 10
+Requests by initiator and host:
+     1  extension background (service worker) -> ashley-service.openspineconsortium.workers.dev
+     2  extension background (service worker) -> openspineconsortium.com
+    90  page script on the portal tab -> localhost:8443
+     2  tab navigation -> localhost:8443
+     1  tab openspineconsortium.com -> openspineconsortium.com
+
+Screenshots: none (evidence images kept outside the repository); page-text leaks: []

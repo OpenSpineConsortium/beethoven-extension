@@ -1,0 +1,674 @@
+Ashley Bridge 4.0.0 end to end, run A (approved account st1234), 2026-09-29
+
+Setup: the release build extension/.output/chrome-mv3 (4.0.0) in Playwright Chromium (Chrome for Testing
+153.0.8010.12), headless=false, a fresh persistent profile with the extension pinned; the mock portal
+(extension/mock-ood/server.mjs) over https at https://localhost:8443 with --user st1234, MOCK_LOGGED_IN=false, the tool seeded at
+framework version 3; the REAL services.json and the REAL access service. The toolbar button was pressed on
+the portal tab with CDP Extensions.triggerAction (the action a click runs); the side panel was disabled first,
+so the background's own fallback opened the strip as a tab; the browser's permission prompt was answered with
+Windows UI Automation (Allow). The harness answered locally every claude.ai / claude.com / anthropic.com
+request it could intercept (the STUB lines). It could not intercept the two top-level navigations the
+extension itself opened in new tabs with tabs.create (the mock's sign-in URL, claude.ai/oauth/authorize with a
+mock client id, at about +126 s, and the mock's claude.ai/code?environment= link at about +182 s): Playwright
+attached to those tabs after their first request, so those two requests are not listed and went to claude.ai
+itself; the claude.ai app they loaded then asked for its assets, which are the STUB lines. Nothing of the
+extension ran in those tabs.
+Times are UTC from this machine's clock; "+s" is seconds since the harness started. Headers are not logged
+(for the vendor requests only the content type and whether a Cookie header was present); the portal's form
+token in WebSocket URLs is redacted; the extension's own file loads (chrome-extension://) are counted, not listed.
+
+Summary
+  acceptance record written (accepted_at):     2026-09-29 19:03:51.989  +  22.9 s
+  vendor requests before that:                 0
+  first vendor request:                        2026-09-29 19:03:52.016  +  22.9 s  GET https://openspineconsortium.com/ashley/bridge-killlist.json  (0.03 s after the record)
+  access check:                                2026-09-29 19:04:08.269  POST https://ashley-service.openspineconsortium.workers.dev/access_check
+    content-type text/plain;charset=UTF-8; cookie header none
+    body   {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"4.0.0"}
+    answer 200 {"approved":true,"access_id":"st1234","checked":"2026-09-29T19:04:20.778Z","until":null}
+
+Events and requests, in order
+19:03:29.859 +   0.7 s  SETUP        mock portal at https://localhost:8443, dashboard user st1234, MOCK_LOGGED_IN=false, tool seeded at framework version 3
+19:03:31.627 +   2.5 s  SETUP        Chromium 153.0.8010.12 with .output/chrome-mv3 (4.0.0), fresh profile
+19:03:31.874 +   2.7 s  SETUP        extension id ljkjllefjpjebnnghebkppmdfmnakjoo
+19:03:49.919 +  20.8 s  SHOT         01-agreement-signing-dialog.png LEAK "Grego"
+19:03:51.421 +  22.3 s  SHOT         01b-agreement-statements.png LEAK "Grego"
+19:03:51.421 +  22.3 s  CHECK        vendor requests before the agreement was accepted: 0
+19:03:51.904 +  22.8 s  ACCEPT       pressed "Accept and Continue"
+19:03:52.016 +  22.9 s  REQUEST      GET https://openspineconsortium.com/ashley/bridge-killlist.json  [extension background (service worker); fetch] -> 200 answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+19:03:52.021 +  22.9 s  ROUTE        GET https://openspineconsortium.com/ashley/bridge-killlist.json
+19:03:52.030 +  22.9 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/bridge-killlist.json from extension background (service worker)
+19:03:52.173 +  23.0 s  ACCEPT       acceptance record in storage: terms_version 4, accepted_at 2026-09-29T19:03:51.989Z, button "Accept and Continue"
+19:04:03.224 +  34.1 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/bridge-killlist.json answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+19:04:03.335 +  34.2 s  KILLLIST     stored: issued 2026-09-29T15:32:36.000Z, revoked_versions []
+19:04:03.512 +  34.4 s  REQUEST      GET https://localhost:8443/login?go=1&redirect=%2Fpun%2Fsys%2Fdashboard%2F  [tab navigation; document] -> 302
+19:04:03.551 +  34.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [tab navigation; document] -> 200
+19:04:03.828 +  34.7 s  PORTAL       signed in; the dashboard says "Logged in as st1234"
+19:04:03.835 +  34.7 s  HARNESS      side panel disabled (so the strip opens as a tab through the background fallback)
+19:04:04.373 +  35.2 s  CLICK        toolbar action on the portal tab (Extensions.triggerAction, tab target F573142C...)
+19:04:08.121 +  39.0 s  PROMPT       pressed 'Allow' (invoke) in window 'Ashley Bridge - Google Chrome for Testing' (pid 32676)
+19:04:08.129 +  39.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:04:08.155 +  39.0 s  GRANT        origin https://localhost:8443 granted: true; strip tab opened: true
+19:04:08.166 +  39.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:04:08.183 +  39.1 s  REQUEST      GET https://openspineconsortium.com/ashley/services.json  [extension background (service worker); fetch] -> 200 answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:04:08.184 +  39.1 s  ROUTE        GET https://openspineconsortium.com/ashley/services.json
+19:04:08.190 +  39.1 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/services.json from extension background (service worker)
+19:04:08.253 +  39.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:04:08.269 +  39.1 s  REQUEST      POST https://ashley-service.openspineconsortium.workers.dev/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"4.0.0"} answer {"approved":true,"access_id":"st1234","checked":"2026-09-29T19:04:20.778Z","until":null}
+19:04:08.271 +  39.1 s  ROUTE        POST https://ashley-service.openspineconsortium.workers.dev/access_check
+19:04:08.276 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+19:04:08.277 +  39.2 s  VENDOR-REQ   POST https://ashley-service.openspineconsortium.workers.dev/access_check from extension background (service worker) body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"4.0.0"}
+19:04:08.278 +  39.2 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/services.json answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+19:04:08.283 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:04:08.291 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+19:04:08.298 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+19:04:08.303 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+19:04:08.319 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.362 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.373 +  39.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.382 +  39.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.429 +  39.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.436 +  39.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.473 +  39.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.487 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.510 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.522 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.540 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.555 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.570 +  39.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.586 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.596 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.619 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.640 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.647 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.658 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:08.674 +  39.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:08.703 +  39.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.711 +  39.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.726 +  39.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:08.756 +  39.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:08.766 +  39.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:08.790 +  39.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:08.821 +  39.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.852 +  39.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.883 +  39.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:08.915 +  39.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:20.861 +  51.7 s  VENDOR-RES   200 https://ashley-service.openspineconsortium.workers.dev/access_check answer {"approved":true,"access_id":"st1234","checked":"2026-09-29T19:04:20.778Z","until":null}
+19:04:20.890 +  51.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:04:20.931 +  51.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:20.937 +  51.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:20.944 +  51.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:20.979 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:20.987 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:20.995 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:21.002 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.016 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:21.041 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.053 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.062 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.066 +  51.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.083 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.106 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.120 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.127 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.132 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.147 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.165 +  52.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.187 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.194 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.211 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.221 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.253 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.265 +  52.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.295 +  52.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:21.326 +  52.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.343 +  52.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:21.349 +  52.2 s  ACCESS       record: {"access_id":"st1234","approved":true,"checked_at":"2026-09-29T19:04:08.177Z","last_attempt_at":"2026-09-29T19:04:08.177Z","portal":"localhost","request_page":"https://openspineconsortium.com/ashley/request.html","until":null,"v":1}
+19:04:21.354 +  52.2 s  ACCESS       services on file: {"access_check":"https://ashley-service.openspineconsortium.workers.dev/access_check","fetched_at":"2026-09-29T19:04:08.265Z","request_page":"https://openspineconsortium.com/ashley/request.html"}
+19:04:21.361 +  52.2 s  ACCESS       identity on file (from the dashboard): {"seen_at":"2026-09-29T19:04:20.883Z","username":"st1234"}
+19:04:21.370 +  52.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.388 +  52.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.396 +  52.3 s  STRIP        [sign-in step] Checking a compute node (a short job (ten minutes at most))...
+19:04:21.413 +  52.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.422 +  52.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.449 +  52.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.460 +  52.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:21.488 +  52.4 s  REQUEST      GET https://localhost:8443/pun/sys/shell/ssh/default  [page script on the portal tab; fetch] -> 200
+19:04:21.498 +  52.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:21.510 +  52.4 s  WS           page script on the portal tab opened wss://localhost:8443/pun/sys/shell/ssh/default?csrf=[redacted]
+19:04:22.413 +  53.3 s  STRIP        [sign-in step] Asking for a compute node to check (a short job (ten minutes at most))...
+19:04:24.390 +  55.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:04:24.420 +  55.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:04:24.453 +  55.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:24.486 +  55.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:04:24.519 +  55.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:04:25.459 +  56.3 s  STRIP        [sign-in step] Signing in to Claude on the cluster in 58 s (the scheduler is asked at most once a minute)...
+19:05:22.217 + 113.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:22.261 + 113.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.296 + 113.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.329 + 113.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.361 + 113.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:22.411 + 113.3 s  REQUEST      GET https://localhost:8443/pun/sys/shell/ssh/default  [page script on the portal tab; fetch] -> 200
+19:05:22.428 + 113.3 s  WS           page script on the portal tab opened wss://localhost:8443/pun/sys/shell/ssh/default?csrf=[redacted]
+19:05:22.449 + 113.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:22.483 + 113.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.516 + 113.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.548 + 113.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:22.581 + 113.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:23.234 + 114.1 s  STRIP        [sign-in step] Sign in to Claude in the tab that opened, then paste the code it shows below.
+19:05:27.640 + 118.5 s  SHOT         03-sign-in-to-claude.png (page text clean)
+19:05:27.689 + 118.6 s  STRIP        [statement step] Sign in to Claude in the tab that opened, then paste the code it shows below.
+19:05:28.457 + 119.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:28.468 + 119.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:28.498 + 119.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.510 + 119.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.542 + 119.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.552 + 119.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.582 + 119.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.592 + 119.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.622 + 119.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:28.632 + 119.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:28.691 + 119.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:28.700 + 119.6 s  STRIP        [statement step] Read where your work goes and make the statement about worker "worker".
+19:05:28.735 + 119.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:30.386 + 121.3 s  SHOT         03b-where-your-work-goes.png (page text clean)
+19:05:30.580 + 121.5 s  STRIP        [online] Read where your work goes and make the statement about worker "worker".
+19:05:30.613 + 121.5 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/consent  [page script on the portal tab; fetch] -> 200 (body 62 bytes)
+19:05:30.659 + 121.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:30.703 + 121.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.740 + 121.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:30.756 + 121.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:30.768 + 121.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.812 + 121.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.823 + 121.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.833 + 121.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.874 + 121.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.885 + 121.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.895 + 121.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:30.944 + 121.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.956 + 121.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:30.992 + 121.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:31.005 + 121.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:31.593 + 122.5 s  STRIP        [online] Starting your worker in 52 s (the scheduler is asked at most once a minute)...
+19:05:31.922 + 122.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:05:31.985 + 122.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:31.999 + 122.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:32.035 + 122.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.047 + 122.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.081 + 123.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.095 + 123.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.129 + 123.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.141 + 123.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.175 + 123.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:32.189 + 123.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:32.250 + 123.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:32.287 + 123.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.323 + 123.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.358 + 123.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:32.397 + 123.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:32.607 + 123.5 s  STRIP        [online] Starting your worker in 51 s (the scheduler is asked at most once a minute)...
+19:05:32.920 + 123.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:05:32.992 + 123.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:33.006 + 123.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:05:33.041 + 123.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.053 + 123.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.090 + 124.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.101 + 124.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.138 + 124.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.150 + 124.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:05:33.187 + 124.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:33.199 + 124.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:05:33.622 + 124.5 s  STRIP        [online] Starting your worker in 50 s (the scheduler is asked at most once a minute)...
+19:05:36.001 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cc27851ad-DDVos-BJ.woff2  [tab claude.ai; font] -> 200
+19:05:36.002 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cc27851ad-DDVos-BJ.woff2 answered locally
+19:05:36.010 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c66fc489e-2VcCjn5t.woff2 answered locally
+19:05:36.010 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c66fc489e-2VcCjn5t.woff2  [tab claude.ai; font] -> 200
+19:05:36.012 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/index-C8KFjwKO.js answered locally
+19:05:36.012 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/index-C8KFjwKO.js  [tab claude.ai; script] -> 200
+19:05:36.014 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DDbHGESR.css  [tab claude.ai; stylesheet] -> 200
+19:05:36.015 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DDbHGESR.css answered locally
+19:05:36.016 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-kkJVc38W.css  [tab claude.ai; stylesheet] -> 200
+19:05:36.017 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-kkJVc38W.css answered locally
+19:05:36.018 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c6a992d55-DocaKAQx.css  [tab claude.ai; stylesheet] -> 200
+19:05:36.019 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c6a992d55-DocaKAQx.css answered locally
+19:05:36.054 + 126.9 s  STUB         GET https://claude.ai/edge-api/bootstrap?statsig_hashing_algorithm=djb2&growthbook_format=sdk&cache_bust=1&include_system_pr answered locally
+19:05:36.054 + 126.9 s  REQUEST      GET https://claude.ai/edge-api/bootstrap?statsig_hashing_algorithm=djb2&growthbook_format=sdk&cache_bust=1&include_system_prompts=false  [tab claude.ai; fetch] -> 200
+19:05:36.056 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-zod-Q8jeRGLQ.js  [tab claude.ai; script] -> 200
+19:05:36.057 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-zod-Q8jeRGLQ.js answered locally
+19:05:36.064 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/rolldown-runtime-Cd2N18a1.js answered locally
+19:05:36.064 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/rolldown-runtime-Cd2N18a1.js  [tab claude.ai; script] -> 200
+19:05:36.066 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-frame-BWXitXo0.js answered locally
+19:05:36.066 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-frame-BWXitXo0.js  [tab claude.ai; script] -> 200
+19:05:36.068 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/preload-helper-BT8-AKxH.js answered locally
+19:05:36.068 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/preload-helper-BT8-AKxH.js  [tab claude.ai; script] -> 200
+19:05:36.069 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-boot-oHXvRmGR.js  [tab claude.ai; script] -> 200
+19:05:36.070 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-boot-oHXvRmGR.js answered locally
+19:05:36.071 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DZfW-p3r.js answered locally
+19:05:36.071 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DZfW-p3r.js  [tab claude.ai; script] -> 200
+19:05:36.073 + 126.9 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-datadog-BglT4u3l.js answered locally
+19:05:36.073 + 126.9 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-datadog-BglT4u3l.js  [tab claude.ai; script] -> 200
+19:05:36.075 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-growthbook-C_0pIM8g.js answered locally
+19:05:36.075 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-growthbook-C_0pIM8g.js  [tab claude.ai; script] -> 200
+19:05:36.077 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-query-Xq1zR-dl.js answered locally
+19:05:36.077 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-query-Xq1zR-dl.js  [tab claude.ai; script] -> 200
+19:05:36.078 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-common-mcp-msg-0-DuM0mGFd.js answered locally
+19:05:36.078 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-common-mcp-msg-0-DuM0mGFd.js  [tab claude.ai; script] -> 200
+19:05:36.101 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-router-DF-9-pqb.js  [tab claude.ai; script] -> 200
+19:05:36.102 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-router-DF-9-pqb.js answered locally
+19:05:36.103 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-0-DD66e0_o.js answered locally
+19:05:36.103 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-0-DD66e0_o.js  [tab claude.ai; script] -> 200
+19:05:36.104 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-1-6x-JlqOO.js answered locally
+19:05:36.104 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-1-6x-JlqOO.js  [tab claude.ai; script] -> 200
+19:05:36.105 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-2-DuIyIbCq.js answered locally
+19:05:36.105 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-2-DuIyIbCq.js  [tab claude.ai; script] -> 200
+19:05:36.106 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-intl-4yuHOp3_.js answered locally
+19:05:36.106 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-intl-4yuHOp3_.js  [tab claude.ai; script] -> 200
+19:05:36.107 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-3-ByEKCW4W.js  [tab claude.ai; script] -> 200
+19:05:36.108 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-3-ByEKCW4W.js answered locally
+19:05:36.109 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-4-Dsg7emDY.js answered locally
+19:05:36.109 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-4-Dsg7emDY.js  [tab claude.ai; script] -> 200
+19:05:36.110 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-base-ui-P81KMRwC.js answered locally
+19:05:36.110 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-base-ui-P81KMRwC.js  [tab claude.ai; script] -> 200
+19:05:36.111 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-5-B-dn0lWb.js answered locally
+19:05:36.111 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-5-B-dn0lWb.js  [tab claude.ai; script] -> 200
+19:05:36.115 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-motion-TJX6DniK.js  [tab claude.ai; script] -> 200
+19:05:36.116 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-motion-TJX6DniK.js answered locally
+19:05:36.117 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-6-CCT41YkV.js  [tab claude.ai; script] -> 200
+19:05:36.118 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-6-CCT41YkV.js answered locally
+19:05:36.119 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-0-BTH1l8O_.js answered locally
+19:05:36.119 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-0-BTH1l8O_.js  [tab claude.ai; script] -> 200
+19:05:36.121 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-0-CEqtRKql.js answered locally
+19:05:36.121 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-0-CEqtRKql.js  [tab claude.ai; script] -> 200
+19:05:36.122 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-1-DTW6rhLZ.js answered locally
+19:05:36.122 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-1-DTW6rhLZ.js  [tab claude.ai; script] -> 200
+19:05:36.123 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-msg-0-WhSLYHpR.js  [tab claude.ai; script] -> 200
+19:05:36.124 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-msg-0-WhSLYHpR.js answered locally
+19:05:36.125 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-msg-0-BKqrAs7v.js answered locally
+19:05:36.125 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-msg-0-BKqrAs7v.js  [tab claude.ai; script] -> 200
+19:05:36.126 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-0-DoSVKNI5.js answered locally
+19:05:36.126 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-0-DoSVKNI5.js  [tab claude.ai; script] -> 200
+19:05:36.128 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-prosemirror-Cy9fGWHi.js answered locally
+19:05:36.128 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-prosemirror-Cy9fGWHi.js  [tab claude.ai; script] -> 200
+19:05:36.129 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-tiptap-CzD-0r57.js answered locally
+19:05:36.129 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-tiptap-CzD-0r57.js  [tab claude.ai; script] -> 200
+19:05:36.130 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-1-UnePNii8.js answered locally
+19:05:36.130 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-1-UnePNii8.js  [tab claude.ai; script] -> 200
+19:05:36.132 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-0-DWpZsPRj.js answered locally
+19:05:36.132 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-0-DWpZsPRj.js  [tab claude.ai; script] -> 200
+19:05:36.133 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-markdown-CkQ6J3st.js answered locally
+19:05:36.133 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-markdown-CkQ6J3st.js  [tab claude.ai; script] -> 200
+19:05:36.135 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-0-o6O8SI8i.js answered locally
+19:05:36.135 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-0-o6O8SI8i.js  [tab claude.ai; script] -> 200
+19:05:36.137 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-1-DYduyNZF.js answered locally
+19:05:36.137 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-1-DYduyNZF.js  [tab claude.ai; script] -> 200
+19:05:36.138 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-2-DL2gJ22u.js answered locally
+19:05:36.138 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-2-DL2gJ22u.js  [tab claude.ai; script] -> 200
+19:05:36.174 + 127.0 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-0-CTYD3U03.js answered locally
+19:05:36.174 + 127.0 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-0-CTYD3U03.js  [tab claude.ai; script] -> 200
+19:05:36.176 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-2-DGwovBPZ.js answered locally
+19:05:36.176 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-2-DGwovBPZ.js  [tab claude.ai; script] -> 200
+19:05:36.177 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-3-D9rDJbw7.js  [tab claude.ai; script] -> 200
+19:05:36.178 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-3-D9rDJbw7.js answered locally
+19:05:36.179 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-utils-Dqlf2j48.js  [tab claude.ai; script] -> 200
+19:05:36.180 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-utils-Dqlf2j48.js answered locally
+19:05:36.181 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-4-ik_-14h1.js  [tab claude.ai; script] -> 200
+19:05:36.182 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-4-ik_-14h1.js answered locally
+19:05:36.184 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-icons-4AUMXoB9.js answered locally
+19:05:36.184 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-icons-4AUMXoB9.js  [tab claude.ai; script] -> 200
+19:05:36.186 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c0f671921-Bqc4nZA-.woff2 answered locally
+19:05:36.186 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c0f671921-Bqc4nZA-.woff2  [tab claude.ai; font] -> 200
+19:05:36.188 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-5-Bee_Cl7X.js answered locally
+19:05:36.188 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-5-Bee_Cl7X.js  [tab claude.ai; script] -> 200
+19:05:36.194 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-BNjTERdz.js  [tab claude.ai; script] -> 200
+19:05:36.195 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-BNjTERdz.js answered locally
+19:05:36.197 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-6-C8lBHg0v.js answered locally
+19:05:36.197 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-6-C8lBHg0v.js  [tab claude.ai; script] -> 200
+19:05:36.199 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-7-DVFpJBuZ.js answered locally
+19:05:36.199 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-7-DVFpJBuZ.js  [tab claude.ai; script] -> 200
+19:05:36.201 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-8-C1x9YG30.js answered locally
+19:05:36.201 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-8-C1x9YG30.js  [tab claude.ai; script] -> 200
+19:05:36.203 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-9-CjcBMAbU.js answered locally
+19:05:36.203 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-9-CjcBMAbU.js  [tab claude.ai; script] -> 200
+19:05:36.204 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-10-BFXTXAJc.js  [tab claude.ai; script] -> 200
+19:05:36.205 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-10-BFXTXAJc.js answered locally
+19:05:36.212 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-11-4lpa9arv.js  [tab claude.ai; script] -> 200
+19:05:36.213 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-11-4lpa9arv.js answered locally
+19:05:36.214 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-12-BM6lfplL.js answered locally
+19:05:36.214 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-12-BM6lfplL.js  [tab claude.ai; script] -> 200
+19:05:36.215 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-13-DpYLtxjC.js  [tab claude.ai; script] -> 200
+19:05:36.216 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-13-DpYLtxjC.js answered locally
+19:05:36.217 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-14-DgJ20r3B.js answered locally
+19:05:36.217 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-14-DgJ20r3B.js  [tab claude.ai; script] -> 200
+19:05:36.218 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-15-BR5DzK_8.js answered locally
+19:05:36.218 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-15-BR5DzK_8.js  [tab claude.ai; script] -> 200
+19:05:36.219 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-16-3CJfYzn3.js answered locally
+19:05:36.219 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-16-3CJfYzn3.js  [tab claude.ai; script] -> 200
+19:05:36.220 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-17-CIHe4HIU.js answered locally
+19:05:36.220 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-17-CIHe4HIU.js  [tab claude.ai; script] -> 200
+19:05:36.222 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-18-C7NT7yXl.js answered locally
+19:05:36.222 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-18-C7NT7yXl.js  [tab claude.ai; script] -> 200
+19:05:36.223 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-19-BfgFFL9E.js answered locally
+19:05:36.223 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-19-BfgFFL9E.js  [tab claude.ai; script] -> 200
+19:05:36.224 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-20-C-5CXXhP.js answered locally
+19:05:36.224 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-20-C-5CXXhP.js  [tab claude.ai; script] -> 200
+19:05:36.225 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-21-GUuwmr-2.js answered locally
+19:05:36.225 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-21-GUuwmr-2.js  [tab claude.ai; script] -> 200
+19:05:36.226 + 127.1 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-22-BAkIjc1v.js answered locally
+19:05:36.226 + 127.1 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-22-BAkIjc1v.js  [tab claude.ai; script] -> 200
+19:05:36.228 + 127.1 s  STUB         GET https://claude.ai/manifest.json answered locally
+19:05:36.228 + 127.1 s  REQUEST      GET https://claude.ai/manifest.json  [tab claude.ai; manifest] -> 200
+19:05:36.245 + 127.1 s  STUB         GET https://claude.ai/cdn-cgi/challenge-platform/scripts/jsd/main.js answered locally
+19:05:36.245 + 127.1 s  REQUEST      GET https://claude.ai/cdn-cgi/challenge-platform/scripts/jsd/main.js  [tab ; script] -> 200
+19:05:36.306 + 127.2 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cd02a42d9-Vq_H3mgS.svg answered locally
+19:05:36.306 + 127.2 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cd02a42d9-Vq_H3mgS.svg  [tab claude.ai; other] -> 200
+19:05:41.092 + 132.0 s  STUB         GET https://claude.ai/edge-api/client-health/check?platform=web&bundle=1790701925&locale=en-US answered locally
+19:05:41.092 + 132.0 s  REQUEST      GET https://claude.ai/edge-api/client-health/check?platform=web&bundle=1790701925&locale=en-US  [tab claude.ai; fetch] -> 200
+19:06:23.206 + 174.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:23.255 + 174.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.297 + 174.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.340 + 174.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.385 + 174.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:06:23.457 + 174.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:23.497 + 174.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.539 + 174.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.587 + 174.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.629 + 174.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:06:23.673 + 174.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:06:23.739 + 174.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:23.757 + 174.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:23.803 + 174.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.819 + 174.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.862 + 174.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.874 + 174.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.918 + 174.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.932 + 174.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:23.976 + 174.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:06:23.990 + 174.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:06:24.039 + 174.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:24.081 + 175.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+19:06:24.124 + 175.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:24.169 + 175.0 s  REQUEST      GET https://localhost:8443/pun/sys/shell/ssh/default  [page script on the portal tab; fetch] -> 200
+19:06:24.184 + 175.1 s  WS           page script on the portal tab opened wss://localhost:8443/pun/sys/shell/ssh/default?csrf=[redacted]
+19:06:24.331 + 175.2 s  STRIP        [online] Starting your worker (one job on the cluster)...
+19:06:31.193 + 182.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/status.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.241 + 182.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/connection.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.282 + 182.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/rc.log?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.484 + 182.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:31.504 + 182.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:31.519 + 182.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:31.610 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cc27851ad-DDVos-BJ.woff2 answered locally
+19:06:31.610 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cc27851ad-DDVos-BJ.woff2  [tab claude.ai; font] -> 200
+19:06:31.614 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c66fc489e-2VcCjn5t.woff2 answered locally
+19:06:31.614 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c66fc489e-2VcCjn5t.woff2  [tab claude.ai; font] -> 200
+19:06:31.616 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/index-C8KFjwKO.js answered locally
+19:06:31.616 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/index-C8KFjwKO.js  [tab claude.ai; script] -> 200
+19:06:31.623 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DDbHGESR.css  [tab claude.ai; stylesheet] -> 200
+19:06:31.624 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DDbHGESR.css answered locally
+19:06:31.625 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-kkJVc38W.css  [tab claude.ai; stylesheet] -> 200
+19:06:31.626 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-kkJVc38W.css answered locally
+19:06:31.627 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c6a992d55-DocaKAQx.css  [tab claude.ai; stylesheet] -> 200
+19:06:31.628 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c6a992d55-DocaKAQx.css answered locally
+19:06:31.667 + 182.5 s  STUB         GET https://claude.ai/edge-api/bootstrap?statsig_hashing_algorithm=djb2&growthbook_format=sdk&cache_bust=1&include_system_pr answered locally
+19:06:31.667 + 182.5 s  REQUEST      GET https://claude.ai/edge-api/bootstrap?statsig_hashing_algorithm=djb2&growthbook_format=sdk&cache_bust=1&include_system_prompts=false  [tab claude.ai; fetch] -> 200
+19:06:31.672 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-zod-Q8jeRGLQ.js answered locally
+19:06:31.672 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-zod-Q8jeRGLQ.js  [tab claude.ai; script] -> 200
+19:06:31.673 + 182.5 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/rolldown-runtime-Cd2N18a1.js answered locally
+19:06:31.673 + 182.5 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/rolldown-runtime-Cd2N18a1.js  [tab claude.ai; script] -> 200
+19:06:31.675 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-frame-BWXitXo0.js answered locally
+19:06:31.675 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-frame-BWXitXo0.js  [tab claude.ai; script] -> 200
+19:06:31.676 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/preload-helper-BT8-AKxH.js answered locally
+19:06:31.676 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/preload-helper-BT8-AKxH.js  [tab claude.ai; script] -> 200
+19:06:31.677 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-boot-oHXvRmGR.js answered locally
+19:06:31.677 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-boot-oHXvRmGR.js  [tab claude.ai; script] -> 200
+19:06:31.680 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DZfW-p3r.js answered locally
+19:06:31.680 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-frame-DZfW-p3r.js  [tab claude.ai; script] -> 200
+19:06:31.682 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-datadog-BglT4u3l.js answered locally
+19:06:31.682 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-datadog-BglT4u3l.js  [tab claude.ai; script] -> 200
+19:06:31.684 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-growthbook-C_0pIM8g.js answered locally
+19:06:31.684 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-growthbook-C_0pIM8g.js  [tab claude.ai; script] -> 200
+19:06:31.685 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-query-Xq1zR-dl.js answered locally
+19:06:31.685 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-query-Xq1zR-dl.js  [tab claude.ai; script] -> 200
+19:06:31.686 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-common-mcp-msg-0-DuM0mGFd.js answered locally
+19:06:31.686 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-common-mcp-msg-0-DuM0mGFd.js  [tab claude.ai; script] -> 200
+19:06:31.713 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-router-DF-9-pqb.js answered locally
+19:06:31.713 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-router-DF-9-pqb.js  [tab claude.ai; script] -> 200
+19:06:31.715 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c0f671921-Bqc4nZA-.woff2 answered locally
+19:06:31.715 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/c0f671921-Bqc4nZA-.woff2  [tab claude.ai; font] -> 200
+19:06:31.717 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-0-DD66e0_o.js answered locally
+19:06:31.717 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-0-DD66e0_o.js  [tab claude.ai; script] -> 200
+19:06:31.719 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-1-6x-JlqOO.js answered locally
+19:06:31.719 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-1-6x-JlqOO.js  [tab claude.ai; script] -> 200
+19:06:31.720 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-2-DuIyIbCq.js answered locally
+19:06:31.720 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-2-DuIyIbCq.js  [tab claude.ai; script] -> 200
+19:06:31.722 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-intl-4yuHOp3_.js answered locally
+19:06:31.722 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-intl-4yuHOp3_.js  [tab claude.ai; script] -> 200
+19:06:31.726 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-3-ByEKCW4W.js answered locally
+19:06:31.726 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-3-ByEKCW4W.js  [tab claude.ai; script] -> 200
+19:06:31.727 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-4-Dsg7emDY.js answered locally
+19:06:31.727 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-4-Dsg7emDY.js  [tab claude.ai; script] -> 200
+19:06:31.728 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-base-ui-P81KMRwC.js  [tab claude.ai; script] -> 200
+19:06:31.729 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-base-ui-P81KMRwC.js answered locally
+19:06:31.729 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-5-B-dn0lWb.js  [tab claude.ai; script] -> 200
+19:06:31.730 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-5-B-dn0lWb.js answered locally
+19:06:31.731 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-motion-TJX6DniK.js answered locally
+19:06:31.731 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-motion-TJX6DniK.js  [tab claude.ai; script] -> 200
+19:06:31.732 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-6-CCT41YkV.js answered locally
+19:06:31.732 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-mcp-msg-6-CCT41YkV.js  [tab claude.ai; script] -> 200
+19:06:31.733 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-0-BTH1l8O_.js answered locally
+19:06:31.733 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-0-BTH1l8O_.js  [tab claude.ai; script] -> 200
+19:06:31.734 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-0-CEqtRKql.js answered locally
+19:06:31.734 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-0-CEqtRKql.js  [tab claude.ai; script] -> 200
+19:06:31.735 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-1-DTW6rhLZ.js answered locally
+19:06:31.735 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-common-msg-1-DTW6rhLZ.js  [tab claude.ai; script] -> 200
+19:06:31.736 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-msg-0-WhSLYHpR.js answered locally
+19:06:31.736 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-msg-0-WhSLYHpR.js  [tab claude.ai; script] -> 200
+19:06:31.737 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-msg-0-BKqrAs7v.js answered locally
+19:06:31.737 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-msg-0-BKqrAs7v.js  [tab claude.ai; script] -> 200
+19:06:31.738 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-0-DoSVKNI5.js answered locally
+19:06:31.738 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-0-DoSVKNI5.js  [tab claude.ai; script] -> 200
+19:06:31.739 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-prosemirror-Cy9fGWHi.js answered locally
+19:06:31.739 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-prosemirror-Cy9fGWHi.js  [tab claude.ai; script] -> 200
+19:06:31.740 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-tiptap-CzD-0r57.js  [tab claude.ai; script] -> 200
+19:06:31.741 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-tiptap-CzD-0r57.js answered locally
+19:06:31.741 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-1-UnePNii8.js  [tab claude.ai; script] -> 200
+19:06:31.742 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-1-UnePNii8.js answered locally
+19:06:31.742 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-0-DWpZsPRj.js  [tab claude.ai; script] -> 200
+19:06:31.743 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-0-DWpZsPRj.js answered locally
+19:06:31.743 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-markdown-CkQ6J3st.js  [tab claude.ai; script] -> 200
+19:06:31.744 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-markdown-CkQ6J3st.js answered locally
+19:06:31.745 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-0-o6O8SI8i.js answered locally
+19:06:31.745 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-mcp-0-o6O8SI8i.js  [tab claude.ai; script] -> 200
+19:06:31.746 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-1-DYduyNZF.js answered locally
+19:06:31.746 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-1-DYduyNZF.js  [tab claude.ai; script] -> 200
+19:06:31.747 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-2-DL2gJ22u.js answered locally
+19:06:31.747 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-2-DL2gJ22u.js  [tab claude.ai; script] -> 200
+19:06:31.750 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-0-CTYD3U03.js answered locally
+19:06:31.750 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-all-0-CTYD3U03.js  [tab claude.ai; script] -> 200
+19:06:31.751 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-2-DGwovBPZ.js  [tab claude.ai; script] -> 200
+19:06:31.752 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-msg-2-DGwovBPZ.js answered locally
+19:06:31.753 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-3-D9rDJbw7.js answered locally
+19:06:31.753 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-3-D9rDJbw7.js  [tab claude.ai; script] -> 200
+19:06:31.754 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-utils-Dqlf2j48.js answered locally
+19:06:31.754 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-utils-Dqlf2j48.js  [tab claude.ai; script] -> 200
+19:06:31.755 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-4-ik_-14h1.js answered locally
+19:06:31.755 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-4-ik_-14h1.js  [tab claude.ai; script] -> 200
+19:06:31.756 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-icons-4AUMXoB9.js answered locally
+19:06:31.756 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/vendor-icons-4AUMXoB9.js  [tab claude.ai; script] -> 200
+19:06:31.757 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-5-Bee_Cl7X.js answered locally
+19:06:31.757 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-5-Bee_Cl7X.js  [tab claude.ai; script] -> 200
+19:06:31.758 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-BNjTERdz.js  [tab claude.ai; script] -> 200
+19:06:31.759 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-styles-BNjTERdz.js answered locally
+19:06:31.759 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-6-C8lBHg0v.js  [tab claude.ai; script] -> 200
+19:06:31.760 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-6-C8lBHg0v.js answered locally
+19:06:31.761 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-7-DVFpJBuZ.js answered locally
+19:06:31.761 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-7-DVFpJBuZ.js  [tab claude.ai; script] -> 200
+19:06:31.762 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-8-C1x9YG30.js answered locally
+19:06:31.762 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-8-C1x9YG30.js  [tab claude.ai; script] -> 200
+19:06:31.763 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-9-CjcBMAbU.js answered locally
+19:06:31.763 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-9-CjcBMAbU.js  [tab claude.ai; script] -> 200
+19:06:31.764 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-10-BFXTXAJc.js answered locally
+19:06:31.764 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-10-BFXTXAJc.js  [tab claude.ai; script] -> 200
+19:06:31.765 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-11-4lpa9arv.js answered locally
+19:06:31.765 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-11-4lpa9arv.js  [tab claude.ai; script] -> 200
+19:06:31.766 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-12-BM6lfplL.js answered locally
+19:06:31.766 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-12-BM6lfplL.js  [tab claude.ai; script] -> 200
+19:06:31.767 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-13-DpYLtxjC.js answered locally
+19:06:31.767 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-13-DpYLtxjC.js  [tab claude.ai; script] -> 200
+19:06:31.768 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-14-DgJ20r3B.js answered locally
+19:06:31.768 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-14-DgJ20r3B.js  [tab claude.ai; script] -> 200
+19:06:31.772 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-15-BR5DzK_8.js answered locally
+19:06:31.772 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-15-BR5DzK_8.js  [tab claude.ai; script] -> 200
+19:06:31.773 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-16-3CJfYzn3.js answered locally
+19:06:31.773 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-16-3CJfYzn3.js  [tab claude.ai; script] -> 200
+19:06:31.774 + 182.6 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-17-CIHe4HIU.js answered locally
+19:06:31.774 + 182.6 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-17-CIHe4HIU.js  [tab claude.ai; script] -> 200
+19:06:31.775 + 182.7 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-18-C7NT7yXl.js answered locally
+19:06:31.775 + 182.7 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-18-C7NT7yXl.js  [tab claude.ai; script] -> 200
+19:06:31.776 + 182.7 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-19-BfgFFL9E.js answered locally
+19:06:31.776 + 182.7 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-19-BfgFFL9E.js  [tab claude.ai; script] -> 200
+19:06:31.777 + 182.7 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-20-C-5CXXhP.js answered locally
+19:06:31.777 + 182.7 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-20-C-5CXXhP.js  [tab claude.ai; script] -> 200
+19:06:31.778 + 182.7 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-21-GUuwmr-2.js  [tab claude.ai; script] -> 200
+19:06:31.779 + 182.7 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-21-GUuwmr-2.js answered locally
+19:06:31.780 + 182.7 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-22-BAkIjc1v.js answered locally
+19:06:31.780 + 182.7 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/shared-22-BAkIjc1v.js  [tab claude.ai; script] -> 200
+19:06:31.807 + 182.7 s  STUB         GET https://claude.ai/manifest.json answered locally
+19:06:31.807 + 182.7 s  REQUEST      GET https://claude.ai/manifest.json  [tab claude.ai; manifest] -> 200
+19:06:31.809 + 182.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.813 + 182.7 s  STUB         GET https://claude.ai/cdn-cgi/challenge-platform/scripts/jsd/main.js answered locally
+19:06:31.813 + 182.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.813 + 182.7 s  REQUEST      GET https://claude.ai/cdn-cgi/challenge-platform/scripts/jsd/main.js  [tab ; script] -> 200
+19:06:31.815 + 182.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.878 + 182.8 s  STUB         GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cd02a42d9-Vq_H3mgS.svg answered locally
+19:06:31.878 + 182.8 s  REQUEST      GET https://assets-proxy.anthropic.com/claude-ai/v2/assets/v1/cd02a42d9-Vq_H3mgS.svg  [tab claude.ai; other] -> 200
+19:06:31.897 + 182.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.960 + 182.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/status.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.977 + 182.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:31.992 + 182.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.010 + 182.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.083 + 183.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/connection.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.098 + 183.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.114 + 183.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.130 + 183.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.207 + 183.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/rc.log?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.223 + 183.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.240 + 183.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.313 + 183.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:06:32.354 + 183.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:32.405 + 183.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.421 + 183.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:32.438 + 183.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:32.455 + 183.3 s  STRIP        [online] Your worker is online: node01-amber-lantern.
+19:06:32.513 + 183.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.531 + 183.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.546 + 183.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.610 + 183.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.625 + 183.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.645 + 183.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.692 + 183.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.727 + 183.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.766 + 183.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:32.817 + 183.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.833 + 183.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:32.913 + 183.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:32.960 + 183.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:33.010 + 183.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:33.057 + 183.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:33.104 + 184.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:34.362 + 185.2 s  SHOT         04-worker-online-open-in-claude.png (page text clean)
+19:06:34.524 + 185.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:06:34.575 + 185.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:06:34.623 + 185.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:34.674 + 185.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:06:34.723 + 185.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:06:36.674 + 187.5 s  STUB         GET https://claude.ai/edge-api/client-health/check?platform=web&bundle=1790701925&locale=en-US answered locally
+19:06:36.674 + 187.5 s  REQUEST      GET https://claude.ai/edge-api/client-health/check?platform=web&bundle=1790701925&locale=en-US  [tab claude.ai; fetch] -> 200
+19:07:05.524 + 216.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:07:05.589 + 216.5 s  REQUEST      GET https://localhost:8443/pun/sys/shell/ssh/default  [page script on the portal tab; fetch] -> 200
+19:07:05.605 + 216.5 s  WS           page script on the portal tab opened wss://localhost:8443/pun/sys/shell/ssh/default?csrf=[redacted]
+19:07:05.629 + 216.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:05.681 + 216.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:05.732 + 216.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:05.783 + 216.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:05.835 + 216.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:06.948 + 217.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+19:07:07.011 + 217.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user  [page script on the portal tab; fetch] -> 200
+19:07:07.064 + 217.9 s  REQUEST      GET https://localhost:8443/pun/sys/myjobs/workflows.json  [page script on the portal tab; fetch] -> 404
+19:07:07.108 + 218.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/projects  [page script on the portal tab; fetch] -> 200
+19:07:07.157 + 218.0 s  REQUEST      GET https://localhost:8443/rnode/login1/1/  [page script on the portal tab; fetch] -> 404
+19:07:07.206 + 218.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:07.259 + 218.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:07.312 + 218.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:07.398 + 218.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:07.450 + 218.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:07.501 + 218.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:07.555 + 218.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:07.608 + 218.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:09.390 + 220.3 s  CHECKS       run 1: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+19:07:09.754 + 220.6 s  STRIP        [online (reopened strip)] Waking up your portal...
+19:07:09.787 + 220.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+19:07:09.915 + 220.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:09.937 + 220.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:10.016 + 220.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.048 + 220.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.134 + 221.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.165 + 221.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.247 + 221.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.292 + 221.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:10.432 + 221.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:10.471 + 221.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:10.767 + 221.6 s  STRIP        [online (reopened strip)] Your worker is online: node01-amber-lantern.
+19:07:11.009 + 221.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:11.127 + 222.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:11.273 + 222.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:11.382 + 222.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:11.466 + 222.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:13.684 + 224.6 s  SCROLL       Your worker at the top: true
+19:07:14.599 + 225.5 s  SHOT         04b-details-worker-card.png (page text clean)
+19:07:14.608 + 225.5 s  CHECKS       tags shown on the reopened strip: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+19:07:15.046 + 225.9 s  SCROLL       Checks at the top: true
+19:07:15.942 + 226.8 s  SHOT         02-checks.png (page text clean)
+19:07:31.933 + 242.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/status.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:31.992 + 242.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/connection.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:32.045 + 242.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/worker/rc.log?download=1  [page script on the portal tab; fetch] -> 200
+19:07:32.135 + 243.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+19:07:32.192 + 243.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+19:07:32.246 + 243.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:32.301 + 243.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:32.356 + 243.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:35.949 + 246.8 s  RATE         page-script requests to the portal in 20 s with Details open and nothing to do: 8
+19:07:36.132 + 247.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+19:07:36.194 + 247.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 200
+19:07:37.194 + 248.1 s  SETUP-PAGE   access card: There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and Ashley Bridge asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version. Not approved yet? Ask for access; the maintainer approves it, and the next click on the Ashley Bridge button checks again. Access approved for st1234 at localhost (checked 2026-09-29 19:04 UTC) account st1234 at localhost; the service last answered 9/29/2026, 3:04:08 PM Check my access now
+19:07:38.097 + 249.0 s  SHOT         05-setup-page.png (page text clean)
+19:07:39.488 + 250.4 s  SHOT         05b-setup-page-settings.png (page text clean)
+
+Extension file loads (chrome-extension://, not listed): 17
+Requests by initiator and host:
+     1  extension background (service worker) -> ashley-service.openspineconsortium.workers.dev
+     2  extension background (service worker) -> openspineconsortium.com
+   264  page script on the portal tab -> localhost:8443
+     2  tab  -> claude.ai
+   136  tab claude.ai -> assets-proxy.anthropic.com
+     6  tab claude.ai -> claude.ai
+     2  tab navigation -> localhost:8443
+
+The seventeen checks (last run): OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+  OK 1. Access and agreement Access approved for st1234 at localhost (checked 2026-09-29 19:04 UTC); kill-list of 2026-09-29
+  OK 2. Portal connected localhost (granted 2026-09-29)
+  OK 3. Portal tab open the page script answers from your portal tab
+  OK 4. Portal reachable and signed in signed in as st1234
+  OK 5. Shell app admits a connection shell opened, one command ran (exit 0, 1312 ms) and the shell closed
+  OK 6. Files app lists your home /home/st1234: 2 entries, uploads allowed; hpcworker is installed
+  OK 7. Active Jobs lists your clusters 2 job(s) of yours on mock
+  OK 8. Optional submit routes (informational) Job Composer JSON absent (404); Projects present
+  OK 9. Reverse proxy (informational) the reverse proxy is off or does not admit this host (mailbox mode); probed /rnode/login1/1/, the login node the shell reached (login1)
+  OK 10. Scheduler and container runtime found login node login1; scheduler slurm; runtime apptainer/1.2.2 singularity/3.5.2; 2 partition(s); CentOS Linux 7 (Core)
+  OK 11. Probe job has run on a compute node probe of 2026-09-29T19:04 on node01: node temp 210 GB free at /tmp/st1234/hpcworker_100001, /dev/shm 64 GB free, user namespaces yes, container runs, egress direct (api.anthropic.com 404, platform.claude.com 200, claude.ai 403); statsig.anthropic.com has no DNS record here
+  OK 12. Claude Code runs on the compute node claude 2.1.283 (Claude Code) (node v22.12.0, first exec 3 s)
+  OK 13. Signed in to Claude on the cluster signed in from this browser on 2026-09-29 19:05 (student@example.edu max (Remote Control answer on record)); the next probe will confirm it
+  OK 14. Remote Control consent recorded your answer is recorded by Claude Code itself; remote-control flags: --name --capacity --permission-mode --continue
+  OK 15. Runtime directory writable on the node /dev/shm/st1234/xdg works on the node and inside the image
+  OK 16. Data classification acknowledged statement made for worker "worker" on 2026-09-29; the consent marker is written on the cluster; the workspace is not marked restricted
+  OK 17. Portal session age signed in 0 min ago
+
+Screenshots: 01-agreement-signing-dialog.png, 01b-agreement-statements.png, 03-sign-in-to-claude.png, 03b-where-your-work-goes.png, 04-worker-online-open-in-claude.png, 04b-details-worker-card.png, 02-checks.png, 05-setup-page.png, 05b-setup-page-settings.png; page-text leaks: [{"name":"01-agreement-signing-dialog.png","match":"Grego","around":"SE TO USE ASHLEY BRIDGE, NOT THE SOFTWARE ITSELF. This is an agreement between Gregory Schwing, trading as OpenSpineConsortium (\"Licensor\", \"we\"), and you, the person whose institutional account is a"},{"name":"01b-agreement-statements.png","match":"Grego","around":"SE TO USE ASHLEY BRIDGE, NOT THE SOFTWARE ITSELF. This is an agreement between Gregory Schwing, trading as OpenSpineConsortium (\"Licensor\", \"we\"), and you, the person whose institutional account is a"}]

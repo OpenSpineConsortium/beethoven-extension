@@ -4,8 +4,10 @@
 //
 // What is deliberately absent, and must stay absent: any host_permissions at install time, the
 // cookies, tabs, webRequest, nativeMessaging, debugger and identity permissions, and any origin
-// on claude.ai, anthropic.com or claude.com. The one origin the extension talks to is the
-// student's own Open OnDemand portal, granted from a button click and registered at runtime.
+// on claude.ai, anthropic.com or claude.com. The one origin the extension works on is the
+// student's own Open OnDemand portal, granted from a button click and registered at runtime; the
+// only other addresses it fetches are the maintainer's (the approval check, the services file and
+// the withdrawn-versions list), with plain cross-origin fetches and no host permission.
 import { defineConfig } from 'wxt';
 
 const SINGLE_PURPOSE =

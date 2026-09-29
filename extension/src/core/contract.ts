@@ -4,13 +4,15 @@
 // listed here, one line at a time, through the portal's Shell app. If the framework moves a path
 // or renames a field, change it here and in framework/ together. Written against framework
 // version 2 (framework/VERSION; bin/hpcworker, lib/login_plain.sh, jobs/probe.sbatch,
-// jobs/worker.sbatch.tpl, README.md as they stood on 2026-09-29).
+// jobs/worker.sbatch.tpl, README.md as they stood on 2026-09-29) and checked against version 3 the
+// same day: 3 moved none of the paths, fields or commands below (it lengthened the resume window
+// to seven days, named the session after the worker rather than the job, and dropped the profile's
+// email_domain, which the extension no longer reads).
 //
 // Layout:
 //   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/)
 //   ~/.hpcworker/VERSION                      the installed tool's integer version; the strip compares it with the bundled one
-//   ~/.hpcworker/profile.json                 the site profile; its shared_state_dir names the state directory, its
-//                                             email_domain (optional) the e-mail domain a site licence key is matched under
+//   ~/.hpcworker/profile.json                 the site profile; its shared_state_dir names the state directory
 //   ~/.hpcworker/discover.json                `hpcworker discover --save` (optional)
 //   <state_dir>/probe/probe.json              written by the probe job
 //   <state_dir>/<name>/status.json            heartbeat every 30 s: state, job, node, message, session_name, requested_name, environment_url,
@@ -96,21 +98,6 @@ export function stateDirFrom(profileJson: string | undefined, vars: { home: stri
 export function siteFrom(profileJson: string | undefined): string | undefined {
   const site = parseProfile(profileJson)?.site;
   return typeof site === 'string' ? site : undefined;
-}
-
-/**
- * The site's e-mail domain, when the profile names one (`"email_domain": "wayne.edu"`, an optional
- * field of the framework's profile schema; the extension only reads it). A site licence key, one
- * key for every tester at a university, is matched to <portal username>@<this>; without the field
- * the portal hostname's own registrable domain stands in (identity.ts, ondemand.grid.wayne.edu ->
- * wayne.edu), which is right wherever the portal sits under the e-mail domain, so the field matters
- * at a site whose portal does not. Lower-cased, no leading "@"; anything that is not a domain is ignored.
- */
-export function emailDomainFrom(profileJson: string | undefined): string | undefined {
-  const raw = parseProfile(profileJson)?.email_domain;
-  if (typeof raw !== 'string') return undefined;
-  const dom = raw.trim().toLowerCase().replace(/^@/, '');
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(dom) ? dom : undefined;
 }
 
 /**

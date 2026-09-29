@@ -57,3 +57,31 @@ describe('readFileIfExists', () => {
     await expect(c.readFileIfExists('/home/ab1234/forbidden.json')).rejects.toMatchObject({ status: 403 });
   });
 });
+
+describe('the dashboard is the only identity', () => {
+  it("a directory owner found by whoAmI() is never reported by session() as who is signed in", async () => {
+    const page = '<html><head><meta name="csrf-token" content="tok"></head><body>Open OnDemand</body></html>';
+    const net: PortalNet = {
+      fetch: async (input) => {
+        const url = String(input);
+        if (url.endsWith('/pun/sys/dashboard/')) return new Response(page, { status: 200, headers: { 'content-type': 'text/html' } });
+        if (url.endsWith('/pun/sys/dashboard/files')) return new Response(JSON.stringify({ path: '/home/cd5678', files: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+        if (url.includes('/files/fs/home/cd5678')) return new Response(JSON.stringify({ path: '/home/cd5678', files: [{ id: '1', type: 'd', name: '.', size: 0, modified_at: 0, owner: 'cd5678', mode: 0 }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response('nope', { status: 404 });
+      },
+      WebSocket: class {
+        constructor() {
+          throw new Error('no sockets in this test');
+        }
+      } as unknown as PortalNet['WebSocket'],
+    };
+    const c = client(net);
+    expect((await c.session()).username).toBeUndefined();
+    // paths may use the directory's owner...
+    expect(await c.whoAmI()).toBe('cd5678');
+    // ...but the access check's identity stays what the dashboard shows: nothing
+    const again = await c.session();
+    expect(again.signedIn).toBe(true);
+    expect(again.username).toBeUndefined();
+  });
+});

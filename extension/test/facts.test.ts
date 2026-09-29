@@ -1,16 +1,17 @@
 // Fact gathering against a fake portal serving the framework's files: the sign-in made from this
 // browser outlives a live job's older "not signed in", the tool's VERSION is compared with the
-// bundled one, and an update that ran and changed nothing is reported rather than repeated.
+// bundled one, an update that ran and changed nothing is reported rather than repeated, and the
+// access service's record is read (never fetched) for the account the dashboard showed.
 import { describe, expect, it } from 'vitest';
 import { makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
 import { gatherFacts, INSTALL_RETRY_MS, type FactsEnv, type RunLike } from '../src/core/facts';
-import { IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, type InstallNote, type LoginSeen, type PortalSettings } from '../src/core/keys';
+import { ACCESS_KEY, IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, type InstallNote, type LoginSeen, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { decide, LOGIN_SEEN_FRESH_MS } from '../src/core/steps';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
-import { issuer, memoryKV, NOW } from './helpers';
+import { APPROVED_GRACE_MS, APPROVED_TTL_MS, type AccessRecord } from '../src/licensing/access';
+import { memoryKV, NOW } from './helpers';
 
-const I = issuer();
 const NOW_MS = NOW * 1000;
 const HOME = '/home/ab1234';
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
@@ -42,10 +43,13 @@ function fakePortal(files: Record<string, string>): PortalApi {
   } as unknown as PortalApi;
 }
 
-async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs?: number; /** null: a build that carries no framework */ bundled?: string | null; installNote?: InstallNote } = {}): Promise<FactsEnv> {
+/** the access service's last word: approved for ab1234 at ood.example an hour ago (as the background records it) */
+const approved = (checkedAgoMs = 3_600_000, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'ab1234', portal: 'ood.example', approved: true, checked_at: iso(NOW_MS - checkedAgoMs), until: null, last_attempt_at: iso(NOW_MS - checkedAgoMs), ...extra });
+
+async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs?: number; /** null: a build that carries no framework */ bundled?: string | null; installNote?: InstallNote; access?: AccessRecord | null } = {}): Promise<FactsEnv> {
   const local = memoryKV();
   await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
-  await local.set(LICENSE_KEY, { key: I.license(), identity: { accessId: 'ab1234' }, saved_at: 'x' });
+  if (o.access !== null) await local.set(ACCESS_KEY, o.access ?? approved());
   await local.set(IDENTITY_KEY, { username: 'ab1234' });
   await local.set(STATEMENTS_KEY, { 'workspaces/worker': { ...makeAcknowledgement('worker'), consent_written_at: iso(NOW_MS - 3_600_000) } } satisfies Statements);
   if (o.seenAgoMs !== undefined) await local.set(LOGIN_SEEN_KEY, { at: iso(NOW_MS - o.seenAgoMs), detail: 'a@wayne.edu max' } satisfies LoginSeen);
@@ -56,7 +60,6 @@ async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs
     version: '1.0.0',
     now: () => NOW_MS,
     local,
-    keys: I.keys,
     settings,
     prefs: { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true },
     granted: async () => true,
@@ -122,37 +125,53 @@ describe('gathering the facts', () => {
     expect(none.facts.install.failed).toBeUndefined();
   });
 
-  it('a site key is matched to <username>@<site domain>: the portal hostname\'s own, or the profile\'s email_domain once the file is read', async () => {
-    const siteKey = (domain: string) => I.license({ sub: undefined, email: undefined, domain, edition: 'site', name: 'testers' });
-    // the portal is ood.example: a site key for ood.example verifies for ab1234, one for wayne.edu does not
-    const e1 = await env();
-    await e1.local.set(LICENSE_KEY, { key: siteKey('ood.example'), identity: {}, saved_at: 'x' });
-    expect((await gatherFacts(e1)).facts.licence).toMatchObject({ ok: true, missing: false, revoked: false });
+  it('reads the access record for the account the dashboard showed: approved, stale, lapsed, refused, withdrawn, none, another account; and never fetches', async () => {
+    const ok = await gatherFacts(await env());
+    expect(ok.facts.access).toMatchObject({ ok: true, state: 'approved', accessId: 'ab1234', portal: 'ood.example', needsCheck: false, warn: false });
+    expect(ok.facts.access.detail).toBe(`Access approved for ab1234 at ood.example (checked ${iso(NOW_MS - 3_600_000).slice(0, 16).replace('T', ' ')} UTC)`);
+    expect(ok.facts.access.requestUrl).toBe('https://openspineconsortium.com/ashley/request.html?access_id=ab1234');
+    // past a day with the service silent: still good, warned, and due (the strip asks the background quietly)
+    const stale = await gatherFacts(await env({ access: approved(APPROVED_TTL_MS + 1, { last_error: 'x', last_attempt_at: iso(NOW_MS - 3_600_000) }) }));
+    expect(stale.facts.access).toMatchObject({ ok: true, state: 'stale', warn: true, needsCheck: true });
+    expect(decide(stale.facts, NOW_MS).step).toBe('login');
+    // past seven days: not good any more
+    const lapsed = await gatherFacts(await env({ access: approved(APPROVED_GRACE_MS + 1, { last_error: 'x', last_attempt_at: iso(NOW_MS - 3_600_000) }) }));
+    expect(lapsed.facts.access).toMatchObject({ ok: false, state: 'lapsed' });
+    expect(decide(lapsed.facts, NOW_MS)).toMatchObject({ step: 'access', primary: { action: 'retry-access' } });
+    // refused: the one button asks for access
+    const denied = await gatherFacts(await env({ access: approved(60_000, { approved: false, until: undefined }) }));
+    expect(denied.facts.access).toMatchObject({ ok: false, state: 'denied' });
+    expect(decide(denied.facts, NOW_MS)).toMatchObject({ step: 'access', primary: { label: 'Ask for access', action: 'ask-access' } });
+    // withdrawn: said as such
+    const withdrawn = await gatherFacts(await env({ access: approved(60_000, { approved: false, until: undefined, withdrawn: true }) }));
+    expect(withdrawn.facts.access.state).toBe('withdrawn');
+    expect(decide(withdrawn.facts, NOW_MS).status).toMatch(/^Access withdrawn: ask again/);
+    // nothing on record: checking, and the machine asks the background
+    const none = await gatherFacts(await env({ access: null }));
+    expect(none.facts.access).toMatchObject({ ok: false, state: 'checking', needsCheck: true });
+    expect(decide(none.facts, NOW_MS)).toMatchObject({ step: 'access', auto: 'check-access' });
+    // a record for another account (the dashboard now shows someone else) does not count
+    const other = await gatherFacts(await env({ access: approved(60_000, { access_id: 'zz9999' }) }));
+    expect(other.facts.access.state).toBe('checking');
+    // a record for another portal does not count either
+    const elsewhere = await gatherFacts(await env({ access: approved(60_000, { portal: 'ondemand.osc.edu' }) }));
+    expect(elsewhere.facts.access.state).toBe('checking');
+    // the strip's own attempt in flight, and one that could not ask
+    const e = await env({ access: null });
+    e.transient = { warm: { state: 'warm' }, accessChecking: true };
+    expect((await gatherFacts(e)).facts.access).toMatchObject({ state: 'checking', needsCheck: false });
+    e.transient = { warm: { state: 'warm' }, accessFailed: 'Your portal has not shown who is signed in yet' };
+    expect((await gatherFacts(e)).facts.access).toMatchObject({ state: 'failed', detail: 'Your portal has not shown who is signed in yet' });
+    // a withdrawn version outranks an approval
     const e2 = await env();
-    await e2.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
-    const g2 = await gatherFacts(e2);
-    expect(g2.facts.licence.ok).toBe(false);
-    expect(g2.facts.licence.detail).toBe('this is a site key for wayne.edu; your portal is in ood.example, not in that domain');
-    expect(decide(g2.facts, NOW_MS)).toMatchObject({ step: 'licence', input: 'key', tone: 'fail' });
-    // the profile names wayne.edu as the site's e-mail domain: the same key verifies in the same call, once the file is read
-    const e3 = await env({ files: { [`${HOME}/.hpcworker/profile.json`]: JSON.stringify({ ...JSON.parse(PROFILE), email_domain: 'wayne.edu' }) } });
-    await e3.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
-    const g3 = await gatherFacts(e3);
-    expect(g3.facts.licence.ok).toBe(true);
-    expect(decide(g3.facts, NOW_MS).step).toBe('login');
-    // a cold portal, with the domain remembered in the settings from an earlier read: the same answer without the file
-    const e4 = await env();
-    await e4.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
-    e4.settings = { ...e4.settings!, email_domain: 'wayne.edu' };
-    e4.transient = { warm: { state: 'cold' } };
-    expect((await gatherFacts(e4)).facts.licence.ok).toBe(true);
-    // withdrawn by its lid on the kill-list: refused for everyone at the site
-    const e5 = await env();
-    await e5.local.set(LICENSE_KEY, { key: siteKey('ood.example'), identity: {}, saved_at: 'x' });
-    await e5.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: [], revoked_lids: ['L-test0001'], message: 'the pilot has ended' } });
-    const g5 = await gatherFacts(e5);
-    expect(g5.facts.licence.ok).toBe(false);
-    expect(g5.facts.licence.detail).toMatch(/L-test0001 has been withdrawn/);
+    await e2.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: ['1.0.0'], revoked_lids: [], message: 'update please' } });
+    const revoked = await gatherFacts(e2);
+    expect(revoked.facts.access).toMatchObject({ ok: false, state: 'version-revoked', versionRevoked: true });
+    expect(revoked.facts.access.detail).toMatch(/withdrawn; update to continue\. update please/);
+    const v = decide(revoked.facts, NOW_MS);
+    expect(v.step).toBe('access');
+    expect(v.primary).toBeUndefined();
+    expect(v.auto).toBeUndefined();
   });
 
   it('an update that just ran and left the old version behind is reported once, not run again every minute', async () => {

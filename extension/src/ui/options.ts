@@ -1,21 +1,17 @@
 // The setup page (manifest options_ui; opened on install, from right-click > Options, and from the
-// strip): the signing dialog (ported from Ashley's termsPanel), the licence key, connecting or
+// strip): the signing dialog (ported from Ashley's termsPanel), the access card, connecting or
 // disconnecting the portal by address, the settings, the audit log with its export, and the Google
 // Drive step. Built to the assent pattern the cases enforce: conspicuous notice, un-prechecked
 // boxes whose sentence names the exact button, a typed name, never install-equals-accept; and the
 // text stays exportable and printable.
 import { browser } from 'wxt/browser';
-import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain } from '../core/identity';
-import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, type LicenseState } from '../core/keys';
 import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, PRODUCT_NAME, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, type Affirmation, type TermsRecord } from '../core/terms';
 import { browserName, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
-import { type StoredKillList } from '../licensing/killlist';
-import { BUNDLED_KEYS, findKey, peek, verifyLicense } from '../licensing/license';
 import { AUTO_START_KEY, type AutoStartNote } from '../core/keys';
 import { auditSection, settingsSection } from './details';
-import { add, clear, downloadText, el } from './dom';
+import { add, clear, downloadText, el, fmtTime } from './dom';
 import { currentRun, portalAlive } from './rpc';
-import { ACCESS_REQUEST_URL, connectSection, driveStep, licenceSummary, statementSection } from './sections';
+import { accessButtons, accessLine, accessSummary, connectSection, driveStep, statementSection, type AccessSummary } from './sections';
 
 const SEPARATOR = '\n\n\n==================== PRIVACY STATEMENT ====================\n\n';
 
@@ -34,17 +30,17 @@ export async function mountOptions(root: HTMLElement): Promise<void> {
   };
   const render = async () => {
     clear(root);
-    const summary = await licenceSummary();
+    const summary = await accessSummary();
     const settings = await portalSettings();
     const prefs = await loadPrefs();
     root.append(
       el('h1', { text: `${PRODUCT_NAME}: setup` }),
-      el('p', { class: 'muted' }, 'The everyday way in is the toolbar button on your portal tab: it opens the strip, which does the rest and asks you only when it must. This page holds the agreement, your key, the portal connection, the settings and the audit log. Nothing here signs in anywhere for you, and nothing runs on claude.ai.'),
+      el('p', { class: 'muted' }, 'The everyday way in is the toolbar button on your portal tab: it opens the strip, which does the rest and asks you only when it must. This page holds the agreement, your access, the portal connection, the settings and the audit log. Nothing here signs in anywhere for you, and nothing runs on claude.ai.'),
       notice,
       el('h2', { text: '1. The agreement' }),
       summary.termsOk ? acceptedCard(summary.terms!, notify) : await signingDialog(notify, render),
-      el('h2', { text: '2. Your licence key' }),
-      await licenceCard(notify, render),
+      el('h2', { text: '2. Your access' }),
+      accessCard(summary, notify, render),
       el('h2', { text: '3. Your portal' }),
       connectSection(settings, render, notify),
       el('h2', { text: '4. Where your work goes' }),
@@ -178,51 +174,22 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
 }
 
 /**
- * The key and the username it is matched to. The username the portal's dashboard shows always
- * wins; the field can be typed only while the portal has shown none, and then the page says the
- * portal's own name will take over. A site key (one for everyone at a university) is matched to
- * that username at the connected portal's domain, and asks for nothing else.
+ * Your access: who you are is the account your portal shows once you are signed in there (your
+ * university's own sign-in); whether you may use Ashley Bridge is Licensor's approved list, asked
+ * by the background when the portal connects and about once a day. Nothing is typed here: the
+ * card shows the last answer and offers the two things a person can do.
  */
-async function licenceCard(notify: Notify, done: () => Promise<void>): Promise<HTMLElement> {
-  const stored = await local.get<LicenseState>(LICENSE_KEY);
-  const known = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  const kill = await local.get<StoredKillList>(KILLLIST_KEY);
-  const settings = await portalSettings();
-  const site = siteEmailDomain(undefined, settings?.hostname, settings?.email_domain);
-  const key = el('input', { type: 'text', class: 'wide mono', placeholder: 'ASHLEY1.…  (paste the whole key, or the e-mail it came in)', value: stored?.key ?? '', 'aria-label': 'Licence key' });
-  const user = el('input', { type: 'text', placeholder: 'your portal username', value: known ?? stored?.identity?.accessId ?? '', readonly: !!known, 'aria-label': 'Portal username' });
-  const status = el('div', { class: 'status', role: 'status' });
-  const bound = bindIdentity(known, stored?.identity?.accessId);
-  const current = stored ? await verifyLicense(stored.key, { keys: BUNDLED_KEYS, identity: licenceIdentity(bound, stored.key, site), revoked: kill?.list.revoked_lids ?? [] }) : undefined;
+function accessCard(s: AccessSummary, notify: Notify, done: () => Promise<void>): HTMLElement {
+  const a = s.access;
   const card = el('div', { class: 'card' });
   add(card,
-    el('p', {}, 'A key is checked in this browser, against the signing keys built into this version; nothing is sent to check it. A personal key names one person and must match your portal username: the one your portal\'s dashboard shows once it is connected, which always takes precedence over anything typed here. A site key names a domain, such as wayne.edu, and works for anyone whose portal is in that domain; it is matched to your username at your portal, and nothing more is asked. Not got a key? ', el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }), '.'),
-    current ? el('div', { class: current.ok ? 'ok' : 'fail', text: `${current.detail} (${licenceNote(bound, current.payload, site, settings?.hostname)})` }) : null,
-    key,
-    el('div', { class: 'row' }, el('label', { text: 'Portal username: ' }, user), el('span', { class: 'muted small', text: known ? `(read from your portal's dashboard: ${known}; it cannot be changed here)` : '(type it for now; the name your portal shows will take over once the portal is connected)' })),
-    el('div', { class: 'row' },
-      el('button', {
-        class: 'primary',
-        text: 'Check and save the key',
-        onClick: async () => {
-          const found = findKey(key.value) ?? key.value.trim();
-          const typed = known ? stored?.identity?.accessId : user.value.trim() || undefined;
-          const who = bindIdentity(known, typed);
-          const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, found, site), revoked: kill?.list.revoked_lids ?? [] });
-          if (!v.ok) {
-            const p = peek(found);
-            status.textContent = `${v.detail}${p?.name ? ` (key issued to ${p.name})` : ''}`;
-            return;
-          }
-          await local.set(LICENSE_KEY, { key: found, identity: { accessId: typed }, saved_at: new Date().toISOString() } satisfies LicenseState);
-          status.textContent = '';
-          notify('ok', `${v.detail} (${licenceNote(who, v.payload, site, settings?.hostname)}).`);
-          await done();
-        },
-      }),
-      stored ? el('button', { text: 'Forget the key', onClick: async () => { await local.remove(LICENSE_KEY); await done(); } }) : null,
-    ),
-    status,
+    el('p', {}, "There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and Ashley Bridge asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version. Not approved yet? Ask for access; the maintainer approves it, and the next click on the Ashley Bridge button checks again."),
+    accessLine(a),
+    a.accessId
+      ? el('div', { class: 'muted small', text: `account ${a.accessId}${a.portal ? ` at ${a.portal}` : ''}${a.checkedAt ? `; the service last answered ${fmtTime(new Date(a.checkedAt).toISOString())}` : '; the service has not answered yet'}` })
+      : el('div', { class: 'muted small', text: 'No account name yet: connect your portal and sign in there; its dashboard shows the name.' }),
+    s.versionRevoked ? el('div', { class: 'fail', text: `This version has been withdrawn and sends no commands. ${s.revokedMessage || 'Update to continue.'}` }) : null,
+    el('div', { class: 'row' }, ...accessButtons(a, notify, () => void done())),
   );
   return card;
 }

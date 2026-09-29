@@ -1,27 +1,25 @@
 // The flight strip: the side panel (Chrome/Edge), the sidebar (Firefox) or a tab (Safari). Top:
 // one status line and ONE button showing the next step only, with the step's own input when it
-// has one (the key box, the data statement, the sign-in terminal); everything else is folded
-// under "Details". The step machine (core/steps.ts) decides; this file gathers the facts, renders
-// the view and performs the automatic actions: waking the portal, installing the tool, running
-// the probe, opening the sign-in, starting the worker (through the background's one start path),
-// polling the run's files (every 10 s for the first two minutes after a start, then every 60 s),
-// and opening the Claude link once.
+// has one (the data statement, the sign-in terminal); everything else is folded under "Details".
+// The step machine (core/steps.ts) decides; this file gathers the facts, renders the view and
+// performs the automatic actions: waking the portal, asking the background for the access check,
+// installing the tool, running the probe, opening the sign-in, starting the worker (through the
+// background's one start path), polling the run's files (every 10 s for the first two minutes
+// after a start, then every 60 s), and opening the Claude link once. The strip itself never
+// talks to Licensor: the background does, and only the record it leaves is read here.
 import { browser } from 'wxt/browser';
 import type { RunState } from '../entrypoints/background';
 import { commands, parseJobId } from '../core/contract';
 import { gatherFacts, type Transient } from '../core/facts';
 import { bundledFrameworkVersion, installFramework } from '../core/install';
-import { CLICK_KEY, INSTALL_KEY, LICENSE_KEY, IDENTITY_KEY, KILLLIST_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type InstallNote, type LicenseState, type PortalSettings, type ProbeNote } from '../core/keys';
+import { ACCESS_KEY, CLICK_KEY, IDENTITY_KEY, INSTALL_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type InstallNote, type PortalSettings, type ProbeNote } from '../core/keys';
 import { decide, type Action, type StripView } from '../core/steps';
-import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, withSiteDomain } from '../core/identity';
 import { stopWorker } from '../core/worker';
-import { BUNDLED_KEYS, findKey, peek, verifyLicense } from '../licensing/license';
-import type { StoredKillList } from '../licensing/killlist';
 import { assetUrl, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 import { detailsSections, type Kind } from './details';
 import { add, clear, el } from './dom';
-import { connectPortal, currentRun, markStopped, openEnvironment, openOptions, openPortalTab, originGranted, portal, portalAlive, portalTab, refreshRun, requestOrigin, startWorkerNow } from './rpc';
-import { ACCESS_REQUEST_URL, statementSection } from './sections';
+import { checkAccessNow, connectPortal, currentRun, markStopped, openEnvironment, openOptions, openPortalTab, originGranted, portal, portalAlive, portalTab, refreshRun, requestOrigin, startWorkerNow } from './rpc';
+import { statementSection } from './sections';
 import { openTerminal, type Terminal } from './terminal';
 
 /** the run's files are read this often while the panel is open */
@@ -38,6 +36,8 @@ interface Snapshot {
   alive: boolean;
   url?: string;
   sessionName?: string;
+  /** where "Ask for access" goes, with the account name filled in */
+  requestUrl: string;
 }
 
 /** the floor refusal a start comes back with: not a failure, the machine waits the clock out and asks again */
@@ -52,8 +52,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detailsOpen = false;
   let statementBox: HTMLElement | undefined;
-  /** ~/.hpcworker/profile.json as the last tick read it, for matching a site key under the profile's e-mail domain */
-  let lastProfile: string | undefined;
   const notice = el('div', { class: 'status', role: 'status', 'aria-live': 'polite' });
   const notify = (kind: Kind, text: string) => {
     notice.className = `status ${kind === 'info' ? 'muted' : kind}`;
@@ -73,7 +71,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     }
   };
   // elements that keep their state across renders
-  const keyBox = el('input', { type: 'text', class: 'wide mono', placeholder: 'ASHLEY1.…  (paste the whole key, or the e-mail it came in)', 'aria-label': 'Licence key' });
   const log = el('pre', { class: 'small', hidden: true });
   const showLog = (t: string) => {
     log.hidden = false;
@@ -96,7 +93,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       version: version(),
       now: () => Date.now(),
       local,
-      keys: BUNDLED_KEYS,
       settings,
       prefs,
       granted: (o) => originGranted(o),
@@ -108,13 +104,10 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       bundledFrameworkVersion: () => bundledVersion,
     });
     const view = decide(g.facts);
-    if (g.profile !== undefined) {
-      lastProfile = g.profile;
-      // the profile's e-mail domain, remembered with the portal settings so the setup page and the checks match a site key the same way
-      const remembered = withSiteDomain(settings, g.profile);
-      if (remembered) await local.set(PORTAL_KEY, remembered);
-    }
-    const snap: Snapshot = { view, settings, state, click, alive: g.facts.portal.alive, url: g.facts.run.url, sessionName: g.facts.run.sessionName };
+    // an approval past its day is confirmed again quietly: the background asks Licensor when its
+    // caches say so (never from here), and the strip goes on meanwhile
+    if (g.facts.access.ok && g.facts.access.needsCheck && !busy) void checkAccessNow(false).catch(() => undefined);
+    const snap: Snapshot = { view, settings, state, click, alive: g.facts.portal.alive, url: g.facts.run.url, sessionName: g.facts.run.sessionName, requestUrl: g.facts.access.requestUrl };
     await render(snap);
     // the automatic part, one at a time
     if (view.auto && !busy) {
@@ -150,9 +143,31 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
           transient.warm = { state: 'warming' };
           await tick();
           const w = await portal.warm();
+          // the account name the dashboard shows is the one identity the extension uses (the access check asks about it)
+          if (w.session.signedIn && w.session.username) await local.set(IDENTITY_KEY, { username: w.session.username, seen_at: w.session.checkedAt } satisfies IdentityNote);
           transient.warm = w.ok && w.signedIn ? { state: 'warm' } : w.status === 0 ? { state: 'unreachable', detail: w.detail } : w.ok ? { state: 'signed-out', detail: w.detail } : { state: 'cold', detail: w.detail };
           break;
         }
+        case 'check-access':
+        case 'retry-access': {
+          // the background asks Licensor (its caches decide whether a request is made); a button press asks again after a refusal or a failed attempt
+          transient.accessFailed = undefined;
+          transient.accessChecking = true;
+          await tick();
+          try {
+            const r = await checkAccessNow(a === 'retry-access');
+            if (!r.asked && r.approved === undefined) transient.accessFailed = r.detail;
+          } catch (e) {
+            transient.accessFailed = (e as Error).message;
+          } finally {
+            transient.accessChecking = false;
+          }
+          break;
+        }
+        case 'ask-access':
+          // the request page on Licensor's site, with the account name filled in; the person asks, the maintainer approves
+          await browser.tabs.create({ url: snap.requestUrl });
+          break;
         case 'install':
         case 'retry-install': {
           transient.installing = true;
@@ -256,9 +271,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
         case 'open-portal':
           await openPortalTab().catch((e) => notify('fail', (e as Error).message));
           break;
-        case 'save-key':
-          await saveKey();
-          break;
         case 'acknowledge':
         case 'poll':
           break;
@@ -267,26 +279,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       busy = undefined;
       void tick();
     }
-  };
-
-  const saveKey = async () => {
-    const stored = await local.get<LicenseState>(LICENSE_KEY);
-    const known = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-    const kill = await local.get<StoredKillList>(KILLLIST_KEY);
-    const found = findKey(keyBox.value) ?? keyBox.value.trim();
-    const who = bindIdentity(known, stored?.identity?.accessId);
-    // a personal key is matched to the username; a site key to <username>@<the site's e-mail domain>, nothing more is asked
-    const settings = await portalSettings();
-    const site = siteEmailDomain(lastProfile, settings?.hostname, settings?.email_domain);
-    const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, found, site), revoked: kill?.list.revoked_lids ?? [] });
-    if (!v.ok) {
-      const p = peek(found);
-      notify('fail', `${v.detail}${p?.name ? ` (key issued to ${p.name})` : ''}`);
-      return;
-    }
-    await local.set(LICENSE_KEY, { key: found, identity: { accessId: stored?.identity?.accessId }, saved_at: new Date().toISOString() } satisfies LicenseState);
-    keyBox.value = '';
-    notify('ok', `${v.detail} (${licenceNote(who, v.payload, site, settings?.hostname)}).`);
   };
 
   const primaryButton = (snap: Snapshot): HTMLElement | null => {
@@ -306,13 +298,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       el('div', { class: 'strip-status', text: view.status }),
     );
     // the step's own input, when it has one
-    if (view.input === 'key') {
-      add(head, el('div', { class: 'row' }, keyBox), el('div', { class: 'row' },
-        el('button', { class: 'primary', text: view.primary?.label ?? 'Save the key', onClick: () => void perform('save-key', snap) }),
-        el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }),
-        el('span', { class: 'muted small', text: 'The key is checked in this browser. A personal key must name your portal username; a site key must name a domain your portal is in.' }),
-      ));
-    } else if (view.input === 'statement') {
+    if (view.input === 'statement') {
       // the statement's own button is the step's one button; the box keeps its state across renders
       if (!statementBox) statementBox = await statementSection(() => void tick(), { compact: true });
       add(head, statementBox);
@@ -321,6 +307,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       add(head, primaryButton(snap));
     } else {
       add(head, primaryButton(snap));
+      if (view.step === 'access' && view.primary?.action === 'ask-access') add(head, el('p', { class: 'muted small', text: "Your university's sign-in is who you are; the approved list is whether you may. The request page opens in a tab with your account name filled in." }));
     }
     if (view.input !== 'statement') statementBox = undefined;
     if (view.done && url) {
@@ -337,9 +324,13 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     add(head, notice, log);
     root.append(head);
     const details = el('details', { class: 'details', open: detailsOpen });
+    // A details element created open fires "toggle" too; ticking on that one re-rendered the strip
+    // in a loop while Details was open, each pass reading five files through the portal (about ten
+    // requests a second, measured 2026-09-29 against the mock). Only a person opening it asks for a tick.
     details.addEventListener('toggle', () => {
+      const wasOpen = detailsOpen;
       detailsOpen = details.open;
-      if (detailsOpen) void tick();
+      if (detailsOpen && !wasOpen) void tick();
     });
     details.append(el('summary', { text: 'Details' }));
     if (detailsOpen) {
@@ -371,7 +362,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     return undefined;
   });
   browser.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && (changes[PORTAL_KEY] || changes[PREFS_KEY] || changes[LICENSE_KEY] || changes[STATEMENTS_KEY] || changes['bridge.terms'])) void tick();
+    if (area === 'local' && (changes[PORTAL_KEY] || changes[PREFS_KEY] || changes[ACCESS_KEY] || changes[IDENTITY_KEY] || changes[STATEMENTS_KEY] || changes['bridge.terms'])) void tick();
     if (area === 'session' && changes[CLICK_KEY]) void tick();
   });
   window.addEventListener('unload', () => terminal?.close());

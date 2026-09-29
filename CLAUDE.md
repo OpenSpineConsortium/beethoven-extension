@@ -160,7 +160,7 @@ Decided 2026-09-29, being built this week (the documents already describe it; ch
 claiming it is there): the worker is always on (the job queues one successor with
 `sbatch --dependency=afterany:$SLURM_JOB_ID` of the same rendered script before its wall time ends, at
 most one, ended by a stop file; the successor runs `claude remote-control --continue` in the same
-directory when `connection.json` is younger than 4 h, else registers afresh in the same environment);
+directory when `connection.json` is younger than seven days, else registers afresh in the same environment);
 `hpcworker claude login` is one sitting (`claude auth login`, then `claude remote-control` once in the
 workspace if `remoteDialogSeen` is not yet true; `claude consent` stays as an alias that explains);
 the panel's green *Open in Claude* button opens `environment_url` with `browser.tabs.create` (no

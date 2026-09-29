@@ -1,18 +1,17 @@
 // Sections shared by the setup page and the strip: connecting a portal by address, the plan-class
 // disclosure with the data statement (persisted per workspace), the Google Drive step, and the
-// licence/agreement status line.
+// access/agreement status card.
 import { browser } from 'wxt/browser';
 import { ackSubject, makeAcknowledgement, PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Acknowledgement, type Statements } from '../core/disclosure';
 import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
-import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, type IdentitySource } from '../core/identity';
-import { CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, PREFS_KEY, type Checklist, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
+import { ACCESS_KEY, CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, PREFS_KEY, SERVICES_KEY, type Checklist, type IdentityNote, type PortalSettings, type Prefs } from '../core/keys';
 import { recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
 import { writeConsentFile } from '../core/worker';
-import { BUNDLED_KEYS, verifyLicense } from '../licensing/license';
+import { accessFact, type AccessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import { installId, local, portalSettings, prefs as loadPrefs, version } from '../ext/storage';
-import { add, clear, el } from './dom';
-import { connectPortal, disconnectPortal, openPortalTab, portal, portalAlive, requestOrigin } from './rpc';
+import { add, clear, el, fmtTime } from './dom';
+import { checkAccessNow, connectPortal, disconnectPortal, openPortalTab, portal, portalAlive, requestOrigin } from './rpc';
 
 export interface Notify {
   (kind: 'ok' | 'warn' | 'fail' | 'info', text: string): void;
@@ -20,9 +19,6 @@ export interface Notify {
 
 /** the claude.ai page where a student connects Google Drive; opened in a tab, never scripted */
 export const CONNECTORS_URL = 'https://claude.ai/settings/connectors';
-
-/** where a student without a key asks for one */
-export const ACCESS_REQUEST_URL = 'https://openspineconsortium.com/ashley/bridge';
 
 /** Connect by address (the setup page) or disconnect. The toolbar click from a portal tab is the usual way in. */
 export function connectSection(settings: PortalSettings | undefined, onChange: () => void, notify: Notify): HTMLElement {
@@ -49,7 +45,7 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
   const input = el('input', { type: 'text', class: 'wide', placeholder: 'ondemand.your-university.edu', 'aria-label': 'Portal address' });
   const status = el('div', { class: 'status', role: 'status' });
   add(box,
-    el('p', {}, 'Ashley Bridge talks to one website: your Open OnDemand portal. The usual way in: open the portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site. Or type its address here.'),
+    el('p', {}, 'Ashley Bridge works with one website: your Open OnDemand portal (its only other requests are the approval check and the daily list, section 2 above). The usual way in: open the portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site. Or type its address here.'),
     el('div', { class: 'row' }, input, el('button', {
       text: 'Connect',
       onClick: () => {
@@ -215,53 +211,78 @@ export async function driveStep(onChange: () => void, compact = false): Promise<
   return box;
 }
 
-export interface LicenceSummary {
+export interface AccessSummary {
   termsOk: boolean;
   terms?: TermsRecord;
-  licenceOk: boolean;
-  licenceMissing: boolean;
-  licenceDetail: string;
+  /** the access service's word on the signed-in account, from storage (the background asks; the pages only read) */
+  access: AccessFact;
   versionRevoked: boolean;
   revokedMessage: string;
-  identityKnown: boolean;
-  /** where the username the key was matched against came from */
-  identitySource: IdentitySource;
-  identityNote: string;
 }
 
-export async function licenceSummary(): Promise<LicenceSummary> {
+export async function accessSummary(): Promise<AccessSummary> {
   const terms = await local.get<unknown>(TERMS_KEY);
-  const lic = await local.get<LicenseState>(LICENSE_KEY);
   const stored = await local.get<StoredKillList>(KILLLIST_KEY);
-  const observed = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  // the portal-observed username wins; the typed one stands in only until the portal has shown one;
-  // a site key is matched to that username under the site's e-mail domain (the profile's as remembered, else the portal's own)
-  const who = bindIdentity(observed, lic?.identity?.accessId);
+  const verdict = killListVerdict(stored, version());
+  const record = await local.get<AccessRecord>(ACCESS_KEY);
+  const services = await local.get<StoredServices>(SERVICES_KEY);
+  const observed = (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
   const settings = await portalSettings();
-  const site = siteEmailDomain(undefined, settings?.hostname, settings?.email_domain);
-  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
-  const verdict = killListVerdict(stored, version(), v.payload?.lid);
   return {
     termsOk: recordInForce(terms),
     terms: recordInForce(terms) ? terms : undefined,
-    licenceOk: v.ok,
-    licenceMissing: v.status === 'missing',
-    licenceDetail: v.status === 'missing' ? 'no licence key entered (a trial key is free)' : v.detail,
+    access: accessFact({ record, services, accessId: observed, portal: settings?.hostname, now: new Date(), versionRevoked: verdict.versionRevoked, revokedMessage: verdict.message }),
     versionRevoked: verdict.versionRevoked,
     revokedMessage: verdict.message,
-    identityKnown: !!who.accessId,
-    identitySource: who.source,
-    identityNote: licenceNote(who, v.payload, site, settings?.hostname),
   };
 }
 
-export function licenceLine(s: LicenceSummary, onOpenSetup: () => void): HTMLElement {
+/** the access states in which asking for access is the thing to do */
+const ASKABLE = new Set(['denied', 'withdrawn']);
+
+/** the one line about access, in the class of its state */
+export function accessLine(a: AccessFact): HTMLElement {
+  const cls = a.ok ? (a.warn ? 'warn' : 'ok') : a.state === 'checking' ? 'muted' : 'fail';
+  // "Access approved for ..." and "Access withdrawn: ..." name themselves; the other sentences get the label
+  if (/^access\b/i.test(a.detail)) return el('div', {}, el('span', { class: cls, text: a.detail }));
+  return el('div', {}, el('span', { class: cls, text: 'Access: ' }), el('span', { class: 'small', text: a.detail }));
+}
+
+/**
+ * The buttons every access card carries: ask the service again now (a person's press asks again
+ * after a refusal or a failed attempt; an approval under a day old is not re-asked), and, when the
+ * account is not approved, the request page with the account name filled in.
+ */
+export function accessButtons(a: AccessFact, notify: Notify, onChange: () => void): HTMLElement[] {
+  const out: HTMLElement[] = [
+    el('button', {
+      text: 'Check my access now',
+      title: "Asks Licensor's access service about the account your portal shows",
+      onClick: async () => {
+        try {
+          const r = await checkAccessNow(true);
+          notify(r.asked ? (r.approved ? 'ok' : 'warn') : 'info', r.asked ? `Checked: ${r.detail}.` : `Not asked: ${r.detail}`);
+        } catch (e) {
+          notify('fail', (e as Error).message);
+        }
+        onChange();
+      },
+    }),
+  ];
+  if (ASKABLE.has(a.state)) out.push(el('button', { class: 'primary', text: a.state === 'withdrawn' ? 'Ask again' : 'Ask for access', title: a.requestUrl, onClick: () => void browser.tabs.create({ url: a.requestUrl }) }));
+  return out;
+}
+
+/** the access/agreement card under Details: terms, access, the kill-list's word, the buttons */
+export function accessCard(s: AccessSummary, notify: Notify, onChange: () => void, onOpenSetup: () => void): HTMLElement {
+  const a = s.access;
   const box = el('div', { class: 'card' });
   add(box,
     el('div', {}, el('span', { class: s.termsOk ? 'ok' : 'fail', text: s.termsOk ? 'Terms accepted' : 'Terms not accepted' }), s.terms ? el('span', { class: 'muted small', text: ` on ${s.terms.accepted_at.slice(0, 10)} by ${s.terms.signed_name}` }) : null),
-    el('div', {}, el('span', { class: s.licenceOk ? 'ok' : 'fail', text: s.licenceOk ? 'Licence ' : 'Licence: ' }), el('span', { class: 'small', text: s.licenceDetail }), s.licenceOk ? el('span', { class: `${s.identitySource === 'portal' ? 'muted' : 'warn'} small`, text: ` (${s.identityNote})` }) : null),
+    accessLine(a),
+    a.accessId ? el('div', { class: 'muted small', text: `account ${a.accessId}${a.portal ? ` at ${a.portal}` : ''}${a.checkedAt ? `; the service last answered ${fmtTime(new Date(a.checkedAt).toISOString())}` : '; the service has not answered yet'}` }) : el('div', { class: 'muted small', text: 'No account name yet: your portal shows it once you are signed in there.' }),
     s.versionRevoked ? el('div', { class: 'fail', text: `This version has been withdrawn and sends no commands. ${s.revokedMessage || 'Update to continue.'}` }) : null,
-    el('div', { class: 'row' }, el('button', { text: s.termsOk && s.licenceOk ? 'Open the setup page' : 'Finish setup (terms and key)', onClick: onOpenSetup })),
+    el('div', { class: 'row' }, ...accessButtons(a, notify, onChange), el('button', { text: s.termsOk ? 'Open the setup page' : 'Finish setup (the agreement)', onClick: onOpenSetup })),
   );
   return box;
 }

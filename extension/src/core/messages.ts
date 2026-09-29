@@ -33,6 +33,8 @@ export type Request =
   | { type: 'worker.start' }
   /** fetch and verify the kill-list now */
   | { type: 'killlist.refresh' }
+  /** ask Licensor's access service whether the signed-in account is approved (the background honours its caches; `force` asks again after a refusal or a failed attempt) */
+  | { type: 'access.check'; force?: boolean }
   /** the background pushing a new run state to open pages */
   | { type: 'run.changed' };
 

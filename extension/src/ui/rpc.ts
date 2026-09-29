@@ -2,7 +2,7 @@
 // ask for a start, open the portal's own tabs and the options page. Connecting lives in
 // ext/connectApi.ts (the one place a permission is asked for).
 import { browser } from 'wxt/browser';
-import type { RunState, StartResult } from '../entrypoints/background';
+import type { AccessOutcome, RunState, StartResult } from '../entrypoints/background';
 import { unwrap, type Answer, type Request } from '../core/messages';
 import type { PortalApi, PortalOp } from '../core/portal';
 import { portalSettings } from '../ext/storage';
@@ -29,6 +29,8 @@ export const clearRun = (): Promise<void> => send({ type: 'run.clear' });
 export const startWorkerNow = (): Promise<StartResult> => send<StartResult>({ type: 'worker.start' });
 export const openEnvironment = (): Promise<{ opened: boolean; url?: string }> => send({ type: 'run.open' });
 export const refreshKillList = (): Promise<{ detail: string; revoked: boolean }> => send({ type: 'killlist.refresh' });
+/** ask the background to ask Licensor's access service; `force` asks again after a refusal or a failed attempt (an approval under a day old still holds) */
+export const checkAccessNow = (force = false): Promise<AccessOutcome> => send<AccessOutcome>({ type: 'access.check', force });
 
 export async function openPortalTab(): Promise<void> {
   const s = await portalSettings();
@@ -36,7 +38,7 @@ export async function openPortalTab(): Promise<void> {
   await browser.tabs.create({ url: `${s.origin}/pun/sys/dashboard/` });
 }
 
-/** the setup page: everything that used to be the popup (connect, settings, audit, licence) */
+/** the setup page: everything that used to be the popup (the agreement, access, connect, settings, audit) */
 export async function openOptions(): Promise<void> {
   await browser.runtime.openOptionsPage();
 }

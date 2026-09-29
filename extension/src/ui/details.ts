@@ -1,5 +1,5 @@
 // What sits under "Details" in the strip: the worker card with its buttons (set up, probe, start,
-// stop, read status), the seventeen checks, rc.log, the audit log, the licence line, the settings
+// stop, read status), the seventeen checks, rc.log, the audit log, the access card, the settings
 // and the Google Drive step. Everything the panel knows about the cluster comes through the
 // portal page script; everything it remembers is in storage.session except preferences.
 import { browser } from 'wxt/browser';
@@ -13,11 +13,10 @@ import { environmentLinkOf } from '../core/facts';
 import { installFramework } from '../core/install';
 import { AUTO_START_KEY, CHECKS_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, type AutoStartNote, type PortalSettings, type Prefs, type ProbeNote } from '../core/keys';
 import { stopWorker as stopOnCluster, workerLive } from '../core/worker';
-import { BUNDLED_KEYS } from '../licensing/license';
 import { assetUrl, local, session, version } from '../ext/storage';
 import { add, downloadText, el, fmtTime } from './dom';
 import { clearRun, markStopped, openEnvironment, openOptions, openPortalTab, originGranted, portal, portalAlive, refreshRun, startWorkerNow } from './rpc';
-import { driveStep, licenceLine, licenceSummary } from './sections';
+import { accessCard, accessSummary, driveStep } from './sections';
 
 export type Kind = 'ok' | 'warn' | 'fail' | 'info';
 export type Notify = (kind: Kind, text: string) => void;
@@ -39,11 +38,11 @@ export interface DetailsEnv {
 }
 
 export async function detailsSections(env: DetailsEnv): Promise<HTMLElement[]> {
-  const summary = await licenceSummary();
+  const summary = await accessSummary();
   return [
     el('h3', { text: 'Your worker' }),
     workerCard(env),
-    actionsCard(env, summary.termsOk && summary.licenceOk && !summary.versionRevoked),
+    actionsCard(env, summary.termsOk && summary.access.ok && !summary.versionRevoked),
     el('h3', { text: 'Checks' }),
     await checksSection(env),
     el('h3', { text: 'Where your work goes' }),
@@ -51,8 +50,8 @@ export async function detailsSections(env: DetailsEnv): Promise<HTMLElement[]> {
     el('h3', { text: 'Logs' }),
     logsSection(env.state),
     await auditSection(env),
-    el('h3', { text: 'Licence and agreement' }),
-    licenceLine(summary, () => void openOptions()),
+    el('h3', { text: 'Access and agreement' }),
+    accessCard(summary, env.notify, () => void env.render(), () => void openOptions()),
     el('h3', { text: 'Settings' }),
     settingsSection(env, await session.get<AutoStartNote>(AUTO_START_KEY)),
     el('h3', { text: 'Google Drive (optional)' }),
@@ -93,7 +92,7 @@ function workerCard(env: DetailsEnv): HTMLElement {
       : el('p', { class: 'muted small', text: 'The session name and the "Open in Claude" button appear here once the job has registered with Remote Control.' }),
     login ? el('div', { class: 'muted small', text: `Claude sign-in on the cluster: ${login.loggedIn ? `yes${login.email ? ` (${login.email}${login.subscriptionType ? `, ${login.subscriptionType}` : ''})` : ''}` : 'no'}${st?.consent !== undefined ? `; Remote Control answer ${st.consent ? consentSourceWords(st.consent_source) || 'on record' : 'not recorded'}` : ''}${st?.restarts ? `; restarts: ${st.restarts}` : ''}` }) : null,
     st?.chain !== undefined ? el('div', { class: 'muted small', text: st.chain ? (st.next_job ? `Stays on: job ${st.next_job} is queued to take over at the wall time.` : `Stays on: the job queues its successor before it ends${st.chain_note ? ` (${st.chain_note})` : ''}.`) : 'Runs one job at a time (the always-on chain is off for this worker).' }) : null,
-    st?.state === 'preempted' ? el('div', { class: 'warn', text: 'The job ended (wall time or preemption). A worker that stays on hands over to the job it submitted after itself; otherwise it is started again and resumes the same session within four hours.' }) : null,
+    st?.state === 'preempted' ? el('div', { class: 'warn', text: 'The job ended (wall time or preemption). A worker that stays on hands over to the job it submitted after itself; otherwise it is started again and resumes the same session within seven days.' }) : null,
     st?.state === 'stopped' ? el('div', { class: 'muted small', text: 'Stopped: the job left on its own and ended its chain.' }) : null,
     state.error ? el('div', { class: 'warn small', text: `last read failed: ${state.error}` }) : null,
     el('div', { class: 'row' },
@@ -133,7 +132,7 @@ async function statementReview(env: DetailsEnv): Promise<HTMLElement> {
   return box;
 }
 
-function actionsCard(env: DetailsEnv, licensed: boolean): HTMLElement {
+function actionsCard(env: DetailsEnv, approved: boolean): HTMLElement {
   const { settings, state, alive, notify, run, render } = env;
   const out = el('pre', { hidden: true });
   const show = (text: string) => {
@@ -145,16 +144,16 @@ function actionsCard(env: DetailsEnv, licensed: boolean): HTMLElement {
   const box = el('div', { class: 'card' });
   add(box,
     el('div', { class: 'row' },
-      el('button', { disabled: !ready || !licensed, text: 'Set up the cluster again', title: 'Uploads the framework files to ~/.hpcworker through the portal and runs its install once', onClick: () => run('Setting up the cluster', async () => { const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show }); notify(r.ok ? 'ok' : 'fail', r.ok ? 'The framework is installed.' : `The install command ended with exit ${r.exitCode}; see its output.`); }) }),
-      el('button', { disabled: !ready || !licensed, text: 'Run the probe job again', title: 'Submits a short job (ten minutes at most) that tests the compute node; the checks read its report', onClick: () => run('Submitting the probe job', async () => { const r = await portal.shell(commands.probe(), { timeoutMs: 60_000 }); show(r.output); const id = parseJobId(r.output); if (id) await local.set(PROBE_KEY, { submitted_at: new Date().toISOString(), job: id } satisfies ProbeNote); notify(id ? 'ok' : 'warn', id ? `Probe job ${id} submitted. The checks read its report once it has finished (about ten minutes).` : `The probe command ended with exit ${r.exitCode} and printed no job id; see its output.`); }) }),
+      el('button', { disabled: !ready || !approved, text: 'Set up the cluster again', title: 'Uploads the framework files to ~/.hpcworker through the portal and runs its install once', onClick: () => run('Setting up the cluster', async () => { const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show }); notify(r.ok ? 'ok' : 'fail', r.ok ? 'The framework is installed.' : `The install command ended with exit ${r.exitCode}; see its output.`); }) }),
+      el('button', { disabled: !ready || !approved, text: 'Run the probe job again', title: 'Submits a short job (ten minutes at most) that tests the compute node; the checks read its report', onClick: () => run('Submitting the probe job', async () => { const r = await portal.shell(commands.probe(), { timeoutMs: 60_000 }); show(r.output); const id = parseJobId(r.output); if (id) await local.set(PROBE_KEY, { submitted_at: new Date().toISOString(), job: id } satisfies ProbeNote); notify(id ? 'ok' : 'warn', id ? `Probe job ${id} submitted. The checks read its report once it has finished (about ten minutes).` : `The probe command ended with exit ${r.exitCode} and printed no job id; see its output.`); }) }),
       el('button', { disabled: !settings, text: 'Sign in on the cluster', title: 'Opens the sign-in terminal in the strip', onClick: () => env.stripFix('sign-in-claude') }),
     ),
     el('div', { class: 'row' },
-      el('button', { class: 'primary', disabled: !ready || !licensed || occupied, text: 'Start worker', onClick: () => run('Starting the worker', async () => { const r = await startWorkerNow(); notify(r.started ? 'ok' : 'warn', r.started ? (r.alreadyRunning ? `Worker already has job ${r.job}; nothing new was submitted.` : `Job ${r.job} submitted.`) : `Not started: ${r.reason ?? 'a step is missing'}`); await render(); }) }),
+      el('button', { class: 'primary', disabled: !ready || !approved || occupied, text: 'Start worker', onClick: () => run('Starting the worker', async () => { const r = await startWorkerNow(); notify(r.started ? 'ok' : 'warn', r.started ? (r.alreadyRunning ? `Worker already has job ${r.job}; nothing new was submitted.` : `Job ${r.job} submitted.`) : `Not started: ${r.reason ?? 'a step is missing'}`); await render(); }) }),
       el('button', { class: 'danger', disabled: !ready || !state, text: 'Stop', title: 'Writes the stop file; the job leaves on its own and ends its chain', onClick: () => run('Stopping the worker', async () => { const o = await stopOnCluster(portal, state!); show([o.note, o.toolStop?.output].filter(Boolean).join('\n')); await markStopped(); notify('ok', `Worker "${state!.run}": ${o.note}`); await render(); }) }),
       el('button', { disabled: !state, text: 'Read status now', onClick: () => run("Reading the job's files", async () => { await refreshRun(); await render(); }) }),
     ),
-    !licensed ? el('p', { class: 'warn small', text: 'Accept the terms and enter your key (the strip above, or the setup page) to enable the buttons.' }) : null,
+    !approved ? el('p', { class: 'warn small', text: 'Accept the terms and have your access approved (the strip above says where you stand) to enable the buttons.' }) : null,
     out,
   );
   return box;
@@ -214,7 +213,6 @@ async function runChecks(settings: PortalSettings | undefined, prefs: Prefs, qui
       now: () => new Date(),
       local,
       session,
-      keys: BUNDLED_KEYS,
       hasOriginPermission: (origin) => originGranted(origin),
       portalAlive,
       portal: () => portal,
@@ -293,7 +291,7 @@ export function settingsSection(env: { settings: PortalSettings | undefined; pre
     el('div', { class: 'row' }, el('label', { text: 'Site profile name (hpcworker install --profile; the session name the framework asks for starts with it): ' }, site)),
     el('div', { class: 'row' }, el('label', { text: 'Worker permission mode: ' }, mode)),
     el('p', { class: 'muted small', text: 'Supervised mode is the default because several campuses require that an agent never runs a command without your approval. Choosing a broader mode is your decision. The worker name is set with the data statement.' }),
-    el('div', { class: 'box' }, auto, el('label', { for: 'auto-start' }, el('strong', { text: 'Start my worker when I open my portal' }), ' (on unless you turn it off). When on, Ashley Bridge starts your worker as soon as your portal tab connects and no worker of yours is alive, provided the agreement, key, tool, sign-in and data statement are in order. It asks the login node at most once a minute, never more; a start that would break that rule waits for the next minute. Your worker stays on by itself once started: the job submits its successor before its wall time ends, until you press Stop.')),
+    el('div', { class: 'box' }, auto, el('label', { for: 'auto-start' }, el('strong', { text: 'Start my worker when I open my portal' }), ' (on unless you turn it off). When on, Ashley Bridge starts your worker as soon as your portal tab connects and no worker of yours is alive, provided the agreement, your access, the tool, the sign-in and the data statement are in order. It asks the login node at most once a minute, never more; a start that would break that rule waits for the next minute. Your worker stays on by itself once started: the job submits its successor before its wall time ends, until you press Stop.')),
     el('div', { class: 'box' }, openClaude, el('label', { for: 'open-claude' }, el('strong', { text: 'Open claude.ai when the worker connects' }), ' (on unless you turn it off). The first time this browser sees your worker\'s link, it opens it in a new tab; afterwards the green button opens it.')),
     autoNote ? el('div', { class: 'muted small', text: `Last automatic start attempt ${fmtTime(autoNote.attempted_at)}: ${autoNote.outcome}` }) : null,
     el('div', { class: 'row' }, el('button', {

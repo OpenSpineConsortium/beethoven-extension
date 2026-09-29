@@ -36,6 +36,7 @@ export interface SessionInfo {
   /** the page says OnDemand somewhere */
   isOnDemand: boolean;
   csrf?: string;
+  /** the account name this dashboard page shows ("Logged in as ..."), and nothing else: the one identity the access check uses */
   username?: string;
   checkedAt: string;
   detail: string;
@@ -165,7 +166,10 @@ const encodePath = (abs: string) =>
 
 export class PortalClient implements PortalApi {
   private csrf: string | undefined;
-  private username: string | undefined;
+  /** the name the dashboard showed for the signed-in session: an identity */
+  private dashboardUser: string | undefined;
+  /** the home directory's owner, when the dashboard shows no name: for paths only, never an identity */
+  private pathUser: string | undefined;
   private homeDir: string | undefined;
   /** the PUN answered the dashboard with 200 since this client was made (or since it last saw a 5xx) */
   private warmed = false;
@@ -267,7 +271,8 @@ export class PortalClient implements PortalApi {
       const signedIn = res.ok && onDashboard && !!csrf;
       if (signedIn) {
         this.csrf = csrf;
-        if (user) this.username = user;
+        // the page as it is now: a dashboard that stops showing a name stops being an identity
+        this.dashboardUser = user;
       }
       let detail = 'signed in to the portal';
       if (!res.ok) detail = `the portal answered ${res.status}; sign in to it in a tab`;
@@ -275,7 +280,7 @@ export class PortalClient implements PortalApi {
       else if (final?.pathname.startsWith('/nginx/init')) detail = 'the portal is starting your session; try again in a few seconds';
       else if (!onDashboard) detail = 'the portal did not show its dashboard; sign in to it in a tab';
       else if (!csrf) detail = 'the dashboard page carries no form token; this may not be an Open OnDemand portal';
-      const info: SessionInfo = { ok: res.ok, status: res.status, finalUrl, signedIn, isOnDemand, csrf: signedIn ? csrf : undefined, username: this.username, checkedAt, detail };
+      const info: SessionInfo = { ok: res.ok, status: res.status, finalUrl, signedIn, isOnDemand, csrf: signedIn ? csrf : undefined, username: signedIn ? this.dashboardUser : undefined, checkedAt, detail };
       return { result: info, bytes: html.length, outcome: signedIn ? `${res.status} signed in` : `${res.status} ${detail}` };
     });
   }
@@ -286,21 +291,26 @@ export class PortalClient implements PortalApi {
     return this.csrf;
   }
 
-  /** the portal username: from the dashboard page, else the owner of the home directory */
+  /**
+   * The portal username for paths: from the dashboard page, else the owner of the home directory.
+   * Only the dashboard's own name (SessionInfo.username) is an identity; the fallback names a
+   * directory and is used for the state directory alone, never for the access check.
+   */
   async whoAmI(): Promise<string | undefined> {
-    if (this.username) return this.username;
+    if (this.dashboardUser) return this.dashboardUser;
     await this.session();
-    if (this.username) return this.username;
+    if (this.dashboardUser) return this.dashboardUser;
+    if (this.pathUser) return this.pathUser;
     try {
       const home = await this.home();
       const listing = await this.listDir(home);
       const owner = listing.files.find((f) => f.name === '.' || f.owner)?.owner;
-      if (owner) this.username = owner;
-      else this.username = home.split('/').filter(Boolean).pop();
+      // kept apart from the dashboard's name, so session() never reports a directory owner as who is signed in
+      this.pathUser = owner || home.split('/').filter(Boolean).pop();
     } catch {
-      /* stays unknown; the student can type it */
+      /* stays unknown; the home directory's last segment stands in for paths */
     }
-    return this.username;
+    return this.pathUser;
   }
 
   /** the home directory: /pun/sys/dashboard/files redirects to files/fs<home> */

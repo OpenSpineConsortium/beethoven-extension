@@ -4,21 +4,22 @@
 // fixed order and the first one not satisfied is the step. Nothing here touches the browser or
 // the portal, so the whole sequence is tested in Node.
 //
-// Order: portal tab open -> portal awake and signed in -> terms accepted -> licence key -> tool
-// installed -> probe run -> signed in to Claude on the cluster -> data statement -> worker
+// Order: portal tab open -> portal awake and signed in -> terms accepted -> access approved ->
+// tool installed -> probe run -> signed in to Claude on the cluster -> data statement -> worker
 // started -> worker online -> open in Claude.
 import type { WorkerState } from './contract';
+import type { AccessFact } from '../licensing/access';
 
-export type StepId = 'portal' | 'warm' | 'terms' | 'licence' | 'install' | 'probe' | 'login' | 'statement' | 'start' | 'online' | 'open';
+export type StepId = 'portal' | 'warm' | 'terms' | 'access' | 'install' | 'probe' | 'login' | 'statement' | 'start' | 'online' | 'open';
 
-export const STEP_ORDER: StepId[] = ['portal', 'warm', 'terms', 'licence', 'install', 'probe', 'login', 'statement', 'start', 'online', 'open'];
+export const STEP_ORDER: StepId[] = ['portal', 'warm', 'terms', 'access', 'install', 'probe', 'login', 'statement', 'start', 'online', 'open'];
 
 /** the student's words for each step, for the strip's counter */
 export const STEP_TITLES: Record<StepId, string> = {
   portal: 'Your portal',
   warm: 'Waking up your portal',
   terms: 'The agreement',
-  licence: 'Your licence key',
+  access: 'Your access',
   install: 'Setting up the cluster',
   probe: 'Checking a compute node',
   login: 'Signing in to Claude on the cluster',
@@ -29,7 +30,7 @@ export const STEP_TITLES: Record<StepId, string> = {
 };
 
 /** what the extension does by itself, or what the one button does */
-export type Action = 'connect' | 'open-setup' | 'open-portal' | 'warm' | 'accept-terms' | 'save-key' | 'install' | 'probe' | 'login' | 'acknowledge' | 'start' | 'poll' | 'open-claude' | 'retry-warm' | 'retry-install' | 'retry-probe' | 'retry-login' | 'retry-start';
+export type Action = 'connect' | 'open-setup' | 'open-portal' | 'warm' | 'accept-terms' | 'check-access' | 'retry-access' | 'ask-access' | 'install' | 'probe' | 'login' | 'acknowledge' | 'start' | 'poll' | 'open-claude' | 'retry-warm' | 'retry-install' | 'retry-probe' | 'retry-login' | 'retry-start';
 
 export interface Facts {
   portal: {
@@ -45,12 +46,8 @@ export interface Facts {
     detail?: string;
   };
   terms: boolean;
-  licence: {
-    ok: boolean;
-    missing: boolean;
-    detail: string;
-    revoked: boolean;
-  };
+  /** the access service's word on the signed-in account (licensing/access.ts accessFact), from storage; never a network call here */
+  access: AccessFact;
   install: {
     /** undefined until the home directory has been listed */
     installed?: boolean;
@@ -133,8 +130,8 @@ export interface StripView {
   auto?: Action;
   /** the auto action must wait this long first (the 60 s scheduler floor) */
   waitMs?: number;
-  /** the strip shows an input for this step (the key box, the statement, the login terminal) */
-  input?: 'key' | 'statement' | 'terminal';
+  /** the strip shows an input for this step (the statement, the login terminal) */
+  input?: 'statement' | 'terminal';
   /** everything is green: the green button is shown */
   done: boolean;
   tone: 'info' | 'busy' | 'wait' | 'fail' | 'ok';
@@ -183,10 +180,28 @@ export function decide(f: Facts, now = Date.now()): StripView {
   // 3. the agreement, once per browser profile
   if (!f.terms) return view('terms', { status: 'Read and accept the agreement once; it opens on the setup page.', primary: { label: 'Read the agreement', action: 'accept-terms' }, tone: 'info' });
 
-  // 4. the licence key; read-only checks are not blocked on it, the worker is
-  if (f.licence.revoked) return view('licence', { status: f.licence.detail, tone: 'fail' });
-  if (!f.licence.ok) {
-    return view('licence', { status: f.licence.missing ? 'Paste your licence key. Not got one? Ask for access.' : f.licence.detail, input: 'key', primary: { label: 'Save the key', action: 'save-key' }, tone: f.licence.missing ? 'info' : 'fail' });
+  // 4. approval by Licensor's access service, for the account the portal shows; read-only checks
+  // are not blocked on it, the worker is. The background asks the service (check-access); the
+  // strip only ever offers the request page (ask-access) or a fresh attempt (retry-access).
+  const a = f.access;
+  if (!a.ok) {
+    switch (a.state) {
+      case 'version-revoked':
+        return view('access', { status: a.detail, tone: 'fail' });
+      case 'checking':
+        return view('access', { status: 'Checking your access...', auto: a.needsCheck ? 'check-access' : undefined, tone: 'busy' });
+      case 'denied':
+        return view('access', { status: `Your account ${a.accessId ?? ''}${a.portal ? ` at ${a.portal}` : ''} is not on the approved list yet. Ask for access; once it is approved, click the Ashley Bridge button again.`, primary: { label: 'Ask for access', action: 'ask-access' }, tone: 'info' });
+      case 'withdrawn':
+        return view('access', { status: a.detail, primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
+      case 'no-identity':
+        return view('access', { status: "Your portal's dashboard does not show who is signed in, so your access cannot be checked. Open the portal in a tab, sign in there, and try again.", primary: { label: 'Check again', action: 'retry-access' }, tone: 'fail' });
+      case 'lapsed':
+      case 'unreachable':
+      case 'failed':
+      default:
+        return view('access', { status: a.detail, primary: { label: a.state === 'lapsed' ? 'Check again' : 'Try again', action: 'retry-access' }, tone: 'fail' });
+    }
   }
 
   // 5. the tool on the cluster

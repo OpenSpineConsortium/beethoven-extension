@@ -158,7 +158,7 @@ product name and identifier carry no university name. Written approval from Wayn
 written answer from Anthropic precede any paid edition.
 
 Versions in this tree: the extension is 4.0.0 (the first version without licence keys); the
-framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 4 and the extension's
+framework's `VERSION` file is 3; the agreement `LICENSE.txt` is version 4 and the extension's
 `TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
 integers; a changed text moves its version with it.
 
