@@ -23,6 +23,7 @@
     "dev": "wxt --mode development",
     "prezip": "node scripts/sync-framework.mjs",
     "zip": "wxt zip -b chrome && wxt zip -b firefox --mv2",
+    "zip:all": "wxt zip -b chrome && wxt zip -b firefox --mv2 && wxt zip -b edge && wxt zip -b safari",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "mock": "node mock-ood/server.mjs"

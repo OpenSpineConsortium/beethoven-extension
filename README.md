@@ -162,6 +162,64 @@ framework's `VERSION` file is 3; the agreement `LICENSE.txt` is version 4 and th
 `TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
 integers; a changed text moves its version with it.
 
+## Build and release (for the next developer)
+
+Everything below runs from a fresh clone on Windows (Git Bash or WSL), macOS or Linux. Nothing is
+downloaded at run time by the product; the build needs the network only for `npm ci`.
+
+**Prerequisites.** Git; Node 22 (nodejs.org or nvm; on the maintainer's Windows machine it is
+`export PATH=/c/Users/grego/tools/node22:$PATH`); Python 3.8 or newer for the framework tests and the
+site pages; `bash`; `pandoc` only for the site pages; `unzip`/`sha256sum` (Git Bash has both). No
+cluster account is needed for any test: the tests run against the mock portal in `extension/mock-ood`.
+
+**Clone.** `git clone https://github.com/OpenSpineConsortium/ashley-bridge.git` (the organisation's
+private copy; the maintainer's personal copy is `GregorySchwing/ashley-bridge`). Keep the line endings
+as they are in the repository (LF); Windows Git may warn about CRLF and is harmless.
+
+**Extension.**
+
+```
+cd extension
+npm ci                 # pinned versions from package-lock.json
+npm run typecheck      # tsc --noEmit
+npm test               # vitest: 130+ tests, starts the mock portal itself
+npm run build          # -> .output/chrome-mv3 (Chrome, Edge) and .output/firefox-mv2 (Firefox)
+npm run zip:all        # -> .output/ashley-bridge-<version>-{chrome,firefox,edge,safari}.zip + -sources.zip
+```
+
+`npm run build` first runs `scripts/sync-framework.mjs`, which copies `../framework/`, `../LICENSE.txt`
+and `../PRIVACY.md` into `public/` and stops if the agreement's "Version N" line disagrees with
+`TERMS_VERSION` in `src/core/terms.ts`. Load `.output/chrome-mv3` unpacked in Chrome or Edge, or
+`.output/firefox-mv2/manifest.json` as a temporary add-on in Firefox, to try a build by hand
+(`docs/store/TEST_BEFORE_UPLOAD.md`).
+
+**Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about three
+minutes; a few tests skip without a scheduler). To put a checkout on a cluster by hand: copy `framework/`
+there and run `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through
+the portal's file app when its bundled `framework/VERSION` is newer than the installed one.
+
+**Site pages.** `python3 tools/site_bridge_build.py` renders the privacy statement and the agreement into
+the website checkout expected beside this repository (`../openspineconsortium.github.io/ashley/bridge/`)
+and checks that every word of the source texts is on the page; `--check-only` verifies without writing.
+
+**Access service.** The approval check the extension makes is served by the Cloudflare Worker in the
+`ashley` repository (`tools/intake/worker.js`, contract in `tools/intake/ACCESS_CHECK.md`); it is deployed
+from there, not from here.
+
+**Releasing a version.**
+
+1. Versions are integers: `extension/package.json` (and `packages[""].version` in `package-lock.json`)
+   move to the next whole number; a changed agreement or privacy statement moves its own "Version N"
+   line and, for the agreement, `TERMS_VERSION`/`TERMS_DATE` in `src/core/terms.ts`; a changed framework
+   moves `framework/VERSION` and the `VERSION=` line at the top of `framework/bin/hpcworker`.
+2. `npm run typecheck && npm test && npm run build && npm run zip:all` in `extension/`, and the framework
+   tests.
+3. Copy the zips into `release/<version>/`, write `SHA256SUMS.txt` (`sha256sum *.zip > SHA256SUMS.txt`)
+   and a short `README.md` there (see `release/4.0.0/`), commit, tag `v<version>`, push both remotes.
+4. Test by hand (`docs/store/TEST_BEFORE_UPLOAD.md`), then upload store by store
+   (`docs/store/SUBMISSION.md`, texts in `docs/store/LISTING.md`), then rebuild and push the site pages if
+   a text changed.
+
 ## Documents
 
 - `docs/RESEARCH_REPORT.md`: the research and the build specification everything else derives from.
