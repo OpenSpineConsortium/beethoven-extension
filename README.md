@@ -196,7 +196,9 @@ and `../PRIVACY.md` into `public/` and stops if the agreement's "Version N" line
 **Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about three
 minutes; a few tests skip without a scheduler). To put a checkout on a cluster by hand: copy `framework/`
 there and run `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through
-the portal's file app when its bundled `framework/VERSION` is newer than the installed one.
+the portal's file app when its bundled `framework/VERSION` is newer than the installed one. The install adds
+`~/.hpcworker/bin` to PATH through a managed block in `~/.bashrc`, so a new terminal finds `hpcworker`; a
+terminal opened before the install needs `export PATH="$HOME/.hpcworker/bin:$PATH"` once.
 
 **Site pages.** `python3 tools/site_bridge_build.py` renders the privacy statement and the agreement into
 the website checkout expected beside this repository (`../openspineconsortium.github.io/ashley/bridge/`)
