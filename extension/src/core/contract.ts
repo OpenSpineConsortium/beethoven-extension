@@ -7,11 +7,20 @@
 // jobs/worker.sbatch.tpl, README.md as they stood on 2026-09-29) and checked against version 3 the
 // same day: 3 moved none of the paths, fields or commands below (it lengthened the resume window
 // to seven days, named the session after the worker rather than the job, and dropped the profile's
-// email_domain, which the extension no longer reads).
+// email_domain, which the extension no longer reads). Framework 5 (the same evening) added the
+// shared copy: a site profile may name "shared_install", a folder on the lab's volume holding the
+// whole tool, maintained by the lab in one place; `hpcworker install --shared <that folder>` then
+// sets up the account without copying code (a launcher, a marker, the profile, log/).
 //
-// Layout:
-//   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/)
+// Layout, in either of two modes:
+//   the student's own copy (a site with no shared folder, or the fallback when the account cannot read it):
+//   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/), uploaded by the extension
 //   ~/.hpcworker/VERSION                      the installed tool's integer version; the strip compares it with the bundled one
+//   the lab's shared copy (framework 5):
+//   <shared_install>/                         bin/, lib/, jobs/, profiles/, VERSION, README.md, kept by the lab
+//   ~/.hpcworker/shared                       the marker: one line naming <shared_install>; while it exists the account runs that copy
+//   ~/.hpcworker/bin/hpcworker                a small launcher that runs <shared_install>/bin/hpcworker (a regular file, never a link)
+//   in both:
 //   ~/.hpcworker/profile.json                 the site profile; its shared_state_dir names the state directory
 //   ~/.hpcworker/discover.json                `hpcworker discover --save` (optional)
 //   <state_dir>/probe/probe.json              written by the probe job
@@ -34,9 +43,12 @@
 // a download: the Files app answers a download of a missing file with 200 and an HTML page.
 //
 // The extension never deletes anything on the cluster: it writes files, touches the stop file and
-// types hpcworker's verbs. Removing a marker is done by the student in the portal's Files app.
+// types hpcworker's verbs. Removing a marker is done by the student in the portal's Files app. It
+// never writes into a shared folder either: it only reads <shared_install>/VERSION to show it.
 export const FRAMEWORK_DIR = '.hpcworker';
 export const HPCWORKER = `~/${FRAMEWORK_DIR}/bin/hpcworker`;
+/** the second line of ~/.hpcworker/bin/hpcworker when it is the launcher of a shared copy (framework 5 LAUNCHER_TAG); a full copy of the tool has no such line */
+export const LAUNCHER_TAG = '# hpcworker launcher for a shared copy (managed: "hpcworker install" rewrites this file)';
 export const DEFAULT_WORKER_NAME = 'worker';
 export const RESTRICTED_MARKER = '.restricted';
 
@@ -58,7 +70,29 @@ export const paths = {
   workspace: (stateDir: string, name: string) => `${stateDir}/workspaces/${name}`,
   restrictedMarker: (stateDir: string, name: string) => `${stateDir}/workspaces/${name}/${RESTRICTED_MARKER}`,
   consent: (home: string) => `${home}/${FRAMEWORK_DIR}/consent`,
+  /** the shared-copy marker `hpcworker install --shared` writes: one line, the shared folder */
+  sharedMarker: (home: string) => `${home}/${FRAMEWORK_DIR}/shared`,
+  /** the shared copy's own VERSION: the lab's copy is the one that counts, never the bundled one */
+  sharedVersion: (dir: string) => `${dir}/VERSION`,
 };
+
+/**
+ * A shared folder the extension will name on a command line: absolute, made of letters, digits and
+ * . _ + - only, no "." or ".." segment. Anything else is not used (the tool is then uploaded to the
+ * student's own account as before), so no path from a profile or a marker is ever quoted around.
+ */
+export function sharedRootOf(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const s = raw.trim().replace(/\/+$/, '');
+  if (!/^(\/[A-Za-z0-9._+-]+)+$/.test(s)) return undefined;
+  if (s.split('/').some((seg) => seg === '.' || seg === '..')) return undefined;
+  return s;
+}
+
+/** the profile's "shared_install" (framework 5), when it names a usable folder */
+export function sharedInstallFrom(profileJson: string | undefined): string | undefined {
+  return sharedRootOf(parseProfile(profileJson)?.shared_install);
+}
 
 /** "/a/b/c" -> {dir: "/a/b", name: "c"}; what a listing-based existence check needs */
 export function splitPath(abs: string): { dir: string; name: string } {
@@ -122,6 +156,12 @@ function safe(s: string): string {
 export const commands = {
   /** after the files are uploaded: make the tool executable and install with the site profile (it strips CR endings itself) */
   install: (profile: string) => `chmod 755 ${HPCWORKER} 2>/dev/null; bash ${HPCWORKER} install --profile '${safe(profile)}'`,
+  /**
+   * The lab's shared copy (framework 5): nothing is uploaded; the shared tool sets up the account
+   * itself (launcher, marker, profile, the PATH block). `dir` has passed sharedRootOf, so it holds
+   * no quote or space; the quotes are the same habit as every other argument here.
+   */
+  installShared: (dir: string, profile: string) => `bash '${safe(dir)}/bin/hpcworker' install --shared '${safe(dir)}' --profile '${safe(profile)}'`,
   /** the login-node phase-1 discovery (JSON); a one-line fallback when the tool is not installed yet */
   discover: () =>
     `bash ${HPCWORKER} discover 2>/dev/null || { echo "sched=$(command -v sbatch qsub bsub condor_submit 2>/dev/null | tr '\\n' ' ')"; echo "rt=$(command -v apptainer singularity podman enroot 2>/dev/null | tr '\\n' ' ')"; echo "userns=$(sysctl -n user.max_user_namespaces 2>/dev/null)"; echo "os=$(. /etc/os-release 2>/dev/null; echo $PRETTY_NAME)"; echo "glibc=$(ldd --version 2>/dev/null | head -1)"; echo "tmp=\${SLURM_TMPDIR:-}|\${TMPDIR:-}"; echo "proxy=\${https_proxy:-\${HTTPS_PROXY:-}}"; sinfo -h -o 'part=%P|%l|%a' 2>/dev/null | head -40; }`,

@@ -60,6 +60,52 @@ closes a sitting while a slow student is on Anthropic's page, and how long a wor
 `need_login` takes to notice a new sign-in); `GET /rnode/asx1/1/` for the compute-node half of
 question 6.
 
+## The lab's shared copy of the framework (decided 2026-09-29, evening)
+
+Since framework 5 a site profile may name `shared_install`, one copy of the framework the lab keeps
+for all its students (`ARCHITECTURE.md` 2.1); at Wayne State it is
+`/rs/rs_grp_oschome/shared/ashley/hpcworker/current`. What was measured before it was published and
+just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls -l`, `getfacl`,
+`getent`, `readlink`, `find`), then the questions it leaves open.
+
+- **Who can reach the lab's volume.** `/rs/rs_grp_oschome` is a symbolic link to the CephFS volume;
+  the volume root is `drwxrws---+ go2432:oschome`, ACL `group::rwx`, `other::---`. `getent group
+  oschome` answered `oschome:*:2360:ab5188,go2432`: two members. An account outside the group cannot
+  traverse the root at all.
+- **So every student at Wayne State must be in group `oschome` before their first run, in either
+  install mode.** This held before the shared copy existed: the worker image (`image_store`),
+  `claude_bin` and each student's own `shared_state_dir` (`/rs/rs_grp_oschome/$USER/hpcworker`) are
+  all under the same root. The per-user fallback does not help a student outside the group: the tool
+  would go into the home, and the probe and the worker would still fail on the image and the state
+  directory.
+- **Group write.** `shared/ashley` carries `group::rwx` with `default:group::rwx`, so anything created
+  under it is group-writable by default; `tools/deploy_shared.sh` removes group write from the tree it
+  publishes (the `hpcworker/` directory included), so a member can run the lab's code and cannot
+  change it or switch `current`. `shared/ashley` itself stays group-writable, so a member could still
+  rename what sits directly in it (`hpcworker/`, as already `containers/`); tightening it is the
+  maintainer's decision.
+- **The image directory's group.** `containers/claude-node22` is owned by `go2432` with group `wsu`,
+  not `oschome` (`group::r-x`, `other::---`). Whether a second member of `oschome` can run the image
+  has not been tried.
+- **After publication** (read-only, 2026-09-29 17:35 EDT, as `go2432`). `deploy.log` records v5
+  published at 21:30:54 UTC (`new`), then `same`, `readme` and `same`. `hpcworker/` is
+  `drwxr-s---+ go2432:oschome` (ACL `group::r-x`, `mask::r-x`, `other::---`, defaults the same);
+  `current -> v5` (relative); `v5/` and its directories `dr-xr-s---`, the files listed to depth two
+  `-r--r-----`, `bin/hpcworker` and the two `.sbatch` files `-r-xr-x---`, all group `oschome`; nothing under
+  `hpcworker/` is group-writable except the `current` link's own mode, which Linux ignores. The
+  maintainer's account was converted: `~/.hpcworker/shared` names `.../hpcworker/current`,
+  `~/.hpcworker/bin/hpcworker` is the launcher (a regular file), the old copy is in
+  `~/.hpcworker/replaced/20260929-173150/`, `profile.json` kept (13:42), and
+  `bash -lc 'hpcworker version'` over ssh prints `5 (shared copy at
+  /rs/rs_grp_oschome/shared/ashley/hpcworker/current)`. Only `go2432` read it; what a second
+  member sees is still untested.
+
+| Question | Why it matters | First test | Result |
+|---|---|---|---|
+| Can the portal's Files app read `.../hpcworker/current/VERSION` through the `current` link? | The panel shows the shared copy's version from that read. The install does not depend on it: whether the account can use the shared copy is judged by the install line in the shell, and a failed read is reported, not treated as a cold portal | Signed in as a member, in the portal: list `/rs/rs_grp_oschome/shared/ashley/hpcworker/` and download `.../current/VERSION` | Not yet measured. The Files app served paths under `/rs/rs_grp_oschome/go2432/` on 2026-09-29, so `/rs` is inside its allowlist; `shared/` was never read through it |
+| What does an account outside `oschome` see? | The words the panel shows that student, and whether the fallback's note is the right one | A second account, or the first run of a student not yet in the group | Not yet measured; no second account was available. Expected from the ACLs, not observed: bash cannot open the shared copy's `bin/hpcworker` (`Permission denied`, exit 126), the extension falls back to the upload, and the probe then fails on the image |
+| How is a student added to `oschome`, by whom, and how long does it take? | Nothing works at Wayne State without it | Ask C&IT (the group owner may be able to add members; not established) | Not yet asked |
+
 ## Two questions that are not technical
 
 Run in parallel with the above; both precede any paid licence (report, "Licensing and terms carry-over").

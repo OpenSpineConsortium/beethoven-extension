@@ -5,7 +5,7 @@ paste anywhere: your own sign-in to your university's Open OnDemand portal ident
 extension confirms with the maintainer's access service that your account is approved. If an
 instruction you were given earlier mentions a key, it is out of date; this page replaces it.
 
-Written 2026-09-29 for Ashley Bridge 4.0.0.
+Written 2026-09-29 for Ashley Bridge 4.0.0 and brought up to date for 5.0.0.
 
 ## What you need
 
@@ -13,6 +13,8 @@ Written 2026-09-29 for Ashley Bridge 4.0.0.
   it (at Wayne State: the VPN, then `https://ondemand.grid.wayne.edu`).
 - Your own Claude account on a plan that includes Claude Code Remote Control (Pro or Max). One
   person, one account; you sign in yourself, once, and the extension never sees that sign-in.
+- At Wayne State, your grid account in the lab's research-storage group. Ask Greg to have it added;
+  until it is, your worker cannot start.
 - Chrome, Edge or Firefox. Safari is not offered yet.
 
 ## 1. Ask for access
@@ -46,10 +48,11 @@ all the setup page needs; nothing else is entered there.
 2. Click the Ashley Bridge icon in the toolbar (pin it from the extensions menu if it is hidden).
    The first click asks your browser to allow that one site; allow it. The panel then does the
    steps by itself and says in one line what it is doing: it wakes the portal up, checks you are
-   signed in, confirms your account is approved, installs its small set of scripts in your own
-   cluster account, runs one short check job on a compute node the first time, shows you where your
-   work goes and takes your statement about it, starts your worker through the portal's own shell,
-   and waits for Claude Code to connect.
+   signed in, confirms your account is approved, sets up its small set of scripts for your own
+   cluster account (at Wayne State it points your account at the copy the lab keeps for everyone
+   instead of copying them), runs one short check job on a compute node the first time, shows you
+   where your work goes and takes your statement about it, starts your worker through the portal's
+   own shell, and waits for Claude Code to connect.
 3. Sign in to Claude once, when the panel asks. It opens Anthropic's sign-in page in a new tab; sign
    in with your own Claude account, click *Authorize*, and paste the code that page shows into the
    panel's one box. That code is the only thing you ever paste, it goes once into your own job's

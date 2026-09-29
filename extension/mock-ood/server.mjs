@@ -37,6 +37,23 @@
 // and records that virtual home in place of the directory's real path (MOCK_DISPLAY_HOME), so
 // what the extension shows of the tool's output reads like a cluster wherever the mock runs.
 //
+// The lab's shared copy of the tool (framework 5), for the shared-install tests: with
+// --shared-install [PATH] (option sharedInstall) a second directory on disk, seeded with the stand-in
+// tool, a VERSION (--shared-version, default 5) and profiles/mock.json naming PATH, is served
+// read-only by the Files routes at the virtual PATH (default /lab/shared/hpcworker/current), and a
+// typed line that names PATH runs against that directory. --shared-unreadable (sharedReadable:
+// false) plays a student outside the lab's group: the Files routes answer 403 there and bash cannot
+// open the launcher (No such file or directory, exit 127). MOCK_SHARED_INSTALL=PATH in the server's
+// environment does what --shared-install PATH does. Without either nothing changes.
+//
+// The CLI (the store reviewer's recipe) starts the home with the stand-in set up as the account's own
+// copy of the tool: ~/.hpcworker/profile.json and ~/.hpcworker/VERSION at the version the build carries
+// (public/framework/files/VERSION), so the strip finds the tool installed and current and uploads
+// nothing (option seedInstalled). Without it the strip would upload the real framework and run its
+// install, which has no profile for a mock site and refuses, and whose jobs the stand-in scheduler never
+// runs. --fresh-home starts with the stand-in command only (the upload path, up to that refusal);
+// --shared-install never seeds an own copy, so the shared install runs.
+//
 // The only dependency is `ws`. Node 22.
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -64,6 +81,19 @@ function findBash() {
   return 'bash';
 }
 
+/** the framework VERSION the extension build carries (sync-framework's copy), else the checkout's, else 1 */
+function carriedFrameworkVersion() {
+  for (const f of [path.join(here, '..', 'public', 'framework', 'files', 'VERSION'), path.join(here, '..', '..', 'framework', 'VERSION')]) {
+    try {
+      const v = fs.readFileSync(f, 'utf8').trim();
+      if (/^\d+$/.test(v)) return v;
+    } catch {
+      /* not there */
+    }
+  }
+  return '1';
+}
+
 const html = (title, body) => `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>\n`;
 
 export async function createMockPortal(opts = {}) {
@@ -82,6 +112,14 @@ export async function createMockPortal(opts = {}) {
     jobComposer: false,
     shellHosts: ['default', 'login1', 'login2'],
     seedTool: true,
+    /** with seedTool: set the stand-in up as the account's own copy (profile.json, and VERSION at the version the build carries), so the strip uploads nothing */
+    seedInstalled: false,
+    /** the virtual path of the lab's shared copy of the tool (framework 5 shared_install); undefined = the site keeps none */
+    sharedInstall: undefined,
+    /** false plays an account outside the lab's group: the Files routes answer 403 and bash cannot open the launcher */
+    sharedReadable: true,
+    /** the shared copy's VERSION */
+    sharedVersion: '5',
     /** the home the seeded tool prints and writes into its status files in place of the real one; default: the virtual home */
     displayHome: undefined,
     /** the account names the access-service stand-in approves */
@@ -100,7 +138,30 @@ export async function createMockPortal(opts = {}) {
     const dir = path.join(realHome, '.hpcworker', 'bin');
     fs.mkdirSync(dir, { recursive: true });
     fs.copyFileSync(path.join(BIN, 'hpcworker'), path.join(dir, 'hpcworker'));
+    if (o.seedInstalled) {
+      // the account's own copy, installed and current: the stand-in's own default profile, and the VERSION the build carries
+      const hw = path.join(realHome, '.hpcworker');
+      const profile = path.join(hw, 'profile.json');
+      if (!fs.existsSync(profile)) fs.writeFileSync(profile, `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', claude_config_dir: '$HOME/.ashley/claude', login_node_rules: { max_processes: 20, poll_floor_seconds: 60 }, worker_defaults: { cpus: 2, mem: '8G', hours: 8, permission_mode: 'default', capacity: 4 } })}\n`);
+      const version = path.join(hw, 'VERSION');
+      if (!fs.existsSync(version)) fs.writeFileSync(version, `${carriedFrameworkVersion()}\n`);
+    }
   }
+  // the lab's shared copy: a directory on disk beside the home, seeded with the stand-in tool
+  // the option, else MOCK_SHARED_INSTALL in the server's environment (as MOCK_DISPLAY_HOME is read)
+  const sharedOpt = o.sharedInstall ?? process.env.MOCK_SHARED_INSTALL;
+  const sharedVirtual = sharedOpt ? String(sharedOpt).replace(/\/+$/, '') : undefined;
+  let sharedReal;
+  if (sharedVirtual) {
+    sharedReal = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-ood-shared-'));
+    for (const d of ['bin', 'lib', 'jobs', 'profiles']) fs.mkdirSync(path.join(sharedReal, d), { recursive: true });
+    fs.copyFileSync(path.join(BIN, 'hpcworker'), path.join(sharedReal, 'bin', 'hpcworker'));
+    fs.writeFileSync(path.join(sharedReal, 'VERSION'), `${o.sharedVersion}\n`);
+    fs.writeFileSync(path.join(sharedReal, 'README.md'), "The stand-in for the lab's shared copy of the tool (mock-ood).\n");
+    fs.writeFileSync(path.join(sharedReal, 'profiles', 'mock.json'), `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', shared_install: sharedVirtual, claude_config_dir: '$HOME/.ashley/claude' })}\n`);
+  }
+  /** what bash is handed for the shared path: the directory, or, for an outsider, a path that is not there */
+  const sharedForShell = sharedReal ? posix(o.sharedReadable ? sharedReal : `${sharedReal}.unreadable`) : undefined;
   const bash = findBash();
   const railsToken = crypto.randomBytes(32).toString('base64');
   const shellSecret = crypto.randomBytes(24).toString('base64url');
@@ -143,6 +204,16 @@ export async function createMockPortal(opts = {}) {
   const shellTokenValid = (t) => {
     const m = /^([a-f0-9]+)-([a-f0-9]+)$/.exec(String(t ?? ''));
     return !!m && crypto.createHash('sha1').update(`${m[1]}-${shellSecret}`).digest('hex') === m[2];
+  };
+
+  /** the shared copy's virtual path onto its directory: undefined when outside it */
+  const sharedToReal = (virtualPath) => {
+    if (!sharedVirtual) return undefined;
+    const v = decodeURIComponent(virtualPath);
+    if (v !== sharedVirtual && !v.startsWith(`${sharedVirtual}/`)) return undefined;
+    const real = path.resolve(sharedReal, v.slice(sharedVirtual.length).replace(/^\/+/, ''));
+    if (real !== sharedReal && !real.startsWith(sharedReal + path.sep)) return undefined;
+    return real;
   };
 
   const toReal = (virtualPath) => {
@@ -286,7 +357,10 @@ export async function createMockPortal(opts = {}) {
     if (p === '/pun/sys/myjobs/workflows.json') return o.jobComposer ? send(res, 200, '[]') : send(res, 404, html('Not Found', '<h1>Not Found</h1>'));
     if (p.startsWith('/pun/sys/dashboard/files/fs')) {
       const virtualPath = p.slice('/pun/sys/dashboard/files/fs'.length) || '/';
-      const real = toReal(virtualPath);
+      const shared = sharedToReal(virtualPath);
+      // the lab's copy: readable by members, never writable through the portal; an outsider gets 403 as on the lab volume
+      if (shared && (!o.sharedReadable || req.method !== 'GET')) return send(res, 403, JSON.stringify({ error_message: o.sharedReadable ? "the lab's shared copy is read-only" : 'Permission denied' }));
+      const real = shared ?? toReal(virtualPath);
       if (!real) return send(res, 403, JSON.stringify({ error_message: 'path not allowed by the mock (outside the virtual home)' }));
       if (req.method === 'GET') {
         if (!fs.existsSync(real)) {
@@ -387,13 +461,16 @@ export async function createMockPortal(opts = {}) {
       MOCK_NODE_DIR: posix(nodeDir),
       MOCK_USER: o.user,
       MOCK_DISPLAY_HOME: displayHome,
+      ...(sharedVirtual ? { MOCK_SHARED_INSTALL: sharedVirtual, MOCK_SHARED_REAL: sharedForShell } : {}),
       USER: o.user,
       TERM: 'xterm-16color',
     };
     const runLine = (l) => {
       if (!l.trim()) return prompt();
       if (/^\s*exit(\s+\d+)?\s*$/.test(l)) return ws.close(1000);
-      child = spawn(bash, ['-c', `export PATH="$MOCK_BIN:$MOCK_NODE_DIR:$PATH"; cd "$HOME"\n${l}`], { env, cwd: realHome, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+      // a line naming the lab's shared copy runs against its directory on disk (or, for an outsider, a path that is not there)
+      const cmd = sharedVirtual ? l.split(sharedVirtual).join(sharedForShell) : l;
+      child = spawn(bash, ['-c', `export PATH="$MOCK_BIN:$MOCK_NODE_DIR:$PATH"; cd "$HOME"\n${cmd}`], { env, cwd: realHome, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
       const pipe = (s) => s.on('data', (d) => out(d.toString('utf8').replace(/\r?\n/g, '\r\n')));
       pipe(child.stdout);
       pipe(child.stderr);
@@ -470,6 +547,10 @@ export async function createMockPortal(opts = {}) {
     railsToken,
     state,
     cookie: `${COOKIE}=1`,
+    /** the lab's shared copy as the portal shows it (the virtual path), when the mock keeps one */
+    sharedInstall: sharedVirtual,
+    /** the directory on disk behind it */
+    sharedDir: sharedReal,
     async close() {
       for (const c of wss.clients) c.terminate();
       await new Promise((resolve) => server.close(resolve));
@@ -477,10 +558,13 @@ export async function createMockPortal(opts = {}) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--approve a,b] [--access-limit N] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--approve a,b] [--access-limit N] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--shared-install [PATH]] [--shared-version N] [--shared-unreadable] [--fresh-home] [--cert F --key F]
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   const val = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
+  // --shared-install takes an optional path: the next argument unless it is another flag
+  const sharedArg = a.includes('--shared-install') ? (val('--shared-install', '') ?? '') : undefined;
+  const sharedInstall = sharedArg === undefined ? undefined : sharedArg && !sharedArg.startsWith('--') ? sharedArg : '/lab/shared/hpcworker/current';
   const portal = await createMockPortal({
     port: Number(val('--port', 8080)),
     host: val('--host', '127.0.0.1'),
@@ -495,12 +579,19 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     coldPun: Number(val('--cold-pun', 0)) || 0,
     requireCookie: !a.includes('--no-cookie'),
     jobComposer: a.includes('--job-composer'),
+    sharedInstall,
+    sharedReadable: !a.includes('--shared-unreadable'),
+    sharedVersion: val('--shared-version', '5'),
+    // the reviewer's recipe: the stand-in set up as the account's own copy, unless a fresh home or a shared copy is asked for
+    seedInstalled: !a.includes('--fresh-home') && !sharedInstall,
     tls: a.includes('--cert') ? { cert: val('--cert'), key: val('--key') } : undefined,
     log: (s) => console.log(`  ${s}`),
   });
   console.log(`mock Open OnDemand portal at ${portal.origin}`);
   console.log(`  sign in:   ${portal.origin}/login   (then the dashboard is ${portal.origin}/pun/sys/dashboard/)`);
   console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome}; the seeded tool prints it as ${portal.displayHome})`);
+  if (portal.sharedInstall) console.log(`  shared:    ${portal.sharedDir} (the lab's shared copy, shown as ${portal.sharedInstall}${a.includes('--shared-unreadable') ? '; this account cannot read it' : ''}; the strip uses it when the site is one whose bundled profile names that path: open the mock at https://ondemand.wayne.localhost:${portal.port} for wayne, or set the site profile name in Details)`);
+  else console.log(`  tool:      ${a.includes('--fresh-home') ? 'the stand-in command only (not set up: the strip uploads the real framework, whose install refuses a mock site)' : "the stand-in, set up as the account's own copy at the version the build carries"}`);
   console.log(`  user:      ${portal.user}`);
   console.log(`  shell:     ${portal.origin}/pun/sys/shell/ssh/default`);
   console.log(`  access:    ${portal.origin}/ashley/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'})`);

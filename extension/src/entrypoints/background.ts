@@ -15,7 +15,7 @@ import { lookAtTab } from '../core/connect';
 import { isEnvironmentUrl, parseRegistration, paths, type ConnectionFile, type StatusFile } from '../core/contract';
 import { statementFor, type Statements } from '../core/disclosure';
 import { environmentLinkOf, gatherFacts, type Transient } from '../core/facts';
-import { bundledFrameworkVersion } from '../core/install';
+import { bundledFrameworkVersion, bundledSharedInstall } from '../core/install';
 import { ACCESS_KEY, AUTO_START_KEY, CLICK_KEY, IDENTITY_KEY, OPENED_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY, SERVICES_KEY, STATEMENTS_KEY, type AutoStartNote, type ClickNote, type IdentityNote, type OpenedLinks, type PortalSettings } from '../core/keys';
 import { fail, succeed, unwrap, type Answer, type Request } from '../core/messages';
 import { PORTAL_OPS, type PortalApi, type PortalOp, type SessionInfo } from '../core/portal';
@@ -432,6 +432,7 @@ function startNow(trigger: 'strip' | 'auto'): Promise<StartResult> {
       click,
       transient,
       bundledFrameworkVersion: () => bundledFrameworkVersion((path) => fetch(assetUrl(path))),
+      bundledSharedInstall: (site) => bundledSharedInstall(site, (path) => fetch(assetUrl(path))),
     });
     const view = decide(g.facts);
     const byButton = view.step === 'start' && (view.primary?.action === 'start' || view.primary?.action === 'retry-start');

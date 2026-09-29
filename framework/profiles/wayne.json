@@ -20,6 +20,7 @@
  "tmpdir_is_node_local": false,
  "ipc_dir": "/dev/shm",
  "shared_state_dir": "/rs/rs_grp_oschome/$USER/hpcworker",
+ "shared_install": "/rs/rs_grp_oschome/shared/ashley/hpcworker/current",
  "runtime": "apptainer",
  "runtime_module": "apptainer/1.2.2",
  "runtime_bin": "/wsu/el7/gnu7/apptainer/1.2.2/bin/apptainer",

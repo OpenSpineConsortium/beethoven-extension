@@ -1,12 +1,12 @@
 ASHLEY BRIDGE TRIAL EDITION LICENSE AGREEMENT
 
-Version 4, 2026-09-29. Applies to the Trial Edition of Ashley Bridge 4.0.0 and later versions that
+Version 5, 2026-09-29. Applies to the Trial Edition of Ashley Bridge 5.0.0 and later versions that
 ship this text, as distributed through the Chrome Web Store, Microsoft Edge Add-ons, Firefox Add-ons
 and, for Safari, the App Store, and as a signed file for unlisted distribution. You can read, copy,
 save and print this text at any time: it is in the file LICENSE.txt inside the extension and inside
-the framework it installs in your computing account, on the extension's own page ("Read the license
-terms"), in the signing dialog ("Open in a tab", "Save a copy"), and on the Ashley support page. You
-may ask for a paper copy at the notice address there.
+the framework (in your computing account, or in your institution's shared copy), on the extension's
+own page ("Read the license terms"), in the signing dialog ("Open in a tab", "Save a copy"), and on
+the Ashley support page. You may ask for a paper copy at the notice address there.
 
 Copyright (c) 2026 Gregory Schwing, trading as OpenSpineConsortium. All rights reserved.
 
@@ -26,9 +26,10 @@ keeps a copy of the text for you. If you do not agree, choose "Decline" and do n
 1. WHAT ASHLEY BRIDGE IS
 
 "Ashley Bridge" means the browser extension of that name (the "Extension"), the scripts and programs
-it asks you to install in your own computing account on your institution's cluster (the
-"Framework"), the recipe for the container image the Framework runs, its documentation, and updates
-Licensor provides. The Extension starts, watches and stops a job in your own cluster account through
+it asks you to install in your own computing account on your institution's cluster, or that your
+institution's lab keeps in one shared copy which the Extension points your account at (either way,
+the "Framework"), the recipe for the container image the Framework runs, its documentation, and
+updates Licensor provides. The Extension starts, watches and stops a job in your own cluster account through
 your institution's Open OnDemand portal; the job runs Claude Code, Anthropic's program, which you
 have signed in to yourself, and makes that session visible to you at claude.ai and in the Claude app
 through Anthropic's Remote Control feature. "Trial Edition" means the edition this agreement covers:
@@ -337,8 +338,10 @@ is not shifted to you by anything else in this agreement.
 17. UPDATES AND CHANGES TO THESE TERMS
 
 Updates to the Extension are distributed through the store you obtained it from (for Safari, the App
-Store); an extension installed by hand from a file does not update itself. The Framework in your
-cluster account is updated only when you run the update the Extension offers, never on its own. Each
+Store); an extension installed by hand from a file does not update itself. A Framework installed in
+your own cluster account is updated only when you run the update the Extension offers, never on its
+own. Where your institution's lab keeps one shared copy of the Framework, the lab updates that copy,
+your next worker start uses it, and the Extension shows the version in use under Details. Each
 version ships the terms that apply to it. Licensor may change these terms for future versions. A
 change is never effective merely by being posted: Ashley Bridge shows a changed agreement in the
 signing dialog and asks you to accept it again, by the same steps, before the new version is used. A

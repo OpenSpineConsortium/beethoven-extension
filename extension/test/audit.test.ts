@@ -80,6 +80,7 @@ describe('audit chokepoint', () => {
     expect(classifyCommand(commands.diag())).toBe('discover');
     expect(classifyCommand('squeue -h -j 1')).toBe('discover');
     expect(classifyCommand(commands.install('wayne'))).toBe('shell');
+    expect(classifyCommand(commands.installShared('/rs/rs_grp_oschome/shared/ashley/hpcworker/current', 'wayne'))).toBe('shell');
     expect(classifyCommand('true')).toBe('shell');
     expect(classifyCommand('echo hello')).toBe('shell');
   });

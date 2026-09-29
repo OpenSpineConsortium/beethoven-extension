@@ -14,7 +14,7 @@ export const STATEMENTS_KEY = 'bridge.statements'; // {[workspaces/<name>]: Ackn
 export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment links this browser profile already opened by itself
 export const LOGIN_SEEN_KEY = 'bridge.loginSeen'; // {at, detail}: when the login terminal in this browser last reported SIGNED-IN
 export const PROBE_KEY = 'bridge.probe'; //      {submitted_at, job}: the probe job the strip submitted by itself, so it is not submitted again while it runs
-export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail}: the last automatic install, so a failing one is not retried in a loop
+export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail, mode, dir, note}: the last install, so a failing one is not retried in a loop and Details can say which copy it set up
 // TERMS_KEY ('bridge.terms') is in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
@@ -76,6 +76,12 @@ export interface InstallNote {
   attempted_at: string;
   ok: boolean;
   detail: string;
+  /** which copy the install set up: the lab's shared copy, or the student's own (uploaded) */
+  mode?: 'shared' | 'own';
+  /** the shared folder the site profile names, when it names one */
+  dir?: string;
+  /** one line for Details when the shared copy could not be used and the tool went to the student's own account instead */
+  note?: string;
 }
 
 export interface OpenedLinks {

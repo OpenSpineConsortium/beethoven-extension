@@ -173,7 +173,9 @@ Release pipeline and keys:
   claude.ai link, the last 4,000 characters of `rc.log`), the portal tab, the tab the icon was clicked
   from, when the portal sign-in was last seen, what the last automatic start did, and the last check
   results. Never the pasted sign-in code.
-- In the student's cluster account: the framework, job files, `status.json`,
+- In the student's cluster account: the framework (at a site with a shared copy, such as Wayne State,
+  only a small launcher, a one-line marker naming the lab's copy and the profile; the lab's copy itself is
+  read-only to students), job files, `status.json`,
   `connection.json` (the session name and its claude.ai link), `rc.log`, the per-job token (0600), the
   successor job's id and the stop file, the consent marker `~/.hpcworker/consent` (one line: yes, the
   time, the browser's random installation identifier), and Claude Code's own sign-in (written by

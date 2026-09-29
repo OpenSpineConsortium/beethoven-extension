@@ -10,8 +10,9 @@ import { commands, consentSourceWords, parseJobId } from '../core/contract';
 import { runDiagnostics, formatReport, type DiagReport, type FixAction, type NodeReport } from '../core/diagnostics';
 import { PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Statements } from '../core/disclosure';
 import { environmentLinkOf } from '../core/facts';
-import { installFramework } from '../core/install';
-import { AUTO_START_KEY, CHECKS_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, type AutoStartNote, type PortalSettings, type Prefs, type ProbeNote } from '../core/keys';
+import { installFramework, installNoteOf, toolWords } from '../core/install';
+import { AUTO_START_KEY, CHECKS_KEY, INSTALL_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, type AutoStartNote, type InstallNote, type PortalSettings, type Prefs, type ProbeNote } from '../core/keys';
+import type { Facts } from '../core/steps';
 import { stopWorker as stopOnCluster, workerLive } from '../core/worker';
 import { assetUrl, local, session, version } from '../ext/storage';
 import { add, downloadText, el, fmtTime } from './dom';
@@ -30,6 +31,8 @@ export interface DetailsEnv {
   prefs: Prefs;
   state: RunState | undefined;
   alive: boolean;
+  /** which copy of the tool the account runs, as the strip last gathered it (undefined before the home was read) */
+  install?: Facts['install'];
   notify: Notify;
   run: Runner;
   render: () => Promise<void>;
@@ -42,7 +45,7 @@ export async function detailsSections(env: DetailsEnv): Promise<HTMLElement[]> {
   return [
     el('h3', { text: 'Your worker' }),
     workerCard(env),
-    actionsCard(env, summary.termsOk && summary.access.ok && !summary.versionRevoked),
+    actionsCard(env, summary.termsOk && summary.access.ok && !summary.versionRevoked, await local.get<InstallNote>(INSTALL_KEY)),
     el('h3', { text: 'Checks' }),
     await checksSection(env),
     el('h3', { text: 'Where your work goes' }),
@@ -132,7 +135,7 @@ async function statementReview(env: DetailsEnv): Promise<HTMLElement> {
   return box;
 }
 
-function actionsCard(env: DetailsEnv, approved: boolean): HTMLElement {
+function actionsCard(env: DetailsEnv, approved: boolean, installNote: InstallNote | undefined): HTMLElement {
   const { settings, state, alive, notify, run, render } = env;
   const out = el('pre', { hidden: true });
   const show = (text: string) => {
@@ -142,9 +145,24 @@ function actionsCard(env: DetailsEnv, approved: boolean): HTMLElement {
   const ready = !!settings && alive;
   const occupied = !!state && (!state.status || workerLive(state.status));
   const box = el('div', { class: 'card' });
+  // which copy of the tool the account runs; for an own copy at a site with a shared one, why (or how to move)
+  const [tool, ...toolMore] = toolWords(env.install, installNote);
   add(box,
+    tool ? el('p', { class: 'small', text: tool }) : null,
+    ...toolMore.map((t) => el('p', { class: installNote?.note === t ? 'warn small' : 'muted small', text: t })),
     el('div', { class: 'row' },
-      el('button', { disabled: !ready || !approved, text: 'Set up the cluster again', title: 'Uploads the framework files to ~/.hpcworker through the portal and runs its install once', onClick: () => run('Setting up the cluster', async () => { const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show }); notify(r.ok ? 'ok' : 'fail', r.ok ? 'The framework is installed.' : `The install command ended with exit ${r.exitCode}; see its output.`); }) }),
+      el('button', {
+        disabled: !ready || !approved,
+        text: 'Set up the cluster again',
+        title: "Where your lab keeps a shared copy of the tool, points your account at it (nothing is uploaded); otherwise uploads the tool to ~/.hpcworker through the portal and runs its install once",
+        onClick: () =>
+          run('Setting up the cluster', async () => {
+            const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show });
+            await local.set(INSTALL_KEY, installNoteOf(r, new Date()));
+            notify(r.ok ? (r.note ? 'warn' : 'ok') : 'fail', r.ok ? (r.mode === 'shared' ? "Your account now uses your lab's shared copy of the tool." : r.note ?? 'The tool is installed in your account.') : `The install command ended with exit ${r.exitCode}; see its output.`);
+            await render();
+          }),
+      }),
       el('button', { disabled: !ready || !approved, text: 'Run the probe job again', title: 'Submits a short job (ten minutes at most) that tests the compute node; the checks read its report', onClick: () => run('Submitting the probe job', async () => { const r = await portal.shell(commands.probe(), { timeoutMs: 60_000 }); show(r.output); const id = parseJobId(r.output); if (id) await local.set(PROBE_KEY, { submitted_at: new Date().toISOString(), job: id } satisfies ProbeNote); notify(id ? 'ok' : 'warn', id ? `Probe job ${id} submitted. The checks read its report once it has finished (about ten minutes).` : `The probe command ended with exit ${r.exitCode} and printed no job id; see its output.`); }) }),
       el('button', { disabled: !settings, text: 'Sign in on the cluster', title: 'Opens the sign-in terminal in the strip', onClick: () => env.stripFix('sign-in-claude') }),
     ),

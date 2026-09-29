@@ -1,6 +1,6 @@
 # Ashley Bridge privacy statement
 
-Version 5, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
+Version 6, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also on the Ashley
 support page.
 
@@ -10,7 +10,7 @@ licensed to individuals; it is not provided by or on behalf of any school, and L
 for one.
 
 Ashley Bridge is a browser extension that starts, watches and stops a job in your own cluster account
-through your university's Open OnDemand portal, and a set of scripts (the framework) in that account.
+through your university's Open OnDemand portal, and a set of scripts (the framework) that runs in that account.
 The job runs Claude Code, which you signed in to yourself. This statement says what stays in your
 browser, what your portal sees, what happens when you sign in to Claude, what Anthropic receives, what
 Licensor receives, and what is never collected.
@@ -25,7 +25,7 @@ Licensor receives, and what is never collected.
 | Your acceptance of the agreement: its version and text hashes, the statements you ticked with their wording, your typed name, the time, and the exact texts shown | `storage.local`, with a copy you can save | to prove the agreement and its terms, for you and for Licensor | it is yours to read, copy and print; uninstalling removes it |
 | Your statement about a worker's workspace: that it holds none of the restricted data the notice names, and that Remote Control will be enabled for that worker; kept as the workspace name, the exact text and its version, the time, and the time the marker below was written, one record per workspace | `storage.local` | so the notice is shown at every start but you are not asked to tick it again for the same workspace | making it again for a workspace on the options page; uninstalling. It is asked again when the text or the workspace changes |
 | A note of the last sign-in to Claude made from this browser: the time, and what Claude Code's own report said afterwards (the account it is signed in as and its plan) | `storage.local` | so the sign-in step is not offered again while a newer check has not yet confirmed it | uninstalling |
-| The claude.ai links to your sessions that the extension already opened by itself, so each opens once; a note of the check job it submitted by itself (the time and the job number), so it is not submitted again while it runs; and a note of the install or update it ran by itself in your cluster account (the time, whether it succeeded, and how many files it uploaded), so a failing one is not repeated in a loop | `storage.local` | so the automatic steps do not repeat themselves | uninstalling |
+| The claude.ai links to your sessions that the extension already opened by itself, so each opens once; a note of the check job it submitted by itself (the time and the job number), so it is not submitted again while it runs; and a note of the install or update it ran by itself in your cluster account (the time, whether it succeeded, and how many files it uploaded or which shared copy of your lab's it used, with one line when it could not use that copy), so a failing one is not repeated in a loop | `storage.local` | so the automatic steps do not repeat themselves | uninstalling |
 | Your tick on the optional step *Connect Google Drive in claude.ai*: a yes or no. The step opens that claude.ai settings page in a new tab; the extension does nothing on it | `storage.local` | so the checklist remembers what you finished | untick it; uninstalling |
 | The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier created in your browser | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you | uninstalling |
 | Connection state while a job runs: the worker's name and its folder on the cluster, the job number, what the worker's status file last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it), the portal tab the extension talks to and the tab the icon was clicked from, when your portal sign-in was last seen, what the last automatic start did, and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
@@ -42,7 +42,11 @@ only Claude Code's yes-or-no answer about whether it is signed in.
 ## What goes to your own cluster account
 
 The framework's scripts and settings, the job files, a random per-job token in a file only you can
-read, and the job's status files. Nothing about your approval goes there. When you make the statement above for a worker,
+read, and the job's status files. Where your university's lab keeps one shared copy of the framework
+on the cluster, the scripts are not copied into your account: a small launcher that runs the shared
+copy, and a one-line note of where that copy is, take their place. Either way, the install adds a
+marked block of a few lines to `~/.bashrc` so that a terminal finds the tool. Nothing about your
+approval goes there. When you make the statement above for a worker,
 the extension also writes one small file in your account (the framework's own marker,
 `~/.hpcworker/consent`), one line: the word yes, the time, and the random installation identifier
 from your browser. Your worker gives that answer to Claude Code when Claude Code asks its one-time
@@ -56,7 +60,9 @@ The extension makes requests to your university's Open OnDemand portal, and only
 sign-in your browser already holds: waking the portal's own web server up if it is asleep, opening the
 portal's shell once to submit a job and closing it, holding the shell open once for the sign-in
 sitting described below and closing it when the sitting ends, listing and reading files in your own
-account through the portal's Files app and writing the framework's files and the marker there, listing
+account through the portal's Files app (and, where your lab keeps a shared copy of the framework,
+reading that copy's version number) and writing the framework's files (unless the shared copy is
+used) and the marker there, listing
 your jobs, and cancelling a job when you ask. Your institution's logs record those requests as they
 record any use of the portal; the shell's page token appears in the portal's access log, as it does
 when you open the shell yourself. The extension never signs in for you and never touches a
@@ -185,6 +191,12 @@ Ashley Bridge is for adults, or minors with a parent's or guardian's consent (LI
 
 A new version of this statement ships with the Ashley Bridge version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 6 (2026-09-29, Ashley Bridge 5.0.0): where your institution's lab keeps one shared, read-only copy
+of the cluster-side scripts, the extension no longer copies them into your account; it writes a small
+launcher, a one-line marker naming the lab's copy and your profile, and reads that copy's version file
+through your portal. Nothing new leaves your device and nothing new reaches Licensor. The install note
+the extension keeps is also written when you press "Set up the cluster again" under Details.
 
 Version 5 (2026-09-29, Ashley Bridge 4.0.0): there are no license keys any more, and nothing to type
 or paste. Your own sign-in to your portal identifies you, by the account name the portal's dashboard

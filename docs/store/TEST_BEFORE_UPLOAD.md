@@ -1,6 +1,7 @@
-# Testing Ashley Bridge 4.0.0 by hand before the store uploads
+# Testing Ashley Bridge 5.0.0 by hand before the store uploads
 
-One person, one afternoon, three browsers. Written 2026-09-29. The builds are in `extension/.output/`:
+One person, one afternoon, three browsers. Written 2026-09-29 for 4.0.0 and brought up to date for 5.0.0 the
+same evening. The builds are in `extension/.output/`:
 `chrome-mv3/` (Chrome and Edge), `firefox-mv2/` (Firefox); the zips beside them are what the stores get.
 To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
 
@@ -13,7 +14,10 @@ To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
   extension will find it and say so ("found running"); to test a cold start, stop it first (`hpcworker
   worker stop --name worker`, or the panel's Stop later).
 - If an older Ashley Bridge is loaded in the browser, remove it first: its storage carries an old agreement
-  record and, before 4.0.0, a key.
+  record and, before 4.0.0, a key; and 4.0.0 does not know the lab's shared copy, so on an account that uses
+  it (yours since 2026-09-29) it would upload its own copy of the tool over the launcher.
+- The lab's shared copy is published: over ssh, `bash -lc 'hpcworker version'` prints `5 (shared copy at
+  /rs/rs_grp_oschome/shared/ashley/hpcworker/current)`.
 - Have the phone with the Claude app signed in to the same Claude account.
 
 ## What a full pass looks like (every browser)
@@ -27,12 +31,17 @@ To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
    dashboard.
 5. **Click the icon on that tab.** The browser asks to allow that one site: allow. The panel opens and the
    strip runs by itself, one line at a time: portal, warm-up, *Checking your access...* then approved,
-   install (framework 3 is already on the grid: up to date), probe (reuses today's, or submits a short job:
+   install (your account already uses the lab's shared copy of framework 5: nothing to do; an account
+   that has never been set up gets one line, `hpcworker install --shared`, and nothing uploaded), probe (reuses today's, or submits a short job:
    minutes on `reqp`), sign-in (skipped: already signed in), the data statement (tick it), start (finds the
    running worker or submits one), online, and the green *Open in Claude* button. A claude.ai tab opens by
    itself unless you turned that off.
 6. **Details, Run the checks:** 17 OK. Check 1 must read `Access approved for go2432 at
-   ondemand.grid.wayne.edu (checked <time>); kill-list of 2026-09-29`.
+   ondemand.grid.wayne.edu (checked <time>); kill-list of 2026-09-29`. Check 6 ends "hpcworker is installed
+   (your lab's shared copy)", and the line above the buttons under *Your worker* reads `tool: shared copy,
+   version 5 at /rs/rs_grp_oschome/shared/ashley/hpcworker/current`. If it reads `version unknown (...)`
+   instead, the portal's Files app did not read the shared copy's `VERSION` (never measured before this
+   test): nothing else depends on it, but write the words it shows into `docs/OPEN_QUESTIONS.md`.
 7. **Open in Claude.** The environment appears under Code on claude.ai; send a message; get a reply.
 8. **Laptop-off test.** Close the claude.ai tab, the panel, the portal tab and the browser. On the phone:
    Claude app, *Code*, the same environment, continue the conversation. Later, reopen the browser, open a
@@ -68,7 +77,7 @@ portal" means the portal session expired, sign in in the tab; a probe waiting in
    (the same build as Chrome).
 2. Pin: *Extensions* menu, the eye icon next to *Ashley Bridge*.
 3. The panel is Edge's sidebar; otherwise identical to Chrome. Run the full pass.
-4. Edge Add-ons takes the same `ashley-bridge-4.0.0-chrome.zip`.
+4. Edge Add-ons takes the same `ashley-bridge-5.0.0-chrome.zip`.
 
 ## Firefox
 
@@ -85,12 +94,12 @@ portal" means the portal session expired, sign in in the tab; a probe waiting in
    approval check); the sidebar is readable at its narrow width; the audit export downloads.
 6. Optional lint, the same check AMO runs on upload: `npx web-ext lint --source-dir .output/firefox-mv2`
    (fetches web-ext once).
-7. AMO takes `ashley-bridge-4.0.0-firefox.zip` and, on the source-code question, `ashley-bridge-4.0.0-sources.zip`
+7. AMO takes `ashley-bridge-5.0.0-firefox.zip` and, on the source-code question, `ashley-bridge-5.0.0-sources.zip`
    with the build note from `LISTING.md`.
 
 ## Just before uploading
 
-- `unzip -p extension/.output/ashley-bridge-4.0.0-chrome.zip manifest.json` shows version 4.0.0 and the
+- `unzip -p extension/.output/ashley-bridge-5.0.0-chrome.zip manifest.json` shows version 5.0.0 and the
   permissions `storage, alarms, scripting, activeTab, sidePanel`, optional host `https://*/*`, nothing else.
 - The three public pages open: `https://openspineconsortium.com/ashley/bridge/`, `privacy.html`, `terms.html`;
   `services.json` on the site carries `access_check`.

@@ -14,6 +14,14 @@
 # MOCK_EGRESS=none change what the seeded probe reports; MOCK_ENV_ID sets the environment id;
 # MOCK_LOGIN_FAIL=1 makes `claude login --plain` end with HPCW-LOGIN-FAILED whatever code is typed;
 # MOCK_DISPLAY_HOME is the home this tool shows in place of the real one (below).
+#
+# The lab's shared copy (framework 5): MOCK_SHARED_INSTALL is its folder as the portal shows it and
+# MOCK_SHARED_REAL where it sits on disk (server.mjs --shared-install, which also seeds a copy of
+# this file there). `install --shared DIR` then sets the account up the way framework 5 does,
+# copying no code: a launcher at ~/.hpcworker/bin/hpcworker (a regular file) that runs
+# DIR/bin/hpcworker, the marker ~/.hpcworker/shared naming the folder, the profile, log/. An own
+# copy found in ~/.hpcworker is moved aside, never deleted; a plain `install` moves the marker
+# aside in turn, so the account runs its own copy again. `version` says which copy runs.
 set -u
 HPCW_HOME="${HPCW_HOME:-$HOME/.hpcworker}"
 PROFILE="$HPCW_HOME/profile.json"
@@ -21,9 +29,17 @@ PROFILE="$HPCW_HOME/profile.json"
 # machine running the mock (a temp folder on a laptop, say), so every path this tool prints or
 # writes into its status files is shown with MOCK_DISPLAY_HOME in place of that prefix; server.mjs
 # passes the portal's own /home/<user>, the path the Files app shows the extension. The files
-# themselves stay where they are.
+# themselves stay where they are. The shared copy's folder on disk is shown as its portal path too.
 DISPLAY_HOME="${MOCK_DISPLAY_HOME:-$HOME}"
-show() { printf '%s' "${1//"$HOME"/$DISPLAY_HOME}"; }
+show() {
+  local s="${1//"$HOME"/$DISPLAY_HOME}"
+  [ -n "${MOCK_SHARED_REAL:-}" ] && s="${s//"$MOCK_SHARED_REAL"/${MOCK_SHARED_INSTALL:-$MOCK_SHARED_REAL}}"
+  printf '%s' "$s"
+}
+LAUNCHER_TAG='# hpcworker launcher for a shared copy (managed: "hpcworker install" rewrites this file)'
+default_profile() { # $1 = site name: what the stand-in writes when no profile of that name is at hand
+  printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.ashley/claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "$1" > "$PROFILE"
+}
 now() { date -u +%FT%TZ; }
 die() { echo "hpcworker: $*" >&2; exit 1; }
 state_dir() { # the profile's shared_state_dir with $HOME and $USER expanded, as the real tool's profile.py does
@@ -59,10 +75,59 @@ EOT
 }
 case "${1:-}" in
   install)
-    name=""; while [ $# -gt 1 ]; do case "$2" in --profile) name="$3"; shift 2;; *) shift;; esac; done
+    name=""; shared=""
+    while [ $# -gt 1 ]; do
+      case "$2" in
+        --profile) name="${3:-}"; shift 2;;
+        --shared) case "${3:-}" in ""|--*) shared="${MOCK_SHARED_REAL:-}"; shift;; *) shared="$3"; shift 2;; esac;;
+        *) shift;;
+      esac
+    done
+    if [ -n "$shared" ]; then
+      # the lab's shared copy: nothing is copied; the account gets a launcher, the marker and a profile.
+      # The sentences, the exit code 3 for a folder this account cannot use, the launcher's tag line and
+      # the replaced/<time>/ folder are framework 5's (framework/bin/hpcworker install_shared).
+      dir="${shared%/}"; ddir=$(show "$dir")
+      if ! { [ -d "$dir" ] && [ -r "$dir" ]; }; then echo "hpcworker: the shared copy at $ddir cannot be used from this account: this account cannot open it (it does not exist, or this account is not in the group that may read it). Nothing was changed." >&2; exit 3; fi
+      if ! [ -s "$dir/VERSION" ]; then echo "hpcworker: the shared copy at $ddir cannot be used from this account: it has no readable VERSION file. Nothing was changed." >&2; exit 3; fi
+      ver=$(tr -d ' \r\n' < "$dir/VERSION"); prev=$(head -1 "$HPCW_HOME/shared" 2>/dev/null)
+      mkdir -p "$HPCW_HOME/log"
+      # the pieces of an own copy (the launcher is not one) are moved aside whole, never deleted
+      parts=""; for x in bin/hpcworker lib jobs profiles VERSION README.md; do
+        [ -e "$HPCW_HOME/$x" ] || continue
+        [ "$x" = bin/hpcworker ] && sed -n 2p "$HPCW_HOME/$x" | grep -qxF "$LAUNCHER_TAG" && continue
+        parts="$parts $x"
+      done
+      aside=""
+      if [ -n "$parts" ]; then
+        aside="$HPCW_HOME/replaced/$(date -u +%Y%m%d-%H%M%S)"
+        for x in $parts; do mkdir -p "$(dirname "$aside/$x")"; mv -f "$HPCW_HOME/$x" "$aside/$x"; done
+      fi
+      mkdir -p "$HPCW_HOME/bin"
+      { printf '%s\n' '#!/bin/bash' "$LAUNCHER_TAG" "# This account uses the lab's shared copy of hpcworker; its profile, log and consent marker stay in this folder."
+        printf 'HPCW_SHARED_ROOT=%q\n' "$dir"
+        printf '[ -r "$HPCW_SHARED_ROOT/bin/hpcworker" ] || { echo "hpcworker: the shared copy at %s cannot be read from this account (ask your lab lead to give this account access to it)" >&2; exit 3; }\n' "$ddir"
+        printf '%s\n' 'exec bash "$HPCW_SHARED_ROOT/bin/hpcworker" "$@"'
+      } > "$HPCW_HOME/bin/hpcworker"
+      chmod 755 "$HPCW_HOME/bin/hpcworker" 2>/dev/null
+      printf '%s\n' "$ddir" > "$HPCW_HOME/shared"
+      if [ -s "$PROFILE" ]; then echo "profile.json exists; kept (use --force to replace it with '${name:-mock}')"
+      elif [ -n "$name" ] && [ -r "$dir/profiles/$name.json" ]; then cp "$dir/profiles/$name.json" "$PROFILE"; echo "profile.json written from '$name'"
+      else default_profile "${name:-mock}"; echo "profile.json written from '${name:-mock}'"; fi
+      if [ -n "$parts" ]; then echo "switched to the shared copy of hpcworker $ver at $ddir; your own copy was moved to $(show "$aside") (nothing deleted)"
+      elif [ -z "$prev" ]; then echo "installed: this account uses the shared copy of hpcworker $ver at $ddir (nothing copied into $(show "$HPCW_HOME"))"
+      else echo "hpcworker $ver: shared copy at $ddir; launcher and marker refreshed (nothing copied)"; fi
+      echo "next: hpcworker diag, then hpcworker probe, then hpcworker claude login (once: sign-in and the Remote Control question in one sitting), hpcworker worker start"
+      exit 0
+    fi
+    # the account's own copy: a shared-copy marker left from before is moved aside, so this copy is the one that runs
+    if [ -e "$HPCW_HOME/shared" ]; then
+      left=$(head -1 "$HPCW_HOME/shared"); aside="$HPCW_HOME/replaced/$(date -u +%Y%m%d-%H%M%S)"; mkdir -p "$aside"; mv -f "$HPCW_HOME/shared" "$aside/shared"
+      echo "this account now uses its own copy; the shared copy at $left is no longer used (its marker is in $(show "$aside"))"
+    fi
     mkdir -p "$HPCW_HOME"/{bin,lib/adapters,jobs,profiles,log}
     [ -s "$PROFILE" ] && echo "profile.json exists; kept (use --force to replace it with '${name:-mock}')" || {
-      printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.ashley/claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "${name:-mock}" > "$PROFILE"
+      default_profile "${name:-mock}"
       echo "profile.json written from '${name:-mock}'"
     }
     echo "installed hpcworker 1 at $(show "$HPCW_HOME")"
@@ -174,9 +239,15 @@ EOF
   diag)
     printf '{"version":1,"host":"login1","user":"%s","nodes":[{"id":"hpcw.scripts","ok":true,"detail":"hpcworker 1 (mock)"},{"id":"hpcw.python3","ok":true,"detail":"/usr/bin/python3 (3.6)"},{"id":"hpcw.profile","ok":%s,"detail":"%s"}]}\n' "${USER:-student}" "$([ -s "$PROFILE" ] && echo true || echo false)" "$([ -s "$PROFILE" ] && echo "profile ok" || echo "no profile")"
     ;;
-  version) echo 1 ;;
+  version)
+    # through the launcher this file runs from the shared folder: its VERSION and where it is, as framework 5 prints them
+    here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+    if [ -s "$HPCW_HOME/shared" ] && [ -s "$here/VERSION" ]; then printf '%s (shared copy at %s)\n' "$(tr -d ' \r\n' < "$here/VERSION")" "$(head -1 "$HPCW_HOME/shared")"
+    elif [ -s "$HPCW_HOME/VERSION" ]; then tr -d ' \r\n' < "$HPCW_HOME/VERSION"; echo
+    else echo 1; fi
+    ;;
   *)
-    echo "usage: hpcworker install [--profile NAME] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login [--plain]|consent|status | diag [--json] | version" >&2
+    echo "usage: hpcworker install [--profile NAME] [--shared [DIR]] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login [--plain]|consent|status | diag [--json] | version" >&2
     exit 2
     ;;
 esac

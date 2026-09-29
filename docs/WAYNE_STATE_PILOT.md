@@ -14,6 +14,13 @@ For the student:
 - A Wayne State AccessID on the approved list for the Trial Edition.
 - The Wayne State VPN (GlobalProtect) connected: `https://ondemand.grid.wayne.edu/` is VPN-only.
 - An Open OnDemand login at that address (AccessID and password) and a grid account.
+- Membership of the grid group `oschome`, added by C&IT or the group's owner before the first run. The lab's
+  volume `/rs/rs_grp_oschome` is readable by that group only (`other::---`), and everything the worker needs
+  sits under it: the shared copy of the tool (`.../shared/ashley/hpcworker/current`), the container image, the
+  `claude` binary and the student's state directory. Without it neither install mode helps (read from the
+  permissions, not yet seen with a second account: the extension falls back to uploading its own copy, and the
+  probe then fails on the image). On 2026-09-29 the group had
+  two members (ab5188, go2432); how and how fast a student is added is not yet known.
 - A Claude Pro or Max subscription in the student's own name. Remote Control is available on Pro, Max,
   Team and Enterprise; API keys and `setup-token` credentials do not work.
 - A browser the extension supports (Chrome or Edge 148 and later, Firefox; Safari only if that edition

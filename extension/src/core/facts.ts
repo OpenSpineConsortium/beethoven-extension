@@ -6,7 +6,7 @@
 // left is read here. The transient part (what the panel is doing right now) is handed in by the
 // caller, so the same function serves the panel and the background's automatic start.
 import type { KV } from './audit';
-import { isEnvironmentUrl, paths, probeVerdict, profileRestricts, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
+import { isEnvironmentUrl, LAUNCHER_TAG, paths, probeVerdict, profileRestricts, sharedRootOf, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
 import { ackSubject, statementFor, type Statements } from './disclosure';
 import { frameworkOlder } from './install';
 import { ACCESS_KEY, IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, SERVICES_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type InstallNote, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
@@ -66,6 +66,26 @@ export interface FactsEnv {
   transient: Transient;
   /** the VERSION file of the framework this build carries (install.ts bundledFrameworkVersion); absent when the caller cannot read its own files */
   bundledFrameworkVersion?(): Promise<string | undefined>;
+  /** the shared folder the bundled profile of this site names (install.ts bundledSharedInstall); absent or undefined: the site has none */
+  bundledSharedInstall?(site: string): Promise<string | undefined>;
+}
+
+/**
+ * The lab's shared copy the marker names, with its VERSION as the portal's Files app reads it. The
+ * read has its own error handling: a student outside the lab's group, or a Files app that does not
+ * serve the lab volume, answers 403 or 500 here, and that must not make the whole portal look
+ * asleep. The copy is not set up again for it either: the shell, not the Files app, is what runs it.
+ */
+async function sharedCopy(portal: PortalApi, marker: string): Promise<NonNullable<Facts['install']['shared']>> {
+  const dir = sharedRootOf(marker);
+  if (!dir) return { dir: marker.slice(0, 200), unreadable: 'the marker file does not name a folder' };
+  try {
+    const v = ((await portal.readFileIfExists(paths.sharedVersion(dir))) ?? '').trim();
+    if (/^\d+$/.test(v)) return { dir, version: v };
+    return { dir, unreadable: v ? 'its VERSION file does not hold a whole number' : "the portal's Files app finds no VERSION file there" };
+  } catch (e) {
+    return { dir, unreadable: `the portal's Files app could not read its VERSION file (${(e as Error).message})` };
+  }
 }
 
 /** what was learned on the way, for the actions that follow */
@@ -162,14 +182,31 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     // for paths only: the dashboard's name, else the directory's owner or its last segment
     const user = observed ?? (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
     out.user = user;
+    // the site's shared folder, from the profile this build carries: it only changes the words of the install step here
+    const sharedRoot = s && env.bundledSharedInstall ? await env.bundledSharedInstall(s.site).catch(() => undefined) : undefined;
+    if (sharedRoot) f.install.sharedRoot = sharedRoot;
     f.install.installed = await portal.exists(paths.profile(home));
     if (!f.install.installed) return out;
-    // installed, but is it this build's framework? ~/.hpcworker/VERSION against the bundled VERSION;
-    // an older (or missing) one is set up again, unless that just ran and changed nothing, which is said instead
-    const bundled = env.bundledFrameworkVersion ? await env.bundledFrameworkVersion() : undefined;
-    if (bundled) {
+    // which copy does the account run? The marker names the lab's shared copy: that copy is the lab's
+    // to keep current, so it is never "outdated" against the one this build carries
+    const marker = ((await portal.readFileIfExists(paths.sharedMarker(home))) ?? '').trim();
+    // the marker alone does not prove it: a full copy uploaded over the launcher leaves the marker behind
+    // and the tool then runs that copy (the framework's own rule); the launcher's second line is the tell
+    // (no bin file at all with a marker is still a shared account: a failed or partial set-up is then said as such)
+    const launcher = marker ? await portal.readFileIfExists(paths.bin(home)) : undefined;
+    const runsTheMarker = launcher === undefined || (launcher.split('\n')[1] ?? '').trim() === LAUNCHER_TAG;
+    if (marker && runsTheMarker) f.install.shared = await sharedCopy(portal, marker);
+    else {
+      // its own copy: is it this build's framework? ~/.hpcworker/VERSION against the bundled VERSION;
+      // an older (or missing) one is set up again (at a site with a shared folder, by moving to it),
+      // unless that just ran and changed nothing, which is said instead
       const have = ((await portal.readFileIfExists(paths.version(home))) ?? '').trim();
-      if (frameworkOlder(have, bundled)) {
+      if (/^\d+$/.test(have)) f.install.version = have;
+      const bundled = env.bundledFrameworkVersion ? await env.bundledFrameworkVersion() : undefined;
+      // the move to a shared copy waits while a worker runs from the own copy: framework 5 refuses to
+      // move code from under a running job, and the strip would sit on a failed install meanwhile
+      const moveWaits = !!sharedRoot && f.run.live;
+      if (bundled && frameworkOlder(have, bundled) && !moveWaits) {
         const note = await env.local.get<InstallNote>(INSTALL_KEY);
         const justRan = !!note && note.ok && now - new Date(note.attempted_at).getTime() < INSTALL_RETRY_MS;
         if (justRan) f.install.failed = f.install.failed ?? `the tool on the cluster still reports version ${have || 'unknown'} after the update to version ${bundled} ran (see Details)`;

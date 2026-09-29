@@ -78,6 +78,8 @@ describe('framework contract', () => {
     expect(commands.workerStart("thesis' ; rm -rf /", 'default')).toBe("bash ~/.hpcworker/bin/hpcworker worker start --name 'thesis ; rm -rf /' --permission-mode 'default'");
     expect(commands.workerStop('worker')).toBe("bash ~/.hpcworker/bin/hpcworker worker stop --name 'worker'");
     expect(commands.install('wayne')).toMatch(/install --profile 'wayne'$/);
+    // the lab's shared copy (framework 5): the shared tool installs the account itself; nothing is chmod-ed or uploaded
+    expect(commands.installShared('/rs/rs_grp_oschome/shared/ashley/hpcworker/current', 'wayne')).toBe("bash '/rs/rs_grp_oschome/shared/ashley/hpcworker/current/bin/hpcworker' install --shared '/rs/rs_grp_oschome/shared/ashley/hpcworker/current' --profile 'wayne'");
     for (const line of [commands.discover(), commands.probe(), commands.diag(), commands.claudeLogin, commands.claudeConsent]) expect(line).not.toMatch(/[\r\n]/);
   });
 

@@ -1,10 +1,12 @@
 # Store listing texts, per store
 
-The exact texts to paste into each store's dashboard for Ashley Bridge 4.0.0, and the answers to
+The exact texts to paste into each store's dashboard for Ashley Bridge 5.0.0, and the answers to
 each store's questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval
 of the account the portal shows, confirmed with the access service), `PRIVACY.md` version 5 and
-`LICENSE.txt` version 4; before anything is pasted, read the built extension (`extension/.output/`)
-once more for every `fetch`, `WebSocket` and `tabs.create` and confirm the facts below.
+`LICENSE.txt` version 4, and brought up to date for 5.0.0 the same evening (the cluster-side tool may
+be one copy that the university's lab keeps for all its students); before anything is pasted, read
+the built extension (`extension/.output/`) once more for every `fetch`, `WebSocket` and
+`tabs.create` and confirm the facts below.
 `SUBMISSION.md` beside this file says where each text goes, click by click. `../STORE_LISTING.md`
 is the longer compliance document these texts come from.
 
@@ -29,6 +31,14 @@ Facts every text below rests on:
   session's `https://claude.ai/code?environment=...` link, `https://claude.ai/settings/connectors`,
   and, from the *Ask for access* button, the maintainer's request page with the account name in its
   address.
+- The cluster-side tool (the framework: shell and Python) is set up for the student's account in one
+  of two ways, both through the portal only. Where the site profile bundled with the extension names
+  a shared copy that the university's lab keeps on the cluster (Wayne State's does), one install line
+  typed into the portal's shell points the account at that copy: nothing is uploaded, and the
+  extension reads that copy's version file through the Files app. Elsewhere the extension uploads its
+  bundled copy through the Files app and runs one install line from it. The mock portal in the
+  reviewer recipe starts with a stand-in for the tool already set up in the account, so neither
+  way runs there.
 - There is no licence key, no activation request, no error or crash reporting and no usage data: the
   code has none. The person's own sign-in to the portal identifies them; nothing is typed or pasted.
 - Fixed public URLs: landing `https://openspineconsortium.com/ashley/bridge/`, privacy
@@ -36,9 +46,9 @@ Facts every text below rests on:
   `https://openspineconsortium.com/ashley/bridge/terms.html`, support
   `https://openspineconsortium.com/ashley/support.html`, request page
   `https://openspineconsortium.com/ashley/request.html`.
-- The store packages are `extension/.output/ashley-bridge-4.0.0-chrome.zip` (Chrome Web Store and
-  Edge Add-ons), `extension/.output/ashley-bridge-4.0.0-firefox.zip` (Firefox) and
-  `extension/.output/ashley-bridge-4.0.0-sources.zip` (the source upload Firefox requires).
+- The store packages are `extension/.output/ashley-bridge-5.0.0-chrome.zip` (Chrome Web Store and
+  Edge Add-ons), `extension/.output/ashley-bridge-5.0.0-firefox.zip` (Firefox) and
+  `extension/.output/ashley-bridge-5.0.0-sources.zip` (the source upload Firefox requires).
 - Publisher, until the LLC exists: Gregory Schwing, trading as OpenSpineConsortium. The product
   name and identifier carry no university name.
 
@@ -56,7 +66,7 @@ Ashley Bridge
 Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.
 ```
 
-### Detailed description (plain text; 4,633 characters; under every store's limit: Chrome 16,000, Edge 10,000)
+### Detailed description (plain text; 4,726 characters; under every store's limit: Chrome 16,000, Edge 10,000)
 
 ```
 Ashley Bridge starts, watches and stops a Claude Code worker in your own account on your university's cluster, through the Open OnDemand portal you already use, and hands you the link that shows that worker at claude.ai/code and in the Claude app (Anthropic's Remote Control feature).
@@ -68,7 +78,7 @@ WHAT YOU NEED
 
 HOW IT WORKS
 1. Open your portal in a tab and sign in as usual.
-2. Click the Ashley Bridge button on that tab. The first click asks your browser to allow that one site. The panel then does the steps by itself and says what it is doing: it wakes the portal up, checks you are signed in, confirms your account is approved, puts its small set of scripts in your cluster account if they are not there, runs one short check job on a compute node, shows you where your work goes and takes your statement about it, starts your worker through the portal's own shell, and waits for Claude Code to connect.
+2. Click the Ashley Bridge button on that tab. The first click asks your browser to allow that one site. The panel then does the steps by itself and says what it is doing: it wakes the portal up, checks you are signed in, confirms your account is approved, sets up its small set of scripts for your cluster account if they are not there (where your university's lab keeps one shared copy, it points your account at that copy), runs one short check job on a compute node, shows you where your work goes and takes your statement about it, starts your worker through the portal's own shell, and waits for Claude Code to connect.
 3. Sign in to Claude once, when the panel asks. It opens Anthropic's sign-in page in a new tab; you sign in with your own account, click Authorize, and paste the code the page shows into the panel's one box. The code is typed once into your own job's terminal and is not kept.
 
 When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off), and the panel shows a green "Open in Claude" button for later. The worker stays on by itself until you press Stop.
@@ -116,7 +126,7 @@ Never requested: `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declara
 Answer: **No.** Justification if a field asks for one:
 
 ```
-No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints during the sign-in are parsed as text and never executed.
+No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints during the sign-in are parsed as text and never executed. Where a university keeps one shared copy of the cluster-side tool, the extension runs that copy in the user's own cluster account through the portal's shell, as it runs its bundled copy elsewhere; nothing from the cluster is ever executed in the browser.
 ```
 
 ### Privacy practices (the same answers in every store's words)
@@ -194,7 +204,7 @@ the text in `SUBMISSION.md`, section 4.
 
 | Field | Text |
 |---|---|
-| Package | `ashley-bridge-4.0.0-chrome.zip` (the same Chromium package) |
+| Package | `ashley-bridge-5.0.0-chrome.zip` (the same Chromium package) |
 | Availability: Visibility | Hidden first (only people with the link can install), then Public |
 | Availability: Markets | United States |
 | Properties: Category | Developer tools |
@@ -235,7 +245,7 @@ What the extension never does: no code, host permission or content script on cla
 | Field | Text |
 |---|---|
 | Distribution | "On this site" (listed) for the public release; "On your own" (self-distributed, signed .xpi) is the equivalent of Chrome's unlisted channel and passes the same review (section 3 of `SUBMISSION.md`) |
-| Package | `ashley-bridge-4.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `ashley-bridge@openspineconsortium.com`) |
+| Package | `ashley-bridge-5.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `ashley-bridge@openspineconsortium.com`) |
 | Name | Ashley Bridge |
 | Add-on URL (slug) | `ashley-bridge` |
 | Summary (250 characters at most; this one is 241) | see below |
@@ -247,9 +257,9 @@ What the extension never does: no code, host permission or content script on cla
 | License | Custom license: paste `LICENSE.txt` (version 4); it is not an open-source licence |
 | "This add-on requires payment, non-free services or software, or additional hardware" | ticked, with the sentence: "Requires approval of your institutional account by the maintainer, asked for on the maintainer's request page; there is no key. The Trial Edition is free for approved accounts; no payment is taken in this version. It also needs an account on a university cluster with an Open OnDemand portal and the user's own Claude account (Pro or Max)." |
 | Data collection (from the manifest) | `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }`; AMO shows it as required data collection, and the privacy policy text names the one item (the institutional account name in the approval check) |
-| Source code | Yes, upload `ashley-bridge-4.0.0-sources.zip` with the build note below |
+| Source code | Yes, upload `ashley-bridge-5.0.0-sources.zip` with the build note below |
 | Notes to reviewer | the reviewer notes above, then the build note below |
-| Version notes (4.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped." |
+| Version notes (5.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped. Where your university's lab keeps one shared copy of the cluster-side tool, the extension points your account at it instead of uploading its own." |
 
 ### Summary (241 characters)
 
@@ -260,7 +270,7 @@ Starts, watches and stops your own Claude Code worker on your university's Open 
 ### Source-code upload note (the sources zip and how to rebuild)
 
 ```
-Source: ashley-bridge-4.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds the cluster-side scripts the extension uploads to the user's account, as text, and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
+Source: ashley-bridge-5.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds, as text, the cluster-side scripts the extension uploads to the user's account where the university keeps no shared copy of them (with the site profiles, which say whether it does), and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
 
 Build (Node 22, npm 10; we used Node 22.23.3):
   npm ci
@@ -273,7 +283,10 @@ That output is the content of the uploaded package: on 2026-09-29 a rebuild from
 hash every file under `.output/firefox-mv2` on both sides. Done for the 4.0.0 packages on
 2026-09-29 at 19:16 UTC with Node 22.23.3 and npm 10.9.9: the sources zip held 76 files; the rebuild gave 30
 files, every one SHA-256-identical to `.output/firefox-mv2` and to the content of
-`ashley-bridge-4.0.0-firefox.zip`. Repeat it if the packages are rebuilt before upload.)
+`ashley-bridge-4.0.0-firefox.zip`. Done again for the 5.0.0 packages on 2026-09-29 at 22:26 UTC with the
+same Node and npm: the sources zip held 76 files; the rebuild gave 30 files, every one SHA-256-identical to
+`.output/firefox-mv2` and to the content of `ashley-bridge-5.0.0-firefox.zip` (the file in `release/5.0.0/`).
+Repeat it if the packages are rebuilt before upload, and change the date in the note above.)
 
 ## Safari
 
@@ -283,7 +296,7 @@ app; an Apple Developer Program membership, without which nothing can be distrib
 review with an app record and the privacy labels ("Identifiers: User ID" collected and linked, for
 the approval check; everything else "Not collected"; "Tracking: No"); and an answer to Apple's
 Guideline 3.1.1, which forbids an app from unlocking functionality outside Apple's own purchase
-system: 4.0.0 has no key and takes no payment, and whether an approval-gated free edition passes as
+system: since 4.0.0 there is no key and no payment, and whether an approval-gated free edition passes as
 it is has not been asked; the fallback is a free edition or an in-app purchase in the host app.
 Safari also has no side panel, so the button opens the panel in a tab. The
 cost is a membership, a Mac or Xcode Cloud hours, a separate review track and a different access

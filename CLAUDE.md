@@ -76,8 +76,8 @@ licensor when it exists). The product name and identifier carry no university na
   5; both describe the software as built (no keys; the approval check against the access service
   with the account name the portal shows; the daily fetch of `services.json` and the
   withdrawn-versions list; no activation step, no error reports; all requests only after acceptance);
-  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match, and the framework's `VERSION` file
-  is 2). The copies the extension ships in
+  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match; extension 5.0.0 keeps all three, and
+  the framework's `VERSION` file is 5). The copies the extension ships in
   `extension/public/` must be byte-identical to them at build time. Change a text and its version
   together (integer). Never pre-tick a box; the button label is part of the record; a changed
   agreement is shown again and accepted again.
@@ -94,14 +94,24 @@ licensor when it exists). The product name and identifier carry no university na
 - `framework/`: bash 4.2 plus Python 3.6 standard library only (the Wayne State login node is
   CentOS 7). `lib/profile.py` (site profile schema and CLI), `lib/adapters/{common,slurm,pbs,lsf}.sh`
   (the eight-call adapter interface), `profiles/<site>.json`, the job template and probe job,
-  `bin/hpcworker` (the one command) and `tests/` (`run.sh`, three unittest files, fixtures).
+  `bin/hpcworker` (the one command) and `tests/` (`run.sh`, six unittest files, fixtures). Two
+  install modes since framework 5 (`docs/ARCHITECTURE.md` 2.1): the lab's shared copy, kept once per
+  site where the profile names `shared_install` (Wayne State:
+  `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`, a link to `v<N>/`, published with
+  `tools/deploy_shared.sh`; `hpcworker install --shared` gives the student's `~/.hpcworker` a
+  launcher, the marker `~/.hpcworker/shared` and the profile, and copies no code), and the student's
+  own copy in `~/.hpcworker` (every other site, and the fallback). The student's state (profile,
+  consent marker, log, run directories) is theirs in both; a shared copy is never replaced by the
+  extension and never called outdated by it.
 - `extension/`: WXT 0.21 plus TypeScript, `browser.*` with Promises, no polyfill; `wxt.config.ts` holds
   the manifest exactly as the report's permission table specifies it; `src/core/` (audit chokepoint,
   net, redact, shell driver), `src/licensing/` (kill-list verification; no licence keys since 4.0.0), `src/entrypoints/`
   (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock portal), `scripts/sync-framework.mjs`
   (copies `../framework/**` into `public/framework/` with a hashed manifest before every build and zip).
 - `docs/`: the report, the design documents, the pilot plan, open questions and measurements.
-- `tools/`: release and signing helpers (empty at the time of writing).
+- `tools/`: `push_via_grid.sh` and `push_org.sh` (the two remotes), `site_bridge_build.py` (the site
+  pages), `deploy_shared.sh` (publishes the framework to a site's shared copy over ssh, from the
+  laptop; on the login node only tar, chmod, setfacl and one link; older versions are kept).
 
 ## Building and testing
 
@@ -120,7 +130,7 @@ npm run mock                             # node mock-ood/server.mjs, port 8080 b
 ```
 
 ```
-HPCW_PYTHON=python bash framework/tests/run.sh   # bash -n, the rendered template, LF check, 54 unittest cases (about 30 s)
+HPCW_PYTHON=python bash framework/tests/run.sh   # bash -n, the rendered template, LF check, the unittest cases
 python -X utf8 framework/lib/profile.py validate framework/profiles/wayne.json
 python -X utf8 framework/lib/profile.py schema
 bash -n framework/lib/adapters/*.sh      # syntax; shellcheck where installed
@@ -142,7 +152,10 @@ node and never on the laptop.
 Panasas soft quota); node-local temp `/tmp/$USER/hpcworker_$SLURM_JOB_ID`; the shared worker image at
 `/rs/rs_grp_oschome/shared/ashley/containers/claude-node22` with `module load apptainer/1.2.2`; the
 student's Claude Code login in `$HOME/.ashley/claude` (the profile's `claude_config_dir`, Ashley's
-`CLAUDE_CONFIG_DIR`). `#SBATCH --output` resolves against the submit directory (use `-D`); chain with
+`CLAUDE_CONFIG_DIR`); the framework's shared copy at `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`
+(the profile's `shared_install`; group read and execute, no group write). Everything under
+`/rs/rs_grp_oschome` is group `oschome` with `other::---`, so every student must be in that group
+before a first run, in either install mode (two members on 2026-09-29; `docs/OPEN_QUESTIONS.md`). `#SBATCH --output` resolves against the submit directory (use `-D`); chain with
 `afterany`, never `afterok`; `/tmp` is swept while jobs run.
 
 Measured 2026-09-28: compute-node egress from `asx15`, direct, `api.anthropic.com` 404 (reachable),
@@ -171,6 +184,14 @@ not online, at the 60 s floor, and is ON by default in the current build (`DEFAU
 `extension/src/core/keys.ts`; the earlier decision had it off, and the maintainer's review settles
 which ships); a checklist step opens `https://claude.ai/settings/connectors` in a new tab with one
 sentence and a local *done* tick.
+
+Decided 2026-09-29 (evening), in the maintainer's words: "Claude Code is like gas, the Ashley code
+base is the car." The container image with Claude Code in it and the framework are the lab's shared
+things, kept once on the lab's CephFS volume; the extension is the student's thin client, which makes
+the student's account see them (`hpcworker install --shared`, typed through the portal's shell) and
+then starts, watches and stops the worker. The per-user upload stays as the fallback for sites with no
+shared directory. The extension updates itself through the browser's store. Fetching the framework
+from the private GitHub repository is not possible for a student (no token) and is not designed.
 
 ## How to be useful here
 

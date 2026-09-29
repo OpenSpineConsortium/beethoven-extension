@@ -205,7 +205,10 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         const l = await portalOf(ctx).listDir(h);
         const uploads = !!l.files_upload_path;
         const installed = l.files.some((f) => f.name === '.hpcworker' && f.type === 'd');
-        return { ok: true, warn: !uploads, detail: `${h}: ${l.files.length} entries${uploads ? ', uploads allowed' : ', uploads disabled at this site (writes still use PUT)'}${installed ? '; hpcworker is installed' : '; hpcworker not installed yet'}` };
+        // which copy: the shared-copy marker in ~/.hpcworker (framework 5) means the lab's; a listing that fails says nothing either way
+        const inner = installed ? await portalOf(ctx).listDir(paths.root(h)).catch(() => undefined) : undefined;
+        const which = !inner ? '' : inner.files.some((f) => f.name === 'shared' && f.type !== 'd') ? " (your lab's shared copy)" : ' (your own copy)';
+        return { ok: true, warn: !uploads, detail: `${h}: ${l.files.length} entries${uploads ? ', uploads allowed' : ', uploads disabled at this site (writes still use PUT)'}${installed ? `; hpcworker is installed${which}` : '; hpcworker not installed yet'}` };
       },
     },
     {

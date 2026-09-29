@@ -10,7 +10,9 @@ through anything the vendor operates. The design, and the rejection of the earli
 claude.ai from a browser extension, are set out in `docs/RESEARCH_REPORT.md`.
 
 Two pieces do the work. The cluster-side **framework** (`framework/`, working name `hpcworker`) is
-shell and Python installed in the student's own account: a static site profile per university, a
+shell and Python that runs in the student's own account, kept once per site by the lab where the
+site has a shared directory for it and copied into the student's home elsewhere (*Build and
+release*, below): a static site profile per university, a
 scheduler/runtime/egress adapter (Slurm first; PBS Pro and LSF next), one job template, a probe job
 that discovers what the site's documentation does not say, and a worker entrypoint that starts
 `claude remote-control` inside `tmux` in an Apptainer image, queues its own successor before its wall
@@ -57,8 +59,9 @@ the portal shows is approved; if it is not, the panel's one button is *Ask for a
    university requires it) and keep the tab open.
 2. **Click the Ashley Bridge icon.** The first click asks the browser once for access to that one
    site. Then the extension does the rest by itself, in order, and says in one line what it is doing:
-   wakes the portal up, checks it is signed in, confirms your account is approved, installs
-   the framework in your account if it is not there, checks a compute node once (a short job,
+   wakes the portal up, checks it is signed in, confirms your account is approved, sets the
+   framework up in your account if it is not there (pointing your account at the lab's shared copy
+   where there is one), checks a compute node once (a short job,
    the first time only), signs you in to Claude if the cluster is not signed in (step 3), shows where
    your work goes and takes your statement about it (once per workspace), starts your worker through
    the portal shell, and waits for Claude Code to connect.
@@ -157,8 +160,9 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 4.0.0 (the first version without licence keys); the
-framework's `VERSION` file is 3; the agreement `LICENSE.txt` is version 4 and the extension's
+Versions in this tree: the extension is 5.0.0 (4.0.0 was the first version without licence keys;
+5.0.0 sets up the lab's shared copy of the framework where a site has one); the framework's `VERSION`
+file is 5; the agreement `LICENSE.txt` is version 4 and the extension's
 `TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
 integers; a changed text moves its version with it.
 
@@ -193,12 +197,35 @@ and `../PRIVACY.md` into `public/` and stops if the agreement's "Version N" line
 `.output/firefox-mv2/manifest.json` as a temporary add-on in Firefox, to try a build by hand
 (`docs/store/TEST_BEFORE_UPLOAD.md`).
 
-**Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about three
-minutes; a few tests skip without a scheduler). To put a checkout on a cluster by hand: copy `framework/`
-there and run `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through
-the portal's file app when its bundled `framework/VERSION` is newer than the installed one. The install adds
-`~/.hpcworker/bin` to PATH through a managed block in `~/.bashrc`, so a new terminal finds `hpcworker`; a
-terminal opened before the install needs `export PATH="$HOME/.hpcworker/bin:$PATH"` once.
+**Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about
+seven minutes under Git Bash on the Windows laptop, measured 2026-09-29; a few tests skip without a
+scheduler). The framework reaches a student's account in one of
+two ways (`docs/ARCHITECTURE.md` 2.1):
+
+- *The lab's shared copy*, where the site profile names `shared_install` (Wayne State's does:
+  `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`, a link to a versioned directory `v<N>/` beside
+  it). The maintainer publishes each framework version there from the laptop with
+  `bash tools/deploy_shared.sh` (options in its header; `--dry-run` says what it would do): it checks
+  the two version lines, the line endings and the shell syntax, packs the framework's files with a
+  SHA-256 manifest, unpacks them over ssh into a new `v<N>/` (file work only on the login node), gives
+  the group read and traverse without write, switches `current` in one rename, keeps every older
+  version (a running worker stays on the one it started with until it is started again), and prints
+  what changed, the tree and the ACLs. A student's account is set up with one line, which the
+  extension types through the portal's shell:
+  `bash <shared_install>/bin/hpcworker install --shared <shared_install> --profile <site>`. The account
+  gets a launcher, a marker naming the shared directory and the profile, and no code; an own copy
+  already there is moved aside into `~/.hpcworker/replaced/`, never deleted. `hpcworker version` then
+  says "5 (shared copy at ...)". The extension never replaces or updates a shared copy.
+- *The student's own copy*, at every other site and as the fallback when the account cannot use the
+  shared copy: copy `framework/` to the cluster and run
+  `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through the
+  portal's Files app, and again when its bundled `framework/VERSION` is newer than the installed one.
+
+Either way the install adds `~/.hpcworker/bin` to PATH through a managed block in `~/.bashrc`, so a
+new terminal finds `hpcworker`; a terminal opened before the install needs
+`export PATH="$HOME/.hpcworker/bin:$PATH"` once. At Wayne State the student's account must be in the
+lab's group `oschome` in both cases: the image, the shared copy and the state directory are all on the
+group's volume, which others cannot enter (`docs/OPEN_QUESTIONS.md`).
 
 **Site pages.** `python3 tools/site_bridge_build.py` renders the privacy statement and the agreement into
 the website checkout expected beside this repository (`../openspineconsortium.github.io/ashley/bridge/`)
@@ -215,9 +242,11 @@ from there, not from here.
    line and, for the agreement, `TERMS_VERSION`/`TERMS_DATE` in `src/core/terms.ts`; a changed framework
    moves `framework/VERSION` and the `VERSION=` line at the top of `framework/bin/hpcworker`.
 2. `npm run typecheck && npm test && npm run build && npm run zip:all` in `extension/`, and the framework
-   tests.
+   tests. A changed framework is then published to each site's shared copy with
+   `bash tools/deploy_shared.sh`, before the extension that needs it reaches students: the extension
+   runs whatever the lab's copy is.
 3. Copy the zips into `release/<version>/`, write `SHA256SUMS.txt` (`sha256sum *.zip > SHA256SUMS.txt`)
-   and a short `README.md` there (see `release/4.0.0/`), commit, tag `v<version>`, push both remotes:
+   and a short `README.md` there (see `release/5.0.0/`), commit, tag `v<version>`, push both remotes:
    `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
    (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
    maintainer's machine that is WSL). Attach the zips and `SHA256SUMS.txt` to a GitHub release named
@@ -229,7 +258,8 @@ from there, not from here.
 ## Documents
 
 - `docs/RESEARCH_REPORT.md`: the research and the build specification everything else derives from.
-- `docs/ARCHITECTURE.md`: components, site profile, adapter interface, job template, the Remote
+- `docs/ARCHITECTURE.md`: components, site profile, the two install modes (the lab's shared copy
+  and the student's own), adapter interface, job template, the Remote
   Control launch sequence, the sign-in sitting and its output contract, the step machine behind the
   icon, the Open OnDemand channels (with the warm-up and the existence rule), the extension per
   browser, security controls.

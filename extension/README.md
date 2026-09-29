@@ -50,7 +50,7 @@ src/core/
   portal.ts                 PortalClient: every OOD endpoint, fetch+WebSocket injected; PUN warm-up with backoff; existence from listings; the login shell
   shell.ts                  the Shell app driver: one command line, framed output, 3146 reasons; the interactive sitting for the sign-in
   login.ts                  the sign-in terminal's reader: the framework's plain-mode lines out of the shell's frames
-  install.ts                setting up the cluster: upload the bundled framework, run its install once
+  install.ts                setting up the cluster: link the lab's shared copy (one line), else upload the bundled framework and run its install once
   audit.ts  redact.ts       the chokepoint: audit record per request, one floor clock per class, redaction, revocation
   diagnostics.ts checks.ts  the node model (id, title, dependsOn, assumption, manualFix, futureRisk, check, repair) and the 17 checks
   worker.ts                 start and stop (and the consent marker), shared by the strip, the Details buttons and the background
@@ -110,7 +110,7 @@ only when a person must act:
 | 2 | portal awake and signed in | GET the dashboard; on 5xx or `/nginx/init` wait 2 s, 5 s, 10 s ("waking up your portal...") | sign in to the portal in its tab |
 | 3 | agreement | | read and accept it, once per browser profile (the setup page) |
 | 4 | access approved | the background asks the access service about the account the dashboard shows (cached: yes 24 h, no 10 min) | "Ask for access" when not approved: opens the request page with the account filled in; read-only checks are never blocked on it |
-| 5 | tool installed | upload the bundled framework, run `hpcworker install` once | |
+| 5 | tool installed | where the site profile names a shared folder (`shared_install`): one line, `hpcworker install --shared`, run from the lab's copy, nothing uploaded; elsewhere, or when the account cannot read that folder: upload the bundled framework, run `hpcworker install` once | |
 | 6 | probe run | submit the five-minute probe once, wait for `probe.json` | |
 | 7 | signed in to Claude on the cluster | open the sign-in terminal (below) | sign in on Anthropic's page, paste the code |
 | 8 | data statement | | read where the work goes, tick the statement (once per workspace; written to `~/.hpcworker/consent`) |
@@ -132,8 +132,10 @@ the framework's own ten-minute limit ends a sitting nobody finished. The paste-c
 it is the credential boundary, and the extension never reads an Anthropic page or the clipboard.
 
 **Details** (collapsed under the strip) keeps the worker card with the buttons (set up the cluster again, run the
-probe again, sign in on the cluster, start, stop, read status now), the seventeen checks, `rc.log`, the audit log
-with its export, the access line, the settings and the Google Drive step with its done box.
+probe again, sign in on the cluster, start, stop, read status now) under one line saying which copy of the tool
+the account runs ("tool: shared copy, version N at DIR" or "tool: your copy, version N", with the one-line note
+when the shared copy could not be used), the seventeen checks, `rc.log`, the audit log with its export, the
+access line, the settings and the Google Drive step with its done box.
 
 ## What the strip and the buttons do on the cluster
 
@@ -163,9 +165,13 @@ with its export, the access line, the settings and the Google Drive step with it
   this browser in the last ten minutes outweighs an older "not signed in" from the probe or from a job that checked
   before it. The sign-in sitting itself is a scheduler call (it runs `srun` on the login node): once a minute, and
   the panel closes it after fifteen minutes at the latest (`SESSION_MAX_MS`, the privacy statement's number).
-- **Updating the tool**: `~/.hpcworker/VERSION` is compared with the bundled `framework/VERSION` on every look at
-  the cluster; an older or missing one is set up again (upload, one `install` line; the tool keeps the profile and
-  prints `upgraded 2 -> 3`), and an update that ran and left the old number behind is reported once, not repeated.
+- **Updating the tool**: an account on the lab's shared copy (the marker `~/.hpcworker/shared` names the folder)
+  is never updated by the extension: the lab keeps that copy current in one place, and Details shows the version
+  its `VERSION` file holds. An account with its own copy has `~/.hpcworker/VERSION` compared with the bundled
+  `framework/VERSION` on every look at the cluster; an older or missing one is set up again (upload, one
+  `install` line; the tool keeps the profile and prints `upgraded 2 -> 3`; where the site keeps a shared copy,
+  that update is the move to it), and an update that ran and left the old number behind is reported once, not
+  repeated.
 - **Open claude.ai when the worker connects** (Settings; on by default): the first time this browser sees the
   worker's link it opens it in a new tab; afterwards the green button does.
 - **Mark this workspace restricted** (in the statement) touches `<workspace>/.restricted`; check 16 and every start
@@ -181,7 +187,7 @@ with its export, the access line, the settings and the Google Drive step with it
 | `scheduler` | a shell line that submits or cancels: `hpcworker probe`, `hpcworker worker start|stop`, `sbatch`, `scancel` | 60 s |
 | `jobs` | the portal's Active Jobs read and its DELETE cancel (the portal runs squeue/scancel) | 60 s |
 | `discover` | the login-node discovery batch (`hpcworker discover`, `diag`, or the fallback with one `sinfo`) | 60 s |
-| `shell` | any other single line through the bootstrap shell (`install`) | 15 s |
+| `shell` | any other single line through the bootstrap shell (`install`, `install --shared`; the fallback waits this clock out between the two) | 15 s |
 | `files`, `dashboard`, `probe` | reads and writes through the Files app, the dashboard, the rnode probe | none (paced by the once-a-minute alarm) |
 
 A full "Run the checks" opens the shell once (discover), asks Active Jobs once (jobs) and reads files;
@@ -217,7 +223,25 @@ bounces through `/nginx/init`), `--cold-pun MS` (the first `/pun/` request after
 the live portal's per-user nginx does), `--job-composer`, `--no-cookie`, `--cert F --key F` (https with your own
 self-signed pair, e.g. from `openssl req -x509 -newkey ed25519 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30`),
 `--display-home DIR` (the home the seeded tool prints and records in place of the mock home's real path; by default the
-portal's own `/home/<user>`, so the strip's output box reads like a cluster wherever the mock home sits on disk).
+portal's own `/home/<user>`, so the strip's output box reads like a cluster wherever the mock home sits on disk),
+`--shared-install [PATH]` (the lab's shared copy of the tool: a second directory, seeded with the stand-in tool, a
+`VERSION` and `profiles/mock.json`, served read-only by the Files routes at `PATH`, default
+`/lab/shared/hpcworker/current`; a typed line naming `PATH` runs against it), `--shared-version N` (its `VERSION`,
+5 by default) and `--shared-unreadable` (an account outside the lab's group: the Files routes answer 403 there and
+bash cannot open the shared launcher, exit 127); `MOCK_SHARED_INSTALL=PATH` in the server's environment does
+what `--shared-install PATH` does. The strip takes the shared path from the bundled profile of the
+site named in Settings, so to see the shared mode by hand, set the site profile name to one whose bundled profile
+names the `--shared-install` path (for `wayne`, `--shared-install /rs/rs_grp_oschome/shared/ashley/hpcworker/current`;
+from Git Bash prefix `MSYS_NO_PATHCONV=1`, or the path reaches node rewritten as a Windows path); or open the mock
+at `https://ondemand.wayne.localhost:<port>` (Chromium resolves any `*.localhost` name to this machine), which makes
+the site `wayne` from the first click, as `ondemand.grid.wayne.edu` does.
+The CLI starts the home with the stand-in set up as the account's own copy: `~/.hpcworker/profile.json` and
+`~/.hpcworker/VERSION` at the version the build carries (`public/framework/files/VERSION`), so the strip finds the
+tool installed and current and uploads nothing; this is what the store reviewer's recipe sees (`tool: your copy,
+version N` under Details). `--fresh-home` starts with the stand-in command only: the strip then uploads the real
+framework and runs its install, which refuses a mock site (it has no profile for `localhost`) and whose jobs the
+stand-in scheduler would never run anyway, so the upload path can be watched only up to that refusal.
+`--shared-install` never seeds an own copy. `createMockPortal` seeds the command only unless `seedInstalled: true`.
 A `?download=1` of a file that does not exist answers 200 with an HTML page, as the live Files app does.
 
 Environment variables the seeded tool reads (set them for the mock server's process): `MOCK_LOGGED_IN=false`
@@ -226,7 +250,12 @@ Environment variables the seeded tool reads (set them for the mock server's proc
 (the environment id in the registration block; by default one stable id per mock home, as Claude Code keys it
 to the machine), `MOCK_LOGIN_FAIL=1` (the plain sign-in ends with `HPCW-LOGIN-FAILED` whatever code is typed),
 `MOCK_DISPLAY_HOME=/home/st1234` (the same as `--display-home`: the tool's sentences, `status.json` and `connection.json`
-carry this home in place of the real one; the files themselves stay where they are). The
+carry this home in place of the real one; the files themselves stay where they are). `MOCK_SHARED_INSTALL` and
+`MOCK_SHARED_REAL` (set by `--shared-install`: the shared folder as the portal shows it and where it sits on disk)
+make the stand-in's `install --shared DIR` behave as framework 5's does: it copies no code, writes a launcher
+`~/.hpcworker/bin/hpcworker` (a regular file) that runs the shared one, the marker `~/.hpcworker/shared` naming the
+folder and the profile, and moves an own copy aside (never deletes it); its plain `install` moves a marker aside
+in turn, and its `version` says which copy runs. The
 mock's `worker start` refuses a workspace holding `.restricted`, its `worker stop` writes `stop.done`, and its
 `claude login` without `--plain` explains the one-sitting flow (`claude consent` is an alias that explains).
 
@@ -237,14 +266,17 @@ real Shell app would crash there.
 
 ## The cluster-side contract
 
-`src/core/contract.ts` follows framework version 3 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
-`jobs/probe.sbatch`, `jobs/worker.sbatch.tpl`). The build (`scripts/sync-framework.mjs`, run before every build
+`src/core/contract.ts` follows framework version 5 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
+`jobs/probe.sbatch`, `jobs/worker.sbatch.tpl`, `profiles/<site>.json`). The build (`scripts/sync-framework.mjs`, run before every build
 and zip) bundles `framework/**` as it is on disk, copies the root `LICENSE.txt` and `PRIVACY.md` over the shipped
 copies, and stops with exit 1 when the copied `LICENSE.txt`'s "Version N, date" line disagrees with `TERMS_VERSION`
 and `TERMS_DATE` in `src/core/terms.ts`:
 
-- The tool lives at `~/.hpcworker/bin/hpcworker`. The extension types exactly one line per action through the
-  portal's Shell app: `install --profile <site>`, `discover`, `probe`, `worker start --name <n> --permission-mode <m>`,
+- The tool is called as `~/.hpcworker/bin/hpcworker` in both modes: the account's own copy, or, where the site
+  profile names a shared folder (`shared_install`, framework 5), a small launcher that runs the lab's copy there,
+  with the marker `~/.hpcworker/shared` naming the folder. The extension types exactly one line per action through the
+  portal's Shell app: `install --profile <site>` (own copy) or
+  `bash '<shared>/bin/hpcworker' install --shared '<shared>' --profile '<site>'` (the lab's copy), `discover`, `probe`, `worker start --name <n> --permission-mode <m>`,
   `worker stop --name <n>`, `diag --json`; and one interactive sitting, `claude login --plain`, in the strip's
   sign-in terminal (the framework prints `HPCW-LOGIN`, `AUTH-URL:`, `SIGNED-IN` and `HPCW-LOGIN-FAILED` lines;
   the extension opens the URL and types the code the student pastes, and never sees the credential).
@@ -264,10 +296,19 @@ and `TERMS_DATE` in `src/core/terms.ts`:
 - The extension reads the files only from the 60-second alarm or a button and never asks the scheduler faster
   than once a minute per class (`Active Jobs` is read for check 7 only; a stop is the stop file).
 
-"Set up the cluster" uploads whatever `scripts/sync-framework.mjs` bundled from `../framework` (text files only,
-LF endings) to `~/.hpcworker/` with `PUT files/fs`, then runs the install line once; the tool strips CR endings
-and copies nothing when it already runs from `~/.hpcworker`. If `framework/` was empty at build time the button
-says so instead of installing nothing.
+"Set up the cluster" first reads the bundled profile of the site (`public/framework/files/profiles/<site>.json`).
+When it names a `shared_install` folder, nothing is uploaded: one line runs the lab's copy's own install
+(`bash '<shared>/bin/hpcworker' install --shared '<shared>' --profile '<site>'`), which sets the account up with
+the launcher, the marker, the profile and the PATH block. When bash cannot open that launcher (exit 126 or 127:
+an account outside the lab's group, or a folder not there) or the tool refuses the folder, the extension falls
+back to the upload below and leaves a one-line note in Details; any other failure is reported as it is. Whether the
+account can use the shared copy is judged by that shell line, not by the portal's Files app, whose view of a lab
+volume was never measured. Otherwise, it uploads whatever `scripts/sync-framework.mjs` bundled from `../framework`
+(text files only, LF endings) to `~/.hpcworker/` with `PUT files/fs`, then runs the install line once; the tool
+strips CR endings and copies nothing when it already runs from `~/.hpcworker`. If `framework/` was empty at build
+time the button says so instead of installing nothing. The extension never writes into a shared folder: it reads
+only `<shared>/VERSION`, to show it, with its own error handling (a 403 there is said, never taken for a portal
+that is asleep).
 
 ## Access: who you are and whether you may
 
@@ -277,7 +318,7 @@ for the signed-in session ("Logged in as ...", read by `PortalClient.session()`)
 cookie, and never the home directory's owner (that fallback names paths only). Whether they may use Ashley
 Bridge is the maintainer's approved list, asked by the background alone: it reads `access_check` from
 `https://openspineconsortium.com/ashley/services.json` (cached a day) and POSTs
-`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"4.0.0"}` as
+`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"5.0.0"}` as
 `text/plain;charset=UTF-8` without cookies when the portal tab connects, about once a day, and on a toolbar click
 after a no or a failed attempt or once the last yes is a day old; never before the acceptance record is in
 storage (the same gate as the kill-list). A yes is kept 24 hours (up to 7 days while the service cannot be

@@ -1,0 +1,163 @@
+Ashley Bridge 5.0.0 end to end, run D1 (upload mode, the reviewer recipe as it stood (a home with the stand-in command only), approved account st1234), 2026-09-29
+
+Setup: the release build extension/.output/chrome-mv3 (5.0.0, framework 5 bundled) in Playwright Chromium (Chrome for
+Testing 153.0.8010.12), headless=false, a fresh persistent profile with the extension pinned; the mock portal
+(extension/mock-ood/server.mjs) over https, reached at https://localhost:8443,
+with --user st1234 and MOCK_LOGGED_IN=false; the REAL services.json and the REAL access service.
+The toolbar button was pressed on the portal tab with CDP Extensions.triggerAction (the action a click runs); the side panel
+was disabled first, so the background's own fallback opened the strip as a tab; the browser's permission prompt was
+answered with Windows UI Automation (Allow). claude.ai / claude.com / anthropic.com pages were answered locally (STUB lines).
+Times are UTC; "+s" is seconds since the harness started. Headers are not logged; the WebSocket token is redacted; the
+lines typed into the portal's shell (SHELL-IN) and what it printed (SHELL-OUT) come from the WebSocket frames, with the pasted
+sign-in code redacted; the extension's own file loads (chrome-extension://) are counted, not listed.
+
+Summary
+  acceptance record written:                   2026-09-29 22:17:57.007  +  19.1 s; vendor requests before it: 0
+  first vendor request:                        2026-09-29 22:17:57.027  GET https://openspineconsortium.com/ashley/bridge-killlist.json
+  access check:                                POST https://ashley-service.openspineconsortium.workers.dev/access_check body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"5.0.0"} -> 200 {"approved":true,"access_id":"st1234","checked":"2026-09-29T22:18:10.085Z","until":null}
+  site profile name the extension used:        localhost (from the hostname localhost)
+  install lines typed into the shell:          1
+      __b=ASHBR76c08c020351; printf '\n%s_BEGIN\n' "$__b"; ( chmod 755 ~/.hpcworker/bin/hpcworker 2>/dev/null; bash ~/.hpcworker/bin/hpcworker install --profile 'localhost' ) 2>&1; printf '\n%s_END:%s\n' "$__b" "$?"; exit
+  PUT requests to the Files app:               19 in all; 13 of them framework files (bin/, lib/, jobs/, profiles/, README.md, VERSION)
+      PUT /home/st1234/.hpcworker?dir=true -> 500
+      PUT /home/st1234/.hpcworker/bin?dir=true -> 500
+      PUT /home/st1234/.hpcworker/jobs?dir=true -> 200
+      PUT /home/st1234/.hpcworker/lib?dir=true -> 200
+      PUT /home/st1234/.hpcworker/lib/adapters?dir=true -> 200
+      PUT /home/st1234/.hpcworker/profiles?dir=true -> 200
+      PUT /home/st1234/.hpcworker/bin/hpcworker -> 200
+      PUT /home/st1234/.hpcworker/jobs/build_image.sbatch -> 200
+      PUT /home/st1234/.hpcworker/jobs/probe.sbatch -> 200
+      PUT /home/st1234/.hpcworker/jobs/worker.sbatch.tpl -> 200
+      PUT /home/st1234/.hpcworker/lib/adapters/common.sh -> 200
+      PUT /home/st1234/.hpcworker/lib/adapters/lsf.sh -> 200
+      PUT /home/st1234/.hpcworker/lib/adapters/pbs.sh -> 200
+      PUT /home/st1234/.hpcworker/lib/adapters/slurm.sh -> 200
+      PUT /home/st1234/.hpcworker/lib/login_plain.sh -> 200
+      PUT /home/st1234/.hpcworker/lib/profile.py -> 200
+      PUT /home/st1234/.hpcworker/profiles/wayne.json -> 200
+      PUT /home/st1234/.hpcworker/README.md -> 200
+      PUT /home/st1234/.hpcworker/VERSION -> 200
+  reads of the shared copy through the Files app: 0
+  install note in storage (bridge.install):    {"attempted_at":"2026-09-29T22:18:16.649Z","detail":"exit 1, 13 file(s) uploaded","mode":"own","ok":false}
+  Details, tool line(s):                       ["tool: not set up yet"]
+
+Events and requests, in order
+22:17:38.430 +   0.5 s  SETUP        mock portal: node mock-ood/server.mjs --port 8443 --host localhost --user st1234 --home <home-D1> --cert <path on this machine> --key <path on this machine> MOCK_LOGGED_IN=false
+22:17:38.432 +   0.5 s  SETUP        mock says: home dir:  <path on disk>  (shown to the extension as /home/st1234; the seeded tool prints it as /home/st1234)
+22:17:38.434 +   0.5 s  SETUP        the mock home before the run: [".hpcworker/bin/hpcworker"]
+22:17:40.135 +   2.2 s  SETUP        Chromium 153.0.8010.12 with .output/chrome-mv3 (5.0.0, framework 5 bundled), fresh profile
+22:17:40.368 +   2.5 s  SETUP        extension id ljkjllefjpjebnnghebkppmdfmnakjoo
+22:17:56.575 +  18.7 s  CHECK        vendor requests before the agreement was accepted: 0
+22:17:56.935 +  19.0 s  ACCEPT       pressed "Accept and Continue"
+22:17:57.027 +  19.1 s  REQUEST      GET https://openspineconsortium.com/ashley/bridge-killlist.json  [extension background (service worker); fetch] -> 200 answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+22:17:57.029 +  19.1 s  ROUTE        GET https://openspineconsortium.com/ashley/bridge-killlist.json
+22:17:57.034 +  19.1 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/bridge-killlist.json from extension background (service worker)
+22:17:57.167 +  19.3 s  ACCEPT       acceptance record in storage: terms_version 4, accepted_at 2026-09-29T22:17:57.007Z
+22:17:57.304 +  19.4 s  REQUEST      GET https://localhost:8443/login?go=1&redirect=%2Fpun%2Fsys%2Fdashboard%2F  [tab navigation; document] -> 302
+22:17:57.337 +  19.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [tab navigation; document] -> 200
+22:17:57.509 +  19.6 s  PORTAL       signed in; the dashboard says "Logged in as st1234"
+22:17:57.514 +  19.6 s  HARNESS      side panel disabled (so the strip opens as a tab through the background fallback)
+22:17:58.030 +  20.1 s  CLICK        toolbar action on the portal tab (Extensions.triggerAction, tab target 352A14A5...)
+22:18:00.675 +  22.8 s  PROMPT       pressed 'Allow' (invoke) in window 'Ashley Bridge - Google Chrome for Testing' (pid 19900)
+22:18:00.678 +  22.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+22:18:00.680 +  22.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+22:18:00.695 +  22.8 s  GRANT        origin https://localhost:8443 granted: true; strip tab opened: true
+22:18:00.702 +  22.8 s  REQUEST      GET https://openspineconsortium.com/ashley/services.json  [extension background (service worker); fetch] -> 200 answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+22:18:00.703 +  22.8 s  ROUTE        GET https://openspineconsortium.com/ashley/services.json
+22:18:00.711 +  22.8 s  VENDOR-REQ   GET https://openspineconsortium.com/ashley/services.json from extension background (service worker)
+22:18:00.712 +  22.8 s  SETTINGS     portal settings on file: {"connected_at":"2026-09-29T22:18:00.590Z","hostname":"localhost","origin":"https://localhost:8443","shell_host":"default","site":"localhost"}
+22:18:00.755 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+22:18:00.760 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+22:18:00.761 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+22:18:00.764 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+22:18:00.775 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+22:18:00.777 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+22:18:00.805 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:00.810 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:00.811 +  22.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:00.857 +  23.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:00.936 +  23.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:00.940 +  23.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:08.578 +  30.7 s  REQUEST      POST https://ashley-service.openspineconsortium.workers.dev/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"5.0.0"} answer {"approved":true,"access_id":"st1234","checked":"2026-09-29T22:18:10.085Z","until":null}
+22:18:08.579 +  30.7 s  ROUTE        POST https://ashley-service.openspineconsortium.workers.dev/access_check
+22:18:08.583 +  30.7 s  VENDOR-REQ   POST https://ashley-service.openspineconsortium.workers.dev/access_check from extension background (service worker) body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"5.0.0"}
+22:18:08.583 +  30.7 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/services.json answer { "license_service": "https://ashley-service.openspineconsortium.workers.dev/trial", "allowlist": "https://ashley-service.openspineconsortium.workers.dev/allowlist", "revocation": "https://ashley-service.openspineconsortium.workers.dev/revoked", "report": "https://ashley-service.openspineconsortium.
+22:18:08.587 +  30.7 s  VENDOR-RES   200 https://openspineconsortium.com/ashley/bridge-killlist.json answer { "v": 1, "kid": "k1", "issued": 1790695956, "revoked_versions": [], "revoked_lids": [], "message": "Ashley Bridge is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDY5NTk1NiwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJBc2hsZXkgQnJpZGdlIGlzIGN1cnJlbnQu
+22:18:09.918 +  32.0 s  VENDOR-RES   200 https://ashley-service.openspineconsortium.workers.dev/access_check answer {"approved":true,"access_id":"st1234","checked":"2026-09-29T22:18:10.085Z","until":null}
+22:18:09.946 +  32.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+22:18:09.978 +  32.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:09.984 +  32.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:09.985 +  32.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:10.037 +  32.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:10.052 +  32.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:10.076 +  32.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:10.108 +  32.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:10.136 +  32.2 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker?dir=true  [page script on the portal tab; fetch] -> 500
+22:18:10.159 +  32.3 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/bin?dir=true  [page script on the portal tab; fetch] -> 500
+22:18:10.180 +  32.3 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/jobs?dir=true  [page script on the portal tab; fetch] -> 200
+22:18:10.201 +  32.3 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib?dir=true  [page script on the portal tab; fetch] -> 200
+22:18:10.223 +  32.3 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/adapters?dir=true  [page script on the portal tab; fetch] -> 200
+22:18:10.246 +  32.3 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profiles?dir=true  [page script on the portal tab; fetch] -> 200
+22:18:10.311 +  32.4 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/bin/hpcworker  [page script on the portal tab; fetch] -> 200 (body 66305 bytes)
+22:18:10.377 +  32.5 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/jobs/build_image.sbatch  [page script on the portal tab; fetch] -> 200 (body 6925 bytes)
+22:18:10.439 +  32.5 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/jobs/probe.sbatch  [page script on the portal tab; fetch] -> 200 (body 13748 bytes)
+22:18:10.500 +  32.6 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/jobs/worker.sbatch.tpl  [page script on the portal tab; fetch] -> 200 (body 28229 bytes)
+22:18:10.559 +  32.7 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/adapters/common.sh  [page script on the portal tab; fetch] -> 200 (body 16409 bytes)
+22:18:10.617 +  32.7 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/adapters/lsf.sh  [page script on the portal tab; fetch] -> 200 (body 3114 bytes)
+22:18:10.652 +  32.7 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/adapters/pbs.sh  [page script on the portal tab; fetch] -> 200 (body 3223 bytes)
+22:18:10.690 +  32.8 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/adapters/slurm.sh  [page script on the portal tab; fetch] -> 200 (body 4824 bytes)
+22:18:10.747 +  32.8 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/login_plain.sh  [page script on the portal tab; fetch] -> 200 (body 14147 bytes)
+22:18:10.819 +  32.9 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/lib/profile.py  [page script on the portal tab; fetch] -> 200 (body 31792 bytes)
+22:18:10.855 +  33.0 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profiles/wayne.json  [page script on the portal tab; fetch] -> 200 (body 2286 bytes)
+22:18:10.858 +  33.0 s  ACCESS       record: {"access_id":"st1234","approved":true,"checked_at":"2026-09-29T22:18:00.699Z","last_attempt_at":"2026-09-29T22:18:00.699Z","portal":"localhost","request_page":"https://openspineconsortium.com/ashley/request.html","until":null,"v":1}
+22:18:10.894 +  33.0 s  STRIP        [install result] Setting up the cluster (uploading the tool and installing it once)...
+22:18:10.919 +  33.0 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/README.md  [page script on the portal tab; fetch] -> 200 (body 37784 bytes)
+22:18:10.954 +  33.1 s  REQUEST      PUT https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/VERSION  [page script on the portal tab; fetch] -> 200 (body 2 bytes)
+22:18:10.994 +  33.1 s  REQUEST      GET https://localhost:8443/pun/sys/shell/ssh/default  [page script on the portal tab; fetch] -> 200
+22:18:11.013 +  33.1 s  WS           page script on the portal tab opened wss://localhost:8443/pun/sys/shell/ssh/default?csrf=[redacted]
+22:18:11.025 +  33.1 s  SHELL-OUT    Last login: Tue, 29 Sep 2026 22:18:11 GMT from 10.0.0.1
+22:18:11.439 +  33.5 s  SHELL-IN     __b=ASHBR76c08c020351; printf '\n%s_BEGIN\n' "$__b"; ( chmod 755 ~/.hpcworker/bin/hpcworker 2>/dev/null; bash ~/.hpcworker/bin/hpcworker install --profile 'localhost' ) 2>&1; printf '\n%s_END:%s\n' "$__b" "$?"; exit
+22:18:11.494 +  33.6 s  SHELL-OUT    [st1234@login1 ~]$ __b=ASHBR76c08c020351; printf '\n%s_BEGIN\n' "$__b"; ( chmod 755 ~/.hpcworker/bin/hpcworker 2>/dev/null; bash ~/.hpcworker/bin/hpcworker install --profile 'localhost' ) 2>&1; printf '\n%s_END:%s\n' "$__b" "$?"; exit
+22:18:11.755 +  33.9 s  SHELL-OUT    ASHBR76c08c020351_BEGIN
+22:18:16.637 +  38.7 s  SHELL-OUT    hpcworker: no profile named 'localhost' (have: wayne )
+22:18:16.643 +  38.7 s  SHELL-OUT    ASHBR76c08c020351_END:1
+22:18:16.691 +  38.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:16.994 +  39.1 s  STRIP        [install result] Setting up the cluster failed: the install command ended with exit 1 (see Details)
+22:18:16.995 +  39.1 s  RESULT       strip after the install: Setting up the cluster failed: the install command ended with exit 1 (see Details)
+22:18:17.001 +  39.1 s  INSTALL-NOTE {"attempted_at":"2026-09-29T22:18:16.649Z","detail":"exit 1, 13 file(s) uploaded","mode":"own","ok":false}
+22:18:17.042 +  39.1 s  STRIP-OUTPUT home /home/st1234
+uploading 13 file(s) to /home/st1234/.hpcworker
+  bin/hpcworker (66305 bytes)
+  jobs/build_image.sbatch (6925 bytes)
+  jobs/probe.sbatch (13748 bytes)
+  jobs/worker.sbatch.tpl (28229 bytes)
+  lib/adapters/common.sh (16409 bytes)
+  lib/adapters/lsf.sh (3114 bytes)
+  lib/adapters/pbs.sh (3223 bytes)
+  lib/adapters/slurm.sh (4824 bytes)
+  lib/login_plain.sh (14147 bytes)
+  lib/profile.py (31792 bytes)
+  profiles/wayne.json (2286 bytes)
+  README.md (37784 bytes)
+  VERSION (2 bytes)
+running: chmod 755 ~/.hpcworker/bin/hpcworker 2>/dev/null; bash ~/.hpcworker/bin/hpcworker install --profile 'localhost'
+hpcworker: no profile named 'localhost' (have: wayne )
+exit 1
+22:18:18.034 +  40.1 s  SHOT         evidence/D1-strip-install-result.png (page text clean)
+22:18:18.163 +  40.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 200
+22:18:19.485 +  41.6 s  DETAILS      tool line(s): ["tool: not set up yet"]
+22:18:20.805 +  42.9 s  SHOT         evidence/D1-details.png (page text clean)
+22:18:20.809 +  42.9 s  HOME         the mock home after the run: [".hpcworker/bin/hpcworker",".hpcworker/jobs/build_image.sbatch",".hpcworker/jobs/probe.sbatch",".hpcworker/jobs/worker.sbatch.tpl",".hpcworker/lib/adapters/common.sh",".hpcworker/lib/adapters/lsf.sh",".hpcworker/lib/adapters/pbs.sh",".hpcworker/lib/adapters/slurm.sh",".hpcworker/lib/login_plain.sh",".hpcworker/lib/profile.py",".hpcworker/profiles/wayne.json",".hpcworker/README.md",".hpcworker/VERSION"]
+22:18:20.809 +  42.9 s  HOME         .hpcworker/shared: absent
+22:18:20.810 +  42.9 s  HOME         .hpcworker/VERSION: "5\n"
+22:18:20.812 +  42.9 s  HOME         .hpcworker/bin/hpcworker: a regular file, 66305 bytes; first lines: #!/bin/bash | # hpcworker: your own Claude Code, as a batch job on your university's cluster, reachable from
+
+Extension file loads (chrome-extension://, not listed): 13
+Requests by initiator and host:
+     1  extension background (service worker) -> ashley-service.openspineconsortium.workers.dev
+     2  extension background (service worker) -> openspineconsortium.com
+    44  page script on the portal tab -> localhost:8443
+     2  tab navigation -> localhost:8443
+
+Store screenshots taken in this run: none (evidence images kept outside the repository); page-text leaks: []

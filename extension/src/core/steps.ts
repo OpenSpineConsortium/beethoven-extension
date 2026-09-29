@@ -51,8 +51,14 @@ export interface Facts {
   install: {
     /** undefined until the home directory has been listed */
     installed?: boolean;
-    /** the tool on the cluster is older than the one this build carries (~/.hpcworker/VERSION against the bundled VERSION) */
+    /** the tool on the cluster is older than the one this build carries (~/.hpcworker/VERSION against the bundled VERSION); never set for the lab's shared copy */
     outdated?: { installed: string; bundled: string };
+    /** the account runs the lab's shared copy (~/.hpcworker/shared names its folder); its VERSION as the Files app read it, or why it could not be read */
+    shared?: { dir: string; version?: string; unreadable?: string };
+    /** the account's own copy's VERSION (~/.hpcworker/VERSION), when it runs its own copy */
+    version?: string;
+    /** the shared folder the bundled site profile names: the install links to it instead of uploading */
+    sharedRoot?: string;
     installing?: boolean;
     failed?: string;
   };
@@ -204,13 +210,16 @@ export function decide(f: Facts, now = Date.now()): StripView {
     }
   }
 
-  // 5. the tool on the cluster
-  if (f.install.installing) return view('install', { status: 'Setting up the cluster (uploading the tool and installing it once)...', tone: 'busy' });
+  // 5. the tool on the cluster: the lab's shared copy where the site keeps one (nothing uploaded),
+  // else the student's own copy (uploaded); the line says which
+  const lab = !!f.install.sharedRoot;
+  if (f.install.installing) return view('install', { status: lab ? "Setting up the cluster (pointing your account at your lab's shared copy of the tool)..." : 'Setting up the cluster (uploading the tool and installing it once)...', tone: 'busy' });
   if (f.install.failed) return view('install', { status: `Setting up the cluster failed: ${f.install.failed}`, primary: { label: 'Try again', action: 'retry-install' }, tone: 'fail' });
   if (f.install.installed === undefined) return view('install', { status: 'Looking at your cluster home...', auto: 'poll', tone: 'busy' });
-  if (!f.install.installed) return view('install', { status: 'Setting up the cluster...', auto: 'install', tone: 'busy' });
-  // an older tool is set up again the same way (upload, one install line); the tool keeps the profile
-  if (f.install.outdated) return view('install', { status: `Updating the tool on the cluster (version ${f.install.outdated.installed} to ${f.install.outdated.bundled})...`, auto: 'install', tone: 'busy' });
+  if (!f.install.installed) return view('install', { status: lab ? "Setting up the cluster with your lab's shared copy of the tool..." : 'Setting up the cluster...', auto: 'install', tone: 'busy' });
+  // an older own copy is set up again: the same way (upload, one install line), or, where the lab
+  // keeps a shared copy, by moving to that; either way the tool keeps the profile
+  if (f.install.outdated) return view('install', { status: lab ? `Moving your account to your lab's shared copy of the tool (your own copy is version ${f.install.outdated.installed})...` : `Updating the tool on the cluster (version ${f.install.outdated.installed} to ${f.install.outdated.bundled})...`, auto: 'install', tone: 'busy' });
 
   // 6. the probe: once, in the background
   if (f.probe.submitting) return view('probe', { status: 'Asking for a compute node to check (a short job (ten minutes at most))...', tone: 'busy' });

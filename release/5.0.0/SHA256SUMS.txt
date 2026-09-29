@@ -1,0 +1,5 @@
+e3773d9823fd5014bf891a270b351df9bb55f2cacb36ab738d3698389a813641 *ashley-bridge-5.0.0-chrome.zip
+e3773d9823fd5014bf891a270b351df9bb55f2cacb36ab738d3698389a813641 *ashley-bridge-5.0.0-edge.zip
+48d97f7f0c707acd53e97389ea7c14655e2df0093b42ea9cea796bb6d43556cb *ashley-bridge-5.0.0-firefox.zip
+0cabd85ce014edd3b0bd93534c3d6e2f627845baf968e2f3e968e7bd7ea51b7d *ashley-bridge-5.0.0-safari.zip
+96c3e13f158476df0417588bec5a2b331ab5133bad4b2e2e356e560a4ddf813a *ashley-bridge-5.0.0-sources.zip

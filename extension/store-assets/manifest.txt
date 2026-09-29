@@ -1,42 +1,47 @@
-Ashley Bridge 4.0.0: store assets
+Ashley Bridge 5.0.0: store assets
 
-Made 2026-09-29 (the screenshots between 19:03 and 19:08 UTC). The screenshots are the real release build
-(extension/.output/chrome-mv3, the 4.0.0 build in the store zips; the zips were made again afterwards for a
-README change in the sources zip, and the built files are the same except the "generated" time stamp in
-framework/manifest.json) loaded into Playwright's Chromium (Chrome for Testing 153) with a fresh profile, a 1280x800
-viewport and the light colour scheme, driven against the mock Open OnDemand portal
-(extension/mock-ood/server.mjs) served over https at localhost:8443 with a self-signed certificate, the mock
-user st1234 (--user st1234), and MOCK_LOGGED_IN=false so the Claude sign-in step is reached. There is no key:
-the extension read the account name the mock's dashboard shows ("Logged in as st1234") and asked the real
-access service (the access_check address in https://openspineconsortium.com/ashley/services.json), which
-answered approved:true for st1234. The withdrawn-versions list was fetched by the extension itself once the
-agreement was accepted (the list issued 2026-09-29 15:32 UTC, nothing withdrawn). The mock home was seeded
-with .hpcworker/profile.json and .hpcworker/VERSION = 3 (the bundled framework version) so the strip found the
-tool installed; the mock's tool prints and records the portal's own home, /home/st1234, in place of the mock
-home's real path.
+Brought up to date 2026-09-29 for 5.0.0. Three screenshots were taken again, from the 5.0.0 release build, between
+22:23 and 22:24 UTC: 02, 04b and 05, the only ones whose content changed (see "Which images changed" below). The other
+six are the 4.0.0 images of 19:03 to 19:08 UTC, kept because what they show is the same in 5.0.0.
 
-How the run was driven: the agreement was accepted on the setup page as a person does (scrolled to the end,
-four boxes ticked, a typed name, "Accept and Continue"). The toolbar button was pressed on the portal tab with
-the DevTools protocol's Extensions.triggerAction (the action a click runs), and the browser's own permission
-prompt was answered with Windows UI Automation (its Allow button); no extension state was edited. Before that
-click the side panel was switched off with chrome.sidePanel.setOptions, so the background's own fallback
-opened the strip as a tab, which is what is captured at 1280x800; in Chrome and Edge a person sees the same
-strip in the side panel beside the portal. The full request log of this run (and of the not-approved run with
-zz9999) is in e2e/. Nothing in the images was drawn by hand or composited. Each image was looked at: no machine
-path and no personal name appears in any of them.
+How the 5.0.0 images were made (run D2, e2e/run-D2-own-copy-reviewer-recipe-st1234.txt): the real release build
+(extension/.output/chrome-mv3, the 5.0.0 build in the store zips, framework 5 bundled) loaded into Playwright's
+Chromium (Chrome for Testing 153) with a fresh profile, a 1280x800 viewport and the light colour scheme, driven
+against the mock Open OnDemand portal (extension/mock-ood/server.mjs) served over https at localhost:8443 with a
+self-signed certificate, exactly as the store reviewer's recipe runs it: --user st1234 and MOCK_LOGGED_IN=false, the
+mock's own home seeding (since 5.0.0 the mock's command line sets its stand-in tool up as the account's own copy at the
+version the build carries, so the strip finds the tool installed and uploads nothing; Details reads "tool: your copy,
+version 5"). There is no key: the extension read the account name the mock's dashboard shows and asked the real
+access service, which answered approved:true for st1234. The agreement was accepted on the setup page as a person
+does (scrolled to the end, four boxes ticked, a typed name, "Accept and Continue"). The toolbar button was pressed on
+the portal tab with the DevTools protocol's Extensions.triggerAction (the action a click runs), and the browser's own
+permission prompt was answered with Windows UI Automation (its Allow button); no extension state was edited. Before
+that click the side panel was switched off with chrome.sidePanel.setOptions, so the background's own fallback opened
+the strip as a tab, which is what is captured at 1280x800; in Chrome and Edge a person sees the same strip in the side
+panel beside the portal. Nothing in the images was drawn by hand or composited. Each image was looked at, and the
+harness checked each page's text: no machine path and no personal name appears in any of them.
 
 Screenshots (1280x800 PNG), in the order suggested for the stores:
-  04-worker-online-open-in-claude.png  step 11: the worker is online; the green Open in Claude button, Copy link, Stop, the session name; the output box shows the probe submission with its cluster path
-  03-sign-in-to-claude.png  step 7: the sign-in sitting is open on the cluster; the sign-in page opened in a tab; one box for the code
-  02-checks.png  Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip reopened afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-29 19:04 UTC); kill-list of 2026-09-29"
-  01-agreement-signing-dialog.png  the setup page (options.html) as it opens on install: the signing dialog, the summary ("In short") and the top of the full text
-  05-setup-page.png  the setup page after setup, from the top: the agreement accepted, "2. Your access" (Access approved for st1234 at localhost, the time the service answered, "Check my access now"; there is nothing to enter and no key card), the connected portal
+  04-worker-online-open-in-claude.png  (4.0.0 image) step 11: the worker is online; the green Open in Claude button, Copy link, Stop, the session name; the output box shows the probe submission with its cluster path
+  03-sign-in-to-claude.png  (4.0.0 image) step 7: the sign-in sitting is open on the cluster; the sign-in page opened in a tab; one box for the code
+  02-checks.png  (5.0.0) Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip reopened afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-29 22:20 UTC); kill-list of 2026-09-29"; check 6 ends "hpcworker is installed (your own copy)"
+  01-agreement-signing-dialog.png  (4.0.0 image) the setup page (options.html) as it opens on install: the signing dialog, the summary ("In short") and the top of the full text
+  05-setup-page.png  (5.0.0) the setup page after setup, from the top: the agreement accepted (with the SHA-256 prefixes of the agreement and of the privacy statement as this build ships them), "2. Your access" (Access approved for st1234 at localhost, the time the service answered, "Check my access now"; there is nothing to enter and no key card), the connected portal
 
 Extra screenshots (1280x800 PNG), optional for the stores:
-  01b-agreement-statements.png  the same dialog scrolled to the four statements, the typed-name box, "Accept and Continue" (disabled until everything is done), and "2. Your access" before any portal is connected
-  03b-where-your-work-goes.png  step 8: where the work goes, and the statement about the workspace
-  04b-details-worker-card.png  Details > Your worker in a settled state (the strip reopened, so no notice line): the job, the session name, the Claude sign-in and Remote Control answer as the job reports them, the checks below
-  05b-setup-page-settings.png  the setup page scrolled to the settings and the audit log
+  01b-agreement-statements.png  (4.0.0 image) the same dialog scrolled to the four statements, the typed-name box, "Accept and Continue" (disabled until everything is done), and "2. Your access" before any portal is connected
+  03b-where-your-work-goes.png  (4.0.0 image) step 8: where the work goes, and the statement about the workspace
+  04b-details-worker-card.png  (5.0.0) Details > Your worker in a settled state (the strip reopened, so no notice line): the job, the session name, the Claude sign-in and Remote Control answer as the job reports them, the line "tool: your copy, version 5" above the buttons, the checks below
+  05b-setup-page-settings.png  (4.0.0 image) the setup page scrolled to the settings and the audit log
+
+Which images changed in 5.0.0, and how that was decided
+- 04b: the new line naming the copy of the tool the account runs ("tool: your copy, version 5"), and check 6's new
+  ending. 02: check 6 now says which copy is installed ("(your own copy)"). 05: the privacy statement's SHA-256
+  prefix in the acceptance card, because PRIVACY.md was reworded for the shared copy (its version line stayed 5).
+- 04, 05b: taken again in the same run as candidates and compared with the 4.0.0 images. 04 shows the same words
+  (the pixels differ only in rendering); 05b's settings are the same and its audit rows are the run's own requests
+  at any time. 01, 01b, 03 and 03b show steps and texts 5.0.0 did not change (LICENSE.txt, the summary, the sign-in
+  step, the statement step), so they were not taken again.
 
 Rendered images (Edge headless, --headless=new --screenshot, from the HTML in src/; unchanged since 3.0.0):
   promo-tile-440x280.png  (440x280)  Chrome Web Store small promo tile and Edge small promotional tile
@@ -44,19 +49,38 @@ Rendered images (Edge headless, --headless=new --screenshot, from the HTML in sr
   edge-store-logo-300x300.png  (300x300)  Edge Add-ons store logo (Partner Center requires 300x300)
   src/tile-440x280.html, src/marquee-1400x560.html, src/edge-store-logo-300x300.html  the pages they were rendered from
 
+The request logs in e2e/ (each lists every request the browser made, who made it, the vendor requests with their
+bodies and answers, and, for 5.0.0, every line typed into the portal's shell and what it printed):
+  run-C-shared-copy-st1234.txt  5.0.0, the lab's shared copy: the mock reached at https://ondemand.wayne.localhost:8443
+      (Chromium resolves *.localhost to this machine, and the hostname makes the site "wayne", as
+      ondemand.grid.wayne.edu does) with --shared-install /rs/rs_grp_oschome/shared/ashley/hpcworker/current: one install
+      line, `bash '<shared>/bin/hpcworker' install --shared '<shared>' --profile 'wayne'`, exit 0; no framework file
+      uploaded (the one PUT is the consent marker); Details "tool: shared copy, version 5 at
+      /rs/rs_grp_oschome/shared/ashley/hpcworker/current"; online; seventeen checks OK. Evidence only, no store image.
+  run-D1-upload-reviewer-recipe-as-it-stood-st1234.txt  5.0.0, the upload path with the mock's home as the recipe had
+      it until this release (the stand-in command only, no profile): the extension uploaded the thirteen framework files
+      and ran `hpcworker install --profile 'localhost'`; the real tool refused ("no profile named 'localhost'", exit 1),
+      and the strip said "Setting up the cluster failed". This is why the mock's command line now sets its stand-in up
+      as the account's own copy; 4.0.0's mock and tool have the same code there, so its recipe had the same fault
+      (read from the code, not run).
+  run-D2-own-copy-reviewer-recipe-st1234.txt  5.0.0, the reviewer recipe as it is now: nothing uploaded, no install
+      line, "tool: your copy, version 5", online, seventeen checks OK; the source of 02, 04b and 05.
+  run-A-approved-st1234.txt, run-B-not-approved-zz9999.txt  4.0.0 (the approved and the not-approved account); the
+      source of the 4.0.0 images kept above.
+
 Caveats
 - The strip is captured as a tab, not in the side panel (see above); the content is the same page.
-- 03b and 04 were captured again from the 4.0.0 build and came out byte-identical to the 3.0.0 images: those two
-  steps did not change.
 - The agreement text inside the dialog names the licensor (the copyright line and the parties clause of
   LICENSE.txt, the first lines of PRIVACY.md); neither is inside the visible part of 01 or 01b.
 - 02, 04b: "Connected - phone - HEAD" and "student@example.edu" are the mock's stand-in Remote Control and
   Claude sign-in values, not the reviewer's or anyone's account.
-- 04, 03: the claude.ai tabs the extension opened during the run (the mock's sign-in URL with a mock client id,
-  and the mock's environment link) loaded claude.ai itself; the harness stubbed their assets only (e2e/run-A-*.txt
-  says which requests). They are not in any image.
+- 04, 03: the claude.ai tabs the extension opened during the runs (the mock's sign-in URL with a mock client id,
+  and the mock's environment link) loaded claude.ai itself; the harness stubbed their assets only (the e2e logs
+  say which requests). They are not in any image.
 - The time stamps in 02, 04b and 05 are this machine's local time (US Eastern) as the extension shows them; the
   "checked ... UTC" in check 1 and the access card is UTC.
+- Run C sent the real access service one check with the portal name "ondemand.wayne.localhost" for st1234 (the
+  store reviewer's mock username); the service keys its answer on the account name only.
 
 Not here: the 128x128 store icon is extension/public/icon/128.png (also inside every package).
 This folder is outside the build (wxt publicDir is public/) and excluded from the AMO sources zip

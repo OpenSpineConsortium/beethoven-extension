@@ -152,6 +152,17 @@ describe('the step machine', () => {
     expect(up.status).toMatch(/version 1 to 2/);
     f.install = { installed: true, outdated: { installed: '1', bundled: '2' }, failed: 'the tool on the cluster still reports version 1 after the update to version 2 ran' };
     same(decide(f, NOW), { step: 'install', primary: { action: 'retry-install' }, auto: undefined });
+    // where the lab keeps a shared copy, the same steps say so: the first set-up, the move, the wait
+    const lab = '/rs/rs_grp_oschome/shared/ashley/hpcworker/current';
+    f.install = { installed: false, sharedRoot: lab };
+    same(decide(f, NOW), { step: 'install', auto: 'install', status: "Setting up the cluster with your lab's shared copy of the tool..." });
+    f.install = { installed: false, sharedRoot: lab, installing: true };
+    same(decide(f, NOW), { step: 'install', auto: undefined, status: "Setting up the cluster (pointing your account at your lab's shared copy of the tool)..." });
+    f.install = { installed: true, sharedRoot: lab, version: '4', outdated: { installed: '4', bundled: '5' } };
+    same(decide(f, NOW), { step: 'install', auto: 'install', status: "Moving your account to your lab's shared copy of the tool (your own copy is version 4)..." });
+    // on the shared copy there is nothing to do here, whatever version it is
+    f.install = { installed: true, sharedRoot: lab, shared: { dir: lab, version: '5' } };
+    expect(decide(f, NOW).step).toBe('open');
     f.install = { installed: true };
     f.probe = { present: false };
     same(decide(f, NOW), { step: 'probe', auto: 'probe' });

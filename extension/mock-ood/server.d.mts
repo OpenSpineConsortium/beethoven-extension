@@ -14,6 +14,14 @@ export interface MockPortalOptions {
   jobComposer?: boolean;
   shellHosts?: string[];
   seedTool?: boolean;
+  /** with seedTool: also profile.json and VERSION (the version the build carries), so the strip finds the tool installed and current; default false (the CLI sets it unless --fresh-home or --shared-install) */
+  seedInstalled?: boolean;
+  /** the virtual path of the lab's shared copy of the tool (framework 5 shared_install), served read-only; undefined: the site keeps none */
+  sharedInstall?: string;
+  /** false plays an account outside the lab's group: the Files routes answer 403 there and bash cannot open the launcher (exit 127); default true */
+  sharedReadable?: boolean;
+  /** the shared copy's VERSION; default '5' */
+  sharedVersion?: string;
   /** the home the seeded tool prints and records in place of the real one (MOCK_DISPLAY_HOME); default: the virtual home */
   displayHome?: string;
   /** the account names the access-service stand-in (/ashley/access_check, tests only) approves; default ['st1234'] */
@@ -40,6 +48,10 @@ export interface MockPortal {
   railsToken: string;
   /** the Cookie header value of a signed-in session */
   cookie: string;
+  /** the lab's shared copy as the portal shows it (the virtual path), when the mock keeps one */
+  sharedInstall?: string;
+  /** the directory on disk behind it */
+  sharedDir?: string;
   state: {
     coldDone: boolean;
     shells: number;

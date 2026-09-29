@@ -11,9 +11,9 @@ import { browser } from 'wxt/browser';
 import type { RunState } from '../entrypoints/background';
 import { commands, parseJobId } from '../core/contract';
 import { gatherFacts, type Transient } from '../core/facts';
-import { bundledFrameworkVersion, installFramework } from '../core/install';
-import { ACCESS_KEY, CLICK_KEY, IDENTITY_KEY, INSTALL_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type InstallNote, type PortalSettings, type ProbeNote } from '../core/keys';
-import { decide, type Action, type StripView } from '../core/steps';
+import { bundledFrameworkVersion, bundledSharedInstall, installFailureWords, installFramework, installNoteOf } from '../core/install';
+import { ACCESS_KEY, CLICK_KEY, IDENTITY_KEY, INSTALL_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type PortalSettings, type ProbeNote } from '../core/keys';
+import { decide, type Action, type Facts, type StripView } from '../core/steps';
 import { stopWorker } from '../core/worker';
 import { assetUrl, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 import { detailsSections, type Kind } from './details';
@@ -38,6 +38,8 @@ interface Snapshot {
   sessionName?: string;
   /** where "Ask for access" goes, with the account name filled in */
   requestUrl: string;
+  /** which copy of the tool the account runs, for the line in Details */
+  install: Facts['install'];
 }
 
 /** the floor refusal a start comes back with: not a failure, the machine waits the clock out and asks again */
@@ -47,6 +49,13 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
   const transient: Transient = {};
   // the framework version this build carries, read once: the facts compare it with ~/.hpcworker/VERSION
   const bundledVersion = bundledFrameworkVersion((p) => fetch(assetUrl(p)));
+  // the shared folder the bundled profile of a site names (framework 5 shared_install), read once per site name
+  const sharedBySite = new Map<string, Promise<string | undefined>>();
+  const sharedFor = (site: string): Promise<string | undefined> => {
+    let p = sharedBySite.get(site);
+    if (!p) sharedBySite.set(site, (p = bundledSharedInstall(site, (x) => fetch(assetUrl(x)))));
+    return p;
+  };
   let terminal: Terminal | undefined;
   let busy: Action | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -102,12 +111,13 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       click,
       transient,
       bundledFrameworkVersion: () => bundledVersion,
+      bundledSharedInstall: sharedFor,
     });
     const view = decide(g.facts);
     // an approval past its day is confirmed again quietly: the background asks Licensor when its
     // caches say so (never from here), and the strip goes on meanwhile
     if (g.facts.access.ok && g.facts.access.needsCheck && !busy) void checkAccessNow(false).catch(() => undefined);
-    const snap: Snapshot = { view, settings, state, click, alive: g.facts.portal.alive, url: g.facts.run.url, sessionName: g.facts.run.sessionName, requestUrl: g.facts.access.requestUrl };
+    const snap: Snapshot = { view, settings, state, click, alive: g.facts.portal.alive, url: g.facts.run.url, sessionName: g.facts.run.sessionName, requestUrl: g.facts.access.requestUrl, install: g.facts.install };
     await render(snap);
     // the automatic part, one at a time
     if (view.auto && !busy) {
@@ -175,9 +185,10 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
           await tick();
           try {
             const r = await installFramework(portal, { site: snap.settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: showLog });
-            if (!r.ok) transient.installFailed = `the install command ended with exit ${r.exitCode} (see Details)`;
-            // remembered so an update that changed nothing is reported once, not run again every minute
-            await local.set(INSTALL_KEY, { attempted_at: new Date().toISOString(), ok: r.ok, detail: `exit ${r.exitCode}, ${r.uploaded} file(s) uploaded` } satisfies InstallNote);
+            if (!r.ok) transient.installFailed = installFailureWords(r);
+            // remembered so an update that changed nothing is reported once, not run again every minute,
+            // and so Details can say which copy was set up (and why not the lab's, when it fell back)
+            await local.set(INSTALL_KEY, installNoteOf(r, new Date()));
           } catch (e) {
             transient.installFailed = (e as Error).message;
           } finally {
@@ -339,6 +350,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
         prefs: await loadPrefs(),
         state,
         alive: snap.alive,
+        install: snap.install,
         notify,
         run: runDetail,
         render: () => tick(),
