@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
 import { gatherFacts, INSTALL_RETRY_MS, type FactsEnv, type RunLike } from '../src/core/facts';
-import { IDENTITY_KEY, INSTALL_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, type InstallNote, type LoginSeen, type PortalSettings } from '../src/core/keys';
+import { IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, type InstallNote, type LoginSeen, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { decide, LOGIN_SEEN_FRESH_MS } from '../src/core/steps';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
@@ -120,6 +120,39 @@ describe('gathering the facts', () => {
     expect(none.facts.install).toMatchObject({ installed: true });
     expect(none.facts.install.outdated).toBeUndefined();
     expect(none.facts.install.failed).toBeUndefined();
+  });
+
+  it('a site key is matched to <username>@<site domain>: the portal hostname\'s own, or the profile\'s email_domain once the file is read', async () => {
+    const siteKey = (domain: string) => I.license({ sub: undefined, email: undefined, domain, edition: 'site', name: 'testers' });
+    // the portal is ood.example: a site key for ood.example verifies for ab1234, one for wayne.edu does not
+    const e1 = await env();
+    await e1.local.set(LICENSE_KEY, { key: siteKey('ood.example'), identity: {}, saved_at: 'x' });
+    expect((await gatherFacts(e1)).facts.licence).toMatchObject({ ok: true, missing: false, revoked: false });
+    const e2 = await env();
+    await e2.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
+    const g2 = await gatherFacts(e2);
+    expect(g2.facts.licence.ok).toBe(false);
+    expect(g2.facts.licence.detail).toBe('this is a site key for wayne.edu; your portal is in ood.example, not in that domain');
+    expect(decide(g2.facts, NOW_MS)).toMatchObject({ step: 'licence', input: 'key', tone: 'fail' });
+    // the profile names wayne.edu as the site's e-mail domain: the same key verifies in the same call, once the file is read
+    const e3 = await env({ files: { [`${HOME}/.hpcworker/profile.json`]: JSON.stringify({ ...JSON.parse(PROFILE), email_domain: 'wayne.edu' }) } });
+    await e3.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
+    const g3 = await gatherFacts(e3);
+    expect(g3.facts.licence.ok).toBe(true);
+    expect(decide(g3.facts, NOW_MS).step).toBe('login');
+    // a cold portal, with the domain remembered in the settings from an earlier read: the same answer without the file
+    const e4 = await env();
+    await e4.local.set(LICENSE_KEY, { key: siteKey('wayne.edu'), identity: {}, saved_at: 'x' });
+    e4.settings = { ...e4.settings!, email_domain: 'wayne.edu' };
+    e4.transient = { warm: { state: 'cold' } };
+    expect((await gatherFacts(e4)).facts.licence.ok).toBe(true);
+    // withdrawn by its lid on the kill-list: refused for everyone at the site
+    const e5 = await env();
+    await e5.local.set(LICENSE_KEY, { key: siteKey('ood.example'), identity: {}, saved_at: 'x' });
+    await e5.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: [], revoked_lids: ['L-test0001'], message: 'the pilot has ended' } });
+    const g5 = await gatherFacts(e5);
+    expect(g5.facts.licence.ok).toBe(false);
+    expect(g5.facts.licence.detail).toMatch(/L-test0001 has been withdrawn/);
   });
 
   it('an update that just ran and left the old version behind is reported once, not run again every minute', async () => {

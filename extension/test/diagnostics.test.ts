@@ -9,7 +9,7 @@ import type { EndpointClass } from '../src/core/audit';
 import { buildNodes, CHECK_IDS, type DiagCtx, type DiagEnv } from '../src/core/checks';
 import { formatReport, order, runDiagnostics } from '../src/core/diagnostics';
 import { ackSubject, makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
-import { IDENTITY_KEY, LICENSE_KEY, type PortalSettings } from '../src/core/keys';
+import { IDENTITY_KEY, LICENSE_KEY, PORTAL_KEY, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
 import { issuer, memoryKV, NOW } from './helpers';
@@ -63,11 +63,11 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
   };
 }
 
-async function ctxWith(opts: { terms?: boolean; key?: boolean; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; observed?: string; typed?: string; worker?: string }): Promise<DiagCtx> {
+async function ctxWith(opts: { terms?: boolean; key?: boolean; /** a key other than the personal one issued to ab1234 */ licence?: string; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; observed?: string; typed?: string; worker?: string }): Promise<DiagCtx> {
   const local = memoryKV();
   const session = memoryKV();
   if (opts.terms !== false) await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
-  if (opts.key !== false) await local.set(LICENSE_KEY, { key: I.license(), identity: { accessId: opts.typed ?? 'ab1234' }, saved_at: 'x' });
+  if (opts.key !== false) await local.set(LICENSE_KEY, { key: opts.licence ?? I.license(), identity: { accessId: opts.typed ?? 'ab1234' }, saved_at: 'x' });
   if (opts.observed) await local.set(IDENTITY_KEY, { username: opts.observed });
   const worker = opts.worker ?? 'worker';
   if (opts.ack) await local.set(STATEMENTS_KEY, { [ackSubject(worker)]: makeAcknowledgement(worker) } satisfies Statements);
@@ -175,6 +175,26 @@ describe('diagnostics', () => {
     const seen = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', typed: 'someone-else' })));
     expect(seen['licence']!.detail).toMatch(/matched to your portal username ab1234/);
     expect(seen['licence']!.detail).not.toMatch(/typed/);
+  });
+
+  it('matches a site key to the username at the portal\'s domain, refuses it from another domain, and remembers the profile\'s e-mail domain for the next run', async () => {
+    const siteKey = (domain: string) => I.license({ sub: undefined, email: undefined, domain, edition: 'site', name: 'testers' });
+    const ok = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', licence: siteKey('ood.example') })));
+    expect(['ok', 'warn']).toContain(ok['licence']!.status);
+    expect(ok['licence']!.detail).toMatch(/licensed to testers until .*; site key for ood\.example, matched to your portal username ab1234 at ood\.example;/);
+    const outside = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal(), observed: 'ab1234', licence: siteKey('wayne.edu') })));
+    expect(outside['licence']!.status).toBe('fail');
+    expect(outside['licence']!.detail).toBe('this is a site key for wayne.edu; your portal is in ood.example, not in that domain');
+    // the profile names wayne.edu: the licence check runs before any portal read, so the first run still refuses, but the
+    // read of the profile later in that run remembers the domain with the portal settings and the next run matches
+    const ctx = await ctxWith({ portal: fakePortal({}, { profile: JSON.stringify({ ...JSON.parse(PROFILE), email_domain: 'wayne.edu' }) }), observed: 'ab1234', licence: siteKey('wayne.edu') });
+    const first = byId(await runDiagnostics(buildNodes(), ctx));
+    expect(first['licence']!.status).toBe('fail');
+    const saved = await ctx.env.local.get<PortalSettings>(PORTAL_KEY);
+    expect(saved?.email_domain).toBe('wayne.edu');
+    const again = byId(await runDiagnostics(buildNodes(), { ...ctx, settings: saved, cache: {} }));
+    expect(['ok', 'warn']).toContain(again['licence']!.status);
+    expect(again['licence']!.detail).toMatch(/site key for wayne\.edu, matched to your portal username ab1234 at ood\.example \(the site profile names wayne\.edu as its e-mail domain\)/);
   });
 
   it('with a portal and a good probe everything passes; the shell is opened once and its output feeds checks 9 and 10', async () => {

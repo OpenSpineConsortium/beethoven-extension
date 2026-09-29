@@ -13,8 +13,8 @@ import type { KV } from './audit';
 import { statementFor, type Statements } from './disclosure';
 import { commands, consentSourceWords, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
-import { bindIdentity, identityNote } from './identity';
-import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type LicenseState, type LoginSeen, type PortalSettings, type Prefs } from './keys';
+import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, withSiteDomain } from './identity';
+import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, PORTAL_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type LicenseState, type LoginSeen, type PortalSettings, type Prefs } from './keys';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import { verifyLicense, type KeyRing } from '../licensing/license';
 import type { PortalApi, SessionInfo } from './portal';
@@ -72,6 +72,13 @@ async function stateDir(ctx: DiagCtx): Promise<string> {
   ctx.cache.user = user;
   const profile = await portalOf(ctx).readFileIfExists(paths.profile(h));
   ctx.cache.profile = profile;
+  // the profile's e-mail domain is remembered with the portal settings, so the licence check (which
+  // runs first, before any portal read) and the setup page match a site key the same way next time
+  const remembered = withSiteDomain(ctx.settings, profile);
+  if (remembered) {
+    await ctx.env.local.set(PORTAL_KEY, remembered);
+    ctx.settings = remembered;
+  }
   ctx.cache.stateDir = stateDirFrom(profile, { home: h, user });
   return ctx.cache.stateDir;
 }
@@ -104,7 +111,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Licence and agreement',
       layer: 'licence',
       dependsOn: [],
-      assumption: 'the terms are accepted in this browser, the key verifies offline and names your portal username (the one the dashboard shows wins over anything typed), the kill-list is valid and this version is not withdrawn',
+      assumption: 'the terms are accepted in this browser; the key verifies offline and names your portal username (the one the dashboard shows wins over anything typed) or, for a site key, a domain your portal is in (the site profile\'s e-mail domain when it names one, else the portal address\'s own); the kill-list is valid, the key is not withdrawn by its id and this version is not withdrawn',
       manualFix: 'Open the setup page: accept the terms and enter your licence key.',
       fixAction: 'open-onboarding',
       futureRisk: 'a new signing key or a withdrawn release changes the answer without any change on the cluster',
@@ -115,12 +122,15 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         const stored = await ctx.env.local.get<StoredKillList>(KILLLIST_KEY);
         const observed = (await ctx.env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
         const who = bindIdentity(observed, lic?.identity?.accessId);
-        const v = await verifyLicense(lic?.key, { keys: ctx.env.keys, now: Math.floor(ctx.env.now().getTime() / 1000), identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
+        // a site key is matched under the site's e-mail domain: the profile's when this run has read it
+        // or an earlier one remembered it in the settings, else the portal hostname's own
+        const site = siteEmailDomain(ctx.cache.profile, ctx.settings?.hostname, ctx.settings?.email_domain);
+        const v = await verifyLicense(lic?.key, { keys: ctx.env.keys, now: Math.floor(ctx.env.now().getTime() / 1000), identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
         if (!v.ok) return { ok: false, detail: v.status === 'missing' ? 'no licence key entered yet (a trial key is free)' : v.detail };
         const verdict = killListVerdict(stored, ctx.env.version, v.payload?.lid);
         if (verdict.versionRevoked) return { ok: false, detail: `this version (${ctx.env.version}) has been withdrawn; update to continue. ${verdict.message}`.trim() };
         const listNote = stored ? `kill-list of ${new Date(stored.list.issued * 1000).toISOString().slice(0, 10)}` : 'kill-list not fetched yet (works offline on the last good list)';
-        return { ok: true, warn: !stored || v.status === 'grace' || who.source !== 'portal', detail: `${v.detail}; ${identityNote(who)}; ${listNote}` };
+        return { ok: true, warn: !stored || v.status === 'grace' || who.source !== 'portal', detail: `${v.detail}; ${licenceNote(who, v.payload, site, ctx.settings?.hostname)}; ${listNote}` };
       },
     },
     {

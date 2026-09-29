@@ -105,7 +105,7 @@ only when a person must act:
 | 1 | portal tab open | | connect this portal / open my portal |
 | 2 | portal awake and signed in | GET the dashboard; on 5xx or `/nginx/init` wait 2 s, 5 s, 10 s ("waking up your portal...") | sign in to the portal in its tab |
 | 3 | agreement | | read and accept it, once per browser profile (the setup page) |
-| 4 | licence key | | paste it in the strip's box (or "Ask for access"); read-only checks are never blocked on it |
+| 4 | licence key | | paste it in the strip's box (or "Ask for access"): a personal key must name your portal username, a site key a domain your portal is in; read-only checks are never blocked on it |
 | 5 | tool installed | upload the bundled framework, run `hpcworker install` once | |
 | 6 | probe run | submit the five-minute probe once, wait for `probe.json` | |
 | 7 | signed in to Claude on the cluster | open the sign-in terminal (below) | sign in on Anthropic's page, paste the code |
@@ -254,6 +254,33 @@ and `TERMS_DATE` in `src/core/terms.ts`:
 LF endings) to `~/.hpcworker/` with `PUT files/fs`, then runs the install line once; the tool strips CR endings
 and copies nothing when it already runs from `~/.hpcworker`. If `framework/` was empty at build time the button
 says so instead of installing nothing.
+
+## Licence keys: personal and site
+
+Both are Ashley's `ASHLEY1.<payload>.<signature>` keys, verified offline in `src/licensing/license.ts` against the
+public keys in `keys.json`. A **personal key** names one person (`sub`): it verifies only when `sub` equals the
+portal username, and the username the portal's dashboard shows always wins over one typed on the setup page. A
+**site key** (`edition: "site"`, a `domain` such as `wayne.edu`, no `sub`) is one key for everyone at a university,
+the way the maintainer hands one key to all testers. The verifier matches such a key against an e-mail in that
+domain (subdomains count, look-alikes do not), so the extension builds one from what it has, never stores or
+sends it, and uses it for the comparison only (`src/core/identity.ts`):
+
+    <portal username>@<site e-mail domain>
+
+where the site e-mail domain is, in order: the site profile's `email_domain` field when `~/.hpcworker/profile.json`
+names one (an optional field of the framework's profile schema, read where the extension reads the profile anyway
+and remembered with the portal settings as `email_domain`, so the strip, the setup page and the checks agree; it
+matters at a site whose portal is not under its e-mail domain), else the registrable domain of the portal
+hostname: the last two labels (`ondemand.grid.wayne.edu` -> `wayne.edu`), three under a two-label public suffix
+such as `.ac.uk` or `.edu.au` (`ondemand.hpc.cam.ac.uk` -> `cam.ac.uk`; a short list in `identity.ts`). At Wayne
+State both rules give `wayne.edu`. The panel says what was matched: "site key for wayne.edu, matched to your portal
+username go2432 at ondemand.grid.wayne.edu". From a portal outside the domain the key is refused with "this is a
+site key for wayne.edu; your portal is in osc.edu, not in that domain"; a connected portal whose address yields no
+domain at all (the mock at `127.0.0.1`, a bare hostname) is outside every site and refused too, unless the profile
+it serves names the domain. Before a portal is connected there is nothing to compare with, and the key is matched
+once one is, as a typed username is. The kill-list withdraws a site key by its `lid` like any other, which is how a
+tester key is ended when the pilot ends. The key boxes on the strip and the setup page take a pasted site key as
+they take a personal one and ask for nothing else; the audit log redacts every key the same way.
 
 ## The signed kill-list
 

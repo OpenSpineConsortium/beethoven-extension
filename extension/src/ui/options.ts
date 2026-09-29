@@ -5,7 +5,7 @@
 // boxes whose sentence names the exact button, a typed name, never install-equals-accept; and the
 // text stays exportable and printable.
 import { browser } from 'wxt/browser';
-import { bindIdentity, identityNote } from '../core/identity';
+import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain } from '../core/identity';
 import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, type LicenseState } from '../core/keys';
 import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, PRODUCT_NAME, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, type Affirmation, type TermsRecord } from '../core/terms';
 import { browserName, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
@@ -180,21 +180,24 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
 /**
  * The key and the username it is matched to. The username the portal's dashboard shows always
  * wins; the field can be typed only while the portal has shown none, and then the page says the
- * portal's own name will take over.
+ * portal's own name will take over. A site key (one for everyone at a university) is matched to
+ * that username at the connected portal's domain, and asks for nothing else.
  */
 async function licenceCard(notify: Notify, done: () => Promise<void>): Promise<HTMLElement> {
   const stored = await local.get<LicenseState>(LICENSE_KEY);
   const known = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
   const kill = await local.get<StoredKillList>(KILLLIST_KEY);
+  const settings = await portalSettings();
+  const site = siteEmailDomain(undefined, settings?.hostname, settings?.email_domain);
   const key = el('input', { type: 'text', class: 'wide mono', placeholder: 'ASHLEY1.…  (paste the whole key, or the e-mail it came in)', value: stored?.key ?? '', 'aria-label': 'Licence key' });
   const user = el('input', { type: 'text', placeholder: 'your portal username', value: known ?? stored?.identity?.accessId ?? '', readonly: !!known, 'aria-label': 'Portal username' });
   const status = el('div', { class: 'status', role: 'status' });
   const bound = bindIdentity(known, stored?.identity?.accessId);
-  const current = stored ? await verifyLicense(stored.key, { keys: BUNDLED_KEYS, identity: { accessId: bound.accessId }, revoked: kill?.list.revoked_lids ?? [] }) : undefined;
+  const current = stored ? await verifyLicense(stored.key, { keys: BUNDLED_KEYS, identity: licenceIdentity(bound, stored.key, site), revoked: kill?.list.revoked_lids ?? [] }) : undefined;
   const card = el('div', { class: 'card' });
   add(card,
-    el('p', {}, 'A key names one person and is checked in this browser, against the signing keys built into this version; nothing is sent to check it. It must match your portal username: the one your portal\'s dashboard shows once it is connected, which always takes precedence over anything typed here. Not got a key? ', el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }), '.'),
-    current ? el('div', { class: current.ok ? 'ok' : 'fail', text: `${current.detail} (${identityNote(bound)})` }) : null,
+    el('p', {}, 'A key is checked in this browser, against the signing keys built into this version; nothing is sent to check it. A personal key names one person and must match your portal username: the one your portal\'s dashboard shows once it is connected, which always takes precedence over anything typed here. A site key names a domain, such as wayne.edu, and works for anyone whose portal is in that domain; it is matched to your username at your portal, and nothing more is asked. Not got a key? ', el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }), '.'),
+    current ? el('div', { class: current.ok ? 'ok' : 'fail', text: `${current.detail} (${licenceNote(bound, current.payload, site, settings?.hostname)})` }) : null,
     key,
     el('div', { class: 'row' }, el('label', { text: 'Portal username: ' }, user), el('span', { class: 'muted small', text: known ? `(read from your portal's dashboard: ${known}; it cannot be changed here)` : '(type it for now; the name your portal shows will take over once the portal is connected)' })),
     el('div', { class: 'row' },
@@ -205,7 +208,7 @@ async function licenceCard(notify: Notify, done: () => Promise<void>): Promise<H
           const found = findKey(key.value) ?? key.value.trim();
           const typed = known ? stored?.identity?.accessId : user.value.trim() || undefined;
           const who = bindIdentity(known, typed);
-          const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: { accessId: who.accessId }, revoked: kill?.list.revoked_lids ?? [] });
+          const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, found, site), revoked: kill?.list.revoked_lids ?? [] });
           if (!v.ok) {
             const p = peek(found);
             status.textContent = `${v.detail}${p?.name ? ` (key issued to ${p.name})` : ''}`;
@@ -213,7 +216,7 @@ async function licenceCard(notify: Notify, done: () => Promise<void>): Promise<H
           }
           await local.set(LICENSE_KEY, { key: found, identity: { accessId: typed }, saved_at: new Date().toISOString() } satisfies LicenseState);
           status.textContent = '';
-          notify('ok', `${v.detail} (${identityNote(who)}).`);
+          notify('ok', `${v.detail} (${licenceNote(who, v.payload, site, settings?.hostname)}).`);
           await done();
         },
       }),

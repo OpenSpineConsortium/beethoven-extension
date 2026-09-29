@@ -1,7 +1,7 @@
 // Every storage key in one place, split by where it lives and how long it lasts.
 //
 // storage.local (survives restarts; nothing secret and no credential ever):
-export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site}
+export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site, email_domain?}
 export const LICENSE_KEY = 'bridge.license'; // {key, identity: {accessId}, saved_at}
 export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect}
 export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {fetched_at, list}
@@ -32,6 +32,12 @@ export interface PortalSettings {
   shell_host: string;
   /** the site profile name handed to `hpcworker install --profile` and used in the session name */
   site: string;
+  /**
+   * the profile's email_domain as last read from ~/.hpcworker/profile.json (identity.ts withSiteDomain), so every
+   * place that checks a site key agrees; absent when the profile names none, and then the portal hostname's own
+   * domain is what a site key is matched under
+   */
+  email_domain?: string;
 }
 
 export interface Prefs {

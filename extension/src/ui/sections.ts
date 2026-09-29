@@ -4,13 +4,13 @@
 import { browser } from 'wxt/browser';
 import { ackSubject, makeAcknowledgement, PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Acknowledgement, type Statements } from '../core/disclosure';
 import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
-import { bindIdentity, identityNote, type IdentitySource } from '../core/identity';
+import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, type IdentitySource } from '../core/identity';
 import { CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, PREFS_KEY, type Checklist, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
 import { recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
 import { writeConsentFile } from '../core/worker';
 import { BUNDLED_KEYS, verifyLicense } from '../licensing/license';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
-import { installId, local, prefs as loadPrefs, version } from '../ext/storage';
+import { installId, local, portalSettings, prefs as loadPrefs, version } from '../ext/storage';
 import { add, clear, el } from './dom';
 import { connectPortal, disconnectPortal, openPortalTab, portal, portalAlive, requestOrigin } from './rpc';
 
@@ -234,9 +234,12 @@ export async function licenceSummary(): Promise<LicenceSummary> {
   const lic = await local.get<LicenseState>(LICENSE_KEY);
   const stored = await local.get<StoredKillList>(KILLLIST_KEY);
   const observed = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  // the portal-observed username wins; the typed one stands in only until the portal has shown one
+  // the portal-observed username wins; the typed one stands in only until the portal has shown one;
+  // a site key is matched to that username under the site's e-mail domain (the profile's as remembered, else the portal's own)
   const who = bindIdentity(observed, lic?.identity?.accessId);
-  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
+  const settings = await portalSettings();
+  const site = siteEmailDomain(undefined, settings?.hostname, settings?.email_domain);
+  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
   const verdict = killListVerdict(stored, version(), v.payload?.lid);
   return {
     termsOk: recordInForce(terms),
@@ -248,7 +251,7 @@ export async function licenceSummary(): Promise<LicenceSummary> {
     revokedMessage: verdict.message,
     identityKnown: !!who.accessId,
     identitySource: who.source,
-    identityNote: identityNote(who),
+    identityNote: licenceNote(who, v.payload, site, settings?.hostname),
   };
 }
 

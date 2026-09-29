@@ -13,7 +13,7 @@ import { gatherFacts, type Transient } from '../core/facts';
 import { bundledFrameworkVersion, installFramework } from '../core/install';
 import { CLICK_KEY, INSTALL_KEY, LICENSE_KEY, IDENTITY_KEY, KILLLIST_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type InstallNote, type LicenseState, type PortalSettings, type ProbeNote } from '../core/keys';
 import { decide, type Action, type StripView } from '../core/steps';
-import { bindIdentity, identityNote } from '../core/identity';
+import { bindIdentity, licenceIdentity, licenceNote, siteEmailDomain, withSiteDomain } from '../core/identity';
 import { stopWorker } from '../core/worker';
 import { BUNDLED_KEYS, findKey, peek, verifyLicense } from '../licensing/license';
 import type { StoredKillList } from '../licensing/killlist';
@@ -52,6 +52,8 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let detailsOpen = false;
   let statementBox: HTMLElement | undefined;
+  /** ~/.hpcworker/profile.json as the last tick read it, for matching a site key under the profile's e-mail domain */
+  let lastProfile: string | undefined;
   const notice = el('div', { class: 'status', role: 'status', 'aria-live': 'polite' });
   const notify = (kind: Kind, text: string) => {
     notice.className = `status ${kind === 'info' ? 'muted' : kind}`;
@@ -106,6 +108,12 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       bundledFrameworkVersion: () => bundledVersion,
     });
     const view = decide(g.facts);
+    if (g.profile !== undefined) {
+      lastProfile = g.profile;
+      // the profile's e-mail domain, remembered with the portal settings so the setup page and the checks match a site key the same way
+      const remembered = withSiteDomain(settings, g.profile);
+      if (remembered) await local.set(PORTAL_KEY, remembered);
+    }
     const snap: Snapshot = { view, settings, state, click, alive: g.facts.portal.alive, url: g.facts.run.url, sessionName: g.facts.run.sessionName };
     await render(snap);
     // the automatic part, one at a time
@@ -267,7 +275,10 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     const kill = await local.get<StoredKillList>(KILLLIST_KEY);
     const found = findKey(keyBox.value) ?? keyBox.value.trim();
     const who = bindIdentity(known, stored?.identity?.accessId);
-    const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: { accessId: who.accessId }, revoked: kill?.list.revoked_lids ?? [] });
+    // a personal key is matched to the username; a site key to <username>@<the site's e-mail domain>, nothing more is asked
+    const settings = await portalSettings();
+    const site = siteEmailDomain(lastProfile, settings?.hostname, settings?.email_domain);
+    const v = await verifyLicense(found, { keys: BUNDLED_KEYS, identity: licenceIdentity(who, found, site), revoked: kill?.list.revoked_lids ?? [] });
     if (!v.ok) {
       const p = peek(found);
       notify('fail', `${v.detail}${p?.name ? ` (key issued to ${p.name})` : ''}`);
@@ -275,7 +286,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     }
     await local.set(LICENSE_KEY, { key: found, identity: { accessId: stored?.identity?.accessId }, saved_at: new Date().toISOString() } satisfies LicenseState);
     keyBox.value = '';
-    notify('ok', `${v.detail} (${identityNote(who)}).`);
+    notify('ok', `${v.detail} (${licenceNote(who, v.payload, site, settings?.hostname)}).`);
   };
 
   const primaryButton = (snap: Snapshot): HTMLElement | null => {
@@ -299,7 +310,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       add(head, el('div', { class: 'row' }, keyBox), el('div', { class: 'row' },
         el('button', { class: 'primary', text: view.primary?.label ?? 'Save the key', onClick: () => void perform('save-key', snap) }),
         el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }),
-        el('span', { class: 'muted small', text: 'The key is checked in this browser and must name your portal username.' }),
+        el('span', { class: 'muted small', text: 'The key is checked in this browser. A personal key must name your portal username; a site key must name a domain your portal is in.' }),
       ));
     } else if (view.input === 'statement') {
       // the statement's own button is the step's one button; the box keeps its state across renders

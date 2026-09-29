@@ -2,7 +2,7 @@
 // the discovery document, the stop file and restricted marker paths, and the registration block
 // `claude remote-control` prints, parsed the way the extension will meet them.
 import { describe, expect, it } from 'vitest';
-import { commands, expandPath, isEnvironmentUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
+import { commands, emailDomainFrom, expandPath, isEnvironmentUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
 
 /** the maintainer's live output of `claude remote-control` (2.1.283) on 2026-09-28/29, after the QR code */
 const REGISTRATION = `  █▀▀▀▀▀█ ▄▀▄▀ █▀▀▀▀▀█
@@ -44,6 +44,20 @@ describe('framework contract', () => {
     expect(paths.stopDone('/rs/x/hpcworker', 'thesis')).toBe('/rs/x/hpcworker/thesis/stop.done');
     expect(paths.restrictedMarker('/rs/x/hpcworker', 'thesis')).toBe('/rs/x/hpcworker/workspaces/thesis/.restricted');
     expect(sessionName('wayne', '4243102')).toBe('wayne-4243102');
+  });
+
+  it('reads the site e-mail domain out of a profile when one names it (not in schema 1 yet), and nothing else', () => {
+    expect(emailDomainFrom('{"site":"wayne"}')).toBeUndefined();
+    expect(emailDomainFrom(undefined)).toBeUndefined();
+    expect(emailDomainFrom('not json')).toBeUndefined();
+    expect(emailDomainFrom('{"email_domain":"wayne.edu"}')).toBe('wayne.edu');
+    expect(emailDomainFrom('{"email_domain":" @Wayne.EDU "}')).toBe('wayne.edu');
+    expect(emailDomainFrom('{"email_domain":"cam.ac.uk"}')).toBe('cam.ac.uk');
+    // not a domain: refused rather than matched against
+    expect(emailDomainFrom('{"email_domain":""}')).toBeUndefined();
+    expect(emailDomainFrom('{"email_domain":"wayne"}')).toBeUndefined();
+    expect(emailDomainFrom('{"email_domain":"go2432@wayne.edu"}')).toBeUndefined();
+    expect(emailDomainFrom('{"email_domain":42}')).toBeUndefined();
   });
 
   it('reads a restricted flag out of a profile when one carries it, and nothing else', () => {

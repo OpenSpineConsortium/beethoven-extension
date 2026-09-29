@@ -7,7 +7,7 @@
 import type { KV } from './audit';
 import { isEnvironmentUrl, paths, probeVerdict, profileRestricts, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
 import { ackSubject, statementFor, type Statements } from './disclosure';
-import { bindIdentity } from './identity';
+import { bindIdentity, licenceIdentity, siteEmailDomain, type SiteDomain } from './identity';
 import { frameworkOlder } from './install';
 import { IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type InstallNote, type LicenseState, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
 import type { PortalApi } from './portal';
@@ -104,9 +104,16 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
   const stored = await env.local.get<StoredKillList>(KILLLIST_KEY);
   const observed = (await env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
   const who = bindIdentity(observed, lic?.identity?.accessId);
-  const v = await verifyLicense(lic?.key, { keys: env.keys, now: Math.floor(now / 1000), identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
-  const verdict = killListVerdict(stored, env.version, v.payload?.lid);
-  f.licence = { ok: v.ok && !verdict.versionRevoked, missing: v.status === 'missing', detail: verdict.versionRevoked ? `This version of Ashley Bridge has been withdrawn; update to continue. ${verdict.message}`.trim() : v.detail, revoked: verdict.versionRevoked };
+  // a site key is matched under the site's e-mail domain: the profile's, as remembered in the settings,
+  // else the portal hostname's own; the profile itself is read further down, and the key is judged
+  // again there when the file says something else, so one call never leaves a stale verdict behind
+  const judge = async (site: SiteDomain) => {
+    const v = await verifyLicense(lic?.key, { keys: env.keys, now: Math.floor(now / 1000), identity: licenceIdentity(who, lic?.key, site), revoked: stored?.list.revoked_lids ?? [] });
+    const verdict = killListVerdict(stored, env.version, v.payload?.lid);
+    f.licence = { ok: v.ok && !verdict.versionRevoked, missing: v.status === 'missing', detail: verdict.versionRevoked ? `This version of Ashley Bridge has been withdrawn; update to continue. ${verdict.message}`.trim() : v.detail, revoked: verdict.versionRevoked };
+  };
+  let site = siteEmailDomain(undefined, s?.hostname, s?.email_domain);
+  await judge(site);
   const statements = await env.local.get<Statements>(STATEMENTS_KEY);
   const ack = statementFor(statements, env.prefs.worker_name);
   f.statement.acknowledged = !!ack;
@@ -174,6 +181,11 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     }
     const profile = await portal.readFileIfExists(paths.profile(home));
     out.profile = profile;
+    const fromFile = siteEmailDomain(profile, s?.hostname);
+    if (fromFile.domain !== site.domain) {
+      site = fromFile;
+      await judge(site);
+    }
     const stateDir = stateDirFrom(profile, { home, user });
     out.stateDir = stateDir;
     const probeText = await portal.readFileIfExists(paths.probe(stateDir));

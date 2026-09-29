@@ -56,6 +56,7 @@ export interface LicenseCheck {
 
 export interface Identity {
   accessId?: string;
+  /** for a site key: "<portal username>@<site e-mail domain>", built by core/identity.ts for the comparison and kept nowhere */
   email?: string;
 }
 
@@ -156,7 +157,11 @@ export interface VerifyOpts {
 
 const iso = (sec: number) => new Date(sec * 1000).toISOString().slice(0, 10);
 
-/** Check a licence key. Statuses and wording follow grid/license.js so the two products agree. */
+/**
+ * Check a licence key. Statuses and wording follow grid/license.js so the two products agree; the
+ * one addition is the sentence for a site key used from a portal outside its domain, which names
+ * both domains, because here the e-mail was built from the portal and the student never typed one.
+ */
 export async function verifyLicense(key: string | undefined, opts: VerifyOpts = {}): Promise<LicenseCheck> {
   const now = Math.floor(opts.now != null ? opts.now : Date.now() / 1000);
   if (!key || !String(key).trim()) return { ok: false, status: 'missing', detail: 'no licence key has been entered', identity: null };
@@ -172,8 +177,14 @@ export async function verifyLicense(key: string | undefined, opts: VerifyOpts = 
   if (typeof p.nbf === 'number' && now < p.nbf - DAY) return { ok: false, status: 'not-yet-valid', detail: `the licence starts on ${iso(p.nbf)}`, payload: p, identity: null };
   const who = identityMatches(p, opts.identity);
   if (who === false) {
-    const forWho = p.sub || p.email || (p.domain ? `accounts at ${p.domain}` : 'someone else');
-    return { ok: false, status: 'wrong-person', detail: `this licence is for ${forWho}, not for ${opts.identity?.accessId || opts.identity?.email}`, payload: p, identity: false };
+    const id = opts.identity ?? {};
+    if (p.domain && !p.sub && !p.email) {
+      const at = id.email?.split('@')[1];
+      const why = at ? `your portal is in ${at}, not in that domain` : `it works only from a portal in that domain`;
+      return { ok: false, status: 'wrong-person', detail: `this is a site key for ${p.domain}; ${why}`, payload: p, identity: false };
+    }
+    const forWho = p.sub || p.email || 'someone else';
+    return { ok: false, status: 'wrong-person', detail: `this licence is for ${forWho}, not for ${id.accessId || id.email}`, payload: p, identity: false };
   }
   const graceDays = typeof p.grace_days === 'number' && p.grace_days >= 0 ? p.grace_days : DEFAULT_GRACE_DAYS;
   const daysLeft = Math.floor((p.exp - now) / DAY);

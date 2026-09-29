@@ -1,6 +1,7 @@
 {
  "schema_version": 1,
  "site": "wayne",
+ "email_domain": "wayne.edu",
  "display_name": "Wayne State University HPC grid",
  "scheduler": "slurm",
  "submit_host": "warrior",
@@ -9,7 +10,10 @@
  "qos_cpu": "secondary",
  "partition_cpu_batch": "reqp",
  "qos_batch": "requeue",
- "partitions_gpu": ["gmsap", "gvohp"],
+ "partitions_gpu": [
+  "gmsap",
+  "gvohp"
+ ],
  "account": "",
  "max_walltime": "",
  "node_tmp": "/tmp/$USER/hpcworker_$SLURM_JOB_ID",
@@ -20,9 +24,16 @@
  "runtime": "apptainer",
  "runtime_module": "apptainer/1.2.2",
  "runtime_bin": "/wsu/el7/gnu7/apptainer/1.2.2/bin/apptainer",
- "image_store": {"type": "sandbox", "path": "/rs/rs_grp_oschome/shared/ashley/containers/claude-node22"},
+ "image_store": {
+  "type": "sandbox",
+  "path": "/rs/rs_grp_oschome/shared/ashley/containers/claude-node22"
+ },
  "claude_bin": "/rs/rs_grp_oschome/shared/ashley/npm-claude-node22/bin/claude",
- "binds": ["$HOME", "/rs/rs_grp_oschome/$USER", "/rs/rs_grp_oschome/shared/ashley"],
+ "binds": [
+  "$HOME",
+  "/rs/rs_grp_oschome/$USER",
+  "/rs/rs_grp_oschome/shared/ashley"
+ ],
  "cache_dir": "",
  "fakeroot_rung": null,
  "egress": {
@@ -40,14 +51,25 @@
   }
  },
  "claude_config_dir": "$HOME/.ashley/claude",
- "consent_markers": ["$HOME/.ashley/claude/.ashley-remote-consent"],
+ "consent_markers": [
+  "$HOME/.ashley/claude/.ashley-remote-consent"
+ ],
  "ood_base_url": "https://ondemand.grid.wayne.edu",
  "ood_shell_host": "",
  "ood_rnode_enabled": null,
  "vpn_required": true,
- "login_node_rules": {"max_processes": 20, "poll_floor_seconds": 60},
+ "login_node_rules": {
+  "max_processes": 20,
+  "poll_floor_seconds": 60
+ },
  "xdg_runtime_fix": true,
  "home_filesystem": "panfs",
- "worker_defaults": {"cpus": 2, "mem": "8G", "hours": 8, "permission_mode": "default", "capacity": 4},
+ "worker_defaults": {
+  "cpus": 2,
+  "mem": "8G",
+  "hours": 8,
+  "permission_mode": "default",
+  "capacity": 4
+ },
  "notes": "Login node warrior is CentOS 7 (python3 is 3.6, no sysctl on PATH). $TMPDIR there points at CephFS, not the node. The image is an existing sandbox with Node 22 and Claude Code shared by the Ashley product; new images at this site should be SIF because the home is Panasas. claude_config_dir is the student's existing Claude Code login from Ashley; the framework only starts Claude Code there and reads 'claude auth status'."
 }
