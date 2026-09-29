@@ -215,7 +215,11 @@ from there, not from here.
 2. `npm run typecheck && npm test && npm run build && npm run zip:all` in `extension/`, and the framework
    tests.
 3. Copy the zips into `release/<version>/`, write `SHA256SUMS.txt` (`sha256sum *.zip > SHA256SUMS.txt`)
-   and a short `README.md` there (see `release/4.0.0/`), commit, tag `v<version>`, push both remotes.
+   and a short `README.md` there (see `release/4.0.0/`), commit, tag `v<version>`, push both remotes:
+   `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
+   (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
+   maintainer's machine that is WSL). Attach the zips and `SHA256SUMS.txt` to a GitHub release named
+   `v<version>` on the organisation's copy, which is the download page developers and testers are given.
 4. Test by hand (`docs/store/TEST_BEFORE_UPLOAD.md`), then upload store by store
    (`docs/store/SUBMISSION.md`, texts in `docs/store/LISTING.md`), then rebuild and push the site pages if
    a text changed.
