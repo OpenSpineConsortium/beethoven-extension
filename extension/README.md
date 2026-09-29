@@ -205,14 +205,18 @@ Claude Code 2.1.283). Its `claude login --plain` prints the framework's lines (`
 instead of 404 on `/rnode/`), `--no-clusters` (the shell closes 3146 "No clusters defined."), `--cold` (first request
 bounces through `/nginx/init`), `--cold-pun MS` (the first `/pun/` request after MS ms of quiet answers 500 once, as
 the live portal's per-user nginx does), `--job-composer`, `--no-cookie`, `--cert F --key F` (https with your own
-self-signed pair, e.g. from `openssl req -x509 -newkey ed25519 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30`).
+self-signed pair, e.g. from `openssl req -x509 -newkey ed25519 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30`),
+`--display-home DIR` (the home the seeded tool prints and records in place of the mock home's real path; by default the
+portal's own `/home/<user>`, so the strip's output box reads like a cluster wherever the mock home sits on disk).
 A `?download=1` of a file that does not exist answers 200 with an HTML page, as the live Files app does.
 
 Environment variables the seeded tool reads (set them for the mock server's process): `MOCK_LOGGED_IN=false`
 (the probe reports no Claude sign-in), `MOCK_CONSENT=false` (the probe reports no Remote Control answer on record),
 `MOCK_EGRESS=none` (the probe reports no egress; `http-proxy-auto` is also accepted), `MOCK_ENV_ID=env_01...`
 (the environment id in the registration block; by default one stable id per mock home, as Claude Code keys it
-to the machine), `MOCK_LOGIN_FAIL=1` (the plain sign-in ends with `HPCW-LOGIN-FAILED` whatever code is typed). The
+to the machine), `MOCK_LOGIN_FAIL=1` (the plain sign-in ends with `HPCW-LOGIN-FAILED` whatever code is typed),
+`MOCK_DISPLAY_HOME=/home/st1234` (the same as `--display-home`: the tool's sentences, `status.json` and `connection.json`
+carry this home in place of the real one; the files themselves stay where they are). The
 mock's `worker start` refuses a workspace holding `.restricted`, its `worker stop` writes `stop.done`, and its
 `claude login` without `--plain` explains the one-sitting flow (`claude consent` is an alias that explains).
 

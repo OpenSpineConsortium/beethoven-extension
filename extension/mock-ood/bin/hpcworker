@@ -12,10 +12,18 @@
 #
 # Environment knobs (tests and reviewers): MOCK_LOGGED_IN=false, MOCK_CONSENT=false,
 # MOCK_EGRESS=none change what the seeded probe reports; MOCK_ENV_ID sets the environment id;
-# MOCK_LOGIN_FAIL=1 makes `claude login --plain` end with HPCW-LOGIN-FAILED whatever code is typed.
+# MOCK_LOGIN_FAIL=1 makes `claude login --plain` end with HPCW-LOGIN-FAILED whatever code is typed;
+# MOCK_DISPLAY_HOME is the home this tool shows in place of the real one (below).
 set -u
 HPCW_HOME="${HPCW_HOME:-$HOME/.hpcworker}"
 PROFILE="$HPCW_HOME/profile.json"
+# The real tool prints and records cluster paths. Here $HOME is wherever the mock home sits on the
+# machine running the mock (a temp folder on a laptop, say), so every path this tool prints or
+# writes into its status files is shown with MOCK_DISPLAY_HOME in place of that prefix; server.mjs
+# passes the portal's own /home/<user>, the path the Files app shows the extension. The files
+# themselves stay where they are.
+DISPLAY_HOME="${MOCK_DISPLAY_HOME:-$HOME}"
+show() { printf '%s' "${1//"$HOME"/$DISPLAY_HOME}"; }
 now() { date -u +%FT%TZ; }
 die() { echo "hpcworker: $*" >&2; exit 1; }
 state_dir() { # the profile's shared_state_dir with $HOME and $USER expanded, as the real tool's profile.py does
@@ -57,14 +65,14 @@ case "${1:-}" in
       printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.ashley/claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "${name:-mock}" > "$PROFILE"
       echo "profile.json written from '${name:-mock}'"
     }
-    echo "installed hpcworker 1 at $HPCW_HOME"
+    echo "installed hpcworker 1 at $(show "$HPCW_HOME")"
     echo "next: hpcworker diag, then hpcworker probe, then hpcworker claude login (once: sign-in and the Remote Control question in one sitting), hpcworker worker start"
     ;;
   discover)
     printf '{"version":1,"when":"%s","host":"login1","user":"%s","os":"CentOS Linux 7 (Core)","glibc":"2.17","scheduler":{"family":"slurm","bins":{"sbatch":"/usr/bin/sbatch","squeue":"/usr/bin/squeue","scancel":"/usr/bin/scancel","sinfo":"/usr/bin/sinfo"}},"runtime":{"candidates":[],"modules":["apptainer/1.2.2","singularity/3.5.2"],"pyxis":false,"user_namespaces":{"max":15000}},"partitions":[{"name":"secp","timelimit":"1-00:00:00","avail":"up","default":false},{"name":"reqp","timelimit":"7-00:00:00","avail":"up","default":true}],"qos":"secondary requeue","env":{"TMPDIR":"/wsu/tmp","SLURM_TMPDIR":"","L_SCRATCH":"","https_proxy":"","no_proxy":""},"tools":{"tmux":"/usr/bin/tmux","script":"/usr/bin/script","python3":"/usr/bin/python3","curl":"/usr/bin/curl"},"home_fs":"panfs","home_dev":"panfs://home","process_count":7}\n' "$(now)" "${USER:-student}"
     ;;
   probe)
-    [ -s "$PROFILE" ] || die "no profile at $PROFILE: run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
+    [ -s "$PROFILE" ] || die "no profile at $(show "$PROFILE"): run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
     sd=$(state_dir); mkdir -p "$sd/probe"
     id=$(node "$MOCK_LIB/jobs.mjs" add hpcw_probe)
     cat > "$sd/probe/probe.json" <<EOF
@@ -86,30 +94,31 @@ case "${1:-}" in
   "without_proxy_vars":{"api.anthropic.com":"404","platform.claude.com":"200","claude.ai":"403"},
   "statsig.anthropic.com":"no DNS record"}}
 EOF
-    echo "probe job $id submitted (secp/secondary, 00:05:00). It writes $sd/probe/probe.json; read it with: hpcworker probe --show"
+    echo "probe job $id submitted (secp/secondary, 00:05:00). It writes $(show "$sd")/probe/probe.json; read it with: hpcworker probe --show"
     echo "(the file appears when the job has run; do not poll the scheduler: 'hpcworker probe --wait 15' checks the file once a minute)"
     ;;
   worker)
-    [ -s "$PROFILE" ] || die "no profile at $PROFILE: run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
+    [ -s "$PROFILE" ] || die "no profile at $(show "$PROFILE"): run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
     sub="${2:-list}"; shift 2 2>/dev/null || shift $#
     name="worker"; pm="default"; as_json=0
     while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift 2;; --permission-mode) pm="$2"; shift 2;; --json) as_json=1; shift;; *) shift;; esac; done
     sd=$(state_dir); rd="$sd/$name"; st=$(site); sn=$(session_name "$name"); eu=$(env_url)
+    dsd=$(show "$sd"); drd=$(show "$rd") # the same two directories as the student sees them
     case "$sub" in
       start)
-        [ -e "$sd/workspaces/$name/.restricted" ] && die "refusing to start: the workspace $sd/workspaces/$name is marked restricted (remove .restricted yourself if that no longer applies)"
+        [ -e "$sd/workspaces/$name/.restricted" ] && die "refusing to start: the workspace $dsd/workspaces/$name is marked restricted (remove .restricted yourself if that no longer applies)"
         mkdir -p "$rd" "$sd/workspaces/$name"
         if [ -s "$rd/job.id" ] && node "$MOCK_LIB/jobs.mjs" list | grep -q "\"pbsid\":\"$(cat "$rd/job.id")\""; then echo "worker $name already has job $(cat "$rd/job.id") (RUNNING on node01); nothing submitted"; exit 0; fi
         id=$(node "$MOCK_LIB/jobs.mjs" add "hpcw_$name")
         echo "$id" > "$rd/job.id"; echo node01 > "$rd/node"
         nid=$((id + 1)); echo "$nid $id" > "$rd/next.id"
         printf '{"version":1,"site":"%s","run":"%s","job":"%s","node":"node01","pid":4242,"state":"online","message":"Open in Claude: %s and find %s (or tap Code in the Claude app). Connected · phone · HEAD","started_at":"%s","updated_at":"%s","session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","claude_login":{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max","checked_at":"%s"},"consent":true,"consent_source":"claude_config","workspace_trusted":true,"rc_alive":true,"resumed":false,"tmux":true,"restarts":0,"chain":true,"next_job":"%s","chain_note":"successor %s queued (afterany:%s)","workspace":"%s","rc_log":"%s","token_path":"%s"}\n' \
-          "$st" "$name" "$id" "$eu" "$sn" "$(now)" "$(now)" "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$(now)" "$nid" "$nid" "$id" "$sd/workspaces/$name" "$rd/rc.log" "$rd/job.token" > "$rd/status.json"
+          "$st" "$name" "$id" "$eu" "$sn" "$(now)" "$(now)" "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$(now)" "$nid" "$nid" "$id" "$dsd/workspaces/$name" "$drd/rc.log" "$drd/job.token" > "$rd/status.json"
         printf '{"session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","node":"node01","job":"%s","pid":4242,"started_at":"%s","token_path":"%s","workspace":"%s","rc_log":"%s","permission_mode":"%s","capacity":"1/32","resumed":false,"next_job":"%s"}\n' \
-          "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$id" "$(now)" "$rd/job.token" "$sd/workspaces/$name" "$rd/rc.log" "$pm" "$nid" > "$rd/connection.json"
+          "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$id" "$(now)" "$drd/job.token" "$dsd/workspaces/$name" "$drd/rc.log" "$pm" "$nid" > "$rd/connection.json"
         { printf '\n===== %s job %s on node01: starting claude remote-control --name %s-%s --permission-mode %s =====\n' "$(now)" "$id" "$st" "$id" "$pm"; registration_block "$sn"; } > "$rd/rc.log"
         echo "worker $name submitted as job $id (secp/secondary, 8 h). When it registers, find its session under Code in the Claude app (the name is in status.json) or open $eu"
-        echo "watch it with: hpcworker worker status --name $name   (reads $rd/status.json; no scheduler polling)"
+        echo "watch it with: hpcworker worker status --name $name   (reads $drd/status.json; no scheduler polling)"
         ;;
       stop)
         [ -d "$rd" ] || die "no worker named $name"

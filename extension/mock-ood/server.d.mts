@@ -14,6 +14,8 @@ export interface MockPortalOptions {
   jobComposer?: boolean;
   shellHosts?: string[];
   seedTool?: boolean;
+  /** the home the seeded tool prints and records in place of the real one (MOCK_DISPLAY_HOME); default: the virtual home */
+  displayHome?: string;
   tls?: { cert: string; key: string };
   log?: (line: string) => void;
 }
@@ -25,6 +27,8 @@ export interface MockPortal {
   home: string;
   /** what the Files routes call the home directory (/home/<user>) */
   virtualHome: string;
+  /** the home the seeded tool prints and writes into its status files (the virtual home unless set otherwise) */
+  displayHome: string;
   user: string;
   /** the dashboard's <meta name="csrf-token"> */
   railsToken: string;

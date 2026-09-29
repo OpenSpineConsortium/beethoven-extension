@@ -25,7 +25,9 @@
 // scheduler commands (bin/) first on PATH, so the shell semantics the extension relies on are
 // real; only the cluster is fake. While a command runs, typed lines go to its standard input, so
 // the seeded tool's `claude login --plain` can take the pasted code. The Files routes are jailed
-// to a virtual home (/home/<user>) mapped onto a directory on disk.
+// to a virtual home (/home/<user>) mapped onto a directory on disk, and the seeded tool prints
+// and records that virtual home in place of the directory's real path (MOCK_DISPLAY_HOME), so
+// what the extension shows of the tool's output reads like a cluster wherever the mock runs.
 //
 // The only dependency is `ws`. Node 22.
 import { spawn } from 'node:child_process';
@@ -72,6 +74,8 @@ export async function createMockPortal(opts = {}) {
     jobComposer: false,
     shellHosts: ['default', 'login1', 'login2'],
     seedTool: true,
+    /** the home the seeded tool prints and writes into its status files in place of the real one; default: the virtual home */
+    displayHome: undefined,
     tls: undefined,
     log: () => {},
     ...opts,
@@ -79,6 +83,7 @@ export async function createMockPortal(opts = {}) {
   const realHome = o.home ? path.resolve(o.home) : fs.mkdtempSync(path.join(os.tmpdir(), 'mock-ood-home-'));
   fs.mkdirSync(realHome, { recursive: true });
   const virtualHome = `/home/${o.user}`;
+  const displayHome = o.displayHome ?? process.env.MOCK_DISPLAY_HOME ?? virtualHome;
   if (o.seedTool) {
     const dir = path.join(realHome, '.hpcworker', 'bin');
     fs.mkdirSync(dir, { recursive: true });
@@ -338,6 +343,7 @@ export async function createMockPortal(opts = {}) {
       MOCK_BIN: posix(BIN),
       MOCK_NODE_DIR: posix(nodeDir),
       MOCK_USER: o.user,
+      MOCK_DISPLAY_HOME: displayHome,
       USER: o.user,
       TERM: 'xterm-16color',
     };
@@ -415,6 +421,7 @@ export async function createMockPortal(opts = {}) {
     port,
     home: realHome,
     virtualHome,
+    displayHome,
     user: o.user,
     railsToken,
     state,
@@ -426,7 +433,7 @@ export async function createMockPortal(opts = {}) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--user NAME] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   const val = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
@@ -434,6 +441,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     port: Number(val('--port', 8080)),
     host: val('--host', '127.0.0.1'),
     home: val('--home', undefined),
+    displayHome: val('--display-home', undefined),
     user: val('--user', 'student'),
     rnode: val('--rnode', 'disabled'),
     noClusters: a.includes('--no-clusters'),
@@ -446,7 +454,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
   console.log(`mock Open OnDemand portal at ${portal.origin}`);
   console.log(`  sign in:   ${portal.origin}/login   (then the dashboard is ${portal.origin}/pun/sys/dashboard/)`);
-  console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome})`);
+  console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome}; the seeded tool prints it as ${portal.displayHome})`);
   console.log(`  user:      ${portal.user}`);
   console.log(`  shell:     ${portal.origin}/pun/sys/shell/ssh/default`);
   console.log('  Ctrl-C to stop');
