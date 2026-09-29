@@ -1,0 +1,111 @@
+#!/bin/bash
+# A stand-in for the framework's `hpcworker` command (framework/bin/hpcworker, version 1), seeded
+# into the mock home so the extension's buttons have something to talk to. Same verbs, same
+# printed sentences, same files in the same places (contract.ts), with plausible contents; it
+# submits nothing. "Set up the cluster" overwrites this file with the real tool when the build
+# carries one, and the real tool's install then keeps the profile this one wrote.
+set -u
+HPCW_HOME="${HPCW_HOME:-$HOME/.hpcworker}"
+PROFILE="$HPCW_HOME/profile.json"
+now() { date -u +%FT%TZ; }
+die() { echo "hpcworker: $*" >&2; exit 1; }
+state_dir() { # the profile's shared_state_dir with $HOME and $USER expanded, as the real tool's profile.py does
+  local raw; raw=$(tr -d '\n' < "$PROFILE" 2>/dev/null | grep -o '"shared_state_dir": *"[^"]*"' | head -1 | cut -d'"' -f4)
+  raw="${raw:-\$HOME/.hpcworker}"
+  raw="${raw//\$HOME/$HOME}"; raw="${raw//\$USER/${USER:-student}}"
+  printf '%s' "$raw"
+}
+site() { tr -d '\n' < "$PROFILE" 2>/dev/null | grep -o '"site": *"[^"]*"' | head -1 | cut -d'"' -f4; }
+case "${1:-}" in
+  install)
+    name=""; while [ $# -gt 1 ]; do case "$2" in --profile) name="$3"; shift 2;; *) shift;; esac; done
+    mkdir -p "$HPCW_HOME"/{bin,lib/adapters,jobs,profiles,log}
+    [ -s "$PROFILE" ] && echo "profile.json exists; kept (use --force to replace it with '${name:-mock}')" || {
+      printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.ashley/claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "${name:-mock}" > "$PROFILE"
+      echo "profile.json written from '${name:-mock}'"
+    }
+    echo "installed hpcworker 1 at $HPCW_HOME"
+    echo "next: hpcworker diag, then hpcworker probe, then hpcworker claude login (once), hpcworker claude consent (once), hpcworker worker start"
+    ;;
+  discover)
+    printf '{"version":1,"when":"%s","host":"login1","user":"%s","os":"CentOS Linux 7 (Core)","glibc":"2.17","scheduler":{"family":"slurm","bins":{"sbatch":"/usr/bin/sbatch","squeue":"/usr/bin/squeue","scancel":"/usr/bin/scancel","sinfo":"/usr/bin/sinfo"}},"runtime":{"candidates":[],"modules":["apptainer/1.2.2","singularity/3.5.2"],"pyxis":false,"user_namespaces":{"max":15000}},"partitions":[{"name":"secp","timelimit":"1-00:00:00","avail":"up","default":false},{"name":"reqp","timelimit":"7-00:00:00","avail":"up","default":true}],"qos":"secondary requeue","env":{"TMPDIR":"/wsu/tmp","SLURM_TMPDIR":"","L_SCRATCH":"","https_proxy":"","no_proxy":""},"tools":{"tmux":"/usr/bin/tmux","script":"/usr/bin/script","python3":"/usr/bin/python3","curl":"/usr/bin/curl"},"home_fs":"panfs","home_dev":"panfs://home","process_count":7}\n' "$(now)" "${USER:-student}"
+    ;;
+  probe)
+    [ -s "$PROFILE" ] || die "no profile at $PROFILE: run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
+    sd=$(state_dir); mkdir -p "$sd/probe"
+    id=$(node "$MOCK_LIB/jobs.mjs" add hpcw_probe)
+    cat > "$sd/probe/probe.json" <<EOF
+{"version":1,"when":"$(now)","job":"$id","hostname":"node01","os":"CentOS Linux 7 (Core)","glibc":"2.17",
+ "node_tmp":{"path":"/tmp/${USER:-student}/hpcworker_$id","ok":true,"free_gb":210,"fs":"xfs","device":"/dev/sda3"},
+ "tmpdir":{"value":"/wsu/tmp","fs":"ceph","device":"ceph-fuse","node_local":false},
+ "dev_shm":{"size_kb":65000000,"free_kb":64000000,"writable":true},
+ "user_namespaces":{"max":15000,"unshare_works":true},
+ "run_user_dir":{"path":"/run/user/1000","present":false},
+ "xdg_fix":{"dir":"/dev/shm/${USER:-student}/xdg","host_writable":true,"in_image":"true"},
+ "tmux":{"present":true,"version":"tmux 1.8"},"script_present":true,
+ "runtime":{"ok":true,"name":"apptainer","bin":"/wsu/el7/gnu7/apptainer/1.2.2/bin/apptainer","module":"apptainer/1.2.2","version":"apptainer version 1.2.2"},
+ "image":{"type":"sandbox","path":"/rs/shared/claude-node22","node_version":"v22.12.0","claude_version":"2.1.283 (Claude Code)","first_exec_seconds":3,"curl_api_from_image":"404"},
+ "remote_control_flags":"--name --capacity --permission-mode --continue","remote_control_help_head":"Usage: claude remote-control [options]",
+ "claude_auth":{"loggedIn":${MOCK_LOGGED_IN:-true},"subscriptionType":"max","email":"student@example.edu","authMethod":"claude.ai","config_dir_present":true},
+ "consent_recorded":${MOCK_CONSENT:-true},
+ "egress":{"class":"${MOCK_EGRESS:-direct}","inherited_proxy":{"https_proxy":"","http_proxy":"","no_proxy":""},
+  "with_inherited_env":{"api.anthropic.com":"404","platform.claude.com":"200","claude.ai":"403"},
+  "without_proxy_vars":{"api.anthropic.com":"404","platform.claude.com":"200","claude.ai":"403"},
+  "statsig.anthropic.com":"no DNS record"}}
+EOF
+    echo "probe job $id submitted (secp/secondary, 00:05:00). It writes $sd/probe/probe.json; read it with: hpcworker probe --show"
+    echo "(the file appears when the job has run; do not poll the scheduler: 'hpcworker probe --wait 15' checks the file once a minute)"
+    ;;
+  worker)
+    [ -s "$PROFILE" ] || die "no profile at $PROFILE: run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
+    sub="${2:-list}"; shift 2 2>/dev/null || shift $#
+    name="worker"; pm="default"; as_json=0
+    while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift 2;; --permission-mode) pm="$2"; shift 2;; --json) as_json=1; shift;; *) shift;; esac; done
+    sd=$(state_dir); rd="$sd/$name"; st=$(site)
+    case "$sub" in
+      start)
+        mkdir -p "$rd" "$sd/workspaces/$name"
+        if [ -s "$rd/job.id" ] && node "$MOCK_LIB/jobs.mjs" list | grep -q "\"pbsid\":\"$(cat "$rd/job.id")\""; then echo "worker $name already has job $(cat "$rd/job.id") (RUNNING on node01); nothing submitted"; exit 0; fi
+        id=$(node "$MOCK_LIB/jobs.mjs" add "hpcw_$name")
+        echo "$id" > "$rd/job.id"; echo node01 > "$rd/node"
+        printf '{"version":1,"site":"%s","run":"%s","job":"%s","node":"node01","pid":4242,"state":"online","message":"Remote Control session registered (mock)","started_at":"%s","updated_at":"%s","session_name":"%s-%s","session_url":"https://claude.ai/code/session/mock-%s","claude_login":{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max","checked_at":"%s"},"consent":true,"rc_alive":true,"resumed":false,"tmux":true,"restarts":0,"workspace":"%s","rc_log":"%s","token_path":"%s"}\n' \
+          "$st" "$name" "$id" "$(now)" "$(now)" "$st" "$id" "$id" "$(now)" "$sd/workspaces/$name" "$rd/rc.log" "$rd/job.token" > "$rd/status.json"
+        printf '{"session_name":"%s-%s","session_url":"https://claude.ai/code/session/mock-%s","node":"node01","job":"%s","pid":4242,"started_at":"%s","token_path":"%s","workspace":"%s","rc_log":"%s","permission_mode":"%s","capacity":"4","resumed":false}\n' \
+          "$st" "$id" "$id" "$id" "$(now)" "$rd/job.token" "$sd/workspaces/$name" "$rd/rc.log" "$pm" > "$rd/connection.json"
+        printf '\n===== %s job %s on node01: starting claude remote-control --name %s-%s --permission-mode %s =====\nRemote Control session registered\n' "$(now)" "$id" "$st" "$id" "$pm" > "$rd/rc.log"
+        echo "worker $name submitted as job $id (secp/secondary, 8 h). When it runs, open claude.ai/code (or Code in the Claude app) and find the session named $st-$id."
+        echo "watch it with: hpcworker worker status --name $name   (reads $rd/status.json; no scheduler polling)"
+        ;;
+      stop)
+        [ -d "$rd" ] || die "no worker named $name"
+        touch "$rd/stop"; jid=$(cat "$rd/job.id" 2>/dev/null || true)
+        [ -n "$jid" ] && node "$MOCK_LIB/jobs.mjs" remove "$jid"
+        [ -s "$rd/status.json" ] && sed -i 's/"state":"online"/"state":"stopped"/' "$rd/status.json"
+        echo "worker $name: stop requested (job ${jid:-none} cancelled)"
+        ;;
+      status)
+        [ -d "$rd" ] || die "no worker named $name (hpcworker worker start)"
+        if [ $as_json = 1 ]; then printf '{"run":"%s","job":"%s","status":%s,"connection":%s}\n' "$name" "$(cat "$rd/job.id" 2>/dev/null)" "$([ -s "$rd/status.json" ] && cat "$rd/status.json" || echo null)" "$([ -s "$rd/connection.json" ] && cat "$rd/connection.json" || echo null)"
+        else echo "worker $name: $(grep -o '"state":"[a-z_]*"' "$rd/status.json" | cut -d'"' -f4) (job $(cat "$rd/job.id") on node01)"; fi
+        ;;
+      list) for d in "$sd"/*/; do [ -s "$d/job.id" ] && printf '%-16s job %-10s %s\n' "$(basename "$d")" "$(cat "$d/job.id")" "online"; done ;;
+      *) die "worker: start|stop|status|list|log";;
+    esac
+    ;;
+  claude)
+    case "${2:-}" in
+      login) echo "(mock) Sign in to Claude on the cluster: the real tool runs Claude Code's own 'claude auth login' inside an allocation on a compute node and never sees the credential.";;
+      consent) echo "(mock) The real tool runs 'claude remote-control' once in your workspace so you can answer its two questions; only your answer is recorded (a marker file)."; mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent";;
+      status) echo '{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max"}';;
+      *) die "claude: login|consent|status";;
+    esac
+    ;;
+  diag)
+    printf '{"version":1,"host":"login1","user":"%s","nodes":[{"id":"hpcw.scripts","ok":true,"detail":"hpcworker 1 (mock)"},{"id":"hpcw.python3","ok":true,"detail":"/usr/bin/python3 (3.6)"},{"id":"hpcw.profile","ok":%s,"detail":"%s"}]}\n' "${USER:-student}" "$([ -s "$PROFILE" ] && echo true || echo false)" "$([ -s "$PROFILE" ] && echo "profile ok" || echo "no profile")"
+    ;;
+  version) echo 1 ;;
+  *)
+    echo "usage: hpcworker install [--profile NAME] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login|consent|status | diag [--json] | version" >&2
+    exit 2
+    ;;
+esac

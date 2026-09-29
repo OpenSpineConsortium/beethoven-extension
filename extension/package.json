@@ -1,0 +1,38 @@
+{
+  "name": "ashley-bridge",
+  "displayName": "Ashley Bridge",
+  "description": "Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN public/LICENSE.txt",
+  "author": "OpenSpineConsortium",
+  "homepage": "https://openspineconsortium.com/ashley/bridge",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "sync-framework": "node scripts/sync-framework.mjs",
+    "prepare": "wxt prepare",
+    "prebuild": "node scripts/sync-framework.mjs",
+    "build": "wxt build -b chrome && wxt build -b firefox --mv2",
+    "build:chrome": "wxt build -b chrome",
+    "build:firefox": "wxt build -b firefox --mv2",
+    "build:safari": "wxt build -b safari",
+    "build:dev": "wxt build -b chrome --mode development",
+    "dev": "wxt --mode development",
+    "prezip": "node scripts/sync-framework.mjs",
+    "zip": "wxt zip -b chrome && wxt zip -b firefox --mv2",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "mock": "node mock-ood/server.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.4",
+    "typescript": "5.9.3",
+    "vite": "8.3.1",
+    "vitest": "5.0.2",
+    "ws": "8.22.0",
+    "wxt": "0.21.4"
+  }
+}

@@ -1,0 +1,13 @@
+#!/bin/bash
+# mock sbatch: registers a job and prints its id the way the real one does
+parsable=0; script=""
+for a in "$@"; do
+  case "$a" in
+    --parsable) parsable=1 ;;
+    -*) ;;
+    *) script="$a" ;;
+  esac
+done
+name="${script##*/}"; name="${name:-job}"
+id=$(node "$MOCK_LIB/jobs.mjs" add "$name")
+if [ "$parsable" = 1 ]; then echo "$id"; else echo "Submitted batch job $id"; fi

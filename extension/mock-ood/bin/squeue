@@ -1,0 +1,4 @@
+#!/bin/bash
+# mock squeue: one line per job, "id|state|node"
+node "$MOCK_LIB/jobs.mjs" list | node -e '
+let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{ for (const j of JSON.parse(s||"[]")) console.log(`${j.pbsid}|RUNNING|${(j.nodes||[]).join(",")}`); });'

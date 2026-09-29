@@ -1,0 +1,3 @@
+#!/bin/bash
+# mock scancel
+for id in "$@"; do node "$MOCK_LIB/jobs.mjs" remove "$id"; done

@@ -1,0 +1,5 @@
+#!/bin/bash
+# mock sinfo -h -o '%P|%l|%a': partitions the discovery batch lists
+echo "reqp*|7-00:00:00|up"
+echo "gmsap|3-00:00:00|up"
+echo "secondary|1-00:00:00|up"
