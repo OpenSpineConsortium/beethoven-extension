@@ -24,6 +24,8 @@ export default defineConfig({
   srcDir: 'src',
   publicDir: 'public',
   outDir: '.output',
+  // the store kit (screenshots, tiles and their HTML sources) sits beside the project and belongs in no package, not even the AMO sources zip
+  zip: { excludeSources: ['store-assets/**'] },
   // explicit imports throughout: a reviewer reading the bundle should see where every symbol comes from
   imports: false,
   manifestVersion: 3,
@@ -50,12 +52,15 @@ export default defineConfig({
         gecko: {
           id: 'ashley-bridge@openspineconsortium.com',
           strict_min_version: '140.0',
-          // Required by AMO for every new extension since 2025-11-03. The licence check binds a key
-          // to the student's portal username, which is personally identifying; crash and interaction
-          // data would be opt-out and are declared optional.
+          // Required by AMO for every new extension since 2025-11-03. "none" is the truthful answer:
+          // the extension sends nothing to the vendor. The licence key is checked inside the browser
+          // against the public keys in src/licensing/keys.json (no activation request exists), there
+          // is no error or crash reporting in the code, and the one request to the vendor's site is
+          // the daily GET of the signed kill-list (src/licensing/killlist.ts), sent without cookies
+          // and carrying no data. An earlier declaration named an activation ping and optional
+          // reports that were never built; if either is ever added, this must change with it.
           data_collection_permissions: {
-            required: ['personallyIdentifyingInfo'],
-            optional: ['technicalAndInteraction'],
+            required: ['none'],
           },
         },
       },

@@ -100,5 +100,7 @@ describe('connecting a portal', () => {
     expect(normaliseOrigin('https://ondemand.grid.wayne.edu/pun/sys/dashboard')).toBe('https://ondemand.grid.wayne.edu');
     expect(() => normaliseOrigin('http://ood.example')).toThrow(/https/);
     expect(normaliseOrigin('http://localhost:8080/login')).toBe('http://localhost:8080');
+    for (const h of ['claude.ai', 'https://claude.ai/code', 'app.claude.com', 'console.anthropic.com', 'https://ANTHROPIC.com/']) expect(() => normaliseOrigin(h)).toThrow(/Anthropic/);
+    expect(normaliseOrigin('claude.ai.example.edu')).toBe('https://claude.ai.example.edu');
   });
 });

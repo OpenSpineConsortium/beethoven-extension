@@ -18,6 +18,7 @@ import { AUTO_START_KEY, CLICK_KEY, OPENED_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN
 import { fail, succeed, unwrap, type Answer, type Request } from '../core/messages';
 import { PORTAL_OPS, type PortalApi, type PortalOp } from '../core/portal';
 import { decide } from '../core/steps';
+import { recordInForce, TERMS_KEY } from '../core/terms';
 import { startWorker } from '../core/worker';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS, peek } from '../licensing/license';
@@ -84,6 +85,8 @@ export default defineBackground({
     void portalSettings().then((s) => (settingsCache = s));
     browser.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes['bridge.portal']) settingsCache = changes['bridge.portal']?.newValue as PortalSettings | undefined;
+      // the first request to the vendor's site follows the acceptance of the agreement, never precedes it
+      if (area === 'local' && changes[TERMS_KEY] && recordInForce(changes[TERMS_KEY]?.newValue)) void refreshKillListNow();
     });
 
     browser.runtime.onInstalled.addListener(async (details) => {
@@ -443,6 +446,8 @@ async function maybeAutoStart(trigger: 'hello' | 'alarm'): Promise<void> {
 }
 
 async function refreshKillListNow(): Promise<{ detail: string; revoked: boolean }> {
+  // PRIVACY.md and LICENSE.txt section 10(a): the extension makes no request to Licensor before the agreement is accepted
+  if (!recordInForce(await local.get(TERMS_KEY))) return { detail: 'not fetched: the agreement has not been accepted yet', revoked: false };
   const previous = await local.get<StoredKillList>('bridge.killlist');
   const out = await refreshKillList(previous, BUNDLED_KEYS, fetch);
   if (out.fresh && out.current) await local.set('bridge.killlist', out.current);

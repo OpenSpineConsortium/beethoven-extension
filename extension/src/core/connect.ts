@@ -53,6 +53,8 @@ export function normaliseOrigin(input: string): string {
   if (!s) throw new Error('type your portal address first');
   if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
   const u = new URL(s);
+  // never an Anthropic site: the extension has no business on claude.ai, claude.com or anthropic.com (STORE_LISTING.md)
+  if (/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/i.test(u.hostname)) throw new Error('that is an Anthropic address, not a portal: Ashley Bridge never connects to claude.ai, claude.com or anthropic.com');
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(u.hostname))) throw new Error('the portal must be an https address');
   return u.origin;
 }

@@ -1,6 +1,6 @@
 # Ashley Bridge privacy statement
 
-Version 3, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
+Version 4, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also on the Ashley
 support page.
 
@@ -30,7 +30,6 @@ Licensor receives, and what is never collected.
 | The last good copy of the withdrawn-keys list, and a random installation identifier created in your browser | `storage.local` | to keep working when Licensor's service cannot be reached; to name your acceptance record and the marker below without naming you | uninstalling |
 | Connection state while a job runs: the worker's name and its folder on the cluster, the job number, what the worker's status file last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it), the portal tab the extension talks to and the tab the icon was clicked from, when your portal sign-in was last seen, what the last automatic start did, and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
 | The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed is never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and on the options page (view, export, clear); it is never transmitted |
-| Copies of every error report prepared, sent or not | the extension's own storage | so you can read exactly what left your device | the error-reports page |
 
 There is no durable secret in the extension's storage. The extension never reads your portal's sign-in
 cookie: your browser attaches it to requests to that one website, as it does for the portal's own
@@ -94,39 +93,30 @@ and 30 days otherwise. No BAA covers a personal plan. Remote Control usage draws
 limit. Anthropic's terms and privacy policy apply to that data, not this statement. The extension shows
 these facts before each job start.
 
-## What may go to Licensor
+## What Licensor receives
 
-**Activation.** When the extension obtains or renews your key it sends Licensor's access service the
-key's id, the institutional identifier you entered or a hash of it, the extension's version, the time
-and your operating system family. The service records those with the issued key, its dates, and the
-approval and withdrawal decisions about you.
+**From the extension: the withdrawn-keys request, and nothing else.** Once a day the extension
+fetches a signed list of withdrawn keys and withdrawn versions from Licensor's website, at
+`https://openspineconsortium.com/ashley/bridge-killlist.json`. The request is sent without cookies
+and carries nothing about you beyond what any web request carries (your network address, which the
+web host's ordinary server logs may record for a short time); the file holds the list only; the
+extension makes no request to Licensor before you have accepted the agreement. That is the only
+request the extension ever makes to Licensor. In particular:
 
-**Access requests.** If you ask for access on the Ashley support site, the request form records what
-you enter: institutional identifier, name, institutional e-mail, what you will use Ashley Bridge for,
-and the time.
+- your license key is checked inside your browser, against public keys built into the extension;
+  nothing is sent to check it, and there is no activation step;
+- the extension sends no error reports, no crash reports and no usage data; it has no code for them
+  and no address to send them to;
+- your acceptance record, your statements, your audit log and your settings stay in your browser.
 
-**The withdrawn-keys list.** Once a day the extension fetches a signed list of withdrawn keys and
-withdrawn versions from Licensor's service. The request carries nothing about you beyond what any web
-request carries (your network address); the file holds the list only; the extension makes no request
-to Licensor before you have accepted the agreement.
+**Your license record.** When Licensor issues your key, Licensor's own records hold the key's id, the
+name and institutional identifier it names, the e-mail it was sent to, its dates, and any withdrawal
+decision. Those records come from your access request and from the person who issued the key, not
+from the extension.
 
-**Error reports, only if you allow them.** When one of the extension's own checks fails or is
-repaired, or the extension crashes, and only if you have turned reports on, and only if a report
-address is configured, the extension sends one report per distinct failure per day. It contains:
-
-- extension and framework versions, browser and operating system family;
-- a random installation identifier created in your browser (not derived from you or the machine);
-- the time of the check;
-- for each check: its id, verdict and duration;
-- for failing or repaired checks: the check's message, and the last error lines of the extension's own
-  log, with e-mail addresses, institutional identifiers, file paths, hostnames, network addresses,
-  job numbers and anything token-shaped replaced by placeholders;
-- a hash of the failing checks, so the same failure is reported once a day.
-
-It never contains your prompts, files, tokens, the code you pasted to sign in, institutional
-identifier, e-mail, portal cookie, command text, job output or environment values. You choose at first
-use whether to send reports, and can change the choice any time on the options page, which also shows
-what a report contains and opens the copies kept on your device.
+**Access requests.** If you ask for access on the Ashley support site (a web page, not the
+extension), the request form records what you enter: institutional identifier, name, institutional
+e-mail, what you will use Ashley Bridge for, and the time.
 
 **A notice under the agreement**, if you send one: what you write in it, kept with your license record.
 
@@ -134,32 +124,29 @@ what a report contains and opens the copies kept on your device.
 
 Stated in the negative because reviewers read for what is absent: the extension does not collect
 command text, file paths, prompt content, job output, portal cookies or tokens, the code you paste to
-sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It has no
-access to claude.ai, requests no `cookies`, `tabs`, `webRequest`, `nativeMessaging`, `debugger`,
-`identity` or `clipboardRead` permission, and runs no code fetched from anywhere.
+sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It sends
+Licensor no error or crash reports, no usage data and no activation request. It has no access to
+claude.ai, requests no `cookies`, `tabs`, `webRequest`, `nativeMessaging`, `debugger`, `identity` or
+`clipboardRead` permission, and runs no code fetched from anywhere.
 
 ## How Licensor uses and keeps it
 
-Error reports are used to find and fix defects in Ashley Bridge and to decide what to build next.
-Reviewing them and drafting fixes is assisted by AI tools running on Licensor's own accounts; every
-change proposed that way is reviewed by a person and tested before release. Reports are kept for at
-most 365 days. License, trial, activation and acceptance records are kept for the life of the license
-and six years after, to prove the agreement and for accounting and disputes. Nothing is sold or used
-for advertising. Processors acting for Licensor (hosting, the license service) see only what they need
-to run the service. Licensor's use of data complies with the Chrome Web Store's Limited Use
-requirements.
+License and access records are kept for the life of the license and six years after, to prove the
+agreement and for accounting and disputes. Nothing is sold or used for advertising. The web host that
+serves the withdrawn-keys list sees the requests any web server sees and nothing more. Processors
+acting for Licensor (hosting, the access-request service) see only what they need to run the service.
+Licensor's use of data complies with the Chrome Web Store's Limited Use requirements.
 
 ## Security and breaches
 
-Licensor keeps reasonable security measures for the systems that hold license records and error
-reports, and will notify you as Michigan law (MCL 445.72) requires if a breach affects your personal
+Licensor keeps reasonable security measures for the systems that hold license and access records,
+and will notify you as Michigan law (MCL 445.72) requires if a breach affects your personal
 information held by Licensor.
 
 ## Your choices and rights
 
-Turn error reports off at any time; remove the site permission or uninstall the extension; ask
-Licensor for a copy or deletion of your license or report records (deletion of a license record ends
-the license). Michigan residents and residents of other states may have further rights under their
+Remove the site permission or uninstall the extension at any time; ask Licensor for a copy or
+deletion of your license or access records (deletion of a license record ends the license). Michigan residents and residents of other states may have further rights under their
 state's laws; Licensor honours requests it is obliged to honour and answers others where it reasonably
 can. Ashley Bridge is offered in the United States.
 
@@ -171,6 +158,13 @@ Ashley Bridge is for adults, or minors with a parent's or guardian's consent (LI
 
 A new version of this statement ships with the Ashley Bridge version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 4 (2026-09-29): the statement now describes the software as built. Earlier versions described
+an activation request and optional error reports; the extension has neither (there is no code for
+them and no address to send them to), so the sections that described them are removed and the section
+"What Licensor receives" names the one request the extension makes to Licensor, the daily
+withdrawn-keys list. The record Licensor keeps when it issues a key is named for what it is. Nothing
+new leaves your device; less was ever leaving it than the earlier text said.
 
 Version 3 (2026-09-29): the extension now starts the Claude sign-in sitting for you and takes the
 pasted code in its own panel (the section "What happens when you sign in to Claude" is new); your

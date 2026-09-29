@@ -37,7 +37,7 @@ yet measured under the new flow").
 | Framework (`framework/`, `hpcworker`) | Shell plus Python installed in the student's home or group volume: site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job, the sign-in sitting | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix; the plain sign-in sitting and its line contract (4.1) |
 | Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.ashley/claude` on Wayne State) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
 | Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The signed-key licence gate (`grid/license.js`: `ASHLEY1.<b64url payload>.<b64url sig>`, Ed25519, revocation list `ASHLEYREV1`, public keys `k1` and `trial`); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
-| Licence and access service | Ashley's existing activation endpoint, plus a signed JSON document carrying revocations and the kill-list, served over HTTPS | Key issuance, AccessID binding, merchant of record | Kill-list signing key under hardware-key custody; daily fetch |
+| Licence and access service | Keys issued off-line with Ashley's vendor tool and verified in the browser (no activation endpoint), plus a signed JSON document carrying revocations and the kill-list, served over HTTPS | Key issuance, AccessID binding, merchant of record | Kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
 
 Two things are deliberately absent (report, "Components and what each reuses"): any code on claude.ai
@@ -474,7 +474,7 @@ repeat itself (`bridge.opened`: the environment links it already opened; `bridge
 login terminal last reported `SIGNED-IN` and what that line said; `bridge.probe`: the probe job it
 submitted by itself, time and job number; `bridge.install`: the last install or update the strip ran
 by itself, with its time, whether it succeeded and how many files went up), the audit log, the last good kill-list, a random installation
-identifier, copies of error reports and the ticks on the optional checklist steps; `storage.session`
+identifier and the ticks on the optional checklist steps; `storage.session`
 holds the run record (`bridge.run`: the run's name and state directory, job number, the last
 `status.json` and `connection.json` as read, the registration block parsed from `rc.log`, the last
 4,000 characters of `rc.log` for the tail under *Details*, and the last read error), the portal tab
@@ -590,7 +590,7 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 | `options_ui` | the setup page | the agreement, the key, the portal by address, the statement, the settings, the audit log, the Drive step |
 | never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger`, `identity`, `clipboardRead`, any `claude.ai`, `anthropic.com` or `claude.com` origin | stated in the negative in the listing and the privacy policy |
 | `minimum_chrome_version` | `"148"` | `browser.*` namespace, Promise-returning `onMessage` |
-| `browser_specific_settings.gecko` | `id`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"], optional: ["technicalAndInteraction"] }` | the activation ping carries an AccessID or its hash; crash reports are opt-out |
+| `browser_specific_settings.gecko` | `id`; `data_collection_permissions: { required: ["none"] }` | nothing is collected: no activation ping and no crash reports |
 | `content_security_policy` | MV3 default; no remote script sources | remote code: no |
 | Firefox target | `firefox-mv2` or `firefox-mv3` with alarms | Firefox still accepts MV2 |
 

@@ -76,8 +76,8 @@ through, no `y` to type at Claude Code's one-time Remote Control question (the p
 answer in the same statement, records it in your cluster account, and your worker gives it to Claude
 Code when asked) and no terminal to break out of: the sitting ends itself when Claude Code says it is
 signed in. The settings that exist (shell host, site profile, permission mode, *start my worker when I
-open my portal* and *open claude.ai when my worker connects*, both on by default in the current build,
-error reports) live on the extension's options page, and the seventeen checks and the logs sit under
+open my portal* and *open claude.ai when my worker connects*, both on by default in the current build)
+live on the extension's options page, and the seventeen checks and the logs sit under
 *Details* in the panel for the day something does not work.
 
 The optional step *Connect Google Drive in claude.ai* is still there: it opens
@@ -128,7 +128,8 @@ From the report's "deliberately absent" list and its security controls:
 - No durable secret in extension storage. Connection state lives in `storage.session`; the audit log
   of every portal request stays on the device and is never transmitted.
 - No transmission of command text, file paths, prompts, job output, portal cookies or tokens to the
-  vendor. Off-device collection is limited to licence activation and optional crash reports.
+  vendor. Nothing is collected off the device: the only request to the vendor's site is the daily
+  download of the signed withdrawn-keys list, made after the agreement is accepted.
 
 ## Status
 
@@ -152,9 +153,9 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid key.
 
-Versions in this tree: the framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 2
-and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is 2 to match; `PRIVACY.md` is
-version 3. All integers; a changed text moves its version with it.
+Versions in this tree: the framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 3
+and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is 3 to match; `PRIVACY.md` is
+version 4. All integers; a changed text moves its version with it.
 
 ## Documents
 
@@ -172,8 +173,8 @@ version 3. All integers; a changed text moves its version with it.
 - `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
 - `docs/MAC_AND_SAFARI.md`: what the Safari edition needs.
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 2; the extension's
-  `TERMS_VERSION` is 2) and the privacy statement (version 3).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 3; the extension's
+  `TERMS_VERSION` is 3) and the privacy statement (version 4).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

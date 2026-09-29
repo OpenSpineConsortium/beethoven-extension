@@ -67,27 +67,37 @@ address on claude.ai or claude.com.
 
 ## Payment
 
-Listing sentence, required by Chrome and Mozilla where payment gates functionality:
+No payment gates any function of the Trial Edition, so the "payment required" disclosure that Chrome
+and Mozilla ask for where payment gates functionality is NOT used. The listing says instead:
 
-> Payment is required for full functionality. The Trial Edition is free for approved institutional
-> accounts during the evaluation period; a paid Full Edition, if offered, is a separate key and a
-> separate agreement.
+> Free. An access key issued by the maintainer on approval is required; no payment is taken, nothing
+> converts into a paid licence, and no charge follows the end of the evaluation period (agreement,
+> section 3(c)). A paid Full Edition, if ever offered, would be a separate key and a separate agreement.
 
 On Safari the sentence is not used: Apple forbids licence keys (Guideline 3.1.1), so the Safari edition
 is free or is sold by in-app purchase inside the host app.
 
 ## Privacy-practices answers, per store
 
-What leaves the device: licence activation (key id, institutional identifier or its hash, extension
-version, timestamp, coarse platform) and, if the person turns them on, crash and error reports scrubbed
-of identity. What stays on the device: portal hostname and granted origin, preferences, the acceptance
-record, the licence key and institutional identifier, the statement made about each worker's
-workspace, the notes the extension keeps so its automatic steps do not repeat (the last sign-in it saw
-with the account and plan Claude Code reported, the session links it opened, the check job and install
-it ran), the audit log, the last good kill-list, a random installation identifier, copies of error
-reports and the ticks on optional checklist steps; for the browser session only, the job id, the
-session name and its claude.ai link, the tab the icon was clicked from and the last check results
-(the same list as `PRIVACY.md`). What passes through and is never kept: the one-time code the person
+What leaves the device towards the vendor (established from the source on 2026-09-29, every
+`fetch`, `WebSocket` and `tabs.create` in `extension/src` read): one request a day for the signed
+withdrawn-keys list at `https://openspineconsortium.com/ashley/bridge-killlist.json`
+(`src/licensing/killlist.ts`), sent with `credentials: 'omit'`; it carries nothing about the person
+beyond the network address any web request carries. There is no activation request: the licence key
+is checked inside the browser against the public keys in `src/licensing/keys.json`
+(`src/licensing/license.ts`). There are no error or crash reports and no usage data: the code has
+none and no address to send them to. Every other request goes to the one portal origin the person
+granted, from the page script on that origin, with the browser carrying the portal cookie (never
+read). The extension opens, in a new tab and with no code of its own on them, the portal's own pages,
+Anthropic's sign-in page (only an https address on claude.ai or claude.com, printed by the sitting),
+the session's `https://claude.ai/code?environment=...` link and `https://claude.ai/settings/connectors`.
+What stays on the device: portal hostname and granted origin, preferences, the acceptance record, the
+licence key and institutional identifier, the statement made about each worker's workspace, the notes
+the extension keeps so its automatic steps do not repeat (the last sign-in it saw with the account and
+plan Claude Code reported, the session links it opened, the check job and install it ran), the audit
+log, the last good kill-list, a random installation identifier and the ticks on optional checklist
+steps; for the browser session only, the job id, the session name and its claude.ai link, the tab the
+icon was clicked from and the last check results (the same list as `PRIVACY.md`, version 4). What passes through and is never kept: the one-time code the person
 pastes to sign in to Claude, typed once into their own cluster shell; the audit log holds one line for
 the sitting with the counts of bytes read and typed, never the text. What is never collected: command
 text, file paths, prompts, job output,
@@ -103,16 +113,16 @@ use.
 | Single purpose | as above |
 | Permission justifications | as above, one sentence each |
 | Remote code | No |
-| Data collected: personally identifiable information | Yes: institutional identifier (or its hash) at licence activation |
+| Data collected: personally identifiable information | No. The institutional identifier and the licence key stay in the browser's own storage; nothing is sent to the developer to check or activate a key |
 | Data collected: authentication information | No (the portal cookie is never read; no Claude credential is handled; the one-time sign-in code the person pastes is relayed once to their own cluster shell and neither stored nor transmitted to the developer) |
 | Data collected: personal communications | No |
 | Data collected: website content | No |
 | Data collected: web history | No |
-| Data collected: user activity | No, except optional crash reports (check ids, verdicts, scrubbed messages) if the person turns them on |
+| Data collected: user activity | No (there are no crash or error reports and no usage data in the code) |
 | Data collected: location, financial, health | No |
 | Certifications | Not sold to third parties outside approved use cases; not used or transferred for purposes unrelated to the single purpose; not used to determine creditworthiness or for lending |
-| Privacy policy URL | the Ashley support page's copy of PRIVACY.md |
-| Limited Use statement on the website | "Ashley Bridge's use of information received from Google APIs and from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements." |
+| Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` (PRIVACY.md, version 4) |
+| Limited Use statement on the website | "Ashley Bridge's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements." |
 
 ### Edge Add-ons (Partner Center, Privacy page)
 
@@ -121,8 +131,9 @@ use.
 | Single purpose | as above |
 | Permission justification | as above |
 | Are you using remote code? | No |
+| Does this extension access, collect, transmit or use personal information? | No (the privacy policy URL is given all the same, because the extension keeps the items above on the device) |
 | Data usage certification | same categories and answers as Chrome |
-| Privacy policy URL | as above |
+| Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` |
 | Test credentials or explanation | the reviewer-access plan below (no university account can be issued) |
 | Update channel | Partner Center only; no self-update |
 
@@ -130,7 +141,7 @@ use.
 
 | Item | Answer |
 |---|---|
-| `browser_specific_settings.gecko.data_collection_permissions` | `{ "required": ["personallyIdentifyingInfo"], "optional": ["technicalAndInteraction"] }`. The required entry is the institutional identifier in the activation ping; the optional entry is the crash and error reports. `"none"` cannot be declared truthfully while activation exists |
+| `browser_specific_settings.gecko.data_collection_permissions` | `{ "required": ["none"] }` (set in `wxt.config.ts` on 2026-09-29). The extension sends the vendor nothing: the key is checked in the browser, there is no activation request, and there are no error, crash or usage reports; the daily withdrawn-keys GET carries no data. An earlier draft declared `personallyIdentifyingInfo` (activation) and optional `technicalAndInteraction` (reports) for features that were never built; if either is ever added, the declaration, PRIVACY.md and this table change together |
 | Source code | the zip from `wxt zip -b firefox` plus build instructions (`README` in `extension/`: exact Node version, `npm ci`, the build command); the bundle is minified for size only, never obfuscated |
 | Payment disclosure | the payment sentence above in the listing |
 | Testing information | the reviewer-access plan below |
@@ -141,8 +152,8 @@ use.
 
 | Label | Answer |
 |---|---|
-| Identifiers: User ID | Collected, linked to the user, not used for tracking (the institutional identifier or its hash at activation) |
-| Diagnostics: Crash data | Collected only if the user turns reports on; not linked to identity (random install id); not used for tracking |
+| Identifiers: User ID | Not collected (the institutional identifier stays in the browser; there is no activation request) |
+| Diagnostics: Crash data | Not collected (no reporting code exists) |
 | Usage data, Contacts, Location, Financial, Health, Browsing history, User content | Not collected |
 | Tracking | No |
 | 5.1.1 consent | the setup page obtains consent before any collection; paid functionality never depends on granting data access |
@@ -190,8 +201,10 @@ submission therefore includes:
   reads only whether Claude Code says it is signed in.
 - Ashley Bridge runs no code it did not ship with. Its daily update check downloads a signed list, not
   a program.
-- Ashley Bridge talks to one website: the Open OnDemand portal you connect. It requests access to
-  that site when you click its icon on that site's tab, and to nothing else.
+- Ashley Bridge works with one website: the Open OnDemand portal you connect. It requests access to
+  that site when you click its icon on that site's tab, and to nothing else. Its only other request
+  is a daily download of the signed withdrawn-keys list from the maintainer's site, which carries
+  nothing about you.
 - Ashley Bridge does not read your portal cookie and does not sign in for you. When your portal asks
   for a sign-in, the extension asks you to sign in in a tab.
 - Ashley Bridge's audit log of what it asked your portal never contains what you typed to sign in.
@@ -203,13 +216,13 @@ submission therefore includes:
 | 1 | Single-purpose statement, as above; must not read as two products | required | required | implicit | implicit | maintainer | drafted above; already the `description` in `extension/package.json` and `wxt.config.ts` |
 | 2 | Per-permission justification, one sentence each | Privacy practices tab | Partner Center Privacy page | reviewer notes | App Review notes | maintainer | drafted above (revised 2026-09-29 for the icon click and the options page) |
 | 3 | Remote code "No"; no `eval`, no fetched scripts; kill-list is JSON; the sign-in marker lines are parsed, never executed | required | required | required | 2.5.2 | extension stream | to verify in the built bundle (`.output/`) |
-| 4 | Privacy policy URL and data-use certifications; in-product disclosure and affirmative consent before first use, even for on-device data | required | required | required | 5.1.1 labels | maintainer + extension stream | root `PRIVACY.md` (version 3) and `LICENSE.txt` (version 2) written 2026-09-29; `extension/public/LICENSE.txt` and `PRIVACY.md` must be byte-identical copies of the root files at build time (the build's `sync-framework` step copies them) and `TERMS_VERSION` in `extension/src/core/terms.ts` is 2 to match (moved this round; the framework's `VERSION` is 2); setup page exists |
+| 4 | Privacy policy URL and data-use certifications; in-product disclosure and affirmative consent before first use, even for on-device data | required | required | required | 5.1.1 labels | maintainer + extension stream | root `PRIVACY.md` (version 4: it no longer describes an activation request or error reports, which the code never had) and `LICENSE.txt` (version 3) written 2026-09-29; the policy URL is `https://openspineconsortium.com/ashley/bridge/privacy.html`; `extension/public/LICENSE.txt` and `PRIVACY.md` must be byte-identical copies of the root files at build time (the build's `sync-framework` step copies them) and `TERMS_VERSION` in `extension/src/core/terms.ts` is 2 to match (moved this round; the framework's `VERSION` is 2); setup page exists |
 | 5 | "Payment required for full functionality" and the trial sentence in the listing | required | required | required ("Listings must disclose when payment is required") | licence keys forbidden (3.1.1): free edition or IAP | maintainer | drafted above |
 | 6 | Readable, unobfuscated bundle; Firefox source zip with build instructions (`wxt zip -b firefox`) | minification allowed | no obfuscation | source required | | extension stream | `npm run zip` defined; build instructions for the AMO source zip in `extension/README.md` |
 | 7 | Reviewer access: public mock portal plus recorded walk-through | recommended | test credentials or explanation required | "testing information" required | review notes | maintainer + extension stream | mock portal exists at `extension/mock-ood/server.mjs` (`npm run mock`, port 8080 by default; the tests start it themselves) with the stand-in sign-in sitting, the cold-PUN 500 and the 200-HTML missing download; not yet hosted publicly; walk-through not recorded |
 | 8 | Developer account: two-step verification with a hardware key; no third-party OAuth grants on the account | required | | required | Apple ID 2FA | maintainer | to confirm per account |
 | 9 | Distribution channel while private: Unlisted / Hidden / unlisted-signed XPI (same review) | available | available | available | TestFlight or App Store only | maintainer | decision pending |
-| 10 | Firefox `data_collection_permissions` declared in the manifest | | | required for new extensions since 2025-11-03 | | extension stream | set in `wxt.config.ts` (`strict_min_version` 140, gecko id `ashley-bridge@openspineconsortium.com`) |
+| 10 | Firefox `data_collection_permissions` declared in the manifest | | | required for new extensions since 2025-11-03 | | extension stream | set in `wxt.config.ts` to `{ "required": ["none"] }` on 2026-09-29 after the source was read for every network request (`strict_min_version` 140, gecko id `ashley-bridge@openspineconsortium.com`); the store kit is in `docs/store/` |
 | 11 | Trader status and phone number under the EU DSA if offered in the EU; otherwise geo-restrict to the US | required if EU | | | | maintainer | US only, to set in each dashboard |
 | 12 | Safari packaging: `xcrun safari-web-extension-packager` or the App Store Connect packager; Apple Developer Program membership; app record | | | | required | maintainer (needs a Mac) | not started; see MAC_AND_SAFARI.md |
 | 13 | Review time budgeted: days to weeks (Chrome), up to seven business days (Edge), up to 24 hours to sign (Firefox), undocumented (Apple) | | | | | maintainer | to schedule after item 7 |

@@ -65,8 +65,9 @@ licensor when it exists). The product name and identifier carry no university na
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-09-29 `LICENSE.txt` is version 2 and `PRIVACY.md` version 3, for the sign-in
-  sitting and the per-workspace statement; `TERMS_VERSION` in `extension/src/core/terms.ts` is 2 to
+  Edition; since 2026-09-29 `LICENSE.txt` is version 3 and `PRIVACY.md` version 4; both describe the
+  software as built (no activation step, no error reports, one daily request for the withdrawn-keys
+  list, made only after acceptance); `TERMS_VERSION` in `extension/src/core/terms.ts` is 3 to
   match, and the framework's `VERSION` file is 2). The copies the extension ships in
   `extension/public/` must be byte-identical to them at build time. Change a text and its version
   together (integer). Never pre-tick a box; the button label is part of the record; a changed

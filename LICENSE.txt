@@ -1,6 +1,6 @@
 ASHLEY BRIDGE TRIAL EDITION LICENSE AGREEMENT
 
-Version 2, 2026-09-29. Applies to the Trial Edition of Ashley Bridge 1.0.0 and later versions that
+Version 3, 2026-09-29. Applies to the Trial Edition of Ashley Bridge 1.0.0 and later versions that
 ship this text, as distributed through the Chrome Web Store, Microsoft Edge Add-ons, Firefox Add-ons
 and, for Safari, the App Store, and as a signed file for unlisted distribution. You can read, copy,
 save and print this text at any time: it is in the file LICENSE.txt inside the extension and inside
@@ -35,7 +35,7 @@ through Anthropic's Remote Control feature. "Trial Edition" means the edition th
 free of charge during the evaluation period, for persons whose institutional account Licensor has
 approved. "Full Edition" means the paid edition, if Licensor offers one, governed by the separate
 Ashley Bridge Full Edition License Agreement, which you accept only if you choose to register a Full
-Edition key. "Access key" means the signed text beginning "ASHLEY1." that Licensor's access service
+Edition key. "Access key" means the signed text beginning "ASHLEY1." that Licensor
 issues in your name; it states an edition, an end date and a license id. "Named Dependencies" are the
 outside parties and conditions listed in section 7.
 
@@ -53,10 +53,10 @@ The license can end as this agreement says (sections 3 and 9). All rights not gr
 
 (a) The Trial Edition is available only to persons whose institutional account Licensor has
 approved. Approval is requested on the Ashley support site and may be refused or withdrawn at any
-time, with or without reason. After you enter the institutional identifier Licensor approved (at
-Wayne State University, the AccessID), the Extension obtains an access key in your name from
-Licensor's access service; the Extension and the Framework check the key on every use and refuse to
-work without it. A copy of Ashley Bridge with no valid key for the person using it does not work.
+time, with or without reason. Licensor issues an access key in your name, which you paste once into
+the Extension's setup page; the Extension checks it inside your browser, against public keys built
+into the Extension, on every use, and refuses to work without it. Nothing is sent to check a key. A
+copy of Ashley Bridge with no valid key for the person using it does not work.
 
 (b) Your key is for you alone. Do not share, publish, transfer or sell it, and do not use a key issued
 to someone else.
@@ -232,43 +232,27 @@ free or through an in-app purchase instead.
 (e) Nothing in this section limits rights that consumer law gives you and does not allow you to
 waive, including under the Michigan Consumer Protection Act.
 
-10. ERROR REPORTS, ACCESS RECORDS AND PRIVACY
+10. WHAT LICENSOR RECEIVES, ACCESS RECORDS AND PRIVACY
 
-(a) With your permission, Ashley Bridge sends Licensor an error report when one of its own checks
-fails or is repaired, or when the Extension crashes. A report contains: Extension and Framework
-versions; browser and operating system family; a random identifier created in your browser; which
-checks ran, their verdicts and timings; the checks' messages and the last error lines of Ashley
-Bridge's own log, with e-mail addresses, institutional identifiers, file paths, hostnames, network
-addresses, job numbers and anything token-shaped replaced by placeholders. A report never contains
-your prompts, your files, your tokens, your institutional identifier or e-mail, your portal cookie,
-command text, job output, or environment values. Ashley Bridge keeps a copy of every report on your
-device.
+(a) Once a day, and only after you have accepted this agreement, the Extension fetches from
+Licensor's website a signed list of withdrawn keys and withdrawn versions. That request is sent
+without cookies and carries nothing about you beyond what any web request carries (your network
+address). It is the only request the Extension makes to Licensor.
 
-(b) You choose whether reports are sent in the signing dialog, and you can change the choice at any
-time on the Extension's settings page. Nothing is sent before you have chosen, and nothing is sent
-unless a report address is configured, which is named in the documentation.
+(b) The Extension sends no error reports, no crash reports and no usage data, and there is no
+activation step: it has no code for them and no address to send them to. Your acceptance record
+(the version and hash of this text, what you ticked, your typed name, the time, the install id, the
+software versions), your statements, your audit log and your settings stay in your browser; Licensor
+does not receive them.
 
-(c) Reports are used to find and fix defects in Ashley Bridge and to decide what to build next.
-Reviewing them and drafting fixes is assisted by AI tools running on Licensor's own accounts; every
-change proposed that way is reviewed by a person and tested before release. Reports are kept for at
-most 365 days, are not sold, and are shared only with processors acting for Licensor.
+(c) Access records. An access request on the support site records what you enter there
+(institutional identifier, name, institutional e-mail, what you will use Ashley Bridge for). When
+Licensor issues your key, Licensor's own records hold the key's id, the identifier or domain it is
+bound to, the name and e-mail given, the edition, the dates, and the approval and withdrawal
+decisions about you. Licensor keeps these records for the life of your access and six years after,
+to prove the license and its terms.
 
-(d) Access records and activation. An access request on the support site records what you enter
-there (institutional identifier, name, institutional e-mail, what you will use Ashley Bridge for).
-Activating a key sends Licensor's access service the key's id, the institutional identifier you
-entered or a hash of it, the Extension's version, the time and the operating system family; the
-service records those, the issued key and its dates, and the approval and withdrawal decisions about
-you.
-
-(e) Once a day the Extension fetches from Licensor's service a signed list of withdrawn keys and
-withdrawn versions. That request carries nothing about you beyond what any web request carries (your
-network address). The Extension makes none of these requests before you have accepted this agreement.
-
-(f) Licensor keeps your acceptance record (the version and hash of this text, what you ticked, your
-typed name, the time, the install id, the software versions) and your access records for the life of
-your access and six years after, to prove the agreement and its terms.
-
-(g) The full privacy statement is in PRIVACY.md, which forms part of this agreement.
+(d) The full privacy statement is in PRIVACY.md, which forms part of this agreement.
 
 11. NOT FOR CLINICAL OR HIGH-RISK USE, AND NOT FOR RESTRICTED DATA
 
@@ -330,8 +314,8 @@ it, and Ashley Bridge carries none of them.
 
 16. SECURITY AND BREACH NOTICE
 
-Licensor keeps reasonable security measures for the systems that hold access records, acceptance
-records and error reports, and will notify you as Michigan law (MCL 445.72) or the law of your state
+Licensor keeps reasonable security measures for the systems that hold access records, and will
+notify you as Michigan law (MCL 445.72) or the law of your state
 requires if a breach affects your personal information held by Licensor. This duty is Licensor's and
 is not shifted to you by anything else in this agreement.
 

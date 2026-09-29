@@ -68,7 +68,7 @@ Extension:
   worker's workspace (workspace, text and its version, time), the notes the strip keeps so it does
   not repeat itself (the last sign-in it saw with the account and plan Claude Code reported, the
   session links it opened, the probe job it submitted, the install it ran), the audit log, the last good copy of the
-  signed kill-list, a random installation identifier, copies of error reports and the ticks on the
+  signed kill-list, a random installation identifier and the ticks on the
   optional checklist steps; `storage.session` holds connection state (the run's name and folder, the
   job number, the worker's last status file, the session name and link, the last 4,000 characters of
   `rc.log`), the portal tab, the tab the icon was clicked from, when the portal sign-in was last seen,
@@ -85,7 +85,7 @@ Extension:
   port to the page script and into the student's own terminal on the cluster as keystrokes, holds it
   in a local variable only, clears the box as it sends, and records the whole sitting as one audit
   line carrying the counts of bytes read and bytes typed, never the text; it never places the code in
-  storage, an error report or a message to the vendor. On the compute node the framework passes it to
+  storage or a message to the vendor. On the compute node the framework passes it to
   Claude Code's pseudo-terminal with echo off and never copies Claude Code's screen to the terminal
   the extension reads. No `clipboardRead` permission and no script on any Anthropic page, so the
   extension cannot take the code by itself. The sitting is one shell held open, one at a time, ended
@@ -159,7 +159,7 @@ Release pipeline and keys:
   notes (last sign-in seen with the account and plan Claude Code reported, links opened, the probe
   job it submitted, the install it ran), the audit log, the last good kill-list, a random
   installation identifier,
-  copies of error reports, the ticks on optional checklist steps; session-only connection state (the
+  the ticks on optional checklist steps; session-only connection state (the
   run's name and folder, job number, the worker's last status file, session name, the session's
   claude.ai link, the last 4,000 characters of `rc.log`), the portal tab, the tab the icon was clicked
   from, when the portal sign-in was last seen, what the last automatic start did, and the last check
@@ -170,8 +170,10 @@ Release pipeline and keys:
   time, the browser's random installation identifier), and Claude Code's own sign-in (written by
   Claude Code, never read by Ashley Bridge). On a compute node, for a sign-in sitting only: the
   sitting's transcript under `/dev/shm`, mode 0600, removed with the sitting.
-- With the maintainer: licence and activation records; error reports if the student allows them
-  (scrubbed of identity; retention 365 days).
+- With the maintainer: the licence record made when a key is issued (key id, the identifier or
+  domain it is bound to, name, e-mail, dates, approval and withdrawal decisions); nothing from the
+  extension itself except the daily withdrawn-keys request's network address in the web host's
+  ordinary server logs. There are no error reports and no activation step.
 - On Anthropic's servers, under the student's own account: the session transcript while Remote
   Control is connected, retained under Anthropic's data-usage terms.
 
