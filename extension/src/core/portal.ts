@@ -7,14 +7,14 @@
 //   GET  /pun/sys/dashboard/                              session check and PUN warm-up
 //   GET  /pun/sys/dashboard/files/fs/<abs>  Accept: json  directory listing
 //   GET  /pun/sys/dashboard/files/fs/<abs>?download=1     file body
-//   PUT  /pun/sys/dashboard/files/fs/<abs>[?dir=true]     write a file / make a directory (CSRF)
+//   PUT  /pun/sys/dashboard/files/fs/<abs>[?dir=true|?touch=true]  write a file / make a directory / touch (CSRF)
 //   GET  /pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user
 //   DELETE /pun/sys/dashboard/activejobs?cluster=&pbsid=  cancel (CSRF)
 //   GET  /pun/sys/shell/ssh/<host> + wss ...?csrf=        one command line (shell.ts)
 //   GET  /rnode/<host>/1/                                 reverse-proxy probe (404 vs 503)
 //   GET  /pun/sys/myjobs/workflows.json, /pun/sys/dashboard/projects   optional routes, recorded only
 // /logout, /nginx/stop are recognised in redirects and never called.
-import { Audit, SCHEDULER_COMMAND, type EndpointClass } from './audit';
+import { Audit, classifyCommand, type EndpointClass } from './audit';
 import type { PortalNet } from './net';
 import { runShellCommand, type ShellResult } from './shell';
 
@@ -95,6 +95,8 @@ export interface PortalApi {
   readFileIfExists(path: string): Promise<string | undefined>;
   writeFile(path: string, body: string, job?: string): Promise<void>;
   mkdir(path: string): Promise<void>;
+  /** create an empty file or update its time: how the framework's stop file is written */
+  touch(path: string, job?: string): Promise<void>;
   activeJobs(): Promise<ActiveJobs>;
   cancelJob(cluster: string, pbsid: string): Promise<void>;
   shell(command: string, opts?: { timeoutMs?: number; job?: string }): Promise<ShellResult>;
@@ -107,7 +109,7 @@ export interface PortalApi {
 }
 
 export type PortalOp = keyof PortalApi;
-export const PORTAL_OPS: PortalOp[] = ['session', 'whoAmI', 'home', 'listDir', 'readFile', 'readFileIfExists', 'writeFile', 'mkdir', 'activeJobs', 'cancelJob', 'shell', 'probeRnode', 'probeRoutes', 'auditWait', 'auditRecords', 'auditExport', 'auditClear'];
+export const PORTAL_OPS: PortalOp[] = ['session', 'whoAmI', 'home', 'listDir', 'readFile', 'readFileIfExists', 'writeFile', 'mkdir', 'touch', 'activeJobs', 'cancelJob', 'shell', 'probeRnode', 'probeRoutes', 'auditWait', 'auditRecords', 'auditExport', 'auditClear'];
 
 export class PortalError extends Error {
   constructor(
@@ -302,9 +304,26 @@ export class PortalClient implements PortalApi {
     });
   }
 
-  /** `data` is an array of arrays (one per 3,000-job slice); flattened here */
+  /** `?touch=true` creates an empty file (or updates its time); a Files write, so no scheduler floor applies */
+  async touch(path: string, job?: string): Promise<void> {
+    const endpoint = `${FILES}${encodePath(path)}?touch=true`;
+    const csrf = await this.token();
+    await this.audit.request({ method: 'PUT', endpoint, cls: 'files', mutates: true, ...(job ? { job } : {}) }, async () => {
+      const res = await this.net.fetch(this.url(endpoint), { method: 'PUT', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf, Accept: 'application/json' } });
+      const text = await res.text();
+      if (res.status === 422) {
+        this.csrf = undefined;
+        throw new PortalError('the portal rejected the request (stale form token); try again', 422);
+      }
+      if (res.status === 403) throw new PortalError(`the portal does not allow writing ${path} (allowlist or permissions)`, 403);
+      if (!res.ok) throw new PortalError(`touching ${path} failed (${res.status})`, res.status);
+      return { result: undefined, bytes: text.length, outcome: `${res.status} touched` };
+    });
+  }
+
+  /** `data` is an array of arrays (one per 3,000-job slice); flattened here. The portal runs squeue for this: once a minute. */
   async activeJobs(): Promise<ActiveJobs> {
-    return this.audit.request({ method: 'GET', endpoint: ACTIVE_JOBS, cls: 'scheduler' }, async () => {
+    return this.audit.request({ method: 'GET', endpoint: ACTIVE_JOBS, cls: 'jobs' }, async () => {
       const res = await this.net.fetch(this.url(ACTIVE_JOBS), { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
       const text = await res.text();
       if (!res.ok) throw new PortalError(`Active Jobs answered ${res.status}`, res.status);
@@ -326,7 +345,7 @@ export class PortalClient implements PortalApi {
   async cancelJob(cluster: string, pbsid: string): Promise<void> {
     const endpoint = `${ACTIVE_JOBS_DELETE}?cluster=${encodeURIComponent(cluster)}&pbsid=${encodeURIComponent(pbsid)}`;
     const csrf = await this.token();
-    await this.audit.request({ method: 'DELETE', endpoint, cls: 'scheduler', mutates: true, job: pbsid }, async () => {
+    await this.audit.request({ method: 'DELETE', endpoint, cls: 'jobs', mutates: true, job: pbsid }, async () => {
       // The dashboard answers a cancel with a 302 to the Active Jobs page. A browser that follows a
       // 302 re-sends the DELETE (only a POST is turned into a GET), which would loop; so the redirect
       // itself is read as the success it signals and never followed.
@@ -342,9 +361,9 @@ export class PortalClient implements PortalApi {
     });
   }
 
-  /** one command line through the bootstrap shell; the scheduler floor applies when the line reaches the scheduler */
+  /** one command line through the bootstrap shell; its floor class follows what the line costs (audit.ts classifyCommand) */
   async shell(command: string, opts: { timeoutMs?: number; job?: string } = {}): Promise<ShellResult> {
-    const cls: EndpointClass = SCHEDULER_COMMAND.test(command) ? 'scheduler' : 'shell';
+    const cls: EndpointClass = classifyCommand(command);
     const endpoint = `/pun/sys/shell/ssh/${this.shellHost}`;
     return this.audit.request({ method: 'WS', endpoint, cls, mutates: true, ...(opts.job ? { job: opts.job } : {}) }, async () => {
       const r = await runShellCommand({ origin: this.origin, host: this.shellHost, command, net: this.net, timeoutMs: opts.timeoutMs });

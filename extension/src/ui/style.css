@@ -7,6 +7,7 @@
   --accent: #1f5fbf;
   --accent-fg: #ffffff;
   --ok: #1f7a3a;
+  --ok-fg: #ffffff;
   --warn: #a35d00;
   --fail: #b3261e;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -22,6 +23,7 @@
     --accent: #6ea3ff;
     --accent-fg: #101010;
     --ok: #5fbf7a;
+    --ok-fg: #101010;
     --warn: #e0a54a;
     --fail: #ff7b72;
   }
@@ -40,11 +42,15 @@ p, li { margin: 4px 0; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
 button { font: inherit; padding: 6px 12px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); cursor: pointer; }
 button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+/* the one green button: it opens the worker's Claude environment in a tab */
+button.success { background: var(--ok); color: var(--ok-fg); border-color: var(--ok); font-weight: 600; }
 button.danger { color: var(--fail); border-color: var(--fail); }
+button.small { padding: 3px 8px; font-size: 0.92em; }
 button[disabled] { opacity: 0.55; cursor: not-allowed; }
 button:focus-visible, input:focus-visible, select:focus-visible, .doc:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input[type=text], select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--fg); min-width: 12em; }
 input[type=text].wide { width: 100%; }
+input[type=text][readonly] { color: var(--muted); }
 label { cursor: pointer; }
 .box { display: grid; grid-template-columns: 1.4em 1fr; gap: 8px; align-items: start; margin: 8px 0; }
 .box input { margin: 4px 0 0; width: 1.1em; height: 1.1em; }

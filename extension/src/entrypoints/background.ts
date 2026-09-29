@@ -1,33 +1,50 @@
 // The background: a Chrome/Edge MV3 service worker or the Firefox persistent background, from
 // one file. It brokers messages between the pages and the portal page script, wakes once a
-// minute to read the current run's status files, fetches the kill-list once a day, and keeps
-// its state in storage.session so any page can re-attach after it restarts. It never talks to
-// the portal itself: the page script on the portal origin is the only network client.
+// minute to read the current run's status files, fetches the kill-list once a day, starts the
+// worker for a student who asked for that when their portal tab connects, and keeps its state in
+// storage.session so any page can re-attach after it restarts. It never talks to the portal
+// itself: the page script on the portal origin is the only network client.
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
-import { paths, type ConnectionFile, type StatusFile } from '../core/contract';
-import { KILLLIST_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY } from '../core/keys';
+import { isEnvironmentUrl, parseRegistration, paths, type ConnectionFile, type StatusFile } from '../core/contract';
+import { ACK_KEY, type Acknowledgement } from '../core/disclosure';
+import { bindIdentity } from '../core/identity';
+import { AUTO_START_KEY, IDENTITY_KEY, KILLLIST_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY, type AutoStartNote } from '../core/keys';
 import { fail, succeed, unwrap, type Answer, type Request } from '../core/messages';
 import { PORTAL_OPS, type PortalApi, type PortalOp } from '../core/portal';
+import { recordInForce, TERMS_KEY } from '../core/terms';
+import { startWorker, workerLive } from '../core/worker';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
-import { BUNDLED_KEYS, peek } from '../licensing/license';
-import { license, local, portalSettings, session, version } from '../ext/storage';
+import { BUNDLED_KEYS, peek, verifyLicense } from '../licensing/license';
+import { license, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 
 const POLL_ALARM = 'bridge.poll';
 const KILLLIST_ALARM = 'bridge.killlist';
 /** the report's floor: clients read the job's files no more than once a minute */
 const POLL_MINUTES = 1;
+/** the "start when my portal opens" setting asks the login node at most this often */
+const AUTO_START_EVERY_MS = 60_000;
+const ERROR_RETRY_MS = 30 * 60_000; // after a worker ended in error, auto-start waits half an hour before trying again
+/** a run set this recently may still be queued with no status.json yet; it is not started again */
+const FRESH_RUN_MS = 10 * 60_000;
 
 export interface RunState {
   /** the framework's state directory (the profile's shared_state_dir, expanded) */
   stateDir: string;
   /** the worker's name: its run directory is <stateDir>/<run> */
   run: string;
+  /** the job the start command reported; the status file carries the chain's current one */
   job: string;
-  /** the profile's site name, the first half of the session name */
+  /** the profile's site name */
   site?: string;
+  /** when this run was recorded here */
+  set_at?: string;
+  /** how it was started */
+  started_by?: 'button' | 'auto';
   status?: StatusFile;
   connection?: ConnectionFile;
+  /** what the registration block in rc.log says, when the files do not carry it yet */
+  registration?: { session_name?: string; environment_url?: string; capacity?: string };
   rc_tail?: string;
   updated?: string;
   error?: string;
@@ -54,8 +71,10 @@ export default defineBackground({
     void ensureAlarms();
 
     browser.alarms.onAlarm.addListener(async (alarm) => {
-      if (alarm.name === POLL_ALARM) await pollRun();
-      else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow();
+      if (alarm.name === POLL_ALARM) {
+        await pollRun();
+        await maybeAutoStart('alarm');
+      } else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow();
     });
 
     browser.runtime.onMessage.addListener((message: unknown, sender): Promise<Answer> | undefined => {
@@ -85,6 +104,8 @@ async function handle(msg: Request, sender: { tab?: { id?: number }; url?: strin
       const from = sender.url ? new URL(sender.url).origin : '';
       if (!settings || from !== settings.origin || from !== msg.origin || sender.tab?.id === undefined) return fail(new Error('hello from an unexpected origin'));
       await session.set(PORTAL_TAB_KEY, { tabId: sender.tab.id, origin: from } satisfies PortalTab);
+      // the portal tab just connected: the one moment the "start when my portal opens" setting acts on
+      void maybeAutoStart('hello');
       return succeed({ registered: true });
     }
     case 'portal.ping':
@@ -96,7 +117,7 @@ async function handle(msg: Request, sender: { tab?: { id?: number }; url?: strin
     case 'run.get':
       return succeed(await session.get<RunState>(RUN_KEY));
     case 'run.set': {
-      const state: RunState = { stateDir: msg.stateDir, run: msg.run, job: msg.job, ...(msg.site ? { site: msg.site } : {}) };
+      const state: RunState = { stateDir: msg.stateDir, run: msg.run, job: msg.job, ...(msg.site ? { site: msg.site } : {}), set_at: new Date().toISOString(), started_by: 'button' };
       await session.set(RUN_KEY, state);
       await pollRun();
       return succeed(await session.get<RunState>(RUN_KEY));
@@ -164,7 +185,7 @@ async function callPortal(op: PortalOp, args: unknown[]): Promise<unknown> {
   return unwrap(a);
 }
 
-/** the typed view of the page script's operations, for the background's own reads */
+/** the typed view of the page script's operations, for the background's own reads and starts */
 function portal(): PortalApi {
   return new Proxy({} as PortalApi, { get: (_t, op: string) => (...args: unknown[]) => callPortal(op as PortalOp, args) });
 }
@@ -181,15 +202,75 @@ async function pollRun(): Promise<void> {
     const conn = await p.readFileIfExists(paths.connection(state.stateDir, state.run));
     if (conn) next.connection = JSON.parse(conn) as ConnectionFile;
     const log = await p.readFileIfExists(paths.rcLog(state.stateDir, state.run));
-    if (log !== undefined) next.rc_tail = log.slice(-4000);
+    if (log !== undefined) {
+      next.rc_tail = log.slice(-4000);
+      // the registration block is the ground truth for the name and the link; the files echo it
+      const reg = parseRegistration(log);
+      if (reg.session_name || reg.environment_url) next.registration = reg;
+    }
+    const url = next.connection?.environment_url ?? next.status?.environment_url ?? next.registration?.environment_url;
+    if (url && !isEnvironmentUrl(url)) next.error = 'the job reported a link that is not a claude.ai/code environment link; it is not shown';
   } catch (e) {
     next.error = (e as Error).message;
   }
   await session.set(RUN_KEY, next);
+  await tellPages();
+}
+
+async function tellPages(): Promise<void> {
   try {
     await browser.runtime.sendMessage({ type: 'run.changed' } satisfies Request);
   } catch {
     /* no page open to hear it */
+  }
+}
+
+/**
+ * The "start my worker when I open my portal" setting. Off unless the student turned it on; even
+ * then it starts only when the terms and key are in order, the data statement was made this
+ * browser session, no worker is alive, and the scheduler floor allows one start. It asks the
+ * login node at most once a minute and records what it did for the panel to show.
+ */
+async function maybeAutoStart(trigger: 'hello' | 'alarm'): Promise<void> {
+  const prefs = await loadPrefs();
+  if (!prefs.auto_start) return;
+  const settings = await portalSettings();
+  if (!settings) return;
+  const last = await session.get<AutoStartNote>(AUTO_START_KEY);
+  if (last && Date.now() - new Date(last.attempted_at).getTime() < AUTO_START_EVERY_MS) return;
+  const note = async (outcome: string) => {
+    await session.set(AUTO_START_KEY, { attempted_at: new Date().toISOString(), outcome } satisfies AutoStartNote);
+    await tellPages();
+  };
+  const run = await session.get<RunState>(RUN_KEY);
+  if (run) {
+    if (workerLive(run.status)) return;
+    // a worker the student stopped stays stopped: only a click starts it again; a worker that ended in
+    // error is retried at most every half hour, never every minute
+    if (run.status?.state === 'stopped') return;
+    if (run.status?.state === 'error' && last && Date.now() - new Date(last.attempted_at).getTime() < ERROR_RETRY_MS) return;
+    if (!run.status && run.set_at && Date.now() - new Date(run.set_at).getTime() < FRESH_RUN_MS) return;
+  }
+  if (!(await pingPortal())) return;
+  if (!recordInForce(await local.get(TERMS_KEY))) return note('not started: the terms are not accepted in this browser');
+  const lic = await license();
+  const observed = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
+  const stored = await local.get<StoredKillList>(KILLLIST_KEY);
+  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: { accessId: bindIdentity(observed, lic?.identity?.accessId).accessId }, revoked: stored?.list.revoked_lids ?? [] });
+  if (!v.ok) return note(`not started: ${v.detail}`);
+  if (killListVerdict(stored, version(), v.payload?.lid).versionRevoked) return note('not started: this version has been withdrawn');
+  const ack = await session.get<Acknowledgement>(ACK_KEY);
+  const p = portal();
+  try {
+    const wait = await p.auditWait('scheduler');
+    if (wait > 0) return note(`waiting: the scheduler was asked less than a minute ago (${Math.ceil(wait / 1000)} s left)`);
+    const out = await startWorker(p, { name: prefs.worker_name, permissionMode: prefs.permission_mode, site: settings.site, ack });
+    const state: RunState = { stateDir: out.stateDir, run: prefs.worker_name, job: out.job, site: out.site, set_at: new Date().toISOString(), started_by: 'auto' };
+    await session.set(RUN_KEY, state);
+    await note(`${out.alreadyRunning ? 'found running' : 'started'} on the portal ${trigger === 'hello' ? 'connecting' : 'check'}: job ${out.job}`);
+    await pollRun();
+  } catch (e) {
+    await note(`not started: ${(e as Error).message}`);
   }
 }
 

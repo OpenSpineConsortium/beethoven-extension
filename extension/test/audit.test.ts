@@ -1,7 +1,9 @@
-// The chokepoint: every request leaves a record, the floors hold, tokens never reach the log,
-// a withdrawn version sends no commands.
+// The chokepoint: every request leaves a record, the floors hold and each class keeps its own
+// clock, commands are classed by what they cost the cluster, tokens never reach the log, a
+// withdrawn version sends no commands, and a cleared log keeps the clocks.
 import { describe, expect, it } from 'vitest';
-import { Audit, AUDIT_KEY, FloorError, RevokedError, type AuditRecord } from '../src/core/audit';
+import { Audit, AUDIT_KEY, classifyCommand, clearRecordsKeepingClocks, FloorError, RevokedError, type AuditRecord } from '../src/core/audit';
+import { commands } from '../src/core/contract';
 import { auditEndpoint, redact } from '../src/core/redact';
 import { memoryKV } from './helpers';
 
@@ -28,23 +30,55 @@ describe('audit chokepoint', () => {
 
   it('holds the 60 s floor for scheduler-facing calls and records the refusal', async () => {
     const { audit, tick } = clockAudit();
-    await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'scheduler' }, ok(1));
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'scheduler' }, ok(1));
     tick(20_000);
     let err: unknown;
     try {
-      await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'scheduler' }, ok(2));
+      await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'scheduler' }, ok(2));
     } catch (e) {
       err = e;
     }
     expect(err).toBeInstanceOf(FloorError);
     expect((err as FloorError).waitMs).toBe(40_000);
+    expect((err as FloorError).message).toMatch(/the cluster scheduler was asked less than 60 s ago; wait 40 s/);
     expect(await audit.waitFor('scheduler')).toBe(40_000);
     // the shell class has its own clock; files are not held by the scheduler floor
     await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/files/fs/home', cls: 'files' }, ok(3));
     tick(40_000);
-    expect(await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'scheduler' }, ok(4))).toBe(4);
+    expect(await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'scheduler' }, ok(4))).toBe(4);
     const outcomes = (await audit.records()).map((r) => r.outcome);
     expect(outcomes.some((o) => /refused: floor \(40 s left\)/.test(o))).toBe(true);
+  });
+
+  it('keeps one clock per class: a submit, a job-list read and a discovery back to back are all admitted', async () => {
+    const { audit, tick } = clockAudit();
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'discover' }, ok(1));
+    await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'jobs' }, ok(2));
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'scheduler' }, ok(3));
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shell' }, ok(4));
+    // each of the four is now on its own 60 s (15 s for the shell) clock
+    await expect(audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'jobs' }, ok(5))).rejects.toMatchObject({ cls: 'jobs' });
+    await expect(audit.request({ method: 'DELETE', endpoint: '/pun/sys/dashboard/activejobs?cluster=x&pbsid=1', cls: 'jobs' }, ok(5))).rejects.toBeInstanceOf(FloorError);
+    await expect(audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'discover' }, ok(6))).rejects.toMatchObject({ cls: 'discover' });
+    tick(16_000);
+    expect(await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shell' }, ok(7))).toBe(7);
+    expect(await audit.waitFor('jobs')).toBe(44_000);
+    expect(await audit.waitFor('files')).toBe(0);
+  });
+
+  it('classes a command line by what it costs: submit and cancel are scheduler, the discovery batch is discover, the rest is shell', () => {
+    expect(classifyCommand(commands.workerStart('worker', 'default'))).toBe('scheduler');
+    expect(classifyCommand(commands.workerStop('worker'))).toBe('scheduler');
+    expect(classifyCommand(commands.probe())).toBe('scheduler');
+    expect(classifyCommand('sbatch --parsable job.sbatch')).toBe('scheduler');
+    expect(classifyCommand('scancel 123')).toBe('scheduler');
+    // the discovery's fallback contains one sinfo: a scheduler read, on its own clock, never the submit clock
+    expect(classifyCommand(commands.discover())).toBe('discover');
+    expect(classifyCommand(commands.diag())).toBe('discover');
+    expect(classifyCommand('squeue -h -j 1')).toBe('discover');
+    expect(classifyCommand(commands.install('wayne'))).toBe('shell');
+    expect(classifyCommand('true')).toBe('shell');
+    expect(classifyCommand('echo hello')).toBe('shell');
   });
 
   it('never stores a token: csrf query values, licence keys, sk-ant keys and bearer tokens are redacted', async () => {
@@ -76,13 +110,18 @@ describe('audit chokepoint', () => {
     expect(r.at(-1)?.outcome).toBe('refused: this version has been withdrawn');
   });
 
-  it('exports JSON lines and clears without forgetting the floor', async () => {
-    const { audit } = clockAudit();
-    await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/activejobs.json', cls: 'scheduler' }, ok(1));
+  it('exports JSON lines and clears without forgetting the floor, from the chokepoint and from a page', async () => {
+    const { audit, kv } = clockAudit();
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'scheduler' }, ok(1));
     const text = await audit.exportText();
     expect(text.trim().split('\n')).toHaveLength(1);
-    expect(JSON.parse(text.trim())).toMatchObject({ method: 'GET' });
+    expect(JSON.parse(text.trim())).toMatchObject({ method: 'WS' });
     await audit.clear();
+    expect(await audit.records()).toHaveLength(0);
+    expect(await audit.waitFor('scheduler')).toBe(60_000);
+    // the panel's fallback when the page script is away: the same rule, straight on storage
+    await audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/files/fs/h', cls: 'files' }, ok(2));
+    await clearRecordsKeepingClocks(kv);
     expect(await audit.records()).toHaveLength(0);
     expect(await audit.waitFor('scheduler')).toBe(60_000);
   });

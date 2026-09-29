@@ -14,7 +14,7 @@ watches and stops that job through the student's existing Open OnDemand session,
 | Component | What it is | Reused from Ashley 2.0.0 | New here |
 |---|---|---|---|
 | Framework (`framework/`, `hpcworker`) | Shell plus Python installed in the student's home or group volume: site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix |
-| Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; `~/.claude` bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
+| Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.ashley/claude` on Wayne State) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
 | Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The signed-key licence gate (`grid/license.js`: `ASHLEY1.<b64url payload>.<b64url sig>`, Ed25519, revocation list `ASHLEYREV1`, public keys `k1` and `trial`); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver; Files and Active Jobs clients; side panel (Chrome/Edge), `sidebar_action` (Firefox), popup (Safari); on-device audit log; kill-list verifier |
 | Licence and access service | Ashley's existing activation endpoint, plus a signed JSON document carrying revocations and the kill-list, served over HTTPS | Key issuance, AccessID binding, merchant of record | Kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
@@ -24,9 +24,10 @@ Two things are deliberately absent (report, "Components and what each reuses"): 
 `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no read of `~/.claude/.credentials.json`, no multi-account
 rotation). What is carried over from Ashley's `grid/phone.js` is the behaviour, not the code: run
 `claude remote-control` in a pseudo-terminal, strip every credential variable and
-`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` from its environment, answer the one-time consent only from
-a marker the student wrote themselves, restart with backoff, parse the session name, and never run
-`claude auth logout` (it would revoke the login).
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` from its environment, take the one-time consent only from
+the student's own recorded answer (Claude Code's `remoteDialogSeen` key, section 4.1; a marker file
+the student wrote is the fallback), restart with backoff, parse the session name and link, and never
+run `claude auth logout` (it would revoke the login).
 
 ## 2. The site profile
 
@@ -72,8 +73,9 @@ with `qos_batch`, because on Wayne State short allocations go to `secp`/`seconda
 to `reqp`/`requeue`; `node_tmp` as a literal pattern with `tmpdir_is_node_local` alongside
 `node_tmp_var`; `runtime_bin`; `image_store` as `{type: sandbox|sif, path}`; `claude_bin` as seen
 inside the container; `binds`; `claude_config_dir` (the student's own Claude Code login directory,
-which the framework never reads) and `consent_markers` (files whose presence records the student's
-Remote Control consent, the `phone.js` pattern); `home_filesystem`; `worker_defaults`; and the
+whose credential the framework never reads) and `consent_markers` (fallback files whose presence
+records the student's Remote Control consent, the `phone.js` pattern; the primary signal is Claude
+Code's own `remoteDialogSeen` key, section 4.1); `home_filesystem`; `worker_defaults`; and the
 measured egress result kept under `egress.measured` with its date and node. The profile is the one
 place a site's facts live; the probe job corrects it and the templates render from it.
 
@@ -110,19 +112,31 @@ writable working directory; scheduler polling never faster than the profile's fl
 
 ## 4. The job template and the Remote Control launch sequence
 
-### 4.1 The one-time interactive step (the student's, not the tool's)
+### 4.1 The one-time step, in one sitting (the student's answers, not the tool's)
 
-From an interactive allocation on a compute node (`srun --pty` on the CPU partition, or an Open
-OnDemand interactive shell followed by `srun --pty`; never on the login node), inside the worker image:
+`hpcworker claude login`, typed once in the portal's Shell tab, asks the scheduler for a short
+allocation on the CPU partition (never the login node) and, inside the worker image:
 
-1. `claude auth login`, paste-code flow. The credential lands in `~/.claude/.credentials.json`, mode
-   0600, on the shared home, readable only by the student. Measured on Wayne State 2026-09-28: the
-   paste-code login completed from a compute node inside the image; `claude auth status` reports
-   `loggedIn: true`, plan `max`.
-2. `cd` into the project directory. Not `$HOME`: trust is never saved there and the question returns
-   on every run.
-3. `claude remote-control` once; answer `Enable Remote Control? (y/n)` and `Trust <directory>? [y/N]`;
-   confirm the session appears at claude.ai/code; Ctrl-C.
+1. runs `claude auth login`, paste-code flow. The credential lands in
+   `<claude_config_dir>/.credentials.json` (on Wayne State `$HOME/.ashley/claude`, Ashley's
+   `CLAUDE_CONFIG_DIR`), mode 0600, readable only by the student. Measured on Wayne State 2026-09-28:
+   the paste-code login completed from a compute node inside the image; `claude auth status` reported
+   `loggedIn: true`, plan `max` (that login was lost with its folder later the same evening;
+   `SECURITY.md`, incident record).
+2. then, if Claude Code has not yet recorded the student's answer, runs `claude remote-control` once
+   in the worker's workspace, so the student answers `Enable Remote Control? (y/n)` (and the trust
+   question if it is asked), sees the registration block, and presses Ctrl-C, in the same sitting. No
+   separate consent command is needed; `hpcworker claude consent` remains as an alias that explains
+   this. The workspace, not `$HOME`, is where the trust answer is saved: trust is never saved for
+   `$HOME`, and the question would return on every run.
+
+The consent signal is Claude Code's own. Claude Code records the answer in
+`<claude_config_dir>/.claude.json` as `remoteDialogSeen: true` (alongside a `remoteControlMachineId`),
+and directory trust as `projects[<dir>].hasTrustDialogAccepted: true`. The framework reads those two
+boolean keys and nothing else from that file; a marker file (`consent_markers` in the profile) is only
+a fallback. The framework never rewrites that file except to seed `hasCompletedOnboarding`, `theme`
+and the workspace's `hasTrustDialogAccepted`, and only when the student has started a login or a
+worker on purpose; a status check writes nothing.
 
 The extension guides this with text and checks afterwards (checks 13 and 14); it never types the
 answers. Remote Control requires a full-scope login: `setup-token` and `CLAUDE_CODE_OAUTH_TOKEN`
@@ -135,7 +149,9 @@ Ashley's earlier `setup-token` capture is gone rather than supplemented.
 One file rendered from the profile.
 
 Header directives: `--partition`, `--qos`, `--account`, `--time`, `--tmp`, `--requeue`,
-`--signal=B:TERM@120`, `-D <shared_state_dir>/<run>` (so `--output` resolves where intended).
+`--signal=B:TERM@120`, `-D <shared_state_dir>/<run>` (so `--output` resolves where intended); a
+successor in the always-on chain (below) is the same rendered file submitted with
+`--dependency=afterany:<predecessor>`.
 
 Fixed body, in order:
 
@@ -150,12 +166,23 @@ Fixed body, in order:
    never on a command line or in the environment of a submitted job.
 5. Write `status.json` with `state: starting`.
 6. Start the Remote Control process (4.3).
-7. Write `connection.json`: `host`, `port` if the optional `/rnode/` service is enabled, `pid`,
-   `started_at`, `session_name`, `token_path`.
+7. Write `connection.json`: `session_name` (the line of the registration block that carries the
+   name: `<site>-<jobid>` when Claude Code accepts `--name`, otherwise its generated one, of the form
+   `asx10-hazy-meadow`), `environment_url` (`https://claude.ai/code?environment=env_...`, the link the
+   extension's *Open in Claude* button opens), `host`, `port` if the optional `/rnode/` service is
+   enabled, `pid`, `started_at`, `token_path`.
 8. A `SIGTERM` trap that flushes `status.json` (`state: preempted`, `resume_hint`) and exits cleanly.
+9. Before the wall time ends (at the `--signal=B:TERM@120` warning at the latest), queue exactly one
+   successor: `sbatch --dependency=afterany:$SLURM_JOB_ID` of the same rendered script, its id
+   recorded in the run directory so a second submission is refused. A stop file ends the chain: no
+   successor is queued, and a successor that was already queued exits at once when it starts. The
+   worker is always on until the student stops it; `afterany`, never `afterok`, so a predecessor that
+   ends non-zero for a trivial reason does not strand the chain.
 
 All persistence lives on shared storage; `/tmp` is treated as ephemeral; nothing runs on the login node
-beyond the one `sbatch`. Compared with Ashley's `worker.sbatch.tpl`, what changes is the payload
+beyond the one `sbatch`. The job's cleanup trap removes only its own node-local temp and its `/dev/shm`
+directory; the framework deletes nothing outside its own run directories (`SECURITY.md`, the incident
+of 2026-09-28). Compared with Ashley's `worker.sbatch.tpl`, what changes is the payload
 (`claude remote-control` in `tmux` instead of the inbox daemon) and the status files; what stays is the
 `/dev/shm` scratch bound to `/tmp`, the `--signal=B:TERM@120`, `--requeue` with `--open-mode=append`,
 the read-only bind of the host's Slurm client into the container, and the refusal to start when a piece
@@ -177,18 +204,36 @@ fallback, and is what Ashley's `phone.js` uses today. Supervised mode (`--permis
 the default so every command is approved from the app, which is what Utah, NERSC and USC require of
 agents on their systems; a student may choose a broader mode knowingly.
 
-The extension surfaces the session name and the instruction "Open claude.ai/code, or tap Code in the
-Claude app, and find `<site>-<jobid>`". Sessions are found by name, so no QR code is needed.
+The registration block of Claude Code 2.1.283, after the QR code, is what the loop parses:
 
-On preemption or wall-time expiry the next job runs `claude remote-control --continue` in the same
-directory; the documentation says this works for about four hours after the server stopped; whether it
-survives a Slurm requeue is open question 4. If `rc.log` shows the full-scope-token error, the
-extension tells the student to run `claude auth login` again on a node and does nothing else: a
-Remote Control session that outlives the login stops making progress.
+```
+·✔︎· Connected · phone · HEAD
+    Capacity: 1/32 · New sessions will be created in the current directory
+    asx10-hazy-meadow
+Continue coding in the Claude mobile app or https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt
+Or ask Claude to work in this folder from your projects on claude.ai
+```
 
-Whether `claude remote-control` stays registered from an `sbatch` job under `tmux` at all is open
-question 1, the first thing to run. No published account shows it under `sbatch`; the launch sequence
-is inferred from documented TTY behaviour and a community report of it working over SSH plus `tmux`.
+The name line and the `https://claude.ai/code?environment=...` URL go into `connection.json` as
+`session_name` and `environment_url`. The environment id is stable per machine id, so a second host on
+the same login joins the same environment. The extension shows a green *Open in Claude* button that
+opens `environment_url` in a new tab with `browser.tabs.create` (which needs no `tabs` permission and
+puts no code on claude.ai) and a *Copy link* button; it still names the session for students who
+prefer to pick it at claude.ai/code or under *Code* in the Claude app. No QR code is needed.
+
+The worker is always on. The successor queued with `afterany` reconnects the same session:
+`claude remote-control --continue` in the same directory when `connection.json` is younger than four
+hours (the documented recovery window), else a fresh registration, which lands in the same
+environment. Whether `--continue` survives a Slurm requeue is open question 4. If `rc.log` shows the
+full-scope-token error, the extension tells the student to run `hpcworker claude login` again and does
+nothing else: a Remote Control session that outlives the login stops making progress.
+
+Whether `claude remote-control` stays registered from an `sbatch` job at all was open question 1. It
+was answered yes on 2026-09-29 (02:22 UTC): Ashley's phone host, Slurm job 40496445 on `asx15`, `sbatch` under a
+pseudo-terminal with the student's answer already on record, registered and served a session opened
+from the phone (`OPEN_QUESTIONS.md`). Before that no published account showed it under `sbatch`; the
+launch sequence had been inferred from documented TTY behaviour and a community report of it working
+over SSH plus `tmux`.
 
 Session lifetime is the Slurm wall time. Server mode gives up after roughly ten minutes of network
 outage and exits; the framework restarts it with backoff while the job lives.
@@ -247,11 +292,30 @@ the Safari build for Apple's packager. `browser.*` with Promises, no polyfill (t
 | Safari | assumed to die within tens of seconds | popup or a pinned extension tab | content script for everything | per-site prompt on first visit; see `MAC_AND_SAFARI.md` |
 
 The `alarms` API enforces the ≥60-second scheduler-facing floor by construction, since Chrome will not
-honour periods under 30 seconds. Connection state lives in `storage.session`; only the portal
-hostname, the granted origin, UI preferences and the agreement-acceptance record live in
-`storage.local`; there is no durable secret. The content script is registered programmatically with
-`scripting.registerContentScripts` for the one granted origin after the click-time grant, because the
-host is not known at build time. Messages are accepted only after checking `sender.id`.
+honour periods under 30 seconds. `storage.local` holds the portal hostname and granted origin,
+preferences, the acceptance record, the licence key and institutional identifier, the audit log, the
+last good kill-list, a random installation identifier, copies of error reports and the ticks on the
+optional checklist steps; `storage.session` holds connection state (job number, session name, the
+session's claude.ai link) and this session's acknowledgement of the data disclosure; there is no
+durable secret (`PRIVACY.md` and `SECURITY.md` carry the same list; the report's own sentence names
+four items and says "only", but the licence key, the audit log and the last good kill-list that its
+security controls also require are durable, so the list here is the complete one). The content script is registered
+programmatically with `scripting.registerContentScripts` for the one granted origin after the
+click-time grant, because the host is not known at build time. Messages are accepted only after
+checking `sender.id`.
+
+Three panel items decided on 2026-09-29:
+
+- **Open in Claude.** A green button, shown when `connection.json` carries `environment_url`, opens
+  that link in a new tab with `browser.tabs.create` (no `tabs` permission is needed for `create`, and
+  nothing of the extension runs on the page opened); *Copy link* beside it copies the URL.
+- **Start my worker when I open my portal.** A setting, off by default and explained in one sentence
+  where it is switched on: when the portal tab is connected and the worker's status is not online, the
+  extension runs the same start the button runs, through the same chokepoint, so the 60 s
+  scheduler-facing floor still holds.
+- **Connect Google Drive in claude.ai.** A checklist step that opens
+  `https://claude.ai/settings/connectors` in a new tab with one sentence of instruction and a *done*
+  box stored in `storage.local` as one boolean. The extension has no presence on that page.
 
 ### Manifest
 
@@ -306,6 +370,15 @@ From the report's "Security controls", in the order a reviewer will look for the
   read-only with a separate writable working directory; scheduler polling never faster than the
   profile's floor; tokens never on command lines, in argv, in logs, in job files or in
   `sbatch --export`.
+- **Nothing deleted outside the run directories.** The framework removes only what is under its own
+  `<shared_state_dir>/<run>/` and the job's node-local temp and `/dev/shm` directory; never the Claude
+  Code login directory, the workspace, another run or anything else under `$HOME`. A destructive
+  subcommand refuses when `CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar agent marker is in the
+  environment, or when stdin is not a terminal. Added after the incident of 2026-09-28 (`SECURITY.md`).
+- **Claude Code's settings file, two keys.** `<claude_config_dir>/.claude.json` is read for
+  `remoteDialogSeen` and the workspace's `hasTrustDialogAccepted` only, and rewritten only to seed
+  `hasCompletedOnboarding`, `theme` and that trust key, only when the student has started a login or a
+  worker on purpose. The credentials file beside it is never opened.
 
 The data disclosure the extension shows at first run and at each job start, in the report's words:
 files the worker reads and every command's output are sent to Anthropic; while you are connected
@@ -348,5 +421,6 @@ or temp size, and the probe overwrites it.
   sessions started from claude.ai/code), in public beta on Team and Enterprise only; the target if a
   department buys such a plan. The framework built here serves it.
 - **A TTY-free `claude remote-control --headless`.** Requested upstream since March 2026 with no
-  response; if open question 1 fails, this request, the partner-site app and the self-hosted runner are
-  the fallbacks, not interception.
+  response. Open question 1 was answered yes on 2026-09-29 (02:22 UTC), so this is no longer a fallback the
+  product needs; had it failed, this request, the partner-site app and the self-hosted runner would
+  have been the fallbacks, not interception.

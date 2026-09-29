@@ -38,17 +38,35 @@ licensor when it exists). The product name and identifier carry no university na
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
   refuses only on a verified revocation.
-- **Grid etiquette (C&IT, 2026-09-28).** Nothing runs on the login node beyond one `sbatch`, `squeue`
-  or `scancel`; no container command on the login node; container temp and cache on the compute node's
-  local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne State `$TMPDIR` is NOT node-local, it
-  points at CephFS, so never trust `$TMPDIR` blindly); IPC under `/dev/shm`; scheduler polling never
-  faster than 60 s from clients (the job writes `status.json`; clients read the file); every job has a
-  wall time.
+- **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
+  action; no container command on the login node and nothing of ours under its `/tmp`; container temp
+  and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne State
+  `$TMPDIR` is NOT node-local, it points at CephFS, so never trust `$TMPDIR` blindly); IPC under
+  `/dev/shm`; scheduler polling never faster than 60 s from clients (the job writes `status.json`;
+  clients read the file); every job has a wall time. Attribute these exactly when writing for anyone
+  outside: only "nothing container-related on `warrior` and nothing of ours under its `/tmp`" is
+  C&IT's instruction (2026-09-28); the 20-process login-node cap is Wayne State's published policy;
+  the 60 s floor and the wall-time rule are this product's own etiquette, taken from the strictest
+  published rules in the sample and Ashley's licence, and C&IT never stated them.
+- **Nothing is deleted outside the framework's own run directories and node-local temp.** On
+  2026-09-28 at 22:34 local the student's whole `~/.ashley` folder on the grid was deleted while a
+  Remote Control session spawned from the phone was open, and the Claude login inside it was lost;
+  which process did it is not established. No software of ours may ever be able to do that: never
+  the Claude Code login directory, the workspace, another run or anything else under `$HOME`. A
+  destructive subcommand refuses when `CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar agent marker is
+  in the environment, or when stdin is not a terminal.
+- **The consent signal is Claude Code's own.** Claude Code records the student's answer to "Enable
+  Remote Control?" in `<CLAUDE_CONFIG_DIR>/.claude.json` as `remoteDialogSeen: true` (with
+  `remoteControlMachineId`), and directory trust as `projects[<dir>].hasTrustDialogAccepted: true`.
+  Read those two boolean keys and nothing else from that file; a marker file is only a fallback. Never
+  rewrite that file except to seed `hasCompletedOnboarding`, `theme` and the workspace's
+  `hasTrustDialogAccepted`, and only when the student has started a login or a worker on purpose.
 - **Students see one path and no internals.** Plain words in anything student-facing; no close codes,
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition, version 1). The copies the extension ships in `extension/public/` must be byte-identical to
+  Edition; `LICENSE.txt` version 1, `PRIVACY.md` version 2 since the Google Drive step stores one
+  local boolean). The copies the extension ships in `extension/public/` must be byte-identical to
   them at build time. Change a text and its version together (integer). Never pre-tick a box; the button
   label is part of the record; a changed agreement is shown again and accepted again.
 - Never use the word "provenance". Versions are integers (1.0.0, 2.0.0), never fractional.
@@ -61,8 +79,8 @@ licensor when it exists). The product name and identifier carry no university na
 
 - `framework/`: bash 4.2 plus Python 3.6 standard library only (the Wayne State login node is
   CentOS 7). `lib/profile.py` (site profile schema and CLI), `lib/adapters/{common,slurm,pbs,lsf}.sh`
-  (the eight-call adapter interface), `profiles/<site>.json`, the job template and probe job, and
-  `bin/hpcworker` (referenced by the adapters; confirm it exists before relying on it).
+  (the eight-call adapter interface), `profiles/<site>.json`, the job template and probe job,
+  `bin/hpcworker` (the one command) and `tests/` (`run.sh`, three unittest files, fixtures).
 - `extension/`: WXT 0.21 plus TypeScript, `browser.*` with Promises, no polyfill; `wxt.config.ts` holds
   the manifest exactly as the report's permission table specifies it; `src/core/` (audit chokepoint,
   net, redact, shell driver), `src/licensing/` (key and kill-list verification), `src/entrypoints/`
@@ -78,23 +96,26 @@ eat backslashes, so write scripts with the Write tool and run them by path; line
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH
-cd extension && npm ci
-npm run typecheck && npm test            # tsc --noEmit; vitest
-npm run build                            # wxt build -b chrome && wxt build -b firefox --mv2 (runs sync-framework first)
+cd extension && npm ci                   # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0
+npm run typecheck && npm test            # tsc --noEmit; vitest (the mock portal starts itself on an ephemeral port)
+npm run build                            # wxt build -b chrome && wxt build -b firefox --mv2 (sync-framework runs first)
 npm run zip                              # store zips; wxt zip -b firefox also yields the AMO source zip
 npm run build:safari                     # then xcrun safari-web-extension-packager on a Mac
-npm run mock                             # the mock Open OnDemand portal for reviewers and tests
+npm run build:dev                        # the Chrome build that can connect http://localhost, for the mock
+npm run mock                             # node mock-ood/server.mjs, port 8080 by default (--port N); flags in extension/README.md
 ```
 
 ```
+HPCW_PYTHON=python bash framework/tests/run.sh   # bash -n, the rendered template, LF check, 54 unittest cases (about 30 s)
 python -X utf8 framework/lib/profile.py validate framework/profiles/wayne.json
 python -X utf8 framework/lib/profile.py schema
 bash -n framework/lib/adapters/*.sh      # syntax; shellcheck where installed
-bash framework/tests/run.sh              # TO BE CONFIRMED: the framework stream's test entry point
 ```
 
-The extension commands above are the ones in `extension/package.json`; the framework's test entry point
-was not present when this file was written and is marked to be confirmed. Anything that runs a
+On this Windows machine `HPCW_PYTHON=python` is required: `run.sh` tries `python3` first, which here is
+the Microsoft Store stub ("Python was not found"), and the run fails without it. On the grid login node
+`HPCW_PYTHON=/usr/bin/python3 bash tests/run.sh` passes under Python 3.6. The extension commands are
+the ones in `extension/package.json`, described in `extension/README.md`. Anything that runs a
 container, a scheduler call or Claude Code runs on the grid inside a Slurm job, never on the login
 node and never on the laptop.
 
@@ -106,13 +127,33 @@ node and never on the laptop.
 `gmsap`/`gvohp` for GPU; state under `/rs/rs_grp_oschome/$USER/hpcworker` (CephFS; the home is a
 Panasas soft quota); node-local temp `/tmp/$USER/hpcworker_$SLURM_JOB_ID`; the shared worker image at
 `/rs/rs_grp_oschome/shared/ashley/containers/claude-node22` with `module load apptainer/1.2.2`; the
-student's Claude Code login in `$HOME/.ashley/claude`. `#SBATCH --output` resolves against the submit
-directory (use `-D`); chain with `afterany`, never `afterok`; `/tmp` is swept while jobs run.
+student's Claude Code login in `$HOME/.ashley/claude` (the profile's `claude_config_dir`, Ashley's
+`CLAUDE_CONFIG_DIR`). `#SBATCH --output` resolves against the submit directory (use `-D`); chain with
+`afterany`, never `afterok`; `/tmp` is swept while jobs run.
 
 Measured 2026-09-28: compute-node egress from `asx15`, direct, `api.anthropic.com` 404 (reachable),
 `platform.claude.com` 200, `claude.ai` 403 to curl, `statsig.anthropic.com` no DNS record; paste-code
-`claude auth login` completed from a compute node inside the image, `claude auth status` `loggedIn:
-true`, plan `max`. Not yet measured: Remote Control from `sbatch` under `tmux` (open question 1).
+`claude auth login` completed from a compute node inside the image, into `$HOME/.ashley/claude`,
+`claude auth status` `loggedIn: true`, plan `max` (that login was lost with the folder at 22:34 local
+the same evening and has to be redone). Measured 2026-09-29 (02:22 UTC): Remote Control registers from an `sbatch`
+job under a pseudo-terminal with the answer on record (Ashley's phone host, job 40496445, `asx15`);
+open question 1 is yes. The registration block of `claude remote-control` 2.1.283 ends with the session
+name on its own line (like `asx10-hazy-meadow`) and
+`https://claude.ai/code?environment=env_...`; `connection.json` carries both as `session_name` and
+`environment_url`, and the environment id is stable per machine id.
+
+Decided 2026-09-29, being built this week (the documents already describe it; check the code before
+claiming it is there): the worker is always on (the job queues one successor with
+`sbatch --dependency=afterany:$SLURM_JOB_ID` of the same rendered script before its wall time ends, at
+most one, ended by a stop file; the successor runs `claude remote-control --continue` in the same
+directory when `connection.json` is younger than 4 h, else registers afresh in the same environment);
+`hpcworker claude login` is one sitting (`claude auth login`, then `claude remote-control` once in the
+workspace if `remoteDialogSeen` is not yet true; `claude consent` stays as an alias that explains);
+the panel's green *Open in Claude* button opens `environment_url` with `browser.tabs.create` (no
+`tabs` permission is needed for `create`) with *Copy link* beside it; an opt-in setting, off by
+default, starts the worker when the portal tab connects and status is not online, at the 60 s floor;
+a checklist step opens `https://claude.ai/settings/connectors` in a new tab with one sentence and a
+local *done* tick.
 
 ## How to be useful here
 

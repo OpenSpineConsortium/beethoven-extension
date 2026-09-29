@@ -1,8 +1,11 @@
 // Sections shared by the setup page and the panel: connecting a portal, the plan-class
-// disclosure with the data-classification acknowledgement, and the licence/agreement status line.
+// disclosure with the data-classification acknowledgement, the Google Drive step, and the
+// licence/agreement status line.
+import { browser } from 'wxt/browser';
 import { ACK_KEY, ackCovers, ackSubject, DATA_CLASSIFICATION_STATEMENT, PLAN_CLASS_DISCLOSURE, type Acknowledgement } from '../core/disclosure';
-import { paths, stateDirFrom } from '../core/contract';
-import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, PREFS_KEY, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
+import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
+import { bindIdentity, identityNote, type IdentitySource } from '../core/identity';
+import { CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, PREFS_KEY, type Checklist, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
 import { recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
 import { BUNDLED_KEYS, verifyLicense } from '../licensing/license';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
@@ -13,6 +16,9 @@ import { activeTabOrigin, connectPortal, disconnectPortal, openPortalTab, portal
 export interface Notify {
   (kind: 'ok' | 'warn' | 'fail' | 'info', text: string): void;
 }
+
+/** the claude.ai page where a student connects Google Drive; opened in a tab, never scripted */
+export const CONNECTORS_URL = 'https://claude.ai/settings/connectors';
 
 /** Connect / disconnect. `active` is the toolbar tab, known only when the popup opened from it. */
 export function connectSection(settings: PortalSettings | undefined, onChange: () => void, notify: Notify, active?: { origin: string; tabId: number; path: string }): HTMLElement {
@@ -70,16 +76,28 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
   return box;
 }
 
-/** where the named worker works on the cluster, when the portal can tell us; else the relative form */
-export async function workspaceFor(workerName: string): Promise<{ path: string; known: boolean }> {
+export interface WorkspaceInfo {
+  path: string;
+  /** the path was read from the profile through the portal */
+  known: boolean;
+  /** the workspace is marked restricted (its .restricted file, or the profile) */
+  restricted: boolean;
+  markerPath?: string;
+}
+
+/** where the named worker works on the cluster, and whether it is marked restricted, when the portal can tell us */
+export async function workspaceFor(workerName: string): Promise<WorkspaceInfo> {
   try {
     if (!(await portalAlive())) throw new Error('no portal tab');
     const home = await portal.home();
     const user = (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
     const profile = await portal.readFileIfExists(paths.profile(home));
-    return { path: paths.workspace(stateDirFrom(profile, { home, user }), workerName), known: true };
+    const stateDir = stateDirFrom(profile, { home, user });
+    const markerPath = paths.restrictedMarker(stateDir, workerName);
+    const marked = profileRestricts(profile, workerName) || (await portal.readFileIfExists(markerPath)) !== undefined;
+    return { path: paths.workspace(stateDir, workerName), known: true, restricted: marked, markerPath };
   } catch {
-    return { path: `<state directory>/${ackSubject(workerName)}`, known: false };
+    return { path: `<state directory>/${ackSubject(workerName)}`, known: false, restricted: false };
   }
 }
 
@@ -90,21 +108,39 @@ export async function ackSection(onChange: () => void): Promise<HTMLElement> {
   const box = el('div', { class: 'card' });
   const name = el('input', { type: 'text', value: prefs.worker_name, placeholder: 'worker', 'aria-label': 'Worker name', pattern: '[A-Za-z0-9_-]{1,32}' });
   const where = el('div', { class: 'muted small mono' });
+  const restrictedLine = el('div', { class: 'small' });
+  const markButton = el('button', { class: 'small', text: 'Mark this workspace restricted', hidden: true });
   const tick = el('input', { type: 'checkbox', id: 'ack-tick' });
   const status = el('div', { class: 'status', role: 'status' });
   const covered = ackCovers(ack, ackSubject(prefs.worker_name));
+  let current: WorkspaceInfo | undefined;
   const showWhere = async () => {
     const w = await workspaceFor(name.value.trim() || 'worker');
+    current = w;
     where.textContent = w.known ? `workspace on the cluster: ${w.path}` : `workspace on the cluster: ${w.path} (the exact path is read from the profile once the portal is connected and the tool installed)`;
+    restrictedLine.className = w.restricted ? 'fail small' : 'muted small';
+    restrictedLine.textContent = w.restricted ? `This workspace is marked restricted: the worker will not start there. To lift the mark, remove ${w.markerPath ?? RESTRICTED_MARKER} yourself in the portal's Files app; Ashley Bridge never deletes anything.` : w.known ? 'Not marked restricted.' : '';
+    markButton.hidden = !w.known || w.restricted;
   };
+  markButton.addEventListener('click', async () => {
+    if (!current?.markerPath) return;
+    try {
+      await portal.touch(current.markerPath);
+      status.textContent = '';
+      await showWhere();
+    } catch (e) {
+      status.textContent = `Could not write the marker: ${(e as Error).message}`;
+    }
+  });
   void showWhere();
   name.addEventListener('change', () => void showWhere());
   add(box,
     el('h3', { text: 'Where your work goes' }),
     el('ul', {}, ...PLAN_CLASS_DISCLOSURE.map((s) => el('li', { text: s }))),
-    el('p', { class: 'small muted', text: 'This is asked once per browser session and before every start. The worker refuses to start until you have made this statement about its workspace.' }),
+    el('p', { class: 'small muted', text: 'This is asked once per browser session and before every start. The worker refuses to start until you have made this statement about its workspace, and never starts in a workspace you have marked restricted.' }),
     el('div', { class: 'row' }, el('label', { for: 'worker-name', text: 'Worker name (its run directory and workspace are named after it): ' }), name),
     where,
+    el('div', { class: 'row' }, restrictedLine, markButton),
     el('div', { class: 'box' }, tick, el('label', { for: 'ack-tick', text: DATA_CLASSIFICATION_STATEMENT })),
     el('div', { class: 'row' },
       el('button', {
@@ -128,6 +164,32 @@ export async function ackSection(onChange: () => void): Promise<HTMLElement> {
   return box;
 }
 
+/**
+ * The Google Drive step: one sentence, a button that opens claude.ai's connectors page in a new
+ * tab (nothing of ours runs there), and a "done" box the student ticks themselves, kept on this
+ * device only.
+ */
+export async function driveStep(onChange: () => void, compact = false): Promise<HTMLElement> {
+  const list = (await local.get<Checklist>(CHECKLIST_KEY)) ?? {};
+  const done = !!list.drive_connected_at;
+  const box = el('div', { class: compact ? 'row' : 'card' });
+  const tick = el('input', { type: 'checkbox', id: 'drive-done', checked: done });
+  tick.addEventListener('change', async () => {
+    await local.set(CHECKLIST_KEY, { ...list, drive_connected_at: tick.checked ? new Date().toISOString() : undefined } satisfies Checklist);
+    onChange();
+  });
+  const open = el('button', { text: 'Open claude.ai connectors', onClick: () => void browser.tabs.create({ url: CONNECTORS_URL }) });
+  if (compact) {
+    add(box, el('span', { class: 'small muted', text: 'Optional: connect Google Drive in claude.ai so your worker sessions can read your Drive files.' }), open, el('label', { class: 'small', for: 'drive-done' }, tick, ' done'));
+    return box;
+  }
+  add(box,
+    el('p', {}, 'In claude.ai, open Settings, then Connectors, and connect Google Drive; that is how your worker sessions can read files you keep in Drive. Ashley Bridge only opens the page for you and runs nothing there.'),
+    el('div', { class: 'row' }, open, el('label', { for: 'drive-done' }, tick, ' Done: Google Drive is connected in claude.ai'), done ? el('span', { class: 'ok small', text: `ticked ${list.drive_connected_at!.slice(0, 10)}` }) : el('span', { class: 'muted small', text: '(kept on this device only)' })),
+  );
+  return box;
+}
+
 export interface LicenceSummary {
   termsOk: boolean;
   terms?: TermsRecord;
@@ -136,15 +198,19 @@ export interface LicenceSummary {
   versionRevoked: boolean;
   revokedMessage: string;
   identityKnown: boolean;
+  /** where the username the key was matched against came from */
+  identitySource: IdentitySource;
+  identityNote: string;
 }
 
 export async function licenceSummary(): Promise<LicenceSummary> {
   const terms = await local.get<unknown>(TERMS_KEY);
   const lic = await local.get<LicenseState>(LICENSE_KEY);
   const stored = await local.get<StoredKillList>(KILLLIST_KEY);
-  const username = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  const accessId = lic?.identity?.accessId || username;
-  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: { accessId }, revoked: stored?.list.revoked_lids ?? [] });
+  const observed = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
+  // the portal-observed username wins; the typed one stands in only until the portal has shown one
+  const who = bindIdentity(observed, lic?.identity?.accessId);
+  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
   const verdict = killListVerdict(stored, version(), v.payload?.lid);
   return {
     termsOk: recordInForce(terms),
@@ -153,7 +219,9 @@ export async function licenceSummary(): Promise<LicenceSummary> {
     licenceDetail: v.status === 'missing' ? 'no licence key entered (a trial key is free)' : v.detail,
     versionRevoked: verdict.versionRevoked,
     revokedMessage: verdict.message,
-    identityKnown: !!accessId,
+    identityKnown: !!who.accessId,
+    identitySource: who.source,
+    identityNote: identityNote(who),
   };
 }
 
@@ -161,7 +229,7 @@ export function licenceLine(s: LicenceSummary, onOpenSetup: () => void): HTMLEle
   const box = el('div', { class: 'card' });
   add(box,
     el('div', {}, el('span', { class: s.termsOk ? 'ok' : 'fail', text: s.termsOk ? 'Terms accepted' : 'Terms not accepted' }), s.terms ? el('span', { class: 'muted small', text: ` on ${s.terms.accepted_at.slice(0, 10)} by ${s.terms.signed_name}` }) : null),
-    el('div', {}, el('span', { class: s.licenceOk ? 'ok' : 'fail', text: s.licenceOk ? 'Licence ' : 'Licence: ' }), el('span', { class: 'small', text: s.licenceDetail }), !s.identityKnown && s.licenceOk ? el('span', { class: 'warn small', text: ' (the key will be matched to your portal username once the portal is connected)' }) : null),
+    el('div', {}, el('span', { class: s.licenceOk ? 'ok' : 'fail', text: s.licenceOk ? 'Licence ' : 'Licence: ' }), el('span', { class: 'small', text: s.licenceDetail }), s.licenceOk ? el('span', { class: `${s.identitySource === 'portal' ? 'muted' : 'warn'} small`, text: ` (${s.identityNote})` }) : null),
     s.versionRevoked ? el('div', { class: 'fail', text: `This version has been withdrawn and sends no commands. ${s.revokedMessage || 'Update to continue.'}` }) : null,
     el('div', { class: 'row' }, el('button', { text: s.termsOk && s.licenceOk ? 'Open the setup page' : 'Finish setup (terms and key)', onClick: onOpenSetup })),
   );

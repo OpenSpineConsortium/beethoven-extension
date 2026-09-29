@@ -11,7 +11,8 @@ who develops on Windows today.
   requires. The wrapper comes from `xcrun safari-web-extension-packager .output/safari-mv2` on a Mac
   with Xcode (the tool was renamed from `safari-web-extension-converter`), or from Apple's App Store
   Connect packager, which builds "from any web browser, without requiring a Mac" in Xcode Cloud and
-  deducts from the 25 Xcode Cloud hours a year of membership includes. Either way the output is an
+  deducts from the 25 hours per month of Xcode Cloud that the membership includes. Either way the
+  output is an
   Xcode project or an App Store Connect build, not a zip.
 - **An Apple Developer Program membership.** Required for certificates, App Store Connect, TestFlight,
   Xcode Cloud and notarization. A free account cannot distribute.

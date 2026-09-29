@@ -39,26 +39,40 @@ directory here, and chains with `afterany`, never `afterok`. Container temp and 
 (`APPTAINER_TMPDIR`, `APPTAINER_CACHEDIR`) sit on the compute node's local disk; no container command
 runs on `warrior`.
 
-## The student's six steps
+## The student's seven steps
 
 1. Install the extension from the store, read and accept the agreement, type
    `ondemand.grid.wayne.edu`, click *Connect this portal*, and allow that one site when the browser
    asks.
 2. Connect the VPN and sign in to the portal in a tab. The extension runs its checks and one
    five-minute probe job on `secp`, and says in a sentence what works.
-3. Once: sign in to Claude on a compute node. The extension shows the commands to paste into the
-   portal's shell (an `srun --pty` allocation on `secp`, then the worker image), and checks afterwards:
-   `claude auth login` with the paste-code flow; `cd` into the project folder on CephFS; `claude
-   remote-control` once, answering *Enable Remote Control?* and *Trust this directory?*; confirm the
-   session appears at claude.ai/code; Ctrl-C. A student who already signed in through Ashley
-   (`$HOME/.ashley/claude`) skips the first command; the check tells them so.
+3. Once, in one sitting: sign in to Claude on a compute node. The extension shows one command to paste
+   into the portal's shell, `hpcworker claude login`. It asks the scheduler for a short allocation on
+   `secp` and, inside the worker image, runs `claude auth login` (paste-code flow); then, if Claude
+   Code has not yet recorded the student's answer to *Enable Remote Control?*, it runs
+   `claude remote-control` once in the worker's folder on CephFS, so the student answers *y* (and *y*
+   again if Claude Code asks to trust the folder), sees the session appear, and presses Ctrl-C, all in
+   the same sitting. Claude Code records the answer itself in its own settings; the framework reads
+   only that record and never a credential. A student who already signed in through Ashley
+   (`$HOME/.ashley/claude`) is told so and skips the sign-in half. `hpcworker claude consent` remains
+   as a name that explains this; it is no longer a separate step.
 4. Click *Start worker*. The disclosure about where files, output and the transcript go is shown and
-   acknowledged; one job is submitted on `reqp` through the portal shell and the shell is closed.
-5. When the panel shows the session name `wayne-<jobid>`, open claude.ai/code or tap *Code* in the
-   Claude app and pick it.
-6. Work from claude.ai or the phone. The panel shows job state from `status.json`; *Stop* cancels the
-   job; after the wall time, *Start* resumes with `--continue` (whether that survives a Slurm requeue is
-   open question 4).
+   acknowledged; one job is submitted on `reqp` through the portal shell and the shell is closed. From
+   here the worker is always on: before its wall time ends the job queues one successor
+   (`sbatch --dependency=afterany:<its own id>` of the same job file, never more than one), and the
+   successor reconnects the same session. *Stop* writes the stop file that ends the chain and cancels
+   the job.
+5. When the panel shows the session, click the green *Open in Claude* button, which opens the
+   session's claude.ai link in a new tab (*Copy link* copies it), or open claude.ai/code or tap *Code*
+   in the Claude app and pick the session by name.
+6. Work from claude.ai or the phone. The panel shows job state from `status.json`, read no more than
+   once a minute. A setting that is off by default, *start my worker when I open my portal*, runs the
+   same start as the button whenever the portal tab is connected and the worker is not online, at the
+   same once-a-minute floor; the setting's own text says exactly that.
+7. Optional: *Connect Google Drive in claude.ai*. The checklist step opens
+   `https://claude.ai/settings/connectors` in a new tab with one sentence saying what to do there; the
+   student ticks *done* when finished, and the tick is kept only in the browser. The extension does
+   nothing on that page.
 
 ## What C&IT must approve, and how the product is presented
 
@@ -72,9 +86,18 @@ that guideline, a third-party AI bot. The request to C&IT presents it as what it
   credential.
 - It is supervised by default: every command is approved by the student in the Remote Control
   interface. This is the mode Utah, NERSC and USC require of coding agents on their systems.
-- Nothing runs on `warrior` beyond one `sbatch`; no container command runs there; nothing of ours goes
-  under its `/tmp`; scheduler polling never exceeds once a minute; every job has a wall time. These are
-  C&IT's own rules as stated on 2026-09-28, and the framework enforces them.
+- Nothing container-related runs on `warrior`, and nothing of ours goes under its `/tmp`. That is
+  C&IT's instruction of 2026-09-28, given after a container build left files under `/tmp` there, and
+  the framework enforces it: container commands run only inside jobs, with temp and cache on the
+  compute node's local disk.
+- Nothing else runs on `warrior` beyond one `sbatch`, `squeue` or `scancel` per action. That follows
+  the published grid policy (no more than 20 processes on Warrior; the login node is for job
+  submission, status and transfers), not a new instruction.
+- Scheduler-facing polling never faster than once a minute, and every job has a wall time. These two
+  are the product's own etiquette, taken from the strictest published rules in the twelve-site sample
+  (FASRC's once-a-minute rule, TACC's "every few minutes") and from Ashley's own licence terms; C&IT
+  has not asked for them, and the framework keeps them anyway: the job writes `status.json` and
+  clients read the file.
 - Using the student's own portal session from the student's own browser is the student's own use under
   UP 00-1, which prohibits accessing another person's account and obtaining credentials through
   another's negligence, not software a user installs in their own browser. The extension does not touch
@@ -104,22 +127,28 @@ Both precede any paid key; neither blocks the free, approved-list pilot on the m
 
 ## Measurements to collect
 
-Already measured, 2026-09-28:
+Already measured:
 
-- Compute-node egress from `asx15`, direct: `api.anthropic.com` HTTP 404 (reachable),
+- 2026-09-28, compute-node egress from `asx15`, direct: `api.anthropic.com` HTTP 404 (reachable),
   `platform.claude.com` 200, `claude.ai` 403 to curl, `statsig.anthropic.com` no DNS record. The
   feature-flag host is unnamed by Anthropic, so the last result settles nothing.
-- Paste-code `claude auth login` completed from a compute node inside the image; credential present;
-  `claude auth status` reports `loggedIn: true`, plan `max`.
+- 2026-09-28, paste-code `claude auth login` completed from a compute node inside the image, in
+  `$HOME/.ashley/claude` (Ashley's `CLAUDE_CONFIG_DIR`, which the Wayne profile's `claude_config_dir`
+  points at); `claude auth status` reported `loggedIn: true`, plan `max`. That login was lost when the
+  folder was deleted at 22:34 local the same evening (`SECURITY.md`, incident record); the student
+  signs in again with `hpcworker claude login`.
+- 2026-09-29 (02:22 UTC), Remote Control from a batch job (Q1): Ashley's phone host, Slurm job 40496445 on
+  `asx15`, `sbatch` with a pseudo-terminal from `script -qfc`, the student's Remote Control answer
+  already on record, registered and served a session opened from the phone. Q1 is answered yes.
 
 To collect, in this order (each maps to `OPEN_QUESTIONS.md`):
 
 | Measurement | How | Records |
 |---|---|---|
-| Remote Control registers from `sbatch` under `tmux` and stays registered (Q1) | one job (`secp` for a short test, `reqp` for the hour-long one) from a CephFS project subdirectory; watch `rc.log` and claude.ai/code; send a prompt from the phone; leave it an hour | the registration line, time to appear, whether a prompt round-trips, the `rc.log` tail when it exits |
+| Remote Control registers from `sbatch` under a pseudo-terminal and stays registered (Q1) | answered yes 2026-09-29 (02:22 UTC) with Ashley's phone host (job 40496445, `asx15`); repeat once with this framework's own template on `reqp` from the worker's CephFS workspace: watch `rc.log` and claude.ai/code; send a prompt from the phone; leave it an hour | the registration block (`Connected`, `Capacity`, the session name line, the `https://claude.ai/code?environment=...` URL), time to appear, whether a prompt round-trips, the `rc.log` tail when it exits |
 | Feature-flag reachability (Q2, remainder) | the probe's dry run: grep `rc.log` for "Couldn't verify Remote Control eligibility" | present or absent |
 | Trusted Devices enrolment from a node (Q3, remainder) | turn on *Require trusted devices* on the account, sign in on the node, check the session is steerable | works or the error text |
-| Requeue and `--continue` (Q4) | `scontrol requeue` a live session; start the next job with `--continue` | whether the transcript continues; elapsed time |
+| Requeue and `--continue` (Q4) | let the always-on chain run past one wall time (the successor runs `--continue` when `connection.json` is younger than 4 h, else registers afresh in the same environment); separately, `scontrol requeue` a live session | whether the transcript continues; whether the environment URL stays the same; elapsed time |
 | Bash tool `EACCES` and the `/dev/shm` XDG fix (Q5) | the probe's smoke test with and without the variable | pass/fail each way |
 | `/rnode/` on or off (Q6) | signed in on the VPN: `GET /rnode/<compute node>/1/` | 404 or 503 |
 | Shell host and admission (Q7) | check 5 against the live portal | the host, the prompt or the 3146 reason |

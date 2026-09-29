@@ -57,9 +57,15 @@ Extension:
   endpoint, method, job id, byte count, outcome), viewable and exportable by the student, never
   transmitted; the same function enforces the ≥60-second scheduler-facing poll floor and the
   shell-single-use rule.
-- No durable secret: connection state in `storage.session`; `storage.local` holds only the portal
-  hostname, granted origin, preferences and the acceptance record. Extension storage is not encrypted
-  and is treated accordingly.
+- No durable secret. `storage.local` holds the portal hostname and granted origin, preferences, the
+  acceptance record, the licence key and institutional identifier, the audit log, the last good copy
+  of the signed kill-list, a random installation identifier, copies of error reports and the ticks on
+  the optional checklist steps; `storage.session` holds connection state and this session's
+  acknowledgement of the data disclosure. `PRIVACY.md` and `docs/ARCHITECTURE.md` section 6 carry the
+  same list. Extension storage is not encrypted and is treated accordingly.
+- The extension opens a claude.ai page only when the student clicks a button that says so (*Open in
+  Claude*, *Connect Google Drive in claude.ai*), in a new tab through `tabs.create`, which needs no
+  `tabs` permission; it has no presence on the page it opens.
 - Every WebSocket frame is validated as JSON before it is sent; a bad frame would throw inside the
   student's only shell process on the portal.
 
@@ -79,6 +85,17 @@ Cluster side:
   the job writes `status.json` and clients read the file.
 - The worker refuses to start in a directory marked restricted and when Remote Control is unavailable
   under Zero Data Retention.
+- The framework never deletes anything outside its own run directories
+  (`<shared_state_dir>/<run>/`) and the job's node-local temp and `/dev/shm` directory: never the
+  Claude Code login directory, the workspace, another run, or anything else under `$HOME`. Any
+  destructive subcommand refuses when `CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar agent marker is in
+  the environment, or when stdin is not a terminal, so neither an agent nor a script can run it.
+  Written after the incident recorded below.
+- Claude Code's own settings file, `<claude_config_dir>/.claude.json`, is read for two boolean keys
+  only, `remoteDialogSeen` (the student's own answer to "Enable Remote Control?") and the workspace's
+  `hasTrustDialogAccepted`, and rewritten only to seed `hasCompletedOnboarding`, `theme` and that
+  trust key for the workspace, only when the student has started a login or a worker on purpose. The
+  credentials file beside it is never opened.
 
 Release pipeline and keys:
 
@@ -89,14 +106,27 @@ Release pipeline and keys:
   sit behind a hardware security key with no third-party OAuth grants; private keys never enter the
   repository.
 
+## Incident record
+
+- **2026-09-28, 22:34 local, Wayne State grid.** The student's whole `~/.ashley` folder was deleted
+  while a Remote Control session spawned from the phone was open; the Claude Code login inside
+  `~/.ashley/claude` was lost with it, and the open session stopped making progress. Which process
+  deleted the folder is not established from the files that remain. Nothing in Ashley Bridge should
+  ever be able to do this, so two rules were added the same night and now stand in the controls above:
+  the framework deletes nothing outside its own run directories and node-local temp, and a destructive
+  subcommand refuses from an agent context or without a terminal. The login is redone with
+  `hpcworker claude login`.
+
 ## What Ashley Bridge holds, and where
 
 - In the browser: portal hostname and granted origin, preferences, licence key and institutional
-  identifier, the acceptance record, the audit log, copies of error reports; session-only connection
-  state.
+  identifier, the acceptance record, the audit log, the last good kill-list, a random installation
+  identifier, copies of error reports, the ticks on optional checklist steps; session-only connection
+  state (job number, session name, the session's claude.ai link) and the disclosure acknowledgement.
 - In the student's cluster account: the framework, the licence key, job files, `status.json`,
-  `connection.json`, `rc.log`, the per-job token (0600), and Claude Code's own sign-in (written by Claude
-  Code, never read by Ashley Bridge).
+  `connection.json` (the session name and its claude.ai link), `rc.log`, the per-job token (0600), the
+  successor job's id and the stop file, and Claude Code's own sign-in (written by Claude Code, never
+  read by Ashley Bridge).
 - With the maintainer: licence and activation records; error reports if the student allows them
   (scrubbed of identity; retention 365 days).
 - On Anthropic's servers, under the student's own account: the session transcript while Remote

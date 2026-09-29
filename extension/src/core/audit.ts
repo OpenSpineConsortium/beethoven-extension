@@ -22,14 +22,24 @@ export interface AuditRecord {
   outcome: string;
 }
 
-/** Which floor applies. `scheduler` is anything that reaches Slurm (or PBS, or LSF). */
-export type EndpointClass = 'dashboard' | 'files' | 'scheduler' | 'shell' | 'probe' | 'vendor';
+/**
+ * Which floor applies. Each class has its own clock, so one action never trips a different one:
+ * a full check run opens the shell once (discover), reads the Files app and asks Active Jobs once,
+ * and none of the three blocks the others.
+ *   scheduler  a shell line that submits or cancels a job (sbatch, scancel, hpcworker probe,
+ *              hpcworker worker start|stop): once a minute
+ *   jobs       the portal's Active Jobs app (a GET that runs squeue, the DELETE that runs
+ *              scancel): once a minute
+ *   discover   the login-node discovery batch (one sinfo among cheap reads): once a minute
+ *   shell      any other single line through the bootstrap shell (install, diag): every 15 s
+ *   files, dashboard, probe, vendor: no floor of their own; their pace is the once-a-minute alarm
+ */
+export type EndpointClass = 'dashboard' | 'files' | 'jobs' | 'scheduler' | 'discover' | 'shell' | 'probe' | 'vendor';
 
-// The report's floors: a minute for anything scheduler-facing, and a login-node shell no more
-// often than every 15 s. File reads and writes have no floor of their own (an upload is a burst
-// of PUTs); their pace is set by the once-a-minute alarm that asks for them.
 export const FLOORS_MS: Record<EndpointClass, number> = {
   scheduler: 60_000,
+  jobs: 60_000,
+  discover: 60_000,
   shell: 15_000,
   files: 0,
   dashboard: 0,
@@ -37,8 +47,39 @@ export const FLOORS_MS: Record<EndpointClass, number> = {
   vendor: 0,
 };
 
-/** commands that reach the scheduler when run through the bootstrap shell */
-export const SCHEDULER_COMMAND = /\b(sbatch|squeue|scancel|sacct|sinfo|scontrol|srun|qsub|qstat|qdel|bsub|bjobs|bkill|condor_submit|condor_q|condor_rm|hpcworker\s+(start|stop|probe|restart))\b/;
+/** what the floor refusal calls each class, in the student's words */
+const CLASS_WORDS: Record<EndpointClass, string> = {
+  scheduler: 'the cluster scheduler',
+  jobs: "the portal's job list",
+  discover: 'the login node',
+  shell: 'the login-node shell',
+  files: 'the Files app',
+  dashboard: 'the portal',
+  probe: 'the portal',
+  vendor: 'the vendor',
+};
+
+/** hpcworker's own verbs that submit or cancel a job, and the raw scheduler commands that do */
+export const SCHEDULER_COMMAND = /\b(hpcworker\s+(probe|worker\s+(start|stop|restart))|sbatch|scancel|srun|salloc|qsub|qdel|bsub|bkill|condor_submit|condor_rm)\b/;
+
+/** hpcworker's read-only verbs, and the raw commands that only read from the scheduler */
+export const DISCOVERY_COMMAND = /\b(hpcworker\s+(discover|diag)|sinfo|squeue|sacct|sacctmgr|scontrol|qstat|bjobs|condor_q)\b/;
+
+const HPCWORKER_VERB = /\bhpcworker\s+(probe|worker\s+(?:start|stop|restart)|discover|diag)\b/;
+
+/**
+ * The floor class of one command line, by what it really costs the cluster. hpcworker's own verb
+ * decides first: the discovery batch names `sbatch` inside a `command -v` and runs one `sinfo`,
+ * and that is a read, not a submission. A line without the tool is judged by the raw commands in it.
+ */
+export function classifyCommand(command: string): 'scheduler' | 'discover' | 'shell' {
+  const c = String(command ?? '');
+  const verb = HPCWORKER_VERB.exec(c)?.[1];
+  if (verb) return verb === 'discover' || verb === 'diag' ? 'discover' : 'scheduler';
+  if (SCHEDULER_COMMAND.test(c)) return 'scheduler';
+  if (DISCOVERY_COMMAND.test(c)) return 'discover';
+  return 'shell';
+}
 
 export const AUDIT_KEY = 'bridge.audit';
 export const DEFAULT_MAX_RECORDS = 2000;
@@ -60,7 +101,7 @@ export class FloorError extends Error {
     public readonly cls: EndpointClass,
     public readonly waitMs: number,
   ) {
-    super(`too soon: the ${cls === 'scheduler' ? 'cluster scheduler' : 'login-node shell'} was asked less than ${Math.round(FLOORS_MS[cls] / 1000)} s ago; wait ${Math.ceil(waitMs / 1000)} s`);
+    super(`too soon: ${CLASS_WORDS[cls]} was asked less than ${Math.round(FLOORS_MS[cls] / 1000)} s ago; wait ${Math.ceil(waitMs / 1000)} s`);
     this.name = 'FloorError';
   }
 }
@@ -190,10 +231,17 @@ export class Audit {
     return (await this.records()).map((r) => JSON.stringify(r)).join('\n') + '\n';
   }
 
+  /** Forget the records, never the clocks: a cleared log must not reopen a floor. */
   async clear(): Promise<void> {
     await this.serial(async () => {
       const state = await this.load();
       await this.kv.set(AUDIT_KEY, { v: 1, records: [], last: state.last });
     });
   }
+}
+
+/** The same rule for a page that clears the log straight from storage when the page script is unreachable. */
+export async function clearRecordsKeepingClocks(kv: KV): Promise<void> {
+  const s = await kv.get<AuditState>(AUDIT_KEY);
+  await kv.set(AUDIT_KEY, { v: 1, records: [], last: s?.last ?? {} });
 }

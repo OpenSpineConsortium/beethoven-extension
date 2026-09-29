@@ -1,6 +1,6 @@
 # Ashley Bridge privacy statement
 
-Version 1, 2026-09-28. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
+Version 2, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also on the Ashley
 support page.
 
@@ -20,10 +20,12 @@ collected.
 | Data | Where | Why | You control it by |
 |---|---|---|---|
 | The portal address you typed and the one website you granted the extension access to | the extension's own storage (`storage.local`) | to reach your portal | the extension's settings page; removing the site permission in your browser; uninstalling |
-| Your preferences (which panel, which partition, your idle timeout) | `storage.local` | convenience | settings page |
+| Your preferences (which panel, which partition, your idle timeout, and whether your worker starts by itself when you open your portal, which is off unless you turn it on) | `storage.local` | convenience | settings page |
 | Your license key and the institutional identifier you entered | `storage.local` | to check that the license names you | the license page (remove the key); uninstalling |
 | Your acceptance of the agreement: its version and text hashes, the statements you ticked with their wording, your typed name, the time, and the exact texts shown | `storage.local`, with a copy you can save | to prove the agreement and its terms, for you and for Licensor | it is yours to read, copy and print; uninstalling removes it |
-| Connection state while a job runs: the job number, the session name, the portal's page token for the current request | `storage.session`, cleared when the browser closes | to talk to your portal during this session | closing the browser |
+| Your tick on the optional step *Connect Google Drive in claude.ai*: a yes or no. The step opens that claude.ai settings page in a new tab; the extension does nothing on it | `storage.local` | so the checklist remembers what you finished | untick it; uninstalling |
+| The last good copy of the withdrawn-keys list, and a random installation identifier created in your browser | `storage.local` | to keep working when Licensor's service cannot be reached; to name your acceptance record without naming you | uninstalling |
+| Connection state while a job runs: the job number, the session name and its claude.ai link, and your acknowledgement of the data notice for this browser session | `storage.session`, cleared when the browser closes | to talk to your portal during this session and to show you the link | closing the browser |
 | The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome) | the extension's own storage on your device | so you can see exactly what the extension did | the log page (view, export, clear); it is never transmitted |
 | Copies of every error report prepared, sent or not | the extension's own storage | so you can read exactly what left your device | the error-reports page |
 
@@ -47,7 +49,9 @@ reading and writing files in your own account through the portal's Files app, li
 cancelling a job when you ask. Your institution's logs record those requests as they record any use of
 the portal; the shell's page token appears in the portal's access log, as it does when you open the
 shell yourself. The extension never signs in for you and never touches a multi-factor step. It reads no
-other website and makes no request to claude.ai.
+other website and makes no request to claude.ai. When you click *Open in Claude* or *Connect Google
+Drive in claude.ai*, it opens that claude.ai page in a new browser tab, as a bookmark would, and runs
+nothing there.
 
 ## What Anthropic receives
 
@@ -135,3 +139,7 @@ Ashley Bridge is for adults, or minors with a parent's or guardian's consent (LI
 
 A new version of this statement ships with the Ashley Bridge version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 2 (2026-09-29): added the checklist tick, the start-by-itself preference and the session's
+claude.ai link to the table of what stays in your browser, and named the withdrawn-keys copy and the
+installation identifier that were already kept there. Nothing new leaves your device.

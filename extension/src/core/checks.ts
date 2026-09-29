@@ -2,12 +2,18 @@
 // says in plain words what it needs, what it found, and what the student can do about it. The
 // dependency edges are the ones the table implies: nothing portal-side is tried without the
 // origin grant and a signed-in session; nothing compute-side is judged without the probe job's
-// file; the shell is opened once (check 5) and its output is reused by check 10. The files and
-// fields come from framework version 1 (contract.ts).
+// file; the shell is opened once (check 5) and its output is reused by checks 9 and 10. The files
+// and fields come from framework version 1 (contract.ts).
+//
+// Floors: check 5 opens the shell for the discovery batch (its own once-a-minute clock), check 7
+// asks the portal's job list (another clock), and the Files reads have none; so a full run never
+// refuses one of its own checks, and a check whose clock is still running is skipped with the
+// time left, never failed.
 import type { KV } from './audit';
 import { ackCovers, ackSubject, type Acknowledgement, ACK_KEY } from './disclosure';
-import { commands, parseDiscovery, paths, stateDirFrom, type Discovery, type ProbeFile } from './contract';
+import { commands, consentSourceWords, parseDiscovery, paths, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
+import { bindIdentity, identityNote } from './identity';
 import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, SESSION_SEEN_KEY, type LicenseState, type PortalSettings, type Prefs } from './keys';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import { verifyLicense, type KeyRing } from '../licensing/license';
@@ -36,6 +42,7 @@ export interface DiagCtx {
     home?: string;
     user?: string;
     stateDir?: string;
+    profile?: string;
     session?: SessionInfo;
     discoveryText?: string;
     discovery?: Discovery;
@@ -64,6 +71,7 @@ async function stateDir(ctx: DiagCtx): Promise<string> {
   const user = ctx.cache.user ?? ctx.cache.session?.username ?? (await portalOf(ctx).whoAmI()) ?? h.split('/').filter(Boolean).pop() ?? '';
   ctx.cache.user = user;
   const profile = await portalOf(ctx).readFileIfExists(paths.profile(h));
+  ctx.cache.profile = profile;
   ctx.cache.stateDir = stateDirFrom(profile, { home: h, user });
   return ctx.cache.stateDir;
 }
@@ -80,10 +88,19 @@ async function probeFile(ctx: DiagCtx): Promise<ProbeFile | undefined> {
   return ctx.cache.probe;
 }
 
+/** the discovery, parsed once from the shell check's output */
+function discoveryOf(ctx: DiagCtx): Discovery | undefined {
+  if (!ctx.cache.discovery && ctx.cache.discoveryText) ctx.cache.discovery = parseDiscovery(ctx.cache.discoveryText);
+  return ctx.cache.discovery;
+}
+
 const reached = (code: string | number | undefined) => {
   const n = Number(code);
   return Number.isFinite(n) && n > 0;
 };
+
+/** The one-sitting sign-in instruction, used wherever a check points at it. */
+export const SIGN_IN_INSTRUCTION = `Choose "Sign in to Claude on the cluster": it opens the portal's own shell where you run "${commands.claudeLogin}" yourself. That one command does Claude Code's paste-code sign-in on a compute node and then, if you have not answered "Enable Remote Control?" before, starts Claude Code once so you answer y and press Ctrl-C, all in one sitting. Never use setup-token: Remote Control needs a full sign-in.`;
 
 export function buildNodes(): DiagNode<DiagCtx>[] {
   return [
@@ -92,7 +109,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Licence and agreement',
       layer: 'licence',
       dependsOn: [],
-      assumption: 'the terms are accepted in this browser, the key verifies offline, the kill-list is valid and this version is not withdrawn',
+      assumption: 'the terms are accepted in this browser, the key verifies offline and names your portal username (the one the dashboard shows wins over anything typed), the kill-list is valid and this version is not withdrawn',
       manualFix: 'Open the setup page: accept the terms and enter your licence key.',
       fixAction: 'open-onboarding',
       futureRisk: 'a new signing key or a withdrawn release changes the answer without any change on the cluster',
@@ -101,13 +118,14 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         if (!recordInForce(terms)) return { ok: false, detail: 'the licence terms have not been accepted in this browser' };
         const lic = await ctx.env.local.get<LicenseState>(LICENSE_KEY);
         const stored = await ctx.env.local.get<StoredKillList>(KILLLIST_KEY);
-        const identity = (await ctx.env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-        const v = await verifyLicense(lic?.key, { keys: ctx.env.keys, now: Math.floor(ctx.env.now().getTime() / 1000), identity: { accessId: lic?.identity?.accessId || identity }, revoked: stored?.list.revoked_lids ?? [] });
+        const observed = (await ctx.env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
+        const who = bindIdentity(observed, lic?.identity?.accessId);
+        const v = await verifyLicense(lic?.key, { keys: ctx.env.keys, now: Math.floor(ctx.env.now().getTime() / 1000), identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
         if (!v.ok) return { ok: false, detail: v.status === 'missing' ? 'no licence key entered yet (a trial key is free)' : v.detail };
         const verdict = killListVerdict(stored, ctx.env.version, v.payload?.lid);
         if (verdict.versionRevoked) return { ok: false, detail: `this version (${ctx.env.version}) has been withdrawn; update to continue. ${verdict.message}`.trim() };
         const listNote = stored ? `kill-list of ${new Date(stored.list.issued * 1000).toISOString().slice(0, 10)}` : 'kill-list not fetched yet (works offline on the last good list)';
-        return { ok: true, warn: !stored || v.status === 'grace', detail: `${v.detail}; ${listNote}` };
+        return { ok: true, warn: !stored || v.status === 'grace' || who.source !== 'portal', detail: `${v.detail}; ${identityNote(who)}; ${listNote}` };
       },
     },
     {
@@ -156,7 +174,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
             ctx.cache.user = s.username;
             await ctx.env.local.set(IDENTITY_KEY, { username: s.username });
           }
-          return { ok: true, detail: `signed in${s.username ? ` as ${s.username}` : ''}${s.isOnDemand ? '' : ' (the page does not say OnDemand; is this the right portal?)'}`, warn: !s.isOnDemand };
+          return { ok: true, detail: `signed in${s.username ? ` as ${s.username}` : ' (the dashboard shows no username; the licence is matched to what you typed until it does)'}${s.isOnDemand ? '' : ' (the page does not say OnDemand; is this the right portal?)'}`, warn: !s.isOnDemand || !s.username };
         }
         return { ok: false, detail: s.detail };
       },
@@ -166,14 +184,14 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Shell app admits a connection',
       layer: 'login-node',
       dependsOn: ['signed-in'],
-      assumption: 'the Shell page carries a token and the socket opens; one command line runs and the shell is closed again',
+      assumption: 'the Shell page carries a token and the socket opens; one discovery batch runs (under a second of login-node CPU) and the shell is closed again',
       manualFix: 'If the shell is refused, the message names the reason: no cluster defined, an origin check behind an extra proxy, or a host not in the allowlist. Those are settings only the portal administrator can change; a different shell host can be tried in the extension settings.',
       futureRisk: 'a site may disable the Shell app; the framing itself has not changed since OnDemand 2.0',
       slow: true,
       async check(ctx) {
         const p = portalOf(ctx);
-        const wait = await p.auditWait('scheduler');
-        // the login node is asked at most once a minute; a check that would break that rule waits its turn
+        const wait = await p.auditWait('discover');
+        // the discovery batch asks the login node (one sinfo among cheap reads) at most once a minute
         if (wait > 0) return { ok: true, skip: true, detail: `the login node was asked less than a minute ago; this check runs again in ${Math.ceil(wait / 1000)} s` };
         const r = await p.shell(commands.discover(), { timeoutMs: 45_000 });
         ctx.cache.discoveryText = r.output;
@@ -202,11 +220,14 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Active Jobs lists your clusters',
       layer: 'portal',
       dependsOn: ['signed-in'],
-      assumption: 'GET activejobs.json?jobcluster=all&jobfilter=user answers with data[][] and names no unconfigured cluster in errors',
+      assumption: 'GET activejobs.json?jobcluster=all&jobfilter=user answers with data[][] and names no unconfigured cluster in errors (asked at most once a minute: the portal runs squeue for it)',
       manualFix: 'The portal could not ask the scheduler. If errors name a cluster, the portal is misconfigured for it; tell your centre.',
       futureRisk: 'the shape (an array of arrays) is stable since Active Jobs moved into the dashboard; a 5.0 change would show here first',
       async check(ctx) {
-        const a = await portalOf(ctx).activeJobs();
+        const p = portalOf(ctx);
+        const wait = await p.auditWait('jobs');
+        if (wait > 0) return { ok: true, skip: true, detail: `the portal's job list was asked less than a minute ago; this check runs again in ${Math.ceil(wait / 1000)} s` };
+        const a = await p.activeJobs();
         if (a.errors.length) return { ok: true, warn: true, detail: `${a.jobs.length} job(s); the portal reports: ${a.errors.join('; ').slice(0, 160)}` };
         return { ok: true, detail: `${a.jobs.length} job(s) of yours${a.clusters.length ? ` on ${a.clusters.join(', ')}` : ''}` };
       },
@@ -229,13 +250,28 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Reverse proxy (informational)',
       layer: 'portal',
       dependsOn: ['signed-in'],
-      assumption: 'GET /rnode/<shell host>/1/ answers 503 "Failed to connect" when the proxy is on, 404 when it is off',
+      assumption: 'GET /rnode/<shell host>/1/ answers 503 "Failed to connect" when the proxy is on, 404 when it is off; the shell host is the login node the discovery named, else the one in the settings, else the portal host',
       manualFix: 'Nothing to do: without the proxy the worker is read through its files (mailbox mode), which works everywhere.',
       futureRisk: 'a site may narrow host_regex; the probe would then answer 404 for the shell host while compute nodes still match',
       async check(ctx) {
-        const host = ctx.cache.shellHost && ctx.cache.shellHost !== 'default' ? ctx.cache.shellHost : new URL(ctx.settings!.origin).hostname;
+        // the host that was really reached comes from the discovery (hostname -s on the login node);
+        // a shell host set by hand is next; the portal host is the last resort and a 404 there says less
+        const discovered = discoveryOf(ctx)?.host;
+        const setting = ctx.cache.shellHost ?? ctx.settings?.shell_host;
+        let host: string;
+        let which: string;
+        if (discovered) {
+          host = discovered;
+          which = `the login node the shell reached (${discovered})`;
+        } else if (setting && setting !== 'default') {
+          host = setting;
+          which = `the shell host from the settings (${setting})`;
+        } else {
+          host = new URL(ctx.settings!.origin).hostname;
+          which = `the portal host (${host}), because the shell host is "default" and the discovery did not name the login node; a 404 here can also mean the proxy admits only compute nodes`;
+        }
         const r = await portalOf(ctx).probeRnode(host);
-        return { ok: true, warn: r.state === 'unknown', detail: r.detail };
+        return { ok: true, warn: r.state === 'unknown', detail: `${r.detail}; probed /rnode/${host}/1/, ${which}` };
       },
     },
     {
@@ -248,9 +284,9 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       futureRisk: 'a module rename or a new scheduler CLI name lands here',
       async check(ctx) {
         if (!ctx.cache.discoveryText) return { ok: false, detail: 'the shell check did not run (or the shell was rate-limited); run the checks again in a minute' };
-        const d = parseDiscovery(ctx.cache.discoveryText);
-        ctx.cache.discovery = d;
+        const d = discoveryOf(ctx)!;
         const parts: string[] = [];
+        if (d.host) parts.push(`login node ${d.host}`);
         if (d.scheduler) parts.push(`scheduler ${d.scheduler}`);
         if (d.runtime || d.modules || d.pyxis) parts.push(`runtime ${[d.runtime, d.modules, d.pyxis ? 'pyxis' : ''].filter(Boolean).join(' ')}`);
         if (d.partitions?.length) parts.push(`${d.partitions.length} partition(s)`);
@@ -283,7 +319,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         if (!p.runtime?.ok) return { ok: false, detail: `${detail}. The container runtime could not run the image on the compute node.` };
         if (!okEgress) return { ok: false, detail: `${detail}. Compute nodes cannot reach api.anthropic.com or platform.claude.com; ask your centre for an HTTP proxy (Claude Code refuses SOCKS).` };
         if (!p.node_tmp?.ok) return { ok: false, detail: `${detail}. The node-local temp directory named by the profile is not usable.` };
-        return { ok: true, warn: !p.tmux?.present, detail: `${detail}${p.tmux?.present ? '' : '; no tmux on the node (script -qfc is the fallback)'}` };
+        const chain = p.sbatch_on_node === false ? '; the node cannot submit jobs itself, so a worker there runs one job at a time instead of staying on' : '';
+        return { ok: true, warn: !p.tmux?.present || p.sbatch_on_node === false, detail: `${detail}${p.tmux?.present ? '' : '; no tmux on the node (script -qfc is the fallback)'}${chain}` };
       },
     },
     {
@@ -306,7 +343,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'claude',
       dependsOn: ['probe-job'],
       assumption: 'the probe ran `claude auth status` (never reading the credential) and found a sign-in in the configured Claude folder; the job strips CLAUDE_CODE_OAUTH_TOKEN and the other credential variables itself',
-      manualFix: 'Choose "Sign in to Claude on the cluster": it opens the portal\'s own shell where you run "hpcworker claude login" yourself (Claude Code\'s paste-code flow, on a compute node). Never use setup-token: Remote Control needs a full sign-in.',
+      manualFix: SIGN_IN_INSTRUCTION,
       fixAction: 'sign-in-claude',
       futureRisk: 'the sign-in expires after roughly a month; a Remote Control session that outlives it stops making progress',
       async check(ctx) {
@@ -324,16 +361,17 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Remote Control consent recorded',
       layer: 'claude',
       dependsOn: ['claude-login'],
-      assumption: 'the student answered Claude Code\'s one-time "Enable Remote Control?" themselves (hpcworker claude consent records only that they did), and the image\'s `claude remote-control` accepts the flags the job uses',
-      manualFix: 'Choose "Sign in to Claude on the cluster" and run "hpcworker claude consent" there: you answer Claude Code\'s "Enable Remote Control?" and "Trust this folder?" questions yourself, once. If a running job reports "Couldn\'t verify Remote Control eligibility", the compute nodes cannot reach Anthropic\'s feature-flag service; tell your centre.',
+      assumption: 'the student answered Claude Code\'s one-time "Enable Remote Control?" themselves; Claude Code records that answer in its own settings file (remoteDialogSeen) and the probe reads that one flag (a marker file is only the fallback); the image\'s `claude remote-control` accepts the flags the job uses',
+      manualFix: `${SIGN_IN_INSTRUCTION} If you signed in earlier without that question, "${commands.claudeConsent}" explains and does the same. If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
       fixAction: 'sign-in-claude',
       futureRisk: 'Anthropic can change Remote Control eligibility for a plan class at any time; a running job\'s status.json is where it would show',
       async check(ctx) {
         const p = await probeFile(ctx);
-        if (p?.consent_recorded === undefined) return { ok: false, detail: 'the probe did not report on the consent marker' };
-        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" is not recorded yet (the job would wait in need_consent)' };
-        if (p.remote_control_flags === '') return { ok: false, detail: 'consent is recorded, but `claude remote-control --help` printed no flags inside the image: this Claude Code may be too old for Remote Control' };
-        return { ok: true, detail: `consent recorded${p.remote_control_flags ? `; remote-control flags: ${p.remote_control_flags.slice(0, 80)}` : ''}` };
+        if (p?.consent_recorded === undefined) return { ok: false, detail: 'the probe did not report on your Remote Control answer' };
+        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" is not on record yet (the job would wait in need_consent)' };
+        if (p.remote_control_flags === '') return { ok: false, detail: 'your answer is on record, but `claude remote-control --help` printed no flags inside the image: this Claude Code may be too old for Remote Control' };
+        const trust = p.workspace_trusted === false ? '; the workspace is not yet trusted in Claude Code (the job records that itself at the first start)' : '';
+        return { ok: true, warn: p.consent_source === 'marker', detail: `your answer is ${consentSourceWords(p.consent_source) || 'on record'}${trust}${p.remote_control_flags ? `; remote-control flags: ${p.remote_control_flags.slice(0, 80)}` : ''}` };
       },
     },
     {
@@ -359,14 +397,27 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Data classification acknowledged',
       layer: 'student',
       dependsOn: ['licence'],
-      assumption: 'this browser session, the student read where the transcript goes and stated that the worker\'s workspace holds no FERPA, IRB, PHI, export-controlled or restricted data',
-      manualFix: 'Read the disclosure in the panel and tick the statement for the worker you will start. It is asked once per browser session.',
+      assumption: 'the worker\'s workspace is not marked restricted (no .restricted file in it, no profile flag), and this browser session the student read where the transcript goes and stated that the workspace holds no FERPA, IRB, PHI, export-controlled or restricted data',
+      manualFix: 'Read the disclosure in the panel and tick the statement for the worker you will start (asked once per browser session). A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
       fixAction: 'acknowledge',
       futureRisk: 'a change of plan class (Team, Enterprise, ZDR) changes what the disclosure must say',
       async check(ctx) {
+        const name = ctx.prefs.worker_name;
+        // the restricted half first: it needs the portal, and its absence is noted, never failed
+        let restricted: string | undefined;
+        let markerNote = '';
+        try {
+          const sd = await stateDir(ctx);
+          if (profileRestricts(ctx.cache.profile, name)) restricted = `the site profile marks the workspace of worker "${name}" restricted`;
+          else if ((await portalOf(ctx).readFileIfExists(paths.restrictedMarker(sd, name))) !== undefined) restricted = `the workspace ${paths.workspace(sd, name)} is marked restricted (.restricted file present)`;
+          else markerNote = '; the workspace is not marked restricted';
+        } catch {
+          markerNote = '; the restricted marker could not be checked (no portal tab)';
+        }
+        if (restricted) return { ok: false, detail: `${restricted}; the worker will not start there` };
         const ack = await ctx.env.session.get<Acknowledgement>(ACK_KEY);
-        const subject = ackSubject(ctx.prefs.worker_name);
-        return ackCovers(ack, subject) ? { ok: true, detail: `acknowledged this session for worker "${ctx.prefs.worker_name}"` } : { ok: false, detail: `not acknowledged this session for worker "${ctx.prefs.worker_name}"` };
+        const subject = ackSubject(name);
+        return ackCovers(ack, subject) ? { ok: true, detail: `acknowledged this session for worker "${name}"${markerNote}` } : { ok: false, detail: `not acknowledged this session for worker "${name}"${markerNote}` };
       },
     },
     {

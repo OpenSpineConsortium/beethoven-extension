@@ -56,8 +56,11 @@ is free or is sold by in-app purchase inside the host app.
 
 What leaves the device: licence activation (key id, institutional identifier or its hash, extension
 version, timestamp, coarse platform) and, if the person turns them on, crash and error reports scrubbed
-of identity. What stays on the device: portal hostname and granted origin, job ids, preferences, the
-acceptance record, the audit log. What is never collected: command text, file paths, prompts, job
+of identity. What stays on the device: portal hostname and granted origin, preferences, the acceptance
+record, the licence key and institutional identifier, the audit log, the last good kill-list, a random
+installation identifier, copies of error reports and the ticks on optional checklist steps; for the
+browser session only, the job id, the session name and its claude.ai link, and the acknowledgement of
+the data notice (the same list as `PRIVACY.md`). What is never collected: command text, file paths, prompts, job
 output, portal cookies or tokens, browsing activity, anything from claude.ai. Chrome requires the
 privacy policy and in-product disclosure even for data processed only locally, so the onboarding page
 discloses the local items too and takes an affirmative click before first use.
@@ -135,7 +138,9 @@ submission therefore includes:
 ## Negative statements (listing text, privacy policy and reviewer notes, verbatim)
 
 - Ashley Bridge has no access to claude.ai. It does not run on that site, does not read it and does not
-  change it.
+  change it. Two buttons open a claude.ai page in a new tab when you click them (your session's link;
+  the connectors settings page for the optional Google Drive step), as a bookmark would; nothing of
+  the extension runs there.
 - Ashley Bridge never sees your Claude sign-in. You sign in to Claude Code yourself, on your cluster,
   through Anthropic's own flow; the extension reads only whether Claude Code says it is signed in.
 - Ashley Bridge runs no code it did not ship with. Its daily update check downloads a signed list, not
@@ -155,7 +160,7 @@ submission therefore includes:
 | 4 | Privacy policy URL and data-use certifications; in-product disclosure and affirmative consent before first use, even for on-device data | required | required | required | 5.1.1 labels | maintainer + extension stream | root `PRIVACY.md` and `LICENSE.txt` written; `extension/public/LICENSE.txt` and `PRIVACY.md` still carry Ashley's VS Code texts and must be replaced by byte-identical copies of the root files; onboarding page pending |
 | 5 | "Payment required for full functionality" and the trial sentence in the listing | required | required | required ("Listings must disclose when payment is required") | licence keys forbidden (3.1.1): free edition or IAP | maintainer | drafted above |
 | 6 | Readable, unobfuscated bundle; Firefox source zip with build instructions (`wxt zip -b firefox`) | minification allowed | no obfuscation | source required | | extension stream | `npm run zip` defined; build instructions for the AMO source zip not yet written |
-| 7 | Reviewer access: public mock portal plus recorded walk-through | recommended | test credentials or explanation required | "testing information" required | review notes | maintainer + extension stream | mock portal scaffolded at `extension/mock-ood` (`npm run mock`); not yet hosted publicly; walk-through not recorded |
+| 7 | Reviewer access: public mock portal plus recorded walk-through | recommended | test credentials or explanation required | "testing information" required | review notes | maintainer + extension stream | mock portal exists at `extension/mock-ood/server.mjs` (`npm run mock`, port 8080 by default; the tests start it themselves); not yet hosted publicly; walk-through not recorded |
 | 8 | Developer account: two-step verification with a hardware key; no third-party OAuth grants on the account | required | | required | Apple ID 2FA | maintainer | to confirm per account |
 | 9 | Distribution channel while private: Unlisted / Hidden / unlisted-signed XPI (same review) | available | available | available | TestFlight or App Store only | maintainer | decision pending |
 | 10 | Firefox `data_collection_permissions` declared in the manifest | | | required for new extensions since 2025-11-03 | | extension stream | set in `wxt.config.ts` (`strict_min_version` 140, gecko id `ashley-bridge@openspineconsortium.com`) |
