@@ -1,22 +1,28 @@
 // The background: a Chrome/Edge MV3 service worker or the Firefox persistent background, from
-// one file. It brokers messages between the pages and the portal page script, wakes once a
-// minute to read the current run's status files, fetches the kill-list once a day, starts the
-// worker for a student who asked for that when their portal tab connects, and keeps its state in
-// storage.session so any page can re-attach after it restarts. It never talks to the portal
-// itself: the page script on the portal origin is the only network client.
+// one file. The toolbar click is the whole start: it opens the panel and, when the click came from
+// an Open OnDemand tab, asks for that one origin and loads the page script into the tab, all
+// inside the same gesture. It brokers messages between the pages and the portal page script,
+// wakes once a minute to read the current run's status files, fetches the kill-list once a day,
+// is the one place a worker is started from (the strip asks it; the "start when my portal opens"
+// setting asks it too), opens the worker's Claude link once when it first appears, and keeps its
+// state in storage.session so any page can re-attach after it restarts. It never talks to the
+// portal itself: the page script on the portal origin is the only network client.
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
+import { lookAtTab } from '../core/connect';
 import { isEnvironmentUrl, parseRegistration, paths, type ConnectionFile, type StatusFile } from '../core/contract';
-import { ACK_KEY, type Acknowledgement } from '../core/disclosure';
-import { bindIdentity } from '../core/identity';
-import { AUTO_START_KEY, IDENTITY_KEY, KILLLIST_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY, type AutoStartNote } from '../core/keys';
+import { statementFor, type Statements } from '../core/disclosure';
+import { environmentLinkOf, gatherFacts, type Transient } from '../core/facts';
+import { bundledFrameworkVersion } from '../core/install';
+import { AUTO_START_KEY, CLICK_KEY, OPENED_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY, STATEMENTS_KEY, type AutoStartNote, type ClickNote, type OpenedLinks, type PortalSettings } from '../core/keys';
 import { fail, succeed, unwrap, type Answer, type Request } from '../core/messages';
 import { PORTAL_OPS, type PortalApi, type PortalOp } from '../core/portal';
-import { recordInForce, TERMS_KEY } from '../core/terms';
-import { startWorker, workerLive } from '../core/worker';
+import { decide } from '../core/steps';
+import { startWorker } from '../core/worker';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
-import { BUNDLED_KEYS, peek, verifyLicense } from '../licensing/license';
-import { license, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
+import { BUNDLED_KEYS, peek } from '../licensing/license';
+import { connectApi, connectPortal, requestOrigin } from '../ext/connectApi';
+import { assetUrl, installId, license, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 
 const POLL_ALARM = 'bridge.poll';
 const KILLLIST_ALARM = 'bridge.killlist';
@@ -24,9 +30,6 @@ const KILLLIST_ALARM = 'bridge.killlist';
 const POLL_MINUTES = 1;
 /** the "start when my portal opens" setting asks the login node at most this often */
 const AUTO_START_EVERY_MS = 60_000;
-const ERROR_RETRY_MS = 30 * 60_000; // after a worker ended in error, auto-start waits half an hour before trying again
-/** a run set this recently may still be queued with no status.json yet; it is not started again */
-const FRESH_RUN_MS = 10 * 60_000;
 
 export interface RunState {
   /** the framework's state directory (the profile's shared_state_dir, expanded) */
@@ -40,14 +43,16 @@ export interface RunState {
   /** when this run was recorded here */
   set_at?: string;
   /** how it was started */
-  started_by?: 'button' | 'auto';
+  started_by?: 'button' | 'auto' | 'strip';
   status?: StatusFile;
   connection?: ConnectionFile;
-  /** what the registration block in rc.log says, when the files do not carry it yet */
+  /** what the registration block in rc.log says, when the files do not carry them yet */
   registration?: { session_name?: string; environment_url?: string; capacity?: string };
   rc_tail?: string;
   updated?: string;
   error?: string;
+  /** the student pressed Stop; the run stays stopped until they start it again */
+  stopped_by_student?: boolean;
 }
 
 interface PortalTab {
@@ -55,12 +60,34 @@ interface PortalTab {
   origin: string;
 }
 
+export interface StartResult {
+  started: boolean;
+  /** why not, in the student's words, when not started */
+  reason?: string;
+  /** not started only because the scheduler was asked less than a minute ago: ask again after this long */
+  waitMs?: number;
+  job?: string;
+  alreadyRunning?: boolean;
+}
+
+/** the settings, cached so the click handler can decide synchronously inside the gesture */
+let settingsCache: PortalSettings | undefined;
+/** at most one start in flight */
+let startInFlight: Promise<StartResult> | undefined;
+/** serialises the once-only opening of the Claude link */
+let openChain: Promise<unknown> = Promise.resolve();
+
 export default defineBackground({
   // Firefox MV2: a persistent background keeps the alarm and message listeners simple; ignored on MV3
   persistent: true,
   main() {
+    void portalSettings().then((s) => (settingsCache = s));
+    browser.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes['bridge.portal']) settingsCache = changes['bridge.portal']?.newValue as PortalSettings | undefined;
+    });
+
     browser.runtime.onInstalled.addListener(async (details) => {
-      if (details.reason === 'install') await browser.tabs.create({ url: browser.runtime.getURL('/onboarding.html') });
+      if (details.reason === 'install') await browser.runtime.openOptionsPage();
       await ensureAlarms();
       await reRegisterPortalScript();
     });
@@ -69,6 +96,10 @@ export default defineBackground({
       await reRegisterPortalScript();
     });
     void ensureAlarms();
+
+    // the toolbar button: `action` on MV3, `browserAction` on the Firefox MV2 build
+    const b = browser as unknown as { action?: { onClicked: { addListener(fn: (tab: ClickedTab) => void): void } }; browserAction?: { onClicked: { addListener(fn: (tab: ClickedTab) => void): void } } };
+    (b.action ?? b.browserAction)?.onClicked.addListener((tab) => onActionClicked(tab));
 
     browser.alarms.onAlarm.addListener(async (alarm) => {
       if (alarm.name === POLL_ALARM) {
@@ -87,6 +118,60 @@ export default defineBackground({
   },
 });
 
+interface ClickedTab {
+  id?: number;
+  url?: string;
+  windowId?: number;
+}
+
+/**
+ * Icon click = go. Everything that needs the gesture happens before the first await: the panel
+ * opens, and when the tab looks like Open OnDemand (a /pun/ page, or the portal already connected)
+ * the browser is asked for that origin. The rest (registering and loading the page script,
+ * remembering the hostname) follows the grant.
+ */
+function onActionClicked(tab: ClickedTab): void {
+  openPanelFor(tab);
+  const look = lookAtTab(tab.url, settingsCache?.hostname);
+  const note: ClickNote | undefined = look && tab.id !== undefined ? { tabId: tab.id, origin: look.origin, path: look.path, looksLikeOod: look.ood, granted: false, at: new Date().toISOString() } : undefined;
+  if (look && tab.id !== undefined && look.ood) {
+    const tabId = tab.id;
+    const granting = requestOrigin(look.origin);
+    void (async () => {
+      try {
+        const out = await connectPortal(look.origin, tabId, granting);
+        settingsCache = out.settings;
+        if (note) await session.set(CLICK_KEY, { ...note, granted: true });
+        if (out.answered) await session.set(PORTAL_TAB_KEY, { tabId, origin: out.settings.origin } satisfies PortalTab);
+        await tellPages();
+      } catch {
+        if (note) await session.set(CLICK_KEY, note);
+        await tellPages();
+      }
+    })();
+    return;
+  }
+  if (note) void session.set(CLICK_KEY, note).then(tellPages);
+}
+
+/** the monitoring surface this browser has: Chrome/Edge side panel, Firefox sidebar, else a tab (Safari) */
+function openPanelFor(tab: ClickedTab): void {
+  const b = browser as unknown as { sidePanel?: { open(o: { tabId?: number; windowId?: number }): Promise<void> }; sidebarAction?: { open(): Promise<void> } };
+  try {
+    if (b.sidePanel && tab.id !== undefined) {
+      b.sidePanel.open({ tabId: tab.id }).catch(() => browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') }));
+      return;
+    }
+    if (b.sidebarAction) {
+      b.sidebarAction.open().catch(() => browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') }));
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  void browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') });
+}
+
 async function ensureAlarms(): Promise<void> {
   const poll = await browser.alarms.get(POLL_ALARM);
   if (!poll) await browser.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
@@ -104,12 +189,18 @@ async function handle(msg: Request, sender: { tab?: { id?: number }; url?: strin
       const from = sender.url ? new URL(sender.url).origin : '';
       if (!settings || from !== settings.origin || from !== msg.origin || sender.tab?.id === undefined) return fail(new Error('hello from an unexpected origin'));
       await session.set(PORTAL_TAB_KEY, { tabId: sender.tab.id, origin: from } satisfies PortalTab);
+      await tellPages();
       // the portal tab just connected: the one moment the "start when my portal opens" setting acts on
       void maybeAutoStart('hello');
       return succeed({ registered: true });
     }
     case 'portal.ping':
       return succeed(await pingPortal());
+    case 'portal.tab': {
+      const id = await portalTabId();
+      const settings = await portalSettings();
+      return succeed(id !== undefined && settings ? { tabId: id, origin: settings.origin } : undefined);
+    }
     case 'portal.call': {
       if (!PORTAL_OPS.includes(msg.op)) return fail(new Error(`unknown portal operation ${String(msg.op)}`));
       return succeed(await callPortal(msg.op, msg.args ?? []));
@@ -122,12 +213,22 @@ async function handle(msg: Request, sender: { tab?: { id?: number }; url?: strin
       await pollRun();
       return succeed(await session.get<RunState>(RUN_KEY));
     }
+    case 'run.stopped': {
+      const state = await session.get<RunState>(RUN_KEY);
+      if (state) await session.set(RUN_KEY, { ...state, stopped_by_student: true } satisfies RunState);
+      await pollRun();
+      return succeed(await session.get<RunState>(RUN_KEY));
+    }
     case 'run.clear':
       await session.remove(RUN_KEY);
       return succeed(undefined);
     case 'run.refresh':
       await pollRun();
       return succeed(await session.get<RunState>(RUN_KEY));
+    case 'run.open':
+      return succeed(await openEnvironmentOnce(true));
+    case 'worker.start':
+      return succeed(await startNow('strip'));
     case 'killlist.refresh':
       return succeed(await refreshKillListNow());
     default:
@@ -151,8 +252,18 @@ async function portalTabId(): Promise<number | undefined> {
   // matching by URL needs host permission for that URL, which the grant provides; no "tabs" permission
   try {
     const tabs = await browser.tabs.query({ url: `${settings.origin}/*` });
-    const tab = tabs.find((t) => t.id !== undefined);
-    if (tab?.id !== undefined) {
+    for (const tab of tabs) {
+      if (tab.id === undefined) continue;
+      // a tab that was open before the grant has no page script yet: load it now, as the click would have
+      if (!(await connectApi.ping(tab.id).catch(() => false))) {
+        await connectApi.inject(tab.id).catch(() => undefined);
+        let ok = false;
+        for (let i = 0; i < 8 && !ok; i++) {
+          await connectApi.sleep(250);
+          ok = await connectApi.ping(tab.id).catch(() => false);
+        }
+        if (!ok) continue;
+      }
       await session.set(PORTAL_TAB_KEY, { tabId: tab.id, origin: settings.origin } satisfies PortalTab);
       return tab.id;
     }
@@ -165,12 +276,7 @@ async function portalTabId(): Promise<number | undefined> {
 async function pingPortal(): Promise<boolean> {
   const id = await portalTabId();
   if (id === undefined) return false;
-  try {
-    const a = (await browser.tabs.sendMessage(id, { type: 'portal.ping' })) as Answer<boolean> | undefined;
-    return !!a && a.ok && a.value === true;
-  } catch {
-    return false;
-  }
+  return connectApi.ping(id).catch(() => false);
 }
 
 async function callPortal(op: PortalOp, args: unknown[]): Promise<unknown> {
@@ -215,6 +321,30 @@ async function pollRun(): Promise<void> {
   }
   await session.set(RUN_KEY, next);
   await tellPages();
+  await openEnvironmentOnce(false);
+}
+
+/**
+ * Open the worker's claude.ai link in a new tab the first time this browser profile sees it
+ * (setting "open claude.ai when the worker connects", on by default); afterwards the green
+ * button does it on request. The link opened is only ever Claude's own Code page for an
+ * environment (isEnvironmentUrl), and nothing of the extension runs on it.
+ */
+function openEnvironmentOnce(byRequest: boolean): Promise<{ opened: boolean; url?: string }> {
+  const step = openChain.then(async () => {
+    const state = await session.get<RunState>(RUN_KEY);
+    const url = environmentLinkOf(state);
+    if (!url) return { opened: false };
+    const opened = (await local.get<OpenedLinks>(OPENED_KEY)) ?? { urls: [] };
+    const prefs = await loadPrefs();
+    if (!byRequest && (!prefs.open_claude_on_connect || opened.urls.includes(url))) return { opened: false, url };
+    await browser.tabs.create({ url });
+    if (!opened.urls.includes(url)) await local.set(OPENED_KEY, { urls: [...opened.urls.slice(-19), url] } satisfies OpenedLinks);
+    await tellPages();
+    return { opened: true, url };
+  });
+  openChain = step.catch(() => undefined);
+  return step;
 }
 
 async function tellPages(): Promise<void> {
@@ -226,58 +356,96 @@ async function tellPages(): Promise<void> {
 }
 
 /**
- * The "start my worker when I open my portal" setting. Off unless the student turned it on; even
- * then it starts only when the terms and key are in order, the data statement was made this
- * browser session, no worker is alive, and the scheduler floor allows one start. It asks the
- * login node at most once a minute and records what it did for the panel to show.
+ * The one start path. The facts are gathered afresh here and the step machine decides: the
+ * worker is started only when it is the next step (terms, key, tool, probe, sign-in and the
+ * statement all in order, no worker alive, the scheduler floor open). The strip and the
+ * "start my worker when I open my portal" setting both come through here, so two starts can
+ * never race: at most one is in flight, and hpcworker itself finds a job that already exists.
+ * A stopped or failed worker is the one case the two callers differ on: the strip asks after the
+ * student pressed its "Start again" button (the machine offers that button and nothing automatic),
+ * and that press is honoured; the setting never restarts one.
+ */
+function startNow(trigger: 'strip' | 'auto'): Promise<StartResult> {
+  if (startInFlight) return startInFlight;
+  startInFlight = (async (): Promise<StartResult> => {
+    const settings = await portalSettings();
+    if (!settings) return { started: false, reason: 'no portal connected' };
+    const p = portal();
+    const prefs = await loadPrefs();
+    const transient: Transient = {};
+    try {
+      const w = await p.warm();
+      transient.warm = w.ok && w.signedIn ? { state: 'warm' } : w.status === 0 ? { state: 'unreachable', detail: w.detail } : w.ok ? { state: 'signed-out', detail: w.detail } : { state: 'cold', detail: w.detail };
+    } catch (e) {
+      return { started: false, reason: (e as Error).message };
+    }
+    const run = await session.get<RunState>(RUN_KEY);
+    const click = await session.get<ClickNote>(CLICK_KEY);
+    const g = await gatherFacts({
+      version: version(),
+      now: () => Date.now(),
+      local,
+      keys: BUNDLED_KEYS,
+      settings,
+      prefs,
+      granted: (o) => connectApi.containsOrigin(o),
+      alive: () => pingPortal(),
+      portal: () => p,
+      run,
+      click,
+      transient,
+      bundledFrameworkVersion: () => bundledFrameworkVersion((path) => fetch(assetUrl(path))),
+    });
+    const view = decide(g.facts);
+    const byButton = view.step === 'start' && (view.primary?.action === 'start' || view.primary?.action === 'retry-start');
+    const allowed = view.step === 'start' && (view.auto === 'start' || (trigger === 'strip' && byButton));
+    if (!allowed) return { started: false, reason: view.status };
+    const wait = g.facts.run.schedulerWaitMs;
+    if (wait > 0) return { started: false, waitMs: wait, reason: `Starting your worker in ${Math.ceil(wait / 1000)} s (the scheduler is asked at most once a minute)...` };
+    const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
+    try {
+      const out = await startWorker(p, { name: prefs.worker_name, permissionMode: prefs.permission_mode, site: settings.site, ack, consent: { installId: await installId(), written: !!ack?.consent_written_at } });
+      if (out.consentWritten && ack) {
+        const all = (await local.get<Statements>(STATEMENTS_KEY)) ?? {};
+        await local.set(STATEMENTS_KEY, { ...all, [ack.work_dir]: { ...ack, consent_written_at: new Date().toISOString() } } satisfies Statements);
+      }
+      const state: RunState = { stateDir: out.stateDir, run: prefs.worker_name, job: out.job, site: out.site, set_at: new Date().toISOString(), started_by: trigger };
+      await session.set(RUN_KEY, state);
+      await pollRun();
+      return { started: true, job: out.job, alreadyRunning: out.alreadyRunning };
+    } catch (e) {
+      return { started: false, reason: (e as Error).message };
+    }
+  })();
+  startInFlight.finally(() => (startInFlight = undefined)).catch(() => undefined);
+  return startInFlight;
+}
+
+/**
+ * The "start my worker when I open my portal" setting (on by default). It runs the one start
+ * path when the portal tab connects and at the once-a-minute check, at most once a minute, and
+ * records what it did for the panel to show. The step machine inside startNow keeps it honest:
+ * nothing starts while a step is missing, while a worker is alive, or while a stopped worker is
+ * meant to stay stopped.
  */
 async function maybeAutoStart(trigger: 'hello' | 'alarm'): Promise<void> {
   const prefs = await loadPrefs();
   if (!prefs.auto_start) return;
-  const settings = await portalSettings();
-  if (!settings) return;
+  if (!(await portalSettings())) return;
   const last = await session.get<AutoStartNote>(AUTO_START_KEY);
   if (last && Date.now() - new Date(last.attempted_at).getTime() < AUTO_START_EVERY_MS) return;
-  const note = async (outcome: string) => {
-    await session.set(AUTO_START_KEY, { attempted_at: new Date().toISOString(), outcome } satisfies AutoStartNote);
-    await tellPages();
-  };
   const run = await session.get<RunState>(RUN_KEY);
-  if (run) {
-    if (workerLive(run.status)) return;
-    // a worker the student stopped stays stopped: only a click starts it again; a worker that ended in
-    // error is retried at most every half hour, never every minute
-    if (run.status?.state === 'stopped') return;
-    if (run.status?.state === 'error' && last && Date.now() - new Date(last.attempted_at).getTime() < ERROR_RETRY_MS) return;
-    if (!run.status && run.set_at && Date.now() - new Date(run.set_at).getTime() < FRESH_RUN_MS) return;
-  }
+  if (run?.stopped_by_student || run?.status?.state === 'stopped') return;
   if (!(await pingPortal())) return;
-  if (!recordInForce(await local.get(TERMS_KEY))) return note('not started: the terms are not accepted in this browser');
-  const lic = await license();
-  const observed = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
-  const stored = await local.get<StoredKillList>(KILLLIST_KEY);
-  const v = await verifyLicense(lic?.key, { keys: BUNDLED_KEYS, identity: { accessId: bindIdentity(observed, lic?.identity?.accessId).accessId }, revoked: stored?.list.revoked_lids ?? [] });
-  if (!v.ok) return note(`not started: ${v.detail}`);
-  if (killListVerdict(stored, version(), v.payload?.lid).versionRevoked) return note('not started: this version has been withdrawn');
-  const ack = await session.get<Acknowledgement>(ACK_KEY);
-  const p = portal();
-  try {
-    const wait = await p.auditWait('scheduler');
-    if (wait > 0) return note(`waiting: the scheduler was asked less than a minute ago (${Math.ceil(wait / 1000)} s left)`);
-    const out = await startWorker(p, { name: prefs.worker_name, permissionMode: prefs.permission_mode, site: settings.site, ack });
-    const state: RunState = { stateDir: out.stateDir, run: prefs.worker_name, job: out.job, site: out.site, set_at: new Date().toISOString(), started_by: 'auto' };
-    await session.set(RUN_KEY, state);
-    await note(`${out.alreadyRunning ? 'found running' : 'started'} on the portal ${trigger === 'hello' ? 'connecting' : 'check'}: job ${out.job}`);
-    await pollRun();
-  } catch (e) {
-    await note(`not started: ${(e as Error).message}`);
-  }
+  const r = await startNow('auto');
+  await session.set(AUTO_START_KEY, { attempted_at: new Date().toISOString(), outcome: r.started ? `${r.alreadyRunning ? 'found running' : 'started'} on the portal ${trigger === 'hello' ? 'connecting' : 'check'}: job ${r.job}` : `not started: ${r.reason ?? 'a step is missing'}` } satisfies AutoStartNote);
+  await tellPages();
 }
 
 async function refreshKillListNow(): Promise<{ detail: string; revoked: boolean }> {
-  const previous = await local.get<StoredKillList>(KILLLIST_KEY);
+  const previous = await local.get<StoredKillList>('bridge.killlist');
   const out = await refreshKillList(previous, BUNDLED_KEYS, fetch);
-  if (out.fresh && out.current) await local.set(KILLLIST_KEY, out.current);
+  if (out.fresh && out.current) await local.set('bridge.killlist', out.current);
   const lic = await license();
   const lid = lic ? peek(lic.key)?.lid : undefined;
   const verdict = killListVerdict(out.current, version(), lid);
@@ -290,11 +458,8 @@ async function refreshKillListNow(): Promise<{ detail: string; revoked: boolean 
 async function reRegisterPortalScript(): Promise<void> {
   const settings = await portalSettings();
   if (!settings) return;
-  const granted = await browser.permissions.contains({ origins: [`${settings.origin}/*`] });
-  if (!granted) return;
-  const existing = await browser.scripting.getRegisteredContentScripts({ ids: ['ashley-bridge-portal'] }).catch(() => []);
-  if (existing.length) return;
-  await browser.scripting.registerContentScripts([
-    { id: 'ashley-bridge-portal', js: ['/content-scripts/portal.js'], matches: [`${settings.origin}/*`], runAt: 'document_idle', persistAcrossSessions: true },
-  ]);
+  if (!(await connectApi.containsOrigin(settings.origin))) return;
+  if ((await connectApi.scriptRegisteredFor()) === settings.origin) return;
+  await connectApi.unregisterScript();
+  await connectApi.registerScript(settings.origin);
 }

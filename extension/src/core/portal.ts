@@ -15,8 +15,9 @@
 //   GET  /pun/sys/myjobs/workflows.json, /pun/sys/dashboard/projects   optional routes, recorded only
 // /logout, /nginx/stop are recognised in redirects and never called.
 import { Audit, classifyCommand, type EndpointClass } from './audit';
+import { splitPath } from './contract';
 import type { PortalNet } from './net';
-import { runShellCommand, type ShellResult } from './shell';
+import { openShell, runShellCommand, type ShellResult, type ShellSession } from './shell';
 
 export const DASHBOARD = '/pun/sys/dashboard/';
 export const FILES = '/pun/sys/dashboard/files/fs';
@@ -85,12 +86,30 @@ export interface RouteProbe {
 
 export type RnodeState = 'enabled' | 'disabled' | 'unknown';
 
+/** what the warm-up found: the per-user nginx (the PUN) answers 5xx or bounces through /nginx/init while it starts */
+export interface WarmResult {
+  /** the dashboard answered 200 in the end */
+  ok: boolean;
+  /** how many dashboard GETs it took */
+  attempts: number;
+  status: number;
+  signedIn: boolean;
+  detail: string;
+  session: SessionInfo;
+}
+
 /** the operations the side panel may ask the content script to run, by name */
 export interface PortalApi {
   session(): Promise<SessionInfo>;
+  /** wake the PUN: GET the dashboard, and on 5xx or /nginx/init wait 2, 5, 10 s and try again */
+  warm(): Promise<WarmResult>;
   whoAmI(): Promise<string | undefined>;
   home(): Promise<string>;
   listDir(path: string): Promise<DirListing>;
+  /** the entry from the directory's JSON listing, or undefined when the name is not in files[] */
+  stat(path: string): Promise<DirEntry | undefined>;
+  /** existence from the listing, never from a download (a missing file downloads as an HTML page with status 200) */
+  exists(path: string): Promise<boolean>;
   readFile(path: string): Promise<string>;
   readFileIfExists(path: string): Promise<string | undefined>;
   writeFile(path: string, body: string, job?: string): Promise<void>;
@@ -109,7 +128,10 @@ export interface PortalApi {
 }
 
 export type PortalOp = keyof PortalApi;
-export const PORTAL_OPS: PortalOp[] = ['session', 'whoAmI', 'home', 'listDir', 'readFile', 'readFileIfExists', 'writeFile', 'mkdir', 'touch', 'activeJobs', 'cancelJob', 'shell', 'probeRnode', 'probeRoutes', 'auditWait', 'auditRecords', 'auditExport', 'auditClear'];
+export const PORTAL_OPS: PortalOp[] = ['session', 'warm', 'whoAmI', 'home', 'listDir', 'stat', 'exists', 'readFile', 'readFileIfExists', 'writeFile', 'mkdir', 'touch', 'activeJobs', 'cancelJob', 'shell', 'probeRnode', 'probeRoutes', 'auditWait', 'auditRecords', 'auditExport', 'auditClear'];
+
+/** the backoff between warm-up attempts: the portal's own error page says "try again in 30 seconds" */
+export const WARM_DELAYS_MS = [2_000, 5_000, 10_000];
 
 export class PortalError extends Error {
   constructor(
@@ -124,6 +146,15 @@ export class PortalError extends Error {
 export interface PortalClientOpts {
   /** the Shell app host segment; "default" lets the portal choose */
   shellHost?: string;
+  /** the warm-up backoff; tests shorten it */
+  warmDelaysMs?: number[];
+  /** how the client waits between warm-up attempts */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** a cold PUN: the dashboard answered 5xx, or the request ended on the /nginx/init bounce */
+export function looksCold(s: { status: number; finalUrl: string }): boolean {
+  return s.status >= 500 || /\/nginx\/init/.test(s.finalUrl);
 }
 
 const encodePath = (abs: string) =>
@@ -136,7 +167,12 @@ export class PortalClient implements PortalApi {
   private csrf: string | undefined;
   private username: string | undefined;
   private homeDir: string | undefined;
+  /** the PUN answered the dashboard with 200 since this client was made (or since it last saw a 5xx) */
+  private warmed = false;
+  private warming: Promise<WarmResult> | undefined;
   readonly shellHost: string;
+  private readonly warmDelays: number[];
+  private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(
     readonly origin: string,
@@ -145,10 +181,63 @@ export class PortalClient implements PortalApi {
     opts: PortalClientOpts = {},
   ) {
     this.shellHost = opts.shellHost || 'default';
+    this.warmDelays = opts.warmDelaysMs ?? WARM_DELAYS_MS;
+    this.sleep = opts.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
   private url(path: string): string {
     return `${this.origin}${path}`;
+  }
+
+  /**
+   * Wake the per-user nginx before anything that would lose its body or its answer to a cold PUN:
+   * the first portal page after a while answers "Server Error ... try again in 30 seconds" (a 500)
+   * or bounces through /nginx/init, and a PUT that meets the bounce loses its body. One dashboard
+   * GET; on a cold answer wait 2 s, 5 s, 10 s and try again; then give up and say so.
+   */
+  async warm(): Promise<WarmResult> {
+    if (this.warming) return this.warming;
+    this.warming = (async () => {
+      let attempts = 0;
+      let s = await this.session();
+      attempts++;
+      for (const delay of this.warmDelays) {
+        if (!looksCold(s) || s.status === 0) break;
+        await this.sleep(delay);
+        s = await this.session();
+        attempts++;
+      }
+      const cold = looksCold(s);
+      this.warmed = !cold && s.status > 0;
+      const detail = cold ? `your portal did not wake up after ${attempts} tries (it answered ${s.status || 'nothing'}); wait a moment and try again` : s.status === 0 ? s.detail : s.signedIn ? (attempts > 1 ? `your portal woke up after ${attempts} tries` : 'your portal is awake') : s.detail;
+      return { ok: !cold && s.status > 0 && s.ok, attempts, status: s.status, signedIn: s.signedIn, detail, session: s };
+    })();
+    try {
+      return await this.warming;
+    } finally {
+      this.warming = undefined;
+    }
+  }
+
+  /** every Files, Shell and Jobs call goes through here once per client (and again after a 5xx) */
+  private async ensureWarm(): Promise<void> {
+    if (this.warmed) return;
+    await this.warm();
+  }
+
+  /** a read-only call, retried once after a fresh warm-up when the PUN answered 5xx */
+  private async warmRead<T>(fn: () => Promise<T>): Promise<T> {
+    await this.ensureWarm();
+    try {
+      return await fn();
+    } catch (e) {
+      if (e instanceof PortalError && e.status !== undefined && e.status >= 500) {
+        this.warmed = false;
+        await this.ensureWarm();
+        return await fn();
+      }
+      throw e;
+    }
   }
 
   /** One dashboard GET tells us four things: reachable, signed in, the CSRF token, the username. */
@@ -217,6 +306,10 @@ export class PortalClient implements PortalApi {
   /** the home directory: /pun/sys/dashboard/files redirects to files/fs<home> */
   async home(): Promise<string> {
     if (this.homeDir) return this.homeDir;
+    return this.warmRead(() => this.homeOnce());
+  }
+
+  private async homeOnce(): Promise<string> {
     return this.audit.request({ method: 'GET', endpoint: '/pun/sys/dashboard/files', cls: 'files' }, async () => {
       const res = await this.net.fetch(this.url('/pun/sys/dashboard/files'), { credentials: 'same-origin', redirect: 'follow', headers: { Accept: 'application/json' } });
       const finalPath = decodeURIComponent(new URL(res.url || this.url('/pun/sys/dashboard/files')).pathname);
@@ -236,6 +329,10 @@ export class PortalClient implements PortalApi {
   }
 
   async listDir(path: string): Promise<DirListing> {
+    return this.warmRead(() => this.listDirOnce(path));
+  }
+
+  private async listDirOnce(path: string): Promise<DirListing> {
     const endpoint = `${FILES}${encodePath(path)}`;
     return this.audit.request({ method: 'GET', endpoint, cls: 'files' }, async () => {
       const res = await this.net.fetch(this.url(endpoint), { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
@@ -252,21 +349,55 @@ export class PortalClient implements PortalApi {
     });
   }
 
+  /**
+   * Existence comes from the parent's JSON listing. A 404 for the parent means "not there"; any
+   * other failure is thrown, so a caller can say "could not be checked" rather than "absent".
+   */
+  async stat(path: string): Promise<DirEntry | undefined> {
+    const { dir, name } = splitPath(path);
+    if (!name) return undefined;
+    let listing: DirListing;
+    try {
+      listing = await this.listDir(dir);
+    } catch (e) {
+      if (e instanceof PortalError && e.status === 404) return undefined;
+      throw e;
+    }
+    return listing.files.find((f) => f.name === name);
+  }
+
+  async exists(path: string): Promise<boolean> {
+    return (await this.stat(path)) !== undefined;
+  }
+
   async readFile(path: string): Promise<string> {
+    return this.warmRead(() => this.readFileOnce(path));
+  }
+
+  private async readFileOnce(path: string): Promise<string> {
     const endpoint = `${FILES}${encodePath(path)}?download=1`;
     return this.audit.request({ method: 'GET', endpoint, cls: 'files' }, async () => {
       const res = await this.net.fetch(this.url(endpoint), { credentials: 'same-origin', cache: 'no-store' });
       const text = await res.text();
       if (!res.ok) throw new PortalError(`could not read ${path} (${res.status})`, res.status);
+      // the Files app answers a download of a missing file with 200 and its own HTML page: not a file
+      const type = res.headers.get('content-type') ?? '';
+      if (/text\/html/i.test(type)) throw new PortalError(`${path} is not a file there (the Files app answered with a page)`, 404);
       return { result: text, bytes: text.length, outcome: `${res.status}` };
     });
   }
 
+  /**
+   * The file's text, or undefined only when it is not there: a 404, or the Files app's own page in
+   * place of a body (readFileOnce maps that to 404). Anything else (a 500 that survived the one
+   * re-warm, a 403) is thrown, so a caller says "could not be checked" rather than "absent" and
+   * never submits a job on the strength of a missing file that was only unreadable.
+   */
   async readFileIfExists(path: string): Promise<string | undefined> {
     try {
       return await this.readFile(path);
     } catch (e) {
-      if (e instanceof PortalError && (e.status === 404 || e.status === 500)) return undefined;
+      if (e instanceof PortalError && e.status === 404) return undefined;
       throw e;
     }
   }
@@ -274,6 +405,7 @@ export class PortalClient implements PortalApi {
   /** PUT writes the body as the file's content; the Rails Origin check is why this must run on the portal origin. */
   async writeFile(path: string, body: string, job?: string): Promise<void> {
     const endpoint = `${FILES}${encodePath(path)}`;
+    await this.ensureWarm();
     const csrf = await this.token();
     await this.audit.request({ method: 'PUT', endpoint, cls: 'files', mutates: true, ...(job ? { job } : {}) }, async () => {
       const res = await this.net.fetch(this.url(endpoint), { method: 'PUT', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf, Accept: 'application/json', 'Content-Type': 'application/octet-stream' }, body });
@@ -290,6 +422,7 @@ export class PortalClient implements PortalApi {
 
   async mkdir(path: string): Promise<void> {
     const endpoint = `${FILES}${encodePath(path)}?dir=true`;
+    await this.ensureWarm();
     const csrf = await this.token();
     await this.audit.request({ method: 'PUT', endpoint, cls: 'files', mutates: true }, async () => {
       const res = await this.net.fetch(this.url(endpoint), { method: 'PUT', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf, Accept: 'application/json' } });
@@ -307,6 +440,7 @@ export class PortalClient implements PortalApi {
   /** `?touch=true` creates an empty file (or updates its time); a Files write, so no scheduler floor applies */
   async touch(path: string, job?: string): Promise<void> {
     const endpoint = `${FILES}${encodePath(path)}?touch=true`;
+    await this.ensureWarm();
     const csrf = await this.token();
     await this.audit.request({ method: 'PUT', endpoint, cls: 'files', mutates: true, ...(job ? { job } : {}) }, async () => {
       const res = await this.net.fetch(this.url(endpoint), { method: 'PUT', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf, Accept: 'application/json' } });
@@ -323,6 +457,7 @@ export class PortalClient implements PortalApi {
 
   /** `data` is an array of arrays (one per 3,000-job slice); flattened here. The portal runs squeue for this: once a minute. */
   async activeJobs(): Promise<ActiveJobs> {
+    await this.ensureWarm();
     return this.audit.request({ method: 'GET', endpoint: ACTIVE_JOBS, cls: 'jobs' }, async () => {
       const res = await this.net.fetch(this.url(ACTIVE_JOBS), { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' });
       const text = await res.text();
@@ -344,6 +479,7 @@ export class PortalClient implements PortalApi {
 
   async cancelJob(cluster: string, pbsid: string): Promise<void> {
     const endpoint = `${ACTIVE_JOBS_DELETE}?cluster=${encodeURIComponent(cluster)}&pbsid=${encodeURIComponent(pbsid)}`;
+    await this.ensureWarm();
     const csrf = await this.token();
     await this.audit.request({ method: 'DELETE', endpoint, cls: 'jobs', mutates: true, job: pbsid }, async () => {
       // The dashboard answers a cancel with a 302 to the Active Jobs page. A browser that follows a
@@ -365,10 +501,47 @@ export class PortalClient implements PortalApi {
   async shell(command: string, opts: { timeoutMs?: number; job?: string } = {}): Promise<ShellResult> {
     const cls: EndpointClass = classifyCommand(command);
     const endpoint = `/pun/sys/shell/ssh/${this.shellHost}`;
+    await this.ensureWarm();
     return this.audit.request({ method: 'WS', endpoint, cls, mutates: true, ...(opts.job ? { job: opts.job } : {}) }, async () => {
       const r = await runShellCommand({ origin: this.origin, host: this.shellHost, command, net: this.net, timeoutMs: opts.timeoutMs });
       return { result: r, bytes: r.transcript.length + command.length, outcome: `exit ${r.exitCode} in ${r.ms} ms` };
     });
+  }
+
+  /**
+   * The login terminal's sitting: the interactive shell running exactly `command`, output relayed
+   * to `onOutput`, typed text sent back with `send`. It is not in PortalApi because it is not a
+   * request with an answer; the content script hosts it behind a port. The audit record is one WS
+   * line for the whole sitting with the byte counts of what was read and what was typed: the
+   * typed text (the code the student pastes) is counted and never kept anywhere. The sitting runs
+   * `srun` on the login node, so it is a scheduler call: once a minute, like a start or a probe.
+   */
+  openLoginShell(command: string, onOutput: (text: string) => void, opts: { maxMs?: number } = {}): Promise<ShellSession> {
+    const endpoint = `/pun/sys/shell/ssh/${this.shellHost}`;
+    let resolveSession!: (s: ShellSession) => void;
+    let rejectSession!: (e: unknown) => void;
+    const session = new Promise<ShellSession>((res, rej) => {
+      resolveSession = res;
+      rejectSession = rej;
+    });
+    const recorded = (async () => {
+      await this.ensureWarm();
+      return this.audit.request({ method: 'WS', endpoint, cls: classifyCommand(command), mutates: true }, async () => {
+        let s: ShellSession;
+        try {
+          s = await openShell({ origin: this.origin, host: this.shellHost, command, net: this.net, onOutput, maxMs: opts.maxMs });
+        } catch (e) {
+          rejectSession(e);
+          throw e;
+        }
+        resolveSession(s);
+        const end = await s.done;
+        return { result: end, bytes: end.outputBytes + end.inputBytes, outcome: `login terminal: ${end.reason}${end.closeCode !== undefined ? ` (close ${end.closeCode})` : ''}, ${end.outputBytes} bytes read, ${end.inputBytes} bytes typed, ${Math.round(end.ms / 1000)} s` };
+      });
+    })();
+    // a floor refusal or a revocation lands here before the shell was ever opened
+    recorded.catch((e) => rejectSession(e));
+    return session;
   }
 
   /** 404 = proxy off or host_regex mismatch; 503 "Failed to connect" = proxy on, nothing listening on port 1 (as expected) */

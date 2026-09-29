@@ -26,8 +26,9 @@ export interface AuditRecord {
  * Which floor applies. Each class has its own clock, so one action never trips a different one:
  * a full check run opens the shell once (discover), reads the Files app and asks Active Jobs once,
  * and none of the three blocks the others.
- *   scheduler  a shell line that submits or cancels a job (sbatch, scancel, hpcworker probe,
- *              hpcworker worker start|stop): once a minute
+ *   scheduler  a shell line that submits, cancels or allocates a job (sbatch, scancel, srun,
+ *              hpcworker probe, hpcworker worker start|stop, hpcworker claude login, whose
+ *              sitting is an srun on the login node): once a minute
  *   jobs       the portal's Active Jobs app (a GET that runs squeue, the DELETE that runs
  *              scancel): once a minute
  *   discover   the login-node discovery batch (one sinfo among cheap reads): once a minute
@@ -59,13 +60,13 @@ const CLASS_WORDS: Record<EndpointClass, string> = {
   vendor: 'the vendor',
 };
 
-/** hpcworker's own verbs that submit or cancel a job, and the raw scheduler commands that do */
-export const SCHEDULER_COMMAND = /\b(hpcworker\s+(probe|worker\s+(start|stop|restart))|sbatch|scancel|srun|salloc|qsub|qdel|bsub|bkill|condor_submit|condor_rm)\b/;
+/** hpcworker's own verbs that submit, cancel or allocate a job (the login sitting is an srun), and the raw scheduler commands that do */
+export const SCHEDULER_COMMAND = /\b(hpcworker\s+(probe|worker\s+(start|stop|restart)|claude\s+(login|consent))|sbatch|scancel|srun|salloc|qsub|qdel|bsub|bkill|condor_submit|condor_rm)\b/;
 
 /** hpcworker's read-only verbs, and the raw commands that only read from the scheduler */
 export const DISCOVERY_COMMAND = /\b(hpcworker\s+(discover|diag)|sinfo|squeue|sacct|sacctmgr|scontrol|qstat|bjobs|condor_q)\b/;
 
-const HPCWORKER_VERB = /\bhpcworker\s+(probe|worker\s+(?:start|stop|restart)|discover|diag)\b/;
+const HPCWORKER_VERB = /\bhpcworker\s+(probe|worker\s+(?:start|stop|restart)|claude\s+(?:login|consent)|discover|diag)\b/;
 
 /**
  * The floor class of one command line, by what it really costs the cluster. hpcworker's own verb

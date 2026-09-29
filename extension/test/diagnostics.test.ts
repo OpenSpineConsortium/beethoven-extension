@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { EndpointClass } from '../src/core/audit';
 import { buildNodes, CHECK_IDS, type DiagCtx, type DiagEnv } from '../src/core/checks';
 import { formatReport, order, runDiagnostics } from '../src/core/diagnostics';
-import { ACK_KEY, ackSubject, DATA_CLASSIFICATION_STATEMENT } from '../src/core/disclosure';
+import { ackSubject, makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
 import { IDENTITY_KEY, LICENSE_KEY, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
@@ -34,6 +34,7 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
   if (o.probe) files.set(`${STATE}/probe/probe.json`, JSON.stringify(o.probe));
   return {
     session: async () => ({ ok: true, status: 200, finalUrl: 'https://ood.example/pun/sys/dashboard/', signedIn: true, isOnDemand: true, csrf: 't', username: 'ab1234', checkedAt: new Date(NOW * 1000).toISOString(), detail: 'signed in to the portal' }),
+    warm: async () => ({ ok: true, attempts: 1, status: 200, signedIn: true, detail: 'your portal is awake', session: await fakePortal().session() }),
     whoAmI: async () => 'ab1234',
     home: async () => '/home/ab1234',
     listDir: async (p) => ({ path: p, files: [{ id: '1', type: 'd', name: '.hpcworker', size: 0, modified_at: 0, owner: 'ab1234', mode: 0 }], files_upload_path: '/x' }),
@@ -43,6 +44,9 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
       return f;
     },
     readFileIfExists: async (p) => files.get(p),
+    // existence from the parent's listing, as the real client does; the fake keeps files by full path
+    stat: async (p) => (files.has(p) ? { id: p, type: 'f', name: p.split('/').pop() ?? '', size: 0, modified_at: 0, owner: 'ab1234', mode: 0 } : undefined),
+    exists: async (p) => files.has(p),
     writeFile: async () => undefined,
     mkdir: async () => undefined,
     touch: async (p) => void files.set(p, ''),
@@ -66,7 +70,7 @@ async function ctxWith(opts: { terms?: boolean; key?: boolean; settings?: boolea
   if (opts.key !== false) await local.set(LICENSE_KEY, { key: I.license(), identity: { accessId: opts.typed ?? 'ab1234' }, saved_at: 'x' });
   if (opts.observed) await local.set(IDENTITY_KEY, { username: opts.observed });
   const worker = opts.worker ?? 'worker';
-  if (opts.ack) await session.set(ACK_KEY, { v: 1, work_dir: ackSubject(worker), disclosure_at: 'x', classification_at: 'x', statement: DATA_CLASSIFICATION_STATEMENT });
+  if (opts.ack) await local.set(STATEMENTS_KEY, { [ackSubject(worker)]: makeAcknowledgement(worker) } satisfies Statements);
   const settings: PortalSettings | undefined = opts.settings === false ? undefined : { origin: 'https://ood.example', hostname: 'ood.example', connected_at: '2026-09-28T00:00:00Z', shell_host: 'default', site: 'wayne' };
   const env: DiagEnv = {
     version: '1.0.0',
@@ -78,7 +82,7 @@ async function ctxWith(opts: { terms?: boolean; key?: boolean; settings?: boolea
     portalAlive: async () => opts.alive !== false,
     portal: () => opts.portal,
   };
-  return { env, settings, prefs: { worker_name: worker, permission_mode: 'default', auto_start: false }, cache: {} };
+  return { env, settings, prefs: { worker_name: worker, permission_mode: 'default', auto_start: true, open_claude_on_connect: true }, cache: {} };
 }
 
 const byId = (rep: Awaited<ReturnType<typeof runDiagnostics>>) => Object.fromEntries(rep.reports.map((r) => [r.id, r]));
@@ -191,7 +195,7 @@ describe('diagnostics', () => {
     expect(by['claude-login']!.detail).toMatch(/a@wayne.edu, max/);
     expect(by['remote-control-ready']!.status).toBe('ok');
     expect(by['xdg-runtime']!.status).toBe('ok');
-    expect(by['data-classification']!.detail).toMatch(/worker "worker"; the workspace is not marked restricted/);
+    expect(by['data-classification']!.detail).toMatch(/statement made for worker "worker".*the workspace is not marked restricted/);
     expect(by['session-lifetime']!.status).toBe('ok');
   });
 
@@ -244,6 +248,24 @@ describe('diagnostics', () => {
     expect(by3['xdg-runtime']!.detail).toMatch(/inside the image/);
   });
 
+  it('empty Remote Control flags from a probe that ran signed out are "known once you are signed in", not "too old"', async () => {
+    // measured on the grid (probe of 2026-09-29 04:06Z, signed out): `flags: ` empty; the signed-in worker listed them
+    const signedOut = { ...GOOD_PROBE, remote_control_flags: '', claude_auth: { loggedIn: false, config_dir_present: true } };
+    const ctx = await ctxWith({ portal: fakePortal({}, { probe: signedOut }), ack: true });
+    // the sign-in made from this browser since the probe satisfies check 13, so check 14 runs
+    await ctx.env.local.set('bridge.loginSeen', { at: '2026-09-28T02:00:00Z', detail: 'a@wayne.edu max' });
+    const by = byId(await runDiagnostics(buildNodes(), ctx));
+    expect(by['claude-login']!.status).toBe('ok');
+    expect(by['remote-control-ready']!.status).toBe('warn');
+    expect(by['remote-control-ready']!.detail).toMatch(/known once you are signed in/);
+    expect(by['remote-control-ready']!.detail).not.toMatch(/too old/);
+    // signed in at probe time and still no flags: that is the old-version verdict
+    const signedInNoFlags = { ...GOOD_PROBE, remote_control_flags: '' };
+    const by2 = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: signedInNoFlags }), ack: true })));
+    expect(by2['remote-control-ready']!.status).toBe('fail');
+    expect(by2['remote-control-ready']!.detail).toMatch(/too old/);
+  });
+
   it('a workspace marked restricted (its .restricted file, or the profile) fails check 16 even with the statement made', async () => {
     const marker = { [`${STATE}/workspaces/worker/.restricted`]: '' };
     const by = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE, files: marker }), ack: true })));
@@ -255,7 +277,9 @@ describe('diagnostics', () => {
     expect(by2['data-classification']!.detail).toMatch(/site profile marks the workspace of worker "worker" restricted/);
     // another worker's marker does not touch this one
     const by3 = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE, files: marker }), ack: true, worker: 'thesis' })));
-    expect(by3['data-classification']!.status).toBe('ok');
+    // a warn, not a fail: the statement is made and the consent marker is written at the next start
+    expect(by3['data-classification']!.status).toBe('warn');
+    expect(by3['data-classification']!.detail).toMatch(/consent marker is written at the next start/);
   });
 
   it('each floor class has its own clock: a running jobs clock skips check 7 only, a running discover clock skips check 5 and its dependants', async () => {

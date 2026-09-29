@@ -10,9 +10,13 @@
 // (Michigan UETA, MCL 450.838(3): a record the recipient cannot store or print is not enforceable
 // against them).
 
-/** Bump when the agreement or PRIVACY.md changes in substance; every install re-accepts. Integer, never fractional. */
-export const TERMS_VERSION = 1;
-export const TERMS_DATE = '2026-09-28';
+/**
+ * The version and date on the first line of the LICENSE.txt this build ships ("Version N, date");
+ * bump both with the text (integer, never fractional) and every install re-accepts. The build
+ * (scripts/sync-framework.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
+ */
+export const TERMS_VERSION = 2;
+export const TERMS_DATE = '2026-09-29';
 export const PRODUCT_NAME = 'Ashley Bridge';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Accept and Continue';

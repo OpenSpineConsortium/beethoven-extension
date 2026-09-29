@@ -4,22 +4,29 @@
 import { describe, expect, it } from 'vitest';
 import { FloorError } from '../src/core/audit';
 import { commands, paths } from '../src/core/contract';
-import { ackSubject, DATA_CLASSIFICATION_STATEMENT, type Acknowledgement } from '../src/core/disclosure';
+import { makeAcknowledgement, type Acknowledgement } from '../src/core/disclosure';
 import type { PortalApi } from '../src/core/portal';
 import { restrictedReason, startWorker, stopWorker, workerLive, clusterContext } from '../src/core/worker';
 
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
 const PROFILE = JSON.stringify({ site: 'wayne', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker' });
-const ACK: Acknowledgement = { v: 1, work_dir: ackSubject('worker'), disclosure_at: 'x', classification_at: 'x', statement: DATA_CLASSIFICATION_STATEMENT };
+const ACK: Acknowledgement = makeAcknowledgement('worker');
 
 function fake(o: { profile?: string | false; files?: string[]; shellOutput?: string; shellError?: Error; floorScheduler?: boolean } = {}) {
   const files = new Set<string>(o.files ?? []);
   const typed: string[] = [];
   const touched: string[] = [];
+  const written: Array<[string, string]> = [];
   const p = {
     home: async () => '/home/ab1234',
     whoAmI: async () => 'ab1234',
     readFileIfExists: async (path: string) => (path === '/home/ab1234/.hpcworker/profile.json' ? (o.profile === false ? undefined : o.profile ?? PROFILE) : files.has(path) ? '' : undefined),
+    // existence from a listing, never from a download
+    exists: async (path: string) => files.has(path),
+    writeFile: async (path: string, body: string) => {
+      written.push([path, body]);
+      files.add(path);
+    },
     touch: async (path: string) => void touched.push(path),
     shell: async (command: string) => {
       typed.push(command);
@@ -28,7 +35,7 @@ function fake(o: { profile?: string | false; files?: string[]; shellOutput?: str
       return { output: o.shellOutput ?? 'worker worker submitted as job 4243102 (reqp/requeue, 8 h). When it runs...', exitCode: 0, transcript: '', ms: 1200 };
     },
   } as unknown as PortalApi;
-  return { p, typed, touched };
+  return { p, typed, touched, written, files };
 }
 
 describe('worker start and stop', () => {
@@ -63,6 +70,26 @@ describe('worker start and stop', () => {
     expect((await startWorker(again.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).alreadyRunning).toBe(true);
     const bad = fake({ shellOutput: 'hpcworker: the scheduler refused the job: invalid partition' });
     await expect(startWorker(bad.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/printed no job id/);
+  });
+
+  it('writes the consent marker before the start when the statement has not reached the cluster yet, and not twice', async () => {
+    const { p, typed, written } = fake();
+    const out = await startWorker(p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: false } });
+    expect(out.consentWritten).toBe(true);
+    expect(written).toHaveLength(1);
+    expect(written[0]![0]).toBe(paths.consent('/home/ab1234'));
+    expect(written[0]![1]).toMatch(/^yes \d{4}-\d{2}-\d{2}T[^ ]+ a1b2c3\n$/);
+    // the marker is written before the one line is typed
+    expect(typed).toEqual([commands.workerStart('worker', 'default')]);
+    // recorded as written and present on the cluster: nothing to write
+    const again = await startWorker(p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: true } });
+    expect(again.consentWritten).toBe(false);
+    expect(written).toHaveLength(1);
+    // recorded as written but gone from the cluster (a fresh home): written again
+    const fresh = fake();
+    const third = await startWorker(fresh.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: true } });
+    expect(third.consentWritten).toBe(true);
+    expect(fresh.written).toHaveLength(1);
   });
 
   it('a stop touches the stop file first, then runs the tool\'s stop once; a held scheduler clock leaves the file to do the work', async () => {

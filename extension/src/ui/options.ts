@@ -1,16 +1,21 @@
-// The setup page: the signing dialog (ported from Ashley's termsPanel), the licence key, the
-// disclosure, connecting the portal, and the Google Drive step. Built to the assent pattern the
-// cases enforce: conspicuous notice, un-prechecked boxes whose sentence names the exact button, a
-// typed name, never install-equals-accept; and the text stays exportable and printable.
+// The setup page (manifest options_ui; opened on install, from right-click > Options, and from the
+// strip): the signing dialog (ported from Ashley's termsPanel), the licence key, connecting or
+// disconnecting the portal by address, the settings, the audit log with its export, and the Google
+// Drive step. Built to the assent pattern the cases enforce: conspicuous notice, un-prechecked
+// boxes whose sentence names the exact button, a typed name, never install-equals-accept; and the
+// text stays exportable and printable.
 import { browser } from 'wxt/browser';
 import { bindIdentity, identityNote } from '../core/identity';
 import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, type LicenseState } from '../core/keys';
 import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, PRODUCT_NAME, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, type Affirmation, type TermsRecord } from '../core/terms';
-import { browserName, installId, local, portalSettings, version } from '../ext/storage';
+import { browserName, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 import { type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS, findKey, peek, verifyLicense } from '../licensing/license';
+import { AUTO_START_KEY, type AutoStartNote } from '../core/keys';
+import { auditSection, settingsSection } from './details';
 import { add, clear, downloadText, el } from './dom';
-import { ackSection, connectSection, driveStep, licenceSummary } from './sections';
+import { currentRun, portalAlive } from './rpc';
+import { ACCESS_REQUEST_URL, connectSection, driveStep, licenceSummary, statementSection } from './sections';
 
 const SEPARATOR = '\n\n\n==================== PRIVACY STATEMENT ====================\n\n';
 
@@ -19,9 +24,11 @@ async function texts(): Promise<{ license: string; privacy: string }> {
   return { license: l, privacy: p };
 }
 
-export async function mountOnboarding(root: HTMLElement): Promise<void> {
+type Notify = (k: 'ok' | 'warn' | 'fail' | 'info', t: string) => void;
+
+export async function mountOptions(root: HTMLElement): Promise<void> {
   const notice = el('div', { class: 'status', role: 'status', 'aria-live': 'polite' });
-  const notify = (kind: 'ok' | 'warn' | 'fail' | 'info', text: string) => {
+  const notify: Notify = (kind, text) => {
     notice.className = `status ${kind === 'info' ? 'muted' : kind}`;
     notice.textContent = text;
   };
@@ -29,27 +36,32 @@ export async function mountOnboarding(root: HTMLElement): Promise<void> {
     clear(root);
     const summary = await licenceSummary();
     const settings = await portalSettings();
+    const prefs = await loadPrefs();
     root.append(
-      el('h1', { text: `${PRODUCT_NAME}: set up` }),
-      el('p', { class: 'muted' }, 'Five short steps. Nothing here signs in anywhere for you, and nothing runs on claude.ai: the extension only talks to the portal you connect.'),
+      el('h1', { text: `${PRODUCT_NAME}: setup` }),
+      el('p', { class: 'muted' }, 'The everyday way in is the toolbar button on your portal tab: it opens the strip, which does the rest and asks you only when it must. This page holds the agreement, your key, the portal connection, the settings and the audit log. Nothing here signs in anywhere for you, and nothing runs on claude.ai.'),
       notice,
       el('h2', { text: '1. The agreement' }),
       summary.termsOk ? acceptedCard(summary.terms!, notify) : await signingDialog(notify, render),
       el('h2', { text: '2. Your licence key' }),
       await licenceCard(notify, render),
-      el('h2', { text: '3. Where your work goes' }),
-      await ackSection(render),
-      el('h2', { text: '4. Your portal' }),
+      el('h2', { text: '3. Your portal' }),
       connectSection(settings, render, notify),
-      el('h2', { text: '5. Connect Google Drive in claude.ai (optional)' }),
+      el('h2', { text: '4. Where your work goes' }),
+      await statementSection(render),
+      el('h2', { text: '5. Settings' }),
+      settingsSection({ settings, prefs, render }, await session.get<AutoStartNote>(AUTO_START_KEY)),
+      el('h2', { text: '6. Audit log' }),
+      await auditSection({ notify, render }),
+      el('h2', { text: '7. Connect Google Drive in claude.ai (optional)' }),
       await driveStep(render),
-      el('p', { class: 'muted small' }, `${PRODUCT_NAME} ${version()}. The monitoring panel is the toolbar button (side panel in Chrome and Edge, sidebar in Firefox).`),
+      el('p', { class: 'muted small' }, `${PRODUCT_NAME} ${version()}. The strip is the toolbar button (side panel in Chrome and Edge, sidebar in Firefox).${(await portalAlive()) ? '' : ' Your portal tab is not open right now.'}${(await currentRun().catch(() => undefined)) ? ' A worker is recorded in this browser session.' : ''}`),
     );
   };
   await render();
 }
 
-function acceptedCard(rec: TermsRecord, notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: string) => void): HTMLElement {
+function acceptedCard(rec: TermsRecord, notify: Notify): HTMLElement {
   return el('div', { class: 'card' },
     el('div', { class: 'ok', text: `Accepted version ${rec.terms_version} on ${new Date(rec.accepted_at).toLocaleString()} by "${rec.signed_name}" (${rec.host}).` }),
     el('div', { class: 'muted small', text: `Agreement SHA-256 ${rec.license_sha256.slice(0, 16)}..., privacy statement ${rec.privacy_sha256.slice(0, 16)}...` }),
@@ -61,13 +73,13 @@ function acceptedCard(rec: TermsRecord, notify: (k: 'ok' | 'warn' | 'fail' | 'in
   );
 }
 
-async function exportAll(rec: TermsRecord, notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: string) => void): Promise<void> {
+async function exportAll(rec: TermsRecord, notify: Notify): Promise<void> {
   const t = await texts();
   downloadText(`${PRODUCT_NAME.replace(/\s+/g, '-')}-agreement-v${rec.terms_version}.txt`, `${t.license}${SEPARATOR}${t.privacy}\n\n\n==================== YOUR ACCEPTANCE RECORD ====================\n\n${JSON.stringify(rec, null, 1)}\n`);
   notify('ok', 'Exported: the agreement, the privacy statement and your acceptance record, in one text file.');
 }
 
-async function signingDialog(notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: string) => void, done: () => Promise<void>): Promise<HTMLElement> {
+async function signingDialog(notify: Notify, done: () => Promise<void>): Promise<HTMLElement> {
   const t = await texts();
   const licenseHash = await sha256(t.license);
   const privacyHash = await sha256(t.privacy);
@@ -170,7 +182,7 @@ async function signingDialog(notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: str
  * wins; the field can be typed only while the portal has shown none, and then the page says the
  * portal's own name will take over.
  */
-async function licenceCard(notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: string) => void, done: () => Promise<void>): Promise<HTMLElement> {
+async function licenceCard(notify: Notify, done: () => Promise<void>): Promise<HTMLElement> {
   const stored = await local.get<LicenseState>(LICENSE_KEY);
   const known = (await local.get<{ username?: string }>(IDENTITY_KEY))?.username;
   const kill = await local.get<StoredKillList>(KILLLIST_KEY);
@@ -181,7 +193,7 @@ async function licenceCard(notify: (k: 'ok' | 'warn' | 'fail' | 'info', t: strin
   const current = stored ? await verifyLicense(stored.key, { keys: BUNDLED_KEYS, identity: { accessId: bound.accessId }, revoked: kill?.list.revoked_lids ?? [] }) : undefined;
   const card = el('div', { class: 'card' });
   add(card,
-    el('p', {}, 'A key names one person and is checked in this browser, against the signing keys built into this version; nothing is sent to check it. It must match your portal username: the one your portal\'s dashboard shows once it is connected, which always takes precedence over anything typed here.'),
+    el('p', {}, 'A key names one person and is checked in this browser, against the signing keys built into this version; nothing is sent to check it. It must match your portal username: the one your portal\'s dashboard shows once it is connected, which always takes precedence over anything typed here. Not got a key? ', el('a', { href: ACCESS_REQUEST_URL, target: '_blank', rel: 'noopener', text: 'Ask for access' }), '.'),
     current ? el('div', { class: current.ok ? 'ok' : 'fail', text: `${current.detail} (${identityNote(bound)})` }) : null,
     key,
     el('div', { class: 'row' }, el('label', { text: 'Portal username: ' }, user), el('span', { class: 'muted small', text: known ? `(read from your portal's dashboard: ${known}; it cannot be changed here)` : '(type it for now; the name your portal shows will take over once the portal is connected)' })),

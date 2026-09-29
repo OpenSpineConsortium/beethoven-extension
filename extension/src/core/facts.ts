@@ -1,0 +1,240 @@
+// Gathering the facts the strip's state machine decides on: from storage (terms, key, statement,
+// preferences), from the browser (the grant, the page script answering), and from the cluster
+// through the portal page script (the tool installed, probe.json, the restricted marker, the
+// scheduler clock). Reads only: nothing here starts, installs or writes. The transient part
+// (what the panel is doing right now) is handed in by the caller, so the same function serves
+// the panel and the background's automatic start.
+import type { KV } from './audit';
+import { isEnvironmentUrl, paths, probeVerdict, profileRestricts, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
+import { ackSubject, statementFor, type Statements } from './disclosure';
+import { bindIdentity } from './identity';
+import { frameworkOlder } from './install';
+import { IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type InstallNote, type LicenseState, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
+import type { PortalApi } from './portal';
+import { LOGIN_SEEN_FRESH_MS, type Facts } from './steps';
+import { recordInForce, TERMS_KEY } from './terms';
+import { workerLive } from './worker';
+import { killListVerdict, type StoredKillList } from '../licensing/killlist';
+import { verifyLicense, type KeyRing } from '../licensing/license';
+
+/** the run as the background keeps it (background.ts RunState), the part the facts need */
+export interface RunLike {
+  stateDir: string;
+  run: string;
+  job: string;
+  set_at?: string;
+  started_by?: 'button' | 'auto' | 'strip';
+  status?: StatusFile;
+  connection?: ConnectionFile;
+  registration?: Registration;
+  stopped_by_student?: boolean;
+}
+
+/** what the caller is doing right now, which no store records */
+export interface Transient {
+  warm?: Facts['warm'];
+  installing?: boolean;
+  installFailed?: string;
+  probeSubmitting?: boolean;
+  probeFailed?: string;
+  loginInProgress?: boolean;
+  loginFailed?: string;
+  starting?: boolean;
+  startFailed?: string;
+  /** the student pressed the start button; kept while the floor is waited out, cleared once the start went through or failed */
+  startRequested?: boolean;
+}
+
+/** an automatic update that ran this recently and still reads the old version is reported, not repeated */
+export const INSTALL_RETRY_MS = 10 * 60_000;
+
+export interface FactsEnv {
+  version: string;
+  now(): number;
+  local: KV;
+  keys: KeyRing;
+  settings?: PortalSettings;
+  prefs: Prefs;
+  granted(origin: string): Promise<boolean>;
+  alive(): Promise<boolean>;
+  portal(): PortalApi | undefined;
+  run?: RunLike;
+  click?: ClickNote;
+  transient: Transient;
+  /** the VERSION file of the framework this build carries (install.ts bundledFrameworkVersion); absent when the caller cannot read its own files */
+  bundledFrameworkVersion?(): Promise<string | undefined>;
+}
+
+/** what was learned on the way, for the actions that follow */
+export interface Gathered {
+  facts: Facts;
+  home?: string;
+  user?: string;
+  stateDir?: string;
+  profile?: string;
+  probe?: ProbeFile;
+  /** the acknowledgement's consent marker was written to the cluster (or is not needed) */
+  consentWritten?: boolean;
+}
+
+/** the environment link of a run, only when it is Claude's own Code page for an environment */
+export function environmentLinkOf(run: RunLike | undefined): string | undefined {
+  if (!run) return undefined;
+  const raw = run.connection?.environment_url ?? run.status?.environment_url ?? run.registration?.environment_url ?? run.connection?.session_url ?? run.status?.session_url;
+  return isEnvironmentUrl(raw) ? raw : undefined;
+}
+
+export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
+  const t = env.transient;
+  const now = env.now();
+  const out: Gathered = { facts: emptyFacts(env) };
+  const f = out.facts;
+
+  // the portal
+  const s = env.settings;
+  f.portal.connected = !!s;
+  f.portal.hostname = s?.hostname;
+  f.portal.granted = s ? await env.granted(s.origin) : false;
+  f.portal.alive = s && f.portal.granted ? await env.alive() : false;
+  if (!s && env.click?.looksLikeOod) f.portal.candidate = { origin: env.click.origin, hostname: new URL(env.click.origin).hostname, tabId: env.click.tabId };
+
+  // the browser-side facts, whatever the portal says
+  f.terms = recordInForce(await env.local.get(TERMS_KEY));
+  const lic = await env.local.get<LicenseState>(LICENSE_KEY);
+  const stored = await env.local.get<StoredKillList>(KILLLIST_KEY);
+  const observed = (await env.local.get<{ username?: string }>(IDENTITY_KEY))?.username;
+  const who = bindIdentity(observed, lic?.identity?.accessId);
+  const v = await verifyLicense(lic?.key, { keys: env.keys, now: Math.floor(now / 1000), identity: { accessId: who.accessId }, revoked: stored?.list.revoked_lids ?? [] });
+  const verdict = killListVerdict(stored, env.version, v.payload?.lid);
+  f.licence = { ok: v.ok && !verdict.versionRevoked, missing: v.status === 'missing', detail: verdict.versionRevoked ? `This version of Ashley Bridge has been withdrawn; update to continue. ${verdict.message}`.trim() : v.detail, revoked: verdict.versionRevoked };
+  const statements = await env.local.get<Statements>(STATEMENTS_KEY);
+  const ack = statementFor(statements, env.prefs.worker_name);
+  f.statement.acknowledged = !!ack;
+  f.statement.workerName = env.prefs.worker_name;
+  if (ack?.consent_written_at) f.statement.consentWrittenAt = new Date(ack.consent_written_at).getTime();
+  out.consentWritten = !!ack?.consent_written_at;
+  const seen = await env.local.get<LoginSeen>(LOGIN_SEEN_KEY);
+  const seenAt = seen ? new Date(seen.at).getTime() : undefined;
+  const probeNote = await env.local.get<ProbeNote>(PROBE_KEY);
+  if (probeNote?.submitted_at) f.probe.submittedAt = new Date(probeNote.submitted_at).getTime();
+  f.autoOpen = env.prefs.open_claude_on_connect;
+
+  // the run, as the background last read it
+  const run = env.run;
+  const url = environmentLinkOf(run);
+  f.run = {
+    present: !!run,
+    live: workerLive(run?.status, now),
+    state: run?.status?.state,
+    needs: run?.status?.needs,
+    hint: run?.status?.hint,
+    job: run?.status?.job ?? run?.job,
+    message: run?.status?.message,
+    url,
+    sessionName: run?.connection?.session_name || run?.status?.session_name || run?.registration?.session_name,
+    nextJob: run?.status?.next_job || undefined,
+    setAt: run?.set_at ? new Date(run.set_at).getTime() : undefined,
+    starting: t.starting,
+    failed: t.startFailed,
+    schedulerWaitMs: 0,
+    stoppedByStudent: !!run?.stopped_by_student || run?.status?.state === 'stopped',
+    startRequested: t.startRequested,
+  };
+  if (url) {
+    const opened = await env.local.get<OpenedLinks>(OPENED_KEY);
+    f.opened = !!opened?.urls.includes(url);
+  }
+
+  // the cluster, only from a live, warm portal tab
+  f.warm = t.warm ?? { state: 'unknown' };
+  f.install = { installing: t.installing, failed: t.installFailed };
+  f.probe = { ...f.probe, submitting: t.probeSubmitting, failed: t.probeFailed };
+  f.login = { inProgress: t.loginInProgress, failed: t.loginFailed, seenAt };
+  const portal = env.portal();
+  if (!portal || !f.portal.alive || f.warm.state !== 'warm') return out;
+  try {
+    f.run.schedulerWaitMs = await portal.auditWait('scheduler');
+    const home = await portal.home();
+    out.home = home;
+    const user = observed ?? (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
+    out.user = user;
+    f.install.installed = await portal.exists(paths.profile(home));
+    if (!f.install.installed) return out;
+    // installed, but is it this build's framework? ~/.hpcworker/VERSION against the bundled VERSION;
+    // an older (or missing) one is set up again, unless that just ran and changed nothing, which is said instead
+    const bundled = env.bundledFrameworkVersion ? await env.bundledFrameworkVersion() : undefined;
+    if (bundled) {
+      const have = ((await portal.readFileIfExists(paths.version(home))) ?? '').trim();
+      if (frameworkOlder(have, bundled)) {
+        const note = await env.local.get<InstallNote>(INSTALL_KEY);
+        const justRan = !!note && note.ok && now - new Date(note.attempted_at).getTime() < INSTALL_RETRY_MS;
+        if (justRan) f.install.failed = f.install.failed ?? `the tool on the cluster still reports version ${have || 'unknown'} after the update to version ${bundled} ran (see Details)`;
+        else f.install.outdated = { installed: have || 'unknown', bundled };
+      }
+    }
+    const profile = await portal.readFileIfExists(paths.profile(home));
+    out.profile = profile;
+    const stateDir = stateDirFrom(profile, { home, user });
+    out.stateDir = stateDir;
+    const probeText = await portal.readFileIfExists(paths.probe(stateDir));
+    f.probe.present = probeText !== undefined;
+    if (probeText !== undefined) {
+      try {
+        const p = JSON.parse(probeText) as ProbeFile;
+        out.probe = p;
+        const pv = probeVerdict(p);
+        f.probe.ok = pv.ok;
+        f.probe.detail = pv.ok ? pv.detail : pv.reason;
+        // the sign-in: the probe's word, overtaken by a login made in this browser since, or by the running job's own word
+        const probeAt = p.when ? new Date(p.when).getTime() : 0;
+        if (p.claude_auth) {
+          f.login.loggedIn = !!p.claude_auth.loggedIn;
+          f.login.detail = p.claude_auth.loggedIn ? `signed in${p.claude_auth.email ? ` as ${p.claude_auth.email}` : ''}` : 'not signed in to Claude on the cluster';
+        }
+        if (seen && seenAt !== undefined && seenAt > probeAt) {
+          f.login.loggedIn = true;
+          f.login.detail = `signed in from this browser ${seen.at.slice(0, 16)}`;
+        }
+      } catch {
+        f.probe.ok = false;
+        f.probe.detail = 'The compute node check wrote a file that could not be read; run it again.';
+      }
+    }
+    // the live job's word, unless it checked before the sign-in made from this browser (a heartbeat
+    // is written every 30 s, so updated_at says nothing about when the sign-in was last asked)
+    const st = run?.status;
+    if (st?.claude_login && st.updated_at && f.run.live) {
+      const checkedAt = new Date(st.claude_login.checked_at ?? st.updated_at).getTime();
+      const seenSince = seenAt !== undefined && (seenAt > checkedAt || now - seenAt < LOGIN_SEEN_FRESH_MS);
+      if (!seenSince || st.claude_login.loggedIn) {
+        f.login.loggedIn = !!st.claude_login.loggedIn;
+        f.login.detail = st.claude_login.loggedIn ? `signed in (your worker says so)` : 'not signed in to Claude on the cluster (your worker says so)';
+      }
+    }
+    if (profileRestricts(profile, env.prefs.worker_name)) f.statement.restricted = `The site profile marks the workspace of worker "${env.prefs.worker_name}" restricted; no worker starts there.`;
+    else if (await portal.exists(paths.restrictedMarker(stateDir, env.prefs.worker_name))) f.statement.restricted = `The workspace ${paths.workspace(stateDir, env.prefs.worker_name)} is marked restricted (.restricted file present); no worker starts there. Remove the marker yourself in the portal's Files app only if the restriction no longer applies.`;
+  } catch (e) {
+    // a read that failed leaves the fact unknown; the strip shows the reason rather than inventing a state
+    f.warm = { state: 'cold', detail: `Your portal did not answer: ${(e as Error).message}` };
+  }
+  return out;
+}
+
+function emptyFacts(env: FactsEnv): Facts {
+  return {
+    portal: { connected: false, granted: false, alive: false },
+    warm: { state: 'unknown' },
+    terms: false,
+    licence: { ok: false, missing: true, detail: '', revoked: false },
+    install: {},
+    probe: {},
+    login: {},
+    statement: { acknowledged: false, workerName: env.prefs.worker_name },
+    run: { present: false, live: false, schedulerWaitMs: 0 },
+    opened: false,
+    autoOpen: env.prefs.open_claude_on_connect,
+  };
+}
+
+/** the statement's subject for the current prefs, for callers that write it */
+export const currentSubject = (prefs: Prefs): string => ackSubject(prefs.worker_name);

@@ -1,3 +1,3 @@
-import { mountPanel } from '../../ui/panel';
+import { mountStrip } from '../../ui/strip';
 
-void mountPanel(document.getElementById('app') as HTMLElement, 'panel');
+void mountStrip(document.getElementById('app') as HTMLElement);

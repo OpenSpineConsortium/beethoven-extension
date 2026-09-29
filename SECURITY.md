@@ -23,7 +23,13 @@ The other adversaries considered:
 
 - A hostile page. The only content script runs on the portal origin, so the DOM-injection and
   prototype-skimming classes apply to the portal page alone; messages are accepted only after checking
-  `sender.id`; no secret is ever sent to a content script.
+  `sender.id`; no secret is ever sent to a content script. The Anthropic pages the extension opens
+  (the sign-in page during a sitting, the session's claude.ai/code link) are never read.
+- A compromised framework or portal printing a link. The one address the cluster hands the extension
+  during a sign-in sitting is opened only when it is `https` on `claude.ai` or `claude.com` (or a
+  subdomain of either), and is reported as refused otherwise; the only link opened when a worker
+  connects must match `https://claude.ai/code?environment=env_...` exactly; anything else is shown
+  as text.
 - Another portal user. The Open OnDemand `/rnode/` proxy does no job or ownership lookup: any
   authenticated portal user can reach any port on a matching host. The worker therefore trusts nothing
   the proxy adds (`X-Forwarded-User`, `Authorization`, the OIDC cookie) and requires its own per-job
@@ -58,14 +64,36 @@ Extension:
   transmitted; the same function enforces the ≥60-second scheduler-facing poll floor and the
   shell-single-use rule.
 - No durable secret. `storage.local` holds the portal hostname and granted origin, preferences, the
-  acceptance record, the licence key and institutional identifier, the audit log, the last good copy
-  of the signed kill-list, a random installation identifier, copies of error reports and the ticks on
-  the optional checklist steps; `storage.session` holds connection state and this session's
-  acknowledgement of the data disclosure. `PRIVACY.md` and `docs/ARCHITECTURE.md` section 6 carry the
-  same list. Extension storage is not encrypted and is treated accordingly.
-- The extension opens a claude.ai page only when the student clicks a button that says so (*Open in
-  Claude*, *Connect Google Drive in claude.ai*), in a new tab through `tabs.create`, which needs no
-  `tabs` permission; it has no presence on the page it opens.
+  acceptance record, the licence key and institutional identifier, the statement made about each
+  worker's workspace (workspace, text and its version, time), the notes the strip keeps so it does
+  not repeat itself (the last sign-in it saw with the account and plan Claude Code reported, the
+  session links it opened, the probe job it submitted, the install it ran), the audit log, the last good copy of the
+  signed kill-list, a random installation identifier, copies of error reports and the ticks on the
+  optional checklist steps; `storage.session` holds connection state (the run's name and folder, the
+  job number, the worker's last status file, the session name and link, the last 4,000 characters of
+  `rc.log`), the portal tab, the tab the icon was clicked from, when the portal sign-in was last seen,
+  what the last automatic start did, and the last check results. `PRIVACY.md` and
+  `docs/ARCHITECTURE.md` section 6 carry the same list. Extension storage is not encrypted and is
+  treated accordingly.
+- The extension opens an Anthropic page only in a new tab through `tabs.create`, which needs no
+  `tabs` permission, and only in a run the student started with the icon or a button: the sign-in
+  page Claude Code printed during the sign-in sitting, the session's claude.ai/code link when the
+  worker connects (a setting, on by default, that leaves the green *Open in Claude* button when off),
+  and the connectors page from the optional Google Drive step. It has no presence on any page it opens.
+- The pasted sign-in code passes through and is not kept. During the sign-in sitting the student
+  pastes Anthropic's one-time code into one box in the panel; the extension sends it over its login
+  port to the page script and into the student's own terminal on the cluster as keystrokes, holds it
+  in a local variable only, clears the box as it sends, and records the whole sitting as one audit
+  line carrying the counts of bytes read and bytes typed, never the text; it never places the code in
+  storage, an error report or a message to the vendor. On the compute node the framework passes it to
+  Claude Code's pseudo-terminal with echo off and never copies Claude Code's screen to the terminal
+  the extension reads. No `clipboardRead` permission and no script on any Anthropic page, so the
+  extension cannot take the code by itself. The sitting is one shell held open, one at a time, ended
+  by the framework after ten minutes and by the panel after fifteen.
+- The extension types nothing into Claude Code's prompts except that code. Claude Code's one-time
+  Remote Control question is answered by the worker job from the student's own recorded statement
+  (the marker file the panel writes on their acknowledgement, then Claude Code's own record), never
+  without one.
 - Every WebSocket frame is validated as JSON before it is sent; a bad frame would throw inside the
   student's only shell process on the portal.
 
@@ -94,8 +122,15 @@ Cluster side:
 - Claude Code's own settings file, `<claude_config_dir>/.claude.json`, is read for two boolean keys
   only, `remoteDialogSeen` (the student's own answer to "Enable Remote Control?") and the workspace's
   `hasTrustDialogAccepted`, and rewritten only to seed `hasCompletedOnboarding`, `theme` and that
-  trust key for the workspace, only when the student has started a login or a worker on purpose. The
-  credentials file beside it is never opened.
+  trust key for the workspace, only in the sign-in sitting or when a worker is about to start a
+  session. The credentials file beside it is never opened. Before the first session the student's
+  answer is the marker file `~/.hpcworker/consent`, written by the extension through the Files app on
+  the student's acknowledgement in the panel; its existence is all the framework tests.
+- The sign-in sitting (`hpcworker claude login --plain`, `framework/lib/login_plain.sh`) prints only
+  its own lines (`HPCW-LOGIN:` progress, `AUTH-URL:`, `SIGNED-IN <email> <plan>` from Claude Code's
+  own status answer, `HPCW-LOGIN-FAILED:`), never a token and never Claude Code's screen, which stays
+  in a 0600 transcript under `/dev/shm` on the compute node for the sitting only and is removed with
+  it; the code is read from standard input with the terminal's echo off and is never echoed back.
 
 Release pipeline and keys:
 
@@ -120,13 +155,21 @@ Release pipeline and keys:
 ## What Ashley Bridge holds, and where
 
 - In the browser: portal hostname and granted origin, preferences, licence key and institutional
-  identifier, the acceptance record, the audit log, the last good kill-list, a random installation
-  identifier, copies of error reports, the ticks on optional checklist steps; session-only connection
-  state (job number, session name, the session's claude.ai link) and the disclosure acknowledgement.
+  identifier, the acceptance record, the statement made about each worker's workspace, the strip's
+  notes (last sign-in seen with the account and plan Claude Code reported, links opened, the probe
+  job it submitted, the install it ran), the audit log, the last good kill-list, a random
+  installation identifier,
+  copies of error reports, the ticks on optional checklist steps; session-only connection state (the
+  run's name and folder, job number, the worker's last status file, session name, the session's
+  claude.ai link, the last 4,000 characters of `rc.log`), the portal tab, the tab the icon was clicked
+  from, when the portal sign-in was last seen, what the last automatic start did, and the last check
+  results. Never the pasted sign-in code.
 - In the student's cluster account: the framework, the licence key, job files, `status.json`,
   `connection.json` (the session name and its claude.ai link), `rc.log`, the per-job token (0600), the
-  successor job's id and the stop file, and Claude Code's own sign-in (written by Claude Code, never
-  read by Ashley Bridge).
+  successor job's id and the stop file, the consent marker `~/.hpcworker/consent` (one line: yes, the
+  time, the browser's random installation identifier), and Claude Code's own sign-in (written by
+  Claude Code, never read by Ashley Bridge). On a compute node, for a sign-in sitting only: the
+  sitting's transcript under `/dev/shm`, mode 0600, removed with the sitting.
 - With the maintainer: licence and activation records; error reports if the student allows them
   (scrubbed of identity; retention 365 days).
 - On Anthropic's servers, under the student's own account: the session transcript while Remote

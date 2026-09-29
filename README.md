@@ -18,9 +18,10 @@ time ends so the worker stays on, and writes `status.json` and `connection.json`
 its claude.ai link) to shared storage. The browser **extension** (`extension/`, working name
 `ood-worker`) is a launcher and a diagnostics panel. It talks to exactly one origin, the student's
 Open OnDemand portal, over surfaces that exist on every Open OnDemand 3.x and 4.x site without
-administrator help: the Shell WebSocket (to run one `sbatch` and close), the Files JSON routes (to
-read the job's status files), and Active Jobs JSON (to reconcile). It rides the portal session the
-student already has in the browser; it never reads the cookie and never automates a login.
+administrator help: the Shell WebSocket (to run one `sbatch`, and to hold one sign-in sitting open),
+the Files JSON routes (to read the job's status files), and Active Jobs JSON (to reconcile). It rides
+the portal session the student already has in the browser; it never reads the cookie and never
+automates a login.
 
 The product is small on purpose. On twelve sampled US university clusters the things that break a
 worker, egress from compute nodes, the container runtime, node-local temp, login-node rules, proxy
@@ -40,107 +41,139 @@ claude.ai/code, Claude app  ◀════════════════ 
    transcript stored while connected)                                                          │ polls for work
                                                                                                │
 Ashley Bridge extension ──▶ https://ondemand.<university>.edu ──▶ login node ──sbatch──▶ compute node (Slurm job)
-  (one origin, one            │ Shell WebSocket: one sbatch, then close      (nothing else)   tmux ▶ apptainer exec
-   content script)            │ Files JSON: read status.json, rc.log                          ▶ claude remote-control
-                              │ Active Jobs JSON: reconcile                                     writes status.json,
-                              └────────── shared storage <state_dir>/<run>/ ◀────────────────── connection.json, rc.log
+  (one origin, one            │ Shell WebSocket: one sbatch, then close;      (nothing else)   tmux ▶ apptainer exec
+   content script;            │   once, held open for the sign-in sitting                      ▶ claude remote-control
+   the icon runs the steps)   │ Files JSON: list, then read status.json, rc.log                 writes status.json,
+                              │ Active Jobs JSON: reconcile                                     connection.json, rc.log
+                              └────────── shared storage <state_dir>/<run>/ ◀──────────────────────────┘
 ```
 
-What a student does, in order:
+What a student does, in order, after installing the extension from the browser's store, accepting
+the agreement once on its setup page and pasting the key their lead sent, once (the panel asks for it
+on the first click if it is not saved yet):
 
-1. **Install and connect.** Install the extension from the browser's store, read and accept the
-   agreement, type the portal address (`ondemand.<university>.edu`) and click *Connect this portal*.
-   The browser asks once for access to that one site.
-2. **Sign in to the portal in a tab**, the usual way (VPN first if the university requires it). The
-   extension checks the portal, the shell, the files app and the jobs list, then submits a five-minute
-   probe job and reports in plain words what works and what does not.
-3. **Sign in to Claude once, in one sitting.** The extension shows one command to paste into the
-   portal's own Shell tab, `hpcworker claude login`, and checks afterwards; it never types answers. The
-   command asks the scheduler for a short compute-node allocation and, inside the worker image, runs
-   `claude auth login` (paste-code flow); then, if Claude Code has not yet recorded the student's
-   answer to *Enable Remote Control?*, it runs `claude remote-control` once in the worker's folder so
-   the student answers *y* themselves (and *y* again if asked to trust the folder), sees the session
-   appear, and presses Ctrl-C. Claude Code keeps the record of that answer in its own settings file;
-   the framework reads that one record and nothing else there. No separate consent command is needed
-   (`hpcworker claude consent` remains as a name that explains this).
-4. **Start the worker.** One click submits the job through the portal shell and closes the shell. The
-   disclosure about where files, output and the transcript go is shown at this point every time. The
-   worker is then always on: before its wall time ends the job queues exactly one successor
-   (`sbatch --dependency=afterany:<its own id>` of the same job file), and the successor reconnects
-   the same session, with `claude remote-control --continue` in the same directory when
-   `connection.json` is younger than four hours and a fresh registration in the same environment
-   otherwise. *Stop* writes the stop file, which ends the chain, and cancels the job.
-5. **Open in Claude.** When the job is registered the panel shows a green *Open in Claude* button that
-   opens the session's link (`https://claude.ai/code?environment=...`, read from `connection.json`) in
-   a new tab, and *Copy link*. The session can also be picked by name at claude.ai/code or under
-   *Code* in the Claude app.
-6. **Work from claude.ai or the phone.** The panel shows the job's state from `status.json`, read no
-   more than once a minute. A setting that is off by default, *start my worker when I open my portal*,
-   runs the same start as the button whenever the portal tab is connected and the worker is not
-   online, never more often than once a minute; the setting says so where it is switched on.
-7. **Optional: connect Google Drive in claude.ai.** A checklist step opens
-   `https://claude.ai/settings/connectors` in a new tab with one sentence saying what to do there and
-   a *done* box that is remembered only in the browser. The extension has no presence on that page.
+1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
+   university requires it) and keep the tab open.
+2. **Click the Ashley Bridge icon.** The first click asks the browser once for access to that one
+   site. Then the extension does the rest by itself, in order, and says in one line what it is doing:
+   wakes the portal up, checks it is signed in, asks for the licence key if none is saved, installs
+   the framework in your account if it is not there, checks a compute node once (a short job,
+   the first time only), signs you in to Claude if the cluster is not signed in (step 3), shows where
+   your work goes and takes your statement about it (once per workspace), starts your worker through
+   the portal shell, and waits for Claude Code to connect.
+3. **Sign in to Claude once, when the panel asks.** The extension opens Anthropic's sign-in page in a
+   new tab; you sign in with your own Claude account, click *Authorize*, and paste the code the page
+   shows into the one box in the extension's panel. The code is typed once into the sign-in sitting
+   running on a compute node and is not kept. When your worker connects, the claude.ai tab opens by
+   itself, once for each new session link in this browser; after that, and on every later click on
+   the icon, the panel shows the green *Open in Claude* button (with *Copy link* beside it), which
+   opens it again.
+
+The paste stays because that is where Anthropic's rule puts the line: the sign-in must complete
+through Anthropic's own flow, so the extension opens the page and takes the code from you, and never
+reads it from an Anthropic page or from your clipboard by itself. There is no page of options to work
+through, no `y` to type at Claude Code's one-time Remote Control question (the panel takes your
+answer in the same statement, records it in your cluster account, and your worker gives it to Claude
+Code when asked) and no terminal to break out of: the sitting ends itself when Claude Code says it is
+signed in. The settings that exist (shell host, site profile, permission mode, *start my worker when I
+open my portal* and *open claude.ai when my worker connects*, both on by default in the current build,
+error reports) live on the extension's options page, and the seventeen checks and the logs sit under
+*Details* in the panel for the day something does not work.
+
+The optional step *Connect Google Drive in claude.ai* is still there: it opens
+`https://claude.ai/settings/connectors` in a new tab with one sentence saying what to do and a *done*
+box kept only in the browser; the extension has no presence on that page.
 
 ## What it never does
 
 From the report's "deliberately absent" list and its security controls:
 
-- No code on claude.ai: no content script, no host permission, no `fetch` patch, no forged responses.
+- No code on claude.ai or any Anthropic page: no content script, no host permission, no `fetch`
+  patch, no forged responses. It opens exactly two kinds of page outside the portal, in a new tab,
+  as a bookmark would: the sign-in page Claude Code printed during the sitting you started, and your
+  session's `https://claude.ai/code?environment=...` link (plus the connectors page from the optional
+  step). It never reads those pages.
 - No handling of a Claude credential: no `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no reading of
   Claude Code's credentials file, no multi-account rotation. The student signs in through Anthropic's
-  own flow; the framework starts Claude Code where that credential already is, reads `claude auth
-  status`, and reads two yes-or-no keys from Claude Code's own settings file (whether the student
-  answered the Remote Control question, whether the folder is trusted), nothing else.
+  own flow on a compute node; the one-time code they paste into the panel is passed once into that
+  sitting, never stored, never logged (the audit log holds one line for the sitting with the counts
+  of bytes read and typed, never the text) and never sent anywhere else. The framework starts Claude
+  Code where the credential already is, reads
+  `claude auth status`, and reads two yes-or-no keys from Claude Code's own settings file (whether the
+  Remote Control question has been answered, whether the folder is trusted), nothing else.
+- No answer typed into Claude Code that the student did not give. The Remote Control question is
+  answered from the student's own recorded statement (a marker file the panel writes on their
+  acknowledgement, and Claude Code's own record after the first session), and folder trust for the
+  worker's workspace is recorded in Claude Code's settings by the framework when a worker starts.
 - No deleting outside its own run directories and node-local temp: never the Claude Code login
   folder, the workspace, another run or anything else in the student's home. A destructive
   subcommand refuses to run from an agent context (`CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar
   marker in the environment) or without a terminal on standard input. `SECURITY.md` records the
   incident of 2026-09-28 behind this rule.
-- No install-time host permission. Access to the one portal origin is requested from a button click.
+- No install-time host permission. Access to the one portal origin is requested from the click on
+  the icon (or the *Connect* button on the setup page).
 - No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `nativeMessaging`, `debugger` or `identity` permission. The portal cookie is carried by the
-  browser's network stack and never read.
+  `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission. The portal cookie is
+  carried by the browser's network stack and never read.
 - No automated login and no touch on the MFA step: a redirect to the identity provider means "sign
   in to your portal in a tab".
 - No remote code: no `eval`, no fetched scripts. The kill-list is JSON, verified with WebCrypto against
   a public key compiled into the bundle, and the extension works offline on the last good list.
 - Nothing persistent on the login node: one `sbatch --parsable` through the shell, then the shell is
-  closed. Scheduler-facing polling never faster than once a minute; the job writes `status.json` and
-  clients read the file.
-- No durable secret in extension storage. Connection state and the session's acknowledgement live in
-  `storage.session`; the audit log of every portal request stays on the device and is never
-  transmitted. The only claude.ai pages it ever opens are the ones behind *Open in Claude* and
-  *Connect Google Drive in claude.ai*, in a new tab, on a click, with no code of its own there.
+  closed; the sign-in sitting holds the shell open once, for as long as the sitting lasts (up to ten
+  minutes waiting for a compute node and ten minutes for the paste, both the framework's own limits;
+  the panel closes the connection after fifteen minutes whatever happened), and no longer.
+  Scheduler-facing calls never faster than once a minute; the job writes `status.json` and clients
+  read the file.
+- No durable secret in extension storage. Connection state lives in `storage.session`; the audit log
+  of every portal request stays on the device and is never transmitted.
 - No transmission of command text, file paths, prompts, job output, portal cookies or tokens to the
   vendor. Off-device collection is limited to licence activation and optional crash reports.
 
 ## Status
 
 Pre-release. Designed from the research report of 2026-09-28 and being tested on Wayne State
-University's grid (`ondemand.grid.wayne.edu`, Slurm, Apptainer, CentOS 7 login node). Two of the
-twelve open questions were measured on 2026-09-28 (compute-node egress; paste-code login from a
-compute node inside the image), and the first, whether `claude remote-control` stays registered from
-an `sbatch` job under a pseudo-terminal, was answered yes on 2026-09-29 (02:22 UTC) (Ashley's phone host, job
-40496445 on `asx15`, with the student's answer already on record; `docs/OPEN_QUESTIONS.md`). The
-always-on worker chain, the one-sitting sign-in, the *Open in Claude* button, the start-by-itself
-setting and the Google Drive step were decided the same day and are being built this week. The product
-name and identifier carry no university name. Written approval from Wayne State C&IT and a written
-answer from Anthropic precede any paid key.
+University's grid (`ondemand.grid.wayne.edu`, Slurm, Apptainer, CentOS 7 login node). Three of the
+twelve open questions were measured on 2026-09-28 and 2026-09-29 (compute-node egress; paste-code
+login from a compute node inside the image; Remote Control registering from an `sbatch` job under a
+pseudo-terminal, answered yes at 02:22 UTC on 2026-09-29 with Ashley's phone host, job 40496445 on
+`asx15`). On 2026-09-29 at 05:13 local the maintainer ran the extension against the live portal:
+signed in as `go2432`, shell open and closed in 1.9 s, Files and Active Jobs answering, discovery and
+probe green, and three defects found (a content script registered but not injected into the open
+tab; a cold per-user web server answering "Server Error" on the first request; a missing file read as
+present because the Files app answers a missing download with an HTML page). The probe the panel read
+that morning (run at 04:06 UTC) said the cluster was not signed in to Claude; a worker started by hand
+at 09:55 UTC the same day (job 40501099, `asx1`) reported `loggedIn: true`, plan `max`, and registered,
+so the sign-in was redone by hand between the two, by a path not recorded. A worker that finds no
+sign-in does not fail: it writes `need_login` to `status.json` with its own words, "Claude Code on the
+cluster is not signed in; sign in from the panel (or run: hpcworker claude login). This job waits and
+asks again every minute." Their fixes and the three-step flow above are being built this week;
+`docs/OPEN_QUESTIONS.md` records what was measured and `docs/ARCHITECTURE.md` what is being built. The
+product name and identifier carry no university name. Written approval from Wayne State C&IT and a
+written answer from Anthropic precede any paid key.
+
+Versions in this tree: the framework's `VERSION` file is 2; the agreement `LICENSE.txt` is version 2
+and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is 2 to match; `PRIVACY.md` is
+version 3. All integers; a changed text moves its version with it.
 
 ## Documents
 
 - `docs/RESEARCH_REPORT.md`: the research and the build specification everything else derives from.
 - `docs/ARCHITECTURE.md`: components, site profile, adapter interface, job template, the Remote
-  Control launch sequence, the Open OnDemand channels, the extension per browser, security controls.
-- `docs/DIAGNOSTICS.md`: the 17 checks the extension runs and the framework's cluster-side checks.
-- `docs/OPEN_QUESTIONS.md`: the 12 ranked open questions, their first tests and results.
+  Control launch sequence, the sign-in sitting and its output contract, the step machine behind the
+  icon, the Open OnDemand channels (with the warm-up and the existence rule), the extension per
+  browser, security controls.
+- `docs/DIAGNOSTICS.md`: the automatic steps the icon runs, the 17 checks under *Details*, and the
+  framework's cluster-side checks.
+- `docs/OPEN_QUESTIONS.md`: the 12 ranked open questions, their first tests and results, and the
+  live-portal findings of 2026-09-29.
 - `docs/STORE_LISTING.md`: single-purpose statement, permission justifications, privacy answers per
   store, reviewer access, the 13-item checklist.
-- `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus.
+- `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
 - `docs/MAC_AND_SAFARI.md`: what the Safari edition needs.
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement and the privacy statement.
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 2; the extension's
+  `TERMS_VERSION` is 2) and the privacy statement (version 3).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

@@ -70,6 +70,9 @@ describe('audit chokepoint', () => {
     expect(classifyCommand(commands.workerStart('worker', 'default'))).toBe('scheduler');
     expect(classifyCommand(commands.workerStop('worker'))).toBe('scheduler');
     expect(classifyCommand(commands.probe())).toBe('scheduler');
+    // the sign-in sitting is an srun on the login node: the scheduler clock, so two "Try again" within a minute wait
+    expect(classifyCommand(commands.claudeLoginPlain)).toBe('scheduler');
+    expect(classifyCommand(commands.claudeLogin)).toBe('scheduler');
     expect(classifyCommand('sbatch --parsable job.sbatch')).toBe('scheduler');
     expect(classifyCommand('scancel 123')).toBe('scheduler');
     // the discovery's fallback contains one sinfo: a scheduler read, on its own clock, never the submit clock

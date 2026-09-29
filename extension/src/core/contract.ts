@@ -3,10 +3,12 @@
 // these files through the portal's Files routes; the only commands it ever types are the ones
 // listed here, one line at a time, through the portal's Shell app. If the framework moves a path
 // or renames a field, change it here and in framework/ together. Written against framework
-// version 1 (framework/bin/hpcworker, jobs/probe.sbatch, jobs/worker.sbatch.tpl, README.md).
+// version 2 (framework/VERSION; bin/hpcworker, lib/login_plain.sh, jobs/probe.sbatch,
+// jobs/worker.sbatch.tpl, README.md as they stood on 2026-09-29).
 //
 // Layout:
 //   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/)
+//   ~/.hpcworker/VERSION                      the installed tool's integer version; the strip compares it with the bundled one
 //   ~/.hpcworker/profile.json                 the site profile; its shared_state_dir names the state directory
 //   ~/.hpcworker/discover.json                `hpcworker discover --save` (optional)
 //   <state_dir>/probe/probe.json              written by the probe job
@@ -21,7 +23,12 @@
 //   <state_dir>/<name>/stop.done              written by the job once it has left after a stop request
 //   <state_dir>/workspaces/<name>/            the worker's working directory (never the home directory itself)
 //   <state_dir>/workspaces/<name>/.restricted the student's own marker: a workspace so marked is never started
+//   ~/.hpcworker/consent                      the framework's fallback consent marker; the extension writes it when the
+//                                             student acknowledges the data statement ("yes <iso> <install id>")
 // At Wayne State shared_state_dir is /rs/rs_grp_oschome/$USER/hpcworker (CephFS), not the home.
+//
+// Whether a file exists is learned from the JSON listing of its directory (files[] names), never from
+// a download: the Files app answers a download of a missing file with 200 and an HTML page.
 //
 // The extension never deletes anything on the cluster: it writes files, touches the stop file and
 // types hpcworker's verbs. Removing a marker is done by the student in the portal's Files app.
@@ -33,6 +40,7 @@ export const RESTRICTED_MARKER = '.restricted';
 export const paths = {
   root: (home: string) => `${home}/${FRAMEWORK_DIR}`,
   bin: (home: string) => `${home}/${FRAMEWORK_DIR}/bin/hpcworker`,
+  version: (home: string) => `${home}/${FRAMEWORK_DIR}/VERSION`,
   profile: (home: string) => `${home}/${FRAMEWORK_DIR}/profile.json`,
   discover: (home: string) => `${home}/${FRAMEWORK_DIR}/discover.json`,
   probe: (stateDir: string) => `${stateDir}/probe/probe.json`,
@@ -46,7 +54,15 @@ export const paths = {
   stopDone: (stateDir: string, name: string) => `${stateDir}/${name}/stop.done`,
   workspace: (stateDir: string, name: string) => `${stateDir}/workspaces/${name}`,
   restrictedMarker: (stateDir: string, name: string) => `${stateDir}/workspaces/${name}/${RESTRICTED_MARKER}`,
+  consent: (home: string) => `${home}/${FRAMEWORK_DIR}/consent`,
 };
+
+/** "/a/b/c" -> {dir: "/a/b", name: "c"}; what a listing-based existence check needs */
+export function splitPath(abs: string): { dir: string; name: string } {
+  const s = String(abs ?? '').replace(/\/+$/, '');
+  const i = s.lastIndexOf('/');
+  return { dir: i <= 0 ? '/' : s.slice(0, i), name: s.slice(i + 1) };
+}
 
 /** `$USER`, `${USER}`, `$HOME`, `${HOME}` and a leading `~` in a profile path, as the job's shell would expand them */
 export function expandPath(raw: string, vars: { home: string; user: string }): string {
@@ -115,14 +131,67 @@ export const commands = {
   /** the tool's own checks, one JSON document */
   diag: () => `bash ${HPCWORKER} diag --json`,
   /**
-   * Shown to the student to type in the portal's own Shell tab; never typed by the extension. One
-   * sitting: Claude Code's `auth login`, then, if the student has not yet answered "Enable Remote
-   * Control?", `claude remote-control` once in the workspace so they answer y and press Ctrl-C.
+   * The one sitting a student can also type in the portal's own Shell tab: Claude Code's `auth login`,
+   * then, if the student has not yet answered "Enable Remote Control?", `claude remote-control` once
+   * in the workspace so they answer y and press Ctrl-C.
    */
   claudeLogin: `bash ${HPCWORKER} claude login`,
+  /**
+   * The same sitting in plain mode, the only interactive command the extension ever types, into the
+   * login terminal inside its own panel: the framework prints machine-readable lines (LOGIN_LINES)
+   * around Claude Code's own paste-code sign-in, the extension opens the AUTH-URL in a tab and types
+   * the code the student pastes into the panel, and nothing else. The credential never passes
+   * through the extension: Claude Code exchanges the code on the compute node.
+   */
+  claudeLoginPlain: `bash ${HPCWORKER} claude login --plain`,
   /** kept as an alias that explains; the login command covers it */
   claudeConsent: `bash ${HPCWORKER} claude consent`,
 };
+
+/**
+ * The lines `hpcworker claude login --plain` prints for the extension (framework/lib/login_plain.sh),
+ * one per line, at the start of a line (terminal codes stripped first): "HPCW-LOGIN: <progress>"
+ * (informational; "paste the code from that page" is the cue for the panel's box), "AUTH-URL: <url>"
+ * (open it in a tab; the student signs in there and gets a code), "SIGNED-IN <email> <plan>" (done),
+ * "HPCW-LOGIN-FAILED: <sentence>" (the rest of the line says why). Claude Code's own screen is never
+ * copied to that output; anything else that arrives is the shell's own text and is only shown.
+ */
+export const LOGIN_LINES = {
+  started: /^HPCW-LOGIN\b(?!-(?:FAILED|DRY))/,
+  authUrl: /^AUTH-URL:\s*(\S+)/,
+  signedIn: /^SIGNED-IN\b/,
+  failed: /^HPCW-LOGIN-FAILED\b/,
+  /** the framework's cue, or Claude Code's own prompt when a shell shows it, so the panel focuses its box */
+  codePrompt: /Paste code here|paste the code from that page/i,
+};
+
+/** the only pages the login terminal ever opens: Anthropic's own sign-in pages on claude.ai or claude.com, over https */
+export function isClaudeAuthUrl(url: string | undefined): url is string {
+  if (typeof url !== 'string') return false;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:') return false;
+    const h = u.hostname.toLowerCase();
+    return h === 'claude.ai' || h === 'claude.com' || h.endsWith('.claude.ai') || h.endsWith('.claude.com');
+  } catch {
+    return false;
+  }
+}
+
+export type LoginEvent = { kind: 'started'; detail: string } | { kind: 'auth-url'; url: string } | { kind: 'signed-in'; detail: string } | { kind: 'failed'; detail: string } | { kind: 'code-prompt' };
+
+/** what one complete, cleaned line of the plain login means, or undefined when it is ordinary terminal text */
+export function parseLoginLine(line: string): LoginEvent | undefined {
+  const l = String(line ?? '').trim();
+  if (!l) return undefined;
+  if (LOGIN_LINES.failed.test(l)) return { kind: 'failed', detail: l.replace(LOGIN_LINES.failed, '').replace(/^[:\s-]+/, '').trim() };
+  if (LOGIN_LINES.signedIn.test(l)) return { kind: 'signed-in', detail: l.replace(LOGIN_LINES.signedIn, '').replace(/^[:\s-]+/, '').trim() };
+  const url = LOGIN_LINES.authUrl.exec(l)?.[1];
+  if (url) return { kind: 'auth-url', url };
+  if (LOGIN_LINES.codePrompt.test(l)) return { kind: 'code-prompt' };
+  if (LOGIN_LINES.started.test(l)) return { kind: 'started', detail: l.replace(LOGIN_LINES.started, '').replace(/^[:\s-]+/, '').trim() };
+  return undefined;
+}
 
 export type WorkerState = 'starting' | 'need_login' | 'need_consent' | 'running' | 'online' | 'stopped' | 'preempted' | 'error' | 'unknown';
 
@@ -132,7 +201,7 @@ export type ConsentSource = 'claude_config' | 'marker' | 'none' | string;
 /** the consent source in the student's words (never the value itself) */
 export function consentSourceWords(src: ConsentSource | undefined): string {
   if (src === 'claude_config') return 'recorded by Claude Code itself';
-  if (src === 'marker') return 'recorded in a marker file (the fallback)';
+  if (src === 'marker') return 'recorded from your data statement (the marker file Ashley Bridge wrote)';
   if (src === 'none') return 'not recorded';
   return src ? 'recorded' : '';
 }
@@ -148,6 +217,10 @@ export interface StatusFile {
   pid?: number | string;
   state: WorkerState;
   message?: string;
+  /** the one thing the student must do now, as the job sees it: login, consent, or nothing */
+  needs?: 'login' | 'consent' | 'nothing' | string;
+  /** one sentence for that, in the job's words */
+  hint?: string;
   started_at?: string;
   updated_at?: string;
   /** the name Claude Code printed at registration (e.g. asx10-hazy-meadow); until then the requested one */
@@ -230,6 +303,8 @@ export interface ProbeFile {
   consent_source?: ConsentSource;
   /** the worker workspace's hasTrustDialogAccepted is on record */
   workspace_trusted?: boolean;
+  /** the sign-in sitting's dry run, when a probe ran one (framework 2 records it as not tried: the sitting itself is the test); never the link */
+  login_flow?: { tried?: boolean; url_seen?: boolean; prompt_seen?: boolean; select_seen?: boolean; enters?: number; seconds?: number };
   egress?: {
     class?: 'direct' | 'http-proxy-auto' | 'http-proxy-module' | 'none' | string;
     inherited_proxy?: Record<string, string>;
@@ -237,6 +312,26 @@ export interface ProbeFile {
     without_proxy_vars?: Record<string, string>;
     'statsig.anthropic.com'?: string;
   };
+}
+
+const reached = (code: string | number | undefined) => {
+  const n = Number(code);
+  return Number.isFinite(n) && n > 0;
+};
+
+/** what probe.json says about the compute node, in one verdict, for check 11 and the strip alike */
+export function probeVerdict(p: ProbeFile): { ok: boolean; detail: string; reason?: string; warn: boolean } {
+  const e = p.egress ?? {};
+  const bare = e.without_proxy_vars ?? {};
+  const env = e.with_inherited_env ?? {};
+  const reach = ['api.anthropic.com', 'platform.claude.com', 'claude.ai'].map((h) => `${h} ${env[h] ?? '?'}${bare[h] !== undefined && bare[h] !== env[h] ? ` (bare ${bare[h]})` : ''}`).join(', ');
+  const okEgress = e.class ? e.class !== 'none' : (reached(env['api.anthropic.com']) || reached(bare['api.anthropic.com'])) && (reached(env['platform.claude.com']) || reached(bare['platform.claude.com']));
+  const detail = `${p.when ? `probe of ${p.when.slice(0, 16)}` : 'probe'} on ${p.hostname ?? '?'}: node temp ${p.node_tmp?.ok ? `${p.node_tmp.free_gb ?? '?'} GB free at ${p.node_tmp.path ?? '?'}` : 'NOT usable'}, /dev/shm ${p.dev_shm?.writable ? `${Math.round((p.dev_shm.free_kb ?? 0) / 1e6)} GB free` : 'not writable'}, user namespaces ${p.user_namespaces?.unshare_works ? 'yes' : 'no'}, container ${p.runtime?.ok ? 'runs' : 'FAILS'}, egress ${e.class ?? '?'} (${reach})${e['statsig.anthropic.com'] && /no DNS/i.test(e['statsig.anthropic.com']) ? '; statsig.anthropic.com has no DNS record here' : ''}`;
+  if (!p.runtime?.ok) return { ok: false, detail: `${detail}. The container runtime could not run the image on the compute node.`, reason: 'The container could not run on the compute node.', warn: false };
+  if (!okEgress) return { ok: false, detail: `${detail}. Compute nodes cannot reach api.anthropic.com or platform.claude.com; ask your centre for an HTTP proxy (Claude Code refuses SOCKS).`, reason: 'Compute nodes cannot reach Anthropic from your cluster; ask your research computing centre about an HTTP proxy.', warn: false };
+  if (!p.node_tmp?.ok) return { ok: false, detail: `${detail}. The node-local temp directory named by the profile is not usable.`, reason: 'The node-local temp directory is not usable on the compute node.', warn: false };
+  const chain = p.sbatch_on_node === false ? '; the node cannot submit jobs itself, so a worker there runs one job at a time instead of staying on' : '';
+  return { ok: true, detail: `${detail}${p.tmux?.present ? '' : '; no tmux on the node (script -qfc is the fallback)'}${chain}`, warn: !p.tmux?.present || p.sbatch_on_node === false };
 }
 
 /** what the checks need from `hpcworker discover` (or the one-line fallback) */
@@ -307,13 +402,18 @@ export function parseDiscovery(text: string): Discovery {
   return d;
 }
 
-/** the job id in a submit answer: hpcworker's sentences, `job=123`, `123;cluster` (sbatch --parsable), or a bare number */
+/**
+ * The job id in a submit answer: hpcworker's sentences (a fresh submission, a worker that already
+ * has a job, a probe that is still queued or running so nothing was submitted), `job=123`,
+ * `123;cluster` (sbatch --parsable), or a bare number.
+ */
 export function parseJobId(output: string): string | undefined {
   const s = String(output ?? '');
   const m =
     /submitted as job\s+([0-9]+)/i.exec(s) ??
     /already has job\s+([0-9]+)/i.exec(s) ??
     /probe job\s+([0-9]+)\s+submitted/i.exec(s) ??
+    /probe job\s+([0-9]+)\s+is still/i.exec(s) ??
     /\bjob=([0-9]+)/.exec(s) ??
     /Submitted batch job\s+([0-9]+)/.exec(s) ??
     /^\s*([0-9]+)(?:;[\w.-]+)?\s*$/m.exec(s);

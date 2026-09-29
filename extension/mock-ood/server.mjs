@@ -16,10 +16,16 @@
 //   GET  /rnode/<host>/<port>/                 404 (proxy off) or 503 "Failed to connect to host:port" (--rnode enabled)
 //   GET  /nginx/init?redir=                    the cold-PUN redirect (--cold)
 //
+// Two behaviours measured on the live portal (ondemand.grid.wayne.edu, 2026-09-29) are reproduced:
+// the first /pun/ request after a while answers 500 "Error: Server Error ... try again in 30 seconds"
+// once (the per-user nginx starting; --cold-pun MS sets the idle time), and a ?download=1 of a file
+// that does not exist answers 200 with an HTML page, not 404.
+//
 // The fake PTY is a real bash (Git Bash on Windows) running each typed line with the mock's
 // scheduler commands (bin/) first on PATH, so the shell semantics the extension relies on are
-// real; only the cluster is fake. The Files routes are jailed to a virtual home (/home/<user>)
-// mapped onto a directory on disk.
+// real; only the cluster is fake. While a command runs, typed lines go to its standard input, so
+// the seeded tool's `claude login --plain` can take the pasted code. The Files routes are jailed
+// to a virtual home (/home/<user>) mapped onto a directory on disk.
 //
 // The only dependency is `ws`. Node 22.
 import { spawn } from 'node:child_process';
@@ -61,6 +67,8 @@ export async function createMockPortal(opts = {}) {
     rnode: 'disabled',
     uploads: true,
     cold: false,
+    /** ms of no /pun/ traffic after which the next /pun/ request answers 500 once; 0 = never cold */
+    coldPun: 0,
     jobComposer: false,
     shellHosts: ['default', 'login1', 'login2'],
     seedTool: true,
@@ -79,7 +87,7 @@ export async function createMockPortal(opts = {}) {
   const bash = findBash();
   const railsToken = crypto.randomBytes(32).toString('base64');
   const shellSecret = crypto.randomBytes(24).toString('base64url');
-  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0 };
+  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0, coldHits: 0, punWarmUntil: 0 };
   const log = o.log;
 
   // the shell app's tokens: salt-hash, verified against a per-process secret (the csrf module's shape)
@@ -199,6 +207,16 @@ export async function createMockPortal(opts = {}) {
       return redirect(res, url.searchParams.get('redir') || '/pun/sys/dashboard/');
     }
     if (p.startsWith('/pun/') && !state.coldDone) return redirect(res, `/nginx/init?redir=${encodeURIComponent(p)}`);
+    if (o.coldPun > 0 && p.startsWith('/pun/')) {
+      // the PUN idled out: this one request meets the nginx that is still starting
+      const now = Date.now();
+      const cold = now > state.punWarmUntil;
+      state.punWarmUntil = now + o.coldPun;
+      if (cold) {
+        state.coldHits++;
+        return send(res, 500, html('Error', '<h1>Error: Server Error</h1><p>Something went wrong. Please try again in 30 seconds.</p>'));
+      }
+    }
 
     if (p === '/pun/sys/dashboard' || p === '/pun/sys/dashboard/') return send(res, 200, dashboardHtml());
     if (p === '/pun/sys/dashboard/files') return redirect(res, `/pun/sys/dashboard/files/fs${virtualHome}`);
@@ -223,7 +241,11 @@ export async function createMockPortal(opts = {}) {
       const real = toReal(virtualPath);
       if (!real) return send(res, 403, JSON.stringify({ error_message: 'path not allowed by the mock (outside the virtual home)' }));
       if (req.method === 'GET') {
-        if (!fs.existsSync(real)) return send(res, 404, html('Not Found', `<h1>${virtualPath} does not exist</h1>`));
+        if (!fs.existsSync(real)) {
+          // the live Files app answers a download of a missing file with 200 and its own page (58,730 bytes measured)
+          if (url.searchParams.has('download')) return send(res, 200, html('Files - Open OnDemand', `<div class="alert alert-danger">File not found: ${virtualPath}</div>${'<p>filler</p>\n'.repeat(400)}`));
+          return send(res, 404, html('Not Found', `<h1>${virtualPath} does not exist</h1>`));
+        }
         const st = fs.statSync(real);
         if (url.searchParams.has('download')) {
           if (st.isDirectory()) return send(res, 500, JSON.stringify({ error_message: 'zip download not implemented in the mock' }), { 'X-OOD-Failure-Reason': 'zip not implemented' });
@@ -322,10 +344,11 @@ export async function createMockPortal(opts = {}) {
     const runLine = (l) => {
       if (!l.trim()) return prompt();
       if (/^\s*exit(\s+\d+)?\s*$/.test(l)) return ws.close(1000);
-      child = spawn(bash, ['-c', `export PATH="$MOCK_BIN:$MOCK_NODE_DIR:$PATH"; cd "$HOME"\n${l}`], { env, cwd: realHome, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+      child = spawn(bash, ['-c', `export PATH="$MOCK_BIN:$MOCK_NODE_DIR:$PATH"; cd "$HOME"\n${l}`], { env, cwd: realHome, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
       const pipe = (s) => s.on('data', (d) => out(d.toString('utf8').replace(/\r?\n/g, '\r\n')));
       pipe(child.stdout);
       pipe(child.stderr);
+      child.stdin.on('error', () => {});
       child.on('close', () => {
         child = null;
         // a trailing `exit` ends the login shell, which ends the ssh, which closes the socket
@@ -333,6 +356,14 @@ export async function createMockPortal(opts = {}) {
         else prompt();
       });
       child.on('error', (e) => out(`bash: ${e.message}\r\n`));
+    };
+    // a line typed while a command runs is that command's standard input (the pasted code of the plain login)
+    const feedChild = (l) => {
+      try {
+        child.stdin.write(`${l}\n`);
+      } catch {
+        /* the command ended first */
+      }
     };
     out(`Last login: ${new Date().toUTCString()} from 10.0.0.1\r\n`);
     prompt();
@@ -354,7 +385,10 @@ export async function createMockPortal(opts = {}) {
             out('\r\n');
             const l = line;
             line = '';
-            runLine(l);
+            if (child) feedChild(l);
+            else runLine(l);
+          } else if (ch === '\x03' && child) {
+            child.kill();
           } else if (ch === '\x7f' || ch === '\b') {
             line = line.slice(0, -1);
             out('\b \b');
@@ -392,7 +426,7 @@ export async function createMockPortal(opts = {}) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--user NAME] [--rnode enabled] [--no-clusters] [--cold] [--no-cookie] [--job-composer] [--cert F --key F]
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--user NAME] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--cert F --key F]
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   const val = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
@@ -404,6 +438,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     rnode: val('--rnode', 'disabled'),
     noClusters: a.includes('--no-clusters'),
     cold: a.includes('--cold'),
+    coldPun: Number(val('--cold-pun', 0)) || 0,
     requireCookie: !a.includes('--no-cookie'),
     jobComposer: a.includes('--job-composer'),
     tls: a.includes('--cert') ? { cert: val('--cert'), key: val('--key') } : undefined,

@@ -34,6 +34,12 @@ who develops on Windows today.
 - **Testing.** "Allow unsigned extensions" (Settings, Developer) resets when Safari quits; "Add
   Temporary Extension" installs a folder for at most 24 hours. Device testing on iOS needs the paid
   membership.
+- **No side panel.** The icon click that opens the side panel on Chrome and Edge and the sidebar on
+  Firefox opens the panel page in a tab on Safari; `permissions.request` for the portal origin still
+  comes straight from that click, the strip runs in the panel page as on the others, and the options
+  page is the same. The sign-in sitting's WebSocket lives in the content script and its port in the
+  panel page, so Safari's short background lifetime does not cut it off; closing the panel tab ends
+  the sitting, as closing the side panel does elsewhere.
 
 ## Moving development to a Mac
 

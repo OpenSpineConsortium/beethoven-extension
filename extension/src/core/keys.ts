@@ -3,12 +3,17 @@
 // storage.local (survives restarts; nothing secret and no credential ever):
 export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site}
 export const LICENSE_KEY = 'bridge.license'; // {key, identity: {accessId}, saved_at}
-export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start}
+export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect}
 export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {fetched_at, list}
 export const REVOKED_KEY = 'bridge.revoked'; //  {revoked, message}: what the chokepoint consults before a command
 export const INSTALL_ID_KEY = 'bridge.install_id';
 export const IDENTITY_KEY = 'bridge.identity'; // {username}: the portal username last seen on the dashboard
 export const CHECKLIST_KEY = 'bridge.checklist'; // {drive_connected_at}: the student's own "done" ticks for steps outside this extension
+export const STATEMENTS_KEY = 'bridge.statements'; // {[workspaces/<name>]: Acknowledgement}: the data statement, per workspace, with the text version it was made on
+export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment links this browser profile already opened by itself
+export const LOGIN_SEEN_KEY = 'bridge.loginSeen'; // {at, detail}: when the login terminal in this browser last reported SIGNED-IN
+export const PROBE_KEY = 'bridge.probe'; //      {submitted_at, job}: the probe job the strip submitted by itself, so it is not submitted again while it runs
+export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail}: the last automatic install, so a failing one is not retried in a loop
 // TERMS_KEY ('bridge.terms') is in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
@@ -16,8 +21,8 @@ export const PORTAL_TAB_KEY = 'bridge.portalTab'; // {tabId, origin}: the tab wh
 export const RUN_KEY = 'bridge.run'; //             {stateDir, run, job, site, status, connection, rc_tail, updated, error}
 export const CHECKS_KEY = 'bridge.checks'; //       the last diagnostics report
 export const SESSION_SEEN_KEY = 'bridge.sessionSeen'; // {checked_at}: when check 4 last passed
-export const AUTO_START_KEY = 'bridge.autoStart'; // {attempted_at, outcome}: what the "start when my portal opens" setting last did
-// ACK_KEY ('bridge.ack') is in disclosure.ts.
+export const AUTO_START_KEY = 'bridge.autoStart'; // {attempted_at, outcome}: what the last automatic start did
+export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksLikeOod, granted, at}: the tab the toolbar button was last clicked from
 
 export interface PortalSettings {
   origin: string;
@@ -33,8 +38,10 @@ export interface Prefs {
   /** the worker's name: its run directory and workspace are named after it (hpcworker worker start --name) */
   worker_name: string;
   permission_mode: 'default' | 'acceptEdits' | 'plan';
-  /** start the worker when the portal tab connects and no worker is online; off unless the student turns it on */
+  /** "start my worker when I open my portal", on by default (DEFAULT_PREFS): the background starts the worker when the portal tab connects and everything is in order; a stopped or failed worker is never started this way */
   auto_start: boolean;
+  /** open the worker's claude.ai link in a new tab the first time this browser sees it */
+  open_claude_on_connect: boolean;
 }
 
 export interface LicenseState {
@@ -53,7 +60,38 @@ export interface AutoStartNote {
   outcome: string;
 }
 
-export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: false };
+export interface LoginSeen {
+  /** when the login terminal reported SIGNED-IN in this browser */
+  at: string;
+  detail?: string;
+}
+
+export interface ProbeNote {
+  submitted_at: string;
+  job?: string;
+}
+
+export interface InstallNote {
+  attempted_at: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface OpenedLinks {
+  urls: string[];
+}
+
+/** the tab the toolbar button was clicked from, for the strip's first step */
+export interface ClickNote {
+  tabId: number;
+  origin: string;
+  path: string;
+  looksLikeOod: boolean;
+  granted: boolean;
+  at: string;
+}
+
+export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true };
 
 /** "ondemand.grid.wayne.edu" -> "wayne": the default site profile name */
 export function siteFromHostname(hostname: string): string {

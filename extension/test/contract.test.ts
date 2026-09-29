@@ -20,6 +20,8 @@ describe('framework contract', () => {
     expect(parseJobId('worker worker submitted as job 4243102 (secp/secondary, 8 h). When it runs, open claude.ai/code')).toBe('4243102');
     expect(parseJobId('worker thesis already has job 4243101 (RUNNING on asx15); nothing submitted')).toBe('4243101');
     expect(parseJobId('probe job 4243100 submitted (secp/secondary, 00:05:00). It writes /rs/x/probe/probe.json')).toBe('4243100');
+    // framework 2: a probe still queued or running is named, not resubmitted; that is not a failure
+    expect(parseJobId('probe job 4243100 is still PENDING; nothing submitted. It writes /rs/x/probe/probe.json; read it with: hpcworker probe --show')).toBe('4243100');
     expect(parseJobId('Submitted batch job 12345')).toBe('12345');
     expect(parseJobId('12345;cluster\n')).toBe('12345');
     expect(parseJobId('job=777')).toBe('777');

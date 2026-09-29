@@ -37,7 +37,8 @@ export function explainClose(code: number, reason: string): string {
   }
   if (code === 1006) return 'The connection to the portal dropped before the shell answered. Check that you are on the VPN and signed in to the portal.';
   if (code === 1000) return 'The shell closed normally.';
-  return `The shell closed (code ${code}${r ? `, ${r}` : ''}).`;
+  // the code and the raw reason stay on the ShellError for the log; the student gets a sentence
+  return "The connection to the portal's shell closed early. Try again; if it keeps happening, sign in to the portal again in its tab.";
 }
 
 export function markerFor(nonce: string): { base: string; begin: string; end: RegExp } {
@@ -156,6 +157,164 @@ export class ShellError extends Error {
     super(message);
     this.name = 'ShellError';
   }
+}
+
+export interface ShellSessionOpts {
+  origin: string;
+  host: string;
+  /** typed exactly as given, once, after the login prompt has settled */
+  command: string;
+  net: PortalNet;
+  /** every text frame, terminal codes stripped, as it arrives */
+  onOutput(text: string): void;
+  connectTimeoutMs?: number;
+  settleMs?: number;
+  /** the whole sitting is closed after this long whatever state it is in */
+  maxMs?: number;
+}
+
+export interface ShellSessionEnd {
+  reason: 'closed' | 'client' | 'timeout';
+  closeCode?: number;
+  closeReason?: string;
+  /** bytes received from the shell */
+  outputBytes: number;
+  /** bytes typed by the student, counted and never kept */
+  inputBytes: number;
+  ms: number;
+}
+
+export interface ShellSession {
+  /** type into the shell; the text is counted for the audit record and never stored */
+  send(text: string): void;
+  close(): void;
+  readonly done: Promise<ShellSessionEnd>;
+}
+
+/**
+ * The longest a login sitting may hold the portal's shell open: fifteen minutes, the number the
+ * privacy statement gives ("the extension closes the connection after fifteen minutes at the
+ * latest", PRIVACY.md). The framework's own limits sit inside it in the usual case (a node within
+ * a few minutes, ten minutes for the code); a very slow allocation is cut short by this and the
+ * student is told to try again.
+ */
+export const SESSION_MAX_MS = 15 * 60_000;
+
+/**
+ * The interactive form of the shell, for the one sitting that needs a person: open, type one
+ * command line, then relay output out and typed text in until the far side closes, the caller
+ * closes, or the time is up. Nothing is framed or parsed here; the caller reads the lines. No
+ * keep-alive frames are ever sent: the shell's own output is the only traffic.
+ */
+export async function openShell(o: ShellSessionOpts): Promise<ShellSession> {
+  const t0 = Date.now();
+  if (!o.command.trim() || /[\r\n]/.test(o.command)) throw new ShellError('the login terminal runs exactly one command line');
+  const page = await o.net.fetch(shellPageUrl(o.origin, o.host), { credentials: 'same-origin', redirect: 'follow', headers: { Accept: 'text/html' } });
+  if (!page.ok) throw new ShellError(`the portal's Shell app answered ${page.status}; sign in to the portal in a tab and try again`);
+  const csrf = scrapeCsrf(await page.text());
+  if (!csrf) throw new ShellError("the portal's Shell app page carries no token; the Shell app may be disabled at your site");
+  const ws: WsLike = new o.net.WebSocket(shellSocketUrl(o.origin, o.host, csrf));
+  let outputBytes = 0;
+  let inputBytes = 0;
+  let typed = false;
+  let raw = '';
+  let ended: ShellSessionEnd | undefined;
+  let resolveDone!: (e: ShellSessionEnd) => void;
+  const done = new Promise<ShellSessionEnd>((r) => (resolveDone = r));
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const later = (fn: () => void, ms: number) => {
+    const t = setTimeout(fn, ms);
+    timers.push(t);
+  };
+  const end = (reason: ShellSessionEnd['reason'], code?: number, why?: string) => {
+    if (ended) return;
+    ended = { reason, closeCode: code, closeReason: why, outputBytes, inputBytes, ms: Date.now() - t0 };
+    for (const t of timers) clearTimeout(t);
+    try {
+      if (ws.readyState === 0 || ws.readyState === 1) ws.close(1000, 'done');
+    } catch {
+      /* already closing */
+    }
+    resolveDone(ended);
+  };
+  const sendFrame = (obj: Record<string, unknown>) => {
+    if (!('input' in obj) && !('resize' in obj)) throw new Error('refusing to send a frame the shell does not understand');
+    ws.send(JSON.stringify(obj));
+  };
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  const type = () => {
+    if (typed || ended) return;
+    typed = true;
+    try {
+      sendFrame({ input: `${o.command}\r` });
+    } catch (e) {
+      end('client', undefined, `could not type the command: ${(e as Error).message}`);
+    }
+  };
+  const settle = () => {
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(type, o.settleMs ?? 400);
+    timers.push(settleTimer);
+  };
+  return new Promise<ShellSession>((resolve, reject) => {
+    let opened = false;
+    later(() => {
+      if (!opened) {
+        end('timeout');
+        reject(new ShellError('the portal shell did not open in time'));
+      }
+    }, o.connectTimeoutMs ?? 15_000);
+    later(() => end('timeout'), o.maxMs ?? SESSION_MAX_MS);
+    ws.addEventListener('open', () => {
+      opened = true;
+      try {
+        sendFrame({ resize: { cols: 120, rows: 40 } });
+      } catch {
+        /* harmless */
+      }
+      later(() => {
+        if (!typed && !raw) type();
+      }, 5_000);
+      resolve({
+        send(text: string) {
+          if (ended) return;
+          inputBytes += new TextEncoder().encode(text).length;
+          sendFrame({ input: text });
+        },
+        close() {
+          end('client');
+        },
+        done,
+      });
+    });
+    ws.addEventListener('message', (ev: { data: unknown }) => {
+      if (typeof ev.data !== 'string') return;
+      outputBytes += ev.data.length;
+      const text = clean(ev.data);
+      if (!typed) {
+        raw += ev.data;
+        if (/password:|passphrase|Permission denied/i.test(clean(raw))) {
+          o.onOutput(text);
+          end('client', undefined, 'the portal could not log you into the login node without a password');
+          return;
+        }
+        settle();
+      }
+      o.onOutput(text);
+    });
+    ws.addEventListener('close', (ev: { code: number; reason: string }) => {
+      if (!opened) reject(new ShellError(explainClose(ev.code, ev.reason), clean(raw), ev.code, ev.reason));
+      end('closed', ev.code, ev.reason);
+    });
+    ws.addEventListener('error', () => {
+      later(() => {
+        if (!ended) {
+          if (!opened) reject(new ShellError('the connection to the portal shell failed'));
+          end('closed');
+        }
+      }, 1_000);
+    });
+  });
 }
 
 function randomNonce(): string {

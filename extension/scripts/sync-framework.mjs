@@ -62,3 +62,35 @@ for (const rel of await walk(source)) {
 const manifest = { v: 1, generated: new Date().toISOString(), source: 'framework/', files };
 await fs.writeFile(path.join(target, 'manifest.json'), JSON.stringify(manifest, null, 1) + '\n');
 console.log(`sync-framework: ${files.length} file(s) bundled from ${source}`);
+
+// The agreement texts the extension ships must be byte-identical to the canonical ones at the
+// repository root (CLAUDE.md, "Terms"); copy them at the same moment, so a build can never carry
+// a stale or foreign text. The signing dialog hashes what it shows, so the copy is what is recorded.
+for (const name of ['LICENSE.txt', 'PRIVACY.md']) {
+  const from = path.resolve(root, '..', name);
+  try {
+    const text = await fs.readFile(from);
+    await fs.writeFile(path.join(root, 'public', name), text);
+    console.log(`sync-framework: ${name} copied from the repository root (${text.length} bytes)`);
+  } catch {
+    console.warn(`sync-framework: ${from} not found; public/${name} left as it is`);
+  }
+}
+
+// The signing dialog records the version it names (src/core/terms.ts TERMS_VERSION, TERMS_DATE) and
+// hashes the LICENSE.txt it shows. A build in which the two disagree would record an acceptance of
+// "version N" beside a text headed "Version M", so the build stops here instead of shipping that.
+const fail = (msg) => {
+  console.error(`sync-framework: ${msg}`);
+  process.exit(1);
+};
+const termsSource = await fs.readFile(path.join(root, 'src', 'core', 'terms.ts'), 'utf8');
+const termsVersion = /export const TERMS_VERSION = (\d+);/.exec(termsSource)?.[1];
+const termsDate = /export const TERMS_DATE = '(\d{4}-\d{2}-\d{2})';/.exec(termsSource)?.[1];
+if (!termsVersion || !termsDate) fail('src/core/terms.ts does not declare TERMS_VERSION = <integer> and TERMS_DATE = <yyyy-mm-dd>');
+const licenceText = await fs.readFile(path.join(root, 'public', 'LICENSE.txt'), 'utf8').catch(() => '');
+const licenceHead = /^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(licenceText);
+if (!licenceHead) fail('public/LICENSE.txt carries no "Version N, yyyy-mm-dd." line');
+if (licenceHead[1] !== termsVersion) fail(`public/LICENSE.txt is Version ${licenceHead[1]} but src/core/terms.ts has TERMS_VERSION = ${termsVersion}; change the text and the constant together`);
+if (licenceHead[2] !== termsDate) fail(`public/LICENSE.txt is dated ${licenceHead[2]} but src/core/terms.ts has TERMS_DATE = '${termsDate}'; change the text and the constant together`);
+console.log(`sync-framework: LICENSE.txt Version ${licenceHead[1]}, ${licenceHead[2]} matches TERMS_VERSION and TERMS_DATE`);

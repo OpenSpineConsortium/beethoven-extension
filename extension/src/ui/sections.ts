@@ -1,17 +1,18 @@
-// Sections shared by the setup page and the panel: connecting a portal, the plan-class
-// disclosure with the data-classification acknowledgement, the Google Drive step, and the
+// Sections shared by the setup page and the strip: connecting a portal by address, the plan-class
+// disclosure with the data statement (persisted per workspace), the Google Drive step, and the
 // licence/agreement status line.
 import { browser } from 'wxt/browser';
-import { ACK_KEY, ackCovers, ackSubject, DATA_CLASSIFICATION_STATEMENT, PLAN_CLASS_DISCLOSURE, type Acknowledgement } from '../core/disclosure';
+import { ackSubject, makeAcknowledgement, PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Acknowledgement, type Statements } from '../core/disclosure';
 import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
 import { bindIdentity, identityNote, type IdentitySource } from '../core/identity';
 import { CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, PREFS_KEY, type Checklist, type LicenseState, type PortalSettings, type Prefs } from '../core/keys';
 import { recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
+import { writeConsentFile } from '../core/worker';
 import { BUNDLED_KEYS, verifyLicense } from '../licensing/license';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
-import { local, prefs as loadPrefs, session, version } from '../ext/storage';
+import { installId, local, prefs as loadPrefs, version } from '../ext/storage';
 import { add, clear, el } from './dom';
-import { activeTabOrigin, connectPortal, disconnectPortal, openPortalTab, portal, portalAlive } from './rpc';
+import { connectPortal, disconnectPortal, openPortalTab, portal, portalAlive, requestOrigin } from './rpc';
 
 export interface Notify {
   (kind: 'ok' | 'warn' | 'fail' | 'info', text: string): void;
@@ -20,8 +21,11 @@ export interface Notify {
 /** the claude.ai page where a student connects Google Drive; opened in a tab, never scripted */
 export const CONNECTORS_URL = 'https://claude.ai/settings/connectors';
 
-/** Connect / disconnect. `active` is the toolbar tab, known only when the popup opened from it. */
-export function connectSection(settings: PortalSettings | undefined, onChange: () => void, notify: Notify, active?: { origin: string; tabId: number; path: string }): HTMLElement {
+/** where a student without a key asks for one */
+export const ACCESS_REQUEST_URL = 'https://openspineconsortium.com/ashley/bridge';
+
+/** Connect by address (the setup page) or disconnect. The toolbar click from a portal tab is the usual way in. */
+export function connectSection(settings: PortalSettings | undefined, onChange: () => void, notify: Notify): HTMLElement {
   const box = el('div', { class: 'card' });
   if (settings) {
     add(box,
@@ -42,35 +46,32 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
     );
     return box;
   }
-  const looksLikeOod = !!active && /^\/pun\//.test(active.path);
-  const input = el('input', { type: 'text', class: 'wide', placeholder: 'ondemand.your-university.edu', value: active && looksLikeOod ? active.origin : '', 'aria-label': 'Portal address' });
+  const input = el('input', { type: 'text', class: 'wide', placeholder: 'ondemand.your-university.edu', 'aria-label': 'Portal address' });
   const status = el('div', { class: 'status', role: 'status' });
-  const doConnect = (value: string, tabId?: number) => {
-    // no await before connectPortal: the permission prompt must come straight from the click
-    connectPortal(value, tabId)
-      .then(async (s) => {
-        notify('ok', `Connected ${s.hostname}. Checking that it is an Open OnDemand portal...`);
-        onChange();
-        try {
-          const info = await portal.session();
-          if (info.signedIn && info.isOnDemand) notify('ok', `${s.hostname} is an Open OnDemand portal and you are signed in${info.username ? ` as ${info.username}` : ''}.`);
-          else if (!info.signedIn) notify('warn', `${s.hostname}: ${info.detail}`);
-          else notify('warn', `${s.hostname} does not look like an Open OnDemand portal (no "OnDemand" on its dashboard). You can disconnect it.`);
-          if (info.username) await local.set(IDENTITY_KEY, { username: info.username });
-        } catch (e) {
-          notify('warn', `Connected, but the portal tab did not answer yet: ${(e as Error).message}`);
-        }
-      })
-      .catch((e) => {
-        status.textContent = (e as Error).message;
-      });
-  };
   add(box,
-    el('p', {}, 'Ashley Bridge talks to one website: your Open OnDemand portal. Connect it from its own tab, or type its address. The browser will ask you to allow that one site.'),
-    active && looksLikeOod
-      ? el('div', { class: 'row' }, el('button', { class: 'primary', text: `Connect this portal (${new URL(active.origin).hostname})`, onClick: () => doConnect(active.origin, active.tabId) }))
-      : el('p', { class: 'muted small', text: active ? `The current tab (${new URL(active.origin).hostname}) does not look like an Open OnDemand dashboard (no /pun/ in its address). Open your portal, then use the toolbar button there, or type the address below.` : 'Open your portal in a tab and use the toolbar button there, or type its address below.' }),
-    el('div', { class: 'row' }, input, el('button', { text: 'Connect', onClick: () => doConnect(input.value) })),
+    el('p', {}, 'Ashley Bridge talks to one website: your Open OnDemand portal. The usual way in: open the portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site. Or type its address here.'),
+    el('div', { class: 'row' }, input, el('button', {
+      text: 'Connect',
+      onClick: () => {
+        // no await before the permission request: the prompt must come straight from the click
+        let origin: string;
+        try {
+          origin = new URL(/^https?:\/\//i.test(input.value.trim()) ? input.value.trim() : `https://${input.value.trim()}`).origin;
+        } catch {
+          status.textContent = 'type your portal address first';
+          return;
+        }
+        const granting = requestOrigin(origin);
+        connectPortal(origin, undefined, granting)
+          .then((out) => {
+            notify('ok', `Connected ${out.settings.hostname}. Open it in a tab and click the Ashley Bridge button there.`);
+            onChange();
+          })
+          .catch((e) => {
+            status.textContent = (e as Error).message;
+          });
+      },
+    })),
     status,
   );
   return box;
@@ -83,6 +84,7 @@ export interface WorkspaceInfo {
   /** the workspace is marked restricted (its .restricted file, or the profile) */
   restricted: boolean;
   markerPath?: string;
+  home?: string;
 }
 
 /** where the named worker works on the cluster, and whether it is marked restricted, when the portal can tell us */
@@ -94,25 +96,48 @@ export async function workspaceFor(workerName: string): Promise<WorkspaceInfo> {
     const profile = await portal.readFileIfExists(paths.profile(home));
     const stateDir = stateDirFrom(profile, { home, user });
     const markerPath = paths.restrictedMarker(stateDir, workerName);
-    const marked = profileRestricts(profile, workerName) || (await portal.readFileIfExists(markerPath)) !== undefined;
-    return { path: paths.workspace(stateDir, workerName), known: true, restricted: marked, markerPath };
+    const marked = profileRestricts(profile, workerName) || (await portal.exists(markerPath));
+    return { path: paths.workspace(stateDir, workerName), known: true, restricted: marked, markerPath, home };
   } catch {
     return { path: `<state directory>/${ackSubject(workerName)}`, known: false, restricted: false };
   }
 }
 
-/** The disclosure in the report's words and the statement about the worker's workspace; per browser session. */
-export async function ackSection(onChange: () => void): Promise<HTMLElement> {
+/**
+ * Record the statement for a worker and write the framework's consent marker on the cluster
+ * (~/.hpcworker/consent: "yes <iso> <install id>"). When the portal cannot be written to right
+ * now the acknowledgement is kept without consent_written_at and the start writes the file.
+ */
+export async function acknowledgeStatement(workerName: string): Promise<{ ack: Acknowledgement; consentWritten: boolean; note: string }> {
+  const ack = makeAcknowledgement(workerName);
+  const all = (await local.get<Statements>(STATEMENTS_KEY)) ?? {};
+  let consentWritten = false;
+  let note = '';
+  try {
+    if (!(await portalAlive())) throw new Error('no portal tab');
+    const home = await portal.home();
+    await writeConsentFile(portal, home, await installId(), ack.acknowledged_at);
+    ack.consent_written_at = new Date().toISOString();
+    consentWritten = true;
+    note = `Your statement is recorded, and your answer to Claude Code's one-time question is written for your worker (${paths.consent(home)}).`;
+  } catch (e) {
+    note = `Your statement is recorded; the answer file for your worker will be written when it starts (${(e as Error).message}).`;
+  }
+  await local.set(STATEMENTS_KEY, { ...all, [ack.work_dir]: ack } satisfies Statements);
+  return { ack, consentWritten, note };
+}
+
+/** The disclosure in the report's words and the statement about the worker's workspace; kept per workspace. */
+export async function statementSection(onChange: () => void, opts: { compact?: boolean; buttonLabel?: string } = {}): Promise<HTMLElement> {
   const prefs = await loadPrefs();
-  const ack = await session.get<Acknowledgement>(ACK_KEY);
-  const box = el('div', { class: 'card' });
+  const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
+  const box = el('div', { class: opts.compact ? 'statement' : 'card' });
   const name = el('input', { type: 'text', value: prefs.worker_name, placeholder: 'worker', 'aria-label': 'Worker name', pattern: '[A-Za-z0-9_-]{1,32}' });
   const where = el('div', { class: 'muted small mono' });
   const restrictedLine = el('div', { class: 'small' });
   const markButton = el('button', { class: 'small', text: 'Mark this workspace restricted', hidden: true });
   const tick = el('input', { type: 'checkbox', id: 'ack-tick' });
   const status = el('div', { class: 'status', role: 'status' });
-  const covered = ackCovers(ack, ackSubject(prefs.worker_name));
   let current: WorkspaceInfo | undefined;
   const showWhere = async () => {
     const w = await workspaceFor(name.value.trim() || 'worker');
@@ -135,29 +160,29 @@ export async function ackSection(onChange: () => void): Promise<HTMLElement> {
   void showWhere();
   name.addEventListener('change', () => void showWhere());
   add(box,
-    el('h3', { text: 'Where your work goes' }),
-    el('ul', {}, ...PLAN_CLASS_DISCLOSURE.map((s) => el('li', { text: s }))),
-    el('p', { class: 'small muted', text: 'This is asked once per browser session and before every start. The worker refuses to start until you have made this statement about its workspace, and never starts in a workspace you have marked restricted.' }),
-    el('div', { class: 'row' }, el('label', { for: 'worker-name', text: 'Worker name (its run directory and workspace are named after it): ' }), name),
+    opts.compact ? null : el('h3', { text: 'Where your work goes' }),
+    el('ul', { class: 'small' }, ...PLAN_CLASS_DISCLOSURE.map((s) => el('li', { text: s }))),
+    el('p', { class: 'small muted', text: 'Asked once per workspace, and again when this text changes. The worker refuses to start until you have made this statement about its workspace, and never starts in a workspace you have marked restricted.' }),
+    el('div', { class: 'row' }, el('label', { for: 'worker-name', text: 'Worker name: ' }), name),
     where,
     el('div', { class: 'row' }, restrictedLine, markButton),
-    el('div', { class: 'box' }, tick, el('label', { for: 'ack-tick', text: DATA_CLASSIFICATION_STATEMENT })),
+    el('div', { class: 'box' }, tick, el('label', { for: 'ack-tick', text: STATEMENT_TEXT })),
     el('div', { class: 'row' },
       el('button', {
         class: 'primary',
-        text: 'I have read this and the statement is true',
+        text: opts.buttonLabel ?? 'I have read this and the statement is true',
         onClick: async () => {
           const n = name.value.trim() || 'worker';
           if (!/^[A-Za-z0-9_-]{1,32}$/.test(n)) return void (status.textContent = 'The worker name must be letters, digits, _ or - (up to 32).');
           if (!tick.checked) return void (status.textContent = 'Tick the statement only if it is true; it is needed to continue.');
-          const now = new Date().toISOString();
           await local.set(PREFS_KEY, { ...prefs, worker_name: n } satisfies Prefs);
-          await session.set(ACK_KEY, { v: 1, work_dir: ackSubject(n), disclosure_at: now, classification_at: now, statement: DATA_CLASSIFICATION_STATEMENT } satisfies Acknowledgement);
-          status.textContent = '';
+          const r = await acknowledgeStatement(n);
+          status.className = r.consentWritten ? 'status ok' : 'status warn';
+          status.textContent = r.note;
           onChange();
         },
       }),
-      covered ? el('span', { class: 'ok small', text: `acknowledged this session for worker "${prefs.worker_name}"` }) : el('span', { class: 'warn small', text: 'not acknowledged this session' }),
+      ack ? el('span', { class: 'ok small', text: `made for worker "${prefs.worker_name}" on ${ack.acknowledged_at.slice(0, 10)}` }) : el('span', { class: 'warn small', text: 'not made yet for this workspace' }),
     ),
     status,
   );
@@ -178,7 +203,7 @@ export async function driveStep(onChange: () => void, compact = false): Promise<
     await local.set(CHECKLIST_KEY, { ...list, drive_connected_at: tick.checked ? new Date().toISOString() : undefined } satisfies Checklist);
     onChange();
   });
-  const open = el('button', { text: 'Open claude.ai connectors', onClick: () => void browser.tabs.create({ url: CONNECTORS_URL }) });
+  const open = el('button', { class: compact ? 'small' : '', text: 'Open claude.ai connectors', onClick: () => void browser.tabs.create({ url: CONNECTORS_URL }) });
   if (compact) {
     add(box, el('span', { class: 'small muted', text: 'Optional: connect Google Drive in claude.ai so your worker sessions can read your Drive files.' }), open, el('label', { class: 'small', for: 'drive-done' }, tick, ' done'));
     return box;
@@ -194,6 +219,7 @@ export interface LicenceSummary {
   termsOk: boolean;
   terms?: TermsRecord;
   licenceOk: boolean;
+  licenceMissing: boolean;
   licenceDetail: string;
   versionRevoked: boolean;
   revokedMessage: string;
@@ -216,6 +242,7 @@ export async function licenceSummary(): Promise<LicenceSummary> {
     termsOk: recordInForce(terms),
     terms: recordInForce(terms) ? terms : undefined,
     licenceOk: v.ok,
+    licenceMissing: v.status === 'missing',
     licenceDetail: v.status === 'missing' ? 'no licence key entered (a trial key is free)' : v.detail,
     versionRevoked: verdict.versionRevoked,
     revokedMessage: verdict.message,
@@ -240,5 +267,3 @@ export function replaceChildren(node: Element, ...children: Node[]): void {
   clear(node);
   node.append(...children);
 }
-
-export { activeTabOrigin };

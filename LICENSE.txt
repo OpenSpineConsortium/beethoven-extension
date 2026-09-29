@@ -1,6 +1,6 @@
 ASHLEY BRIDGE TRIAL EDITION LICENSE AGREEMENT
 
-Version 1, 2026-09-28. Applies to the Trial Edition of Ashley Bridge 1.0.0 and later versions that
+Version 2, 2026-09-29. Applies to the Trial Edition of Ashley Bridge 1.0.0 and later versions that
 ship this text, as distributed through the Chrome Web Store, Microsoft Edge Add-ons, Firefox Add-ons
 and, for Safari, the App Store, and as a signed file for unlisted distribution. You can read, copy,
 save and print this text at any time: it is in the file LICENSE.txt inside the extension and inside
@@ -99,11 +99,19 @@ This section describes the software as shipped, so that you can hold Licensor to
 
 (a) Claude. Ashley Bridge never reads, stores, copies, prints or relays a Claude credential. You sign
 in to Claude Code yourself, through Anthropic's own flow, once, in a terminal on a compute node of
-your own cluster account; Claude Code keeps its own credential there, and the Framework only starts
-Claude Code where that credential already is. Ashley Bridge reads Claude Code's yes-or-no answer
-about whether it is signed in, nothing more. You use one Claude account, your own. You also answer
-Claude Code's own one-time questions about Remote Control and about trusting your project folder
-yourself; Ashley Bridge never types those answers.
+your own cluster account. The Extension starts that terminal for you through your portal's shell,
+opens Anthropic's sign-in page in a new tab, and shows you one box; you sign in on Anthropic's page
+and paste the one-time code it shows into that box. The Extension types the code once into that
+terminal and keeps no copy of it: it is not stored, not written to the audit log and not sent to
+Licensor or anyone else, and the Extension never reads Anthropic's page or your clipboard to obtain
+it. Claude Code makes its credential from the code and keeps it in its own folder in your cluster
+account; the Framework only starts Claude Code where that credential already is, and Ashley Bridge
+reads Claude Code's yes-or-no answer about whether it is signed in, nothing more. You use one Claude
+account, your own. You answer Claude Code's one-time question about Remote Control yourself, in the
+Extension's own panel, before your first worker starts; the Extension records that answer in one file
+in your cluster account, and your worker gives it to Claude Code when Claude Code asks. Trust for the
+worker's own folder is recorded in Claude Code's settings by the Framework when a worker starts.
+Ashley Bridge gives Claude Code no answer you have not given.
 
 (b) Your portal session. The Extension uses the sign-in your browser already holds for your
 institution's Open OnDemand portal, on that one website only, in the same way the portal's own pages
@@ -127,8 +135,11 @@ working directory. Remote Control usage draws from your plan's shared limit. The
 these sentences at first run and before each job start, and does not start a worker in a folder you
 have marked restricted.
 
-(f) The Extension runs no code on claude.ai and reads nothing from it. Its only page script runs on
-the one portal website you connect.
+(f) The Extension runs no code on claude.ai or any other Anthropic page and reads nothing from them.
+Its only page script runs on the one portal website you connect. It opens an Anthropic page only in a
+new tab, as a bookmark would: the sign-in page during the sign-in described in (a), your worker's
+session page when the worker connects, and the connectors settings page if you choose the optional
+Google Drive step.
 
 (g) None of (a) to (f) is sent to Licensor. Section 10 describes the only things that may be.
 

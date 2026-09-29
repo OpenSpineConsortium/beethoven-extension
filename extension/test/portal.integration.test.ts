@@ -10,8 +10,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Audit, FloorError } from '../src/core/audit';
-import { commands, isEnvironmentUrl, parseJobId, parseRegistration, paths, siteFrom, stateDirFrom } from '../src/core/contract';
-import { ackSubject, DATA_CLASSIFICATION_STATEMENT, type Acknowledgement } from '../src/core/disclosure';
+import { commands, isClaudeAuthUrl, isEnvironmentUrl, parseJobId, parseRegistration, paths, siteFrom, stateDirFrom } from '../src/core/contract';
+import { makeAcknowledgement, type Acknowledgement } from '../src/core/disclosure';
+import { LoginWatcher } from '../src/core/login';
 import { PortalClient, PortalError } from '../src/core/portal';
 import { runShellCommand, ShellError } from '../src/core/shell';
 import { startWorker, stopWorker } from '../src/core/worker';
@@ -25,12 +26,13 @@ let mock: Portal;
 let t = 1_790_000_000_000;
 const clock = { now: () => t, advance: (ms: number) => (t += ms) };
 
-function client(p: Portal, net = cookieNet(p.cookie, p.origin)) {
+function client(p: Portal, net = cookieNet(p.cookie, p.origin), opts: { warmDelaysMs?: number[] } = {}) {
   const audit = new Audit(memoryKV(), { now: clock.now });
-  return { client: new PortalClient(p.origin, net, audit, { shellHost: 'default' }), audit };
+  return { client: new PortalClient(p.origin, net, audit, { shellHost: 'default', ...opts }), audit };
 }
 
-const ACK: Acknowledgement = { v: 1, work_dir: ackSubject('worker'), disclosure_at: 'x', classification_at: 'x', statement: DATA_CLASSIFICATION_STATEMENT };
+const ACK: Acknowledgement = makeAcknowledgement('worker');
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 beforeAll(async () => {
   mock = await createMockPortal({ port: 0 });
@@ -77,6 +79,78 @@ describe('portal client against the mock portal', () => {
     expect(await c.readFileIfExists(`${home}/proj/stop`)).toBe('');
     await c.touch(`${home}/proj/hello.txt`);
     expect(await c.readFile(`${home}/proj/hello.txt`)).toBe('hello from the extension\n');
+  });
+
+  it('a missing file downloads as an HTML page with status 200 (the live portal\'s answer): that is "not a file", and existence comes from the listing', async () => {
+    const { client: c } = client(mock);
+    const home = await c.home();
+    // what the Files app really does: 200 and a page, 58,730 bytes on the live portal
+    const raw = await fetch(`${mock.origin}/pun/sys/dashboard/files/fs${home}/nothing/.restricted?download=1`, { headers: { cookie: mock.cookie } });
+    expect(raw.status).toBe(200);
+    expect(raw.headers.get('content-type')).toMatch(/text\/html/);
+    expect((await raw.text()).length).toBeGreaterThan(1000);
+    // the client does not mistake the page for the file
+    expect(await c.readFileIfExists(`${home}/nothing/.restricted`)).toBeUndefined();
+    await expect(c.readFile(`${home}/nothing/.restricted`)).rejects.toMatchObject({ status: 404 });
+    expect(await c.exists(`${home}/nothing/.restricted`)).toBe(false);
+    expect(await c.exists(`${home}/proj/.restricted`)).toBe(false);
+    expect(await c.stat(`${home}/proj/.restricted`)).toBeUndefined();
+    // an empty marker really there: the listing names it, and its download is empty, not a page
+    await c.touch(`${home}/proj/.restricted`);
+    expect(await c.exists(`${home}/proj/.restricted`)).toBe(true);
+    expect(await c.stat(`${home}/proj/.restricted`)).toMatchObject({ name: '.restricted', type: 'f', size: 0 });
+    expect(await c.readFileIfExists(`${home}/proj/.restricted`)).toBe('');
+    expect(await c.exists(`${home}/proj/hello.txt`)).toBe(true);
+    expect(await c.exists(`${home}/proj`)).toBe(true);
+  });
+
+  it('a cold PUN: the first request after an idle answers 500 once; the client wakes it with backoff before any Files call, and again after a 5xx', async () => {
+    const cold = await createMockPortal({ port: 0, coldPun: 400 });
+    try {
+      // a fresh client's first Files call warms the portal first: one 500, one retry, then the listing
+      const { client: c, audit } = client(cold, cookieNet(cold.cookie, cold.origin), { warmDelaysMs: [20, 20, 20] });
+      const home = await c.home();
+      expect(cold.state.coldHits).toBe(1);
+      const l = await c.listDir(home);
+      expect(l.files.length).toBeGreaterThan(0);
+      expect(cold.state.coldHits).toBe(1);
+      // warm() itself reports what it took
+      const w = await c.warm();
+      expect(w.ok).toBe(true);
+      expect(w.attempts).toBe(1);
+      expect(w.detail).toMatch(/awake/);
+      // the PUN idles out again: a read meets the 500, the client warms again and the read succeeds
+      await c.writeFile(`${home}/status.json`, '{"state":"online"}');
+      await sleep(500);
+      expect(await c.readFileIfExists(`${home}/status.json`)).toBe('{"state":"online"}');
+      expect(cold.state.coldHits).toBe(2);
+      // a cold answer during the warm-up itself is retried with the backoff and counted
+      await sleep(500);
+      const again = await c.warm();
+      expect(again.ok).toBe(true);
+      expect(again.attempts).toBe(2);
+      expect(again.detail).toMatch(/woke up after 2 tries/);
+      // every attempt left a dashboard record and none a token
+      const text = await audit.exportText();
+      expect(text.match(/"endpoint":"\/pun\/sys\/dashboard\/"/g)?.length).toBeGreaterThanOrEqual(4);
+      expect(text).not.toContain(cold.railsToken);
+    } finally {
+      await cold.close();
+    }
+  });
+
+  it('a PUN that never wakes: the warm-up stops after the backoff and says so instead of looping', async () => {
+    const stuck = await createMockPortal({ port: 0, coldPun: 1 });
+    try {
+      const { client: c } = client(stuck, cookieNet(stuck.cookie, stuck.origin), { warmDelaysMs: [5, 5, 5] });
+      const w = await c.warm();
+      expect(w.ok).toBe(false);
+      expect(w.attempts).toBe(4);
+      expect(w.status).toBe(500);
+      expect(w.detail).toMatch(/did not wake up after 4 tries/);
+    } finally {
+      await stuck.close();
+    }
   });
 
   it('the dashboard refuses a write with a foreign Origin or a stale token (422), as Rails does', async () => {
@@ -271,7 +345,7 @@ describe('portal client against the mock portal', () => {
     it('the environment link is the same for every worker on this login', async () => {
       const { client: c } = client(mock);
       clock.advance(61_000);
-      const second = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: { ...ACK, work_dir: ackSubject('thesis') } });
+      const second = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis') });
       const a = JSON.parse((await c.readFileIfExists(paths.connection(stateDir, 'worker')))!);
       const b = JSON.parse((await c.readFileIfExists(paths.connection(stateDir, 'thesis')))!);
       expect(b.environment_url).toBe(a.environment_url);
@@ -284,7 +358,7 @@ describe('portal client against the mock portal', () => {
       clock.advance(61_000);
       // one client, as in the browser (the clocks live in storage.local there): the start a moment ago
       // holds the scheduler clock, so the stop file is the mechanism and the tool line waits
-      const started = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: { ...ACK, work_dir: ackSubject('thesis') } });
+      const started = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis') });
       expect(started.alreadyRunning).toBe(true);
       const out = await stopWorker(c, { stateDir, run: 'thesis', job: started.job });
       expect(out.stopFile).toBe(true);
@@ -320,6 +394,97 @@ describe('portal client against the mock portal', () => {
       const r = await c.shell(commands.workerStart('worker', 'default'), { timeoutMs: 30_000 });
       expect(r.exitCode).not.toBe(0);
       expect(r.output).toMatch(/marked restricted/);
+    }, SLOW);
+
+    it('a start writes the consent marker for the student\'s acknowledgement when it is not on the cluster yet', async () => {
+      const { client: c } = client(mock);
+      const consent = paths.consent(await c.home());
+      expect(await c.exists(consent)).toBe(false);
+      clock.advance(61_000);
+      const out = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis'), consent: { installId: 'install0001', written: false } });
+      expect(out.consentWritten).toBe(true);
+      expect(await c.exists(consent)).toBe(true);
+      expect(await c.readFile(consent)).toMatch(/^yes 20\d\d-\S+ install0001\n$/);
+    }, SLOW);
+
+    it('the login terminal: the plain sitting prints AUTH-URL, takes the typed code, ends with SIGNED-IN; the audit keeps byte counts and never the code', async () => {
+      const { client: c, audit } = client(mock);
+      clock.advance(61_000);
+      let opened: string | undefined;
+      let session: Awaited<ReturnType<typeof c.openLoginShell>> | undefined;
+      let finished = false;
+      let sent = false;
+      const CODE = 'AbCdEf123456#mock-code';
+      // what the panel's terminal does: open the page once, type the code once at the prompt, close the sitting once the outcome is known
+      const watcher = new LoginWatcher((ev) => {
+        if (ev.kind === 'auth-url' && !opened) {
+          opened = ev.url;
+          expect(isClaudeAuthUrl(ev.url)).toBe(true);
+        }
+        if (ev.kind === 'code-prompt' && !sent && session) {
+          sent = true;
+          session.send(`${CODE}\r`);
+        }
+        if ((ev.kind === 'signed-in' || ev.kind === 'failed') && !finished) {
+          finished = true;
+          session?.close();
+        }
+      });
+      const sessionP = c.openLoginShell(commands.claudeLoginPlain, (text) => watcher.feed(text));
+      session = await sessionP;
+      // the sitting is an srun on the login node: it took the scheduler clock, so a second sitting within the minute waits
+      expect(await c.auditWait('scheduler')).toBe(60_000);
+      await expect(c.openLoginShell(commands.claudeLoginPlain, () => undefined)).rejects.toBeInstanceOf(FloorError);
+      if (finished) session.close();
+      const end = await session.done;
+      expect(opened).toMatch(/^https:\/\/claude\.ai\/oauth\/authorize\?/);
+      expect(watcher.outcome).toBe('signed-in');
+      expect(watcher.detail).toMatch(/student@example.edu/);
+      expect(end.inputBytes).toBe(CODE.length + 1);
+      expect(end.outputBytes).toBeGreaterThan(100);
+      // the framework's consent marker is there afterwards (the mock's login writes it, as the real one records the answer)
+      expect(await c.exists(paths.consent(await c.home()))).toBe(true);
+      const records = await audit.records();
+      const rec = records.find((r) => /login terminal/.test(r.outcome));
+      expect(rec).toBeDefined();
+      expect(rec!.method).toBe('WS');
+      expect(rec!.bytes).toBe(end.outputBytes + end.inputBytes);
+      expect(rec!.outcome).toMatch(new RegExp(`${CODE.length + 1} bytes typed`));
+      expect(JSON.stringify(records)).not.toContain(CODE);
+      expect(JSON.stringify(records)).not.toContain('mock-code');
+    }, SLOW);
+
+    it('the login terminal: a refused code ends with HPCW-LOGIN-FAILED and the sentence; the shell is closed either way', async () => {
+      const { client: c } = client(mock);
+      clock.advance(61_000);
+      const before = mock.state.shells;
+      process.env.MOCK_LOGIN_FAIL = '1';
+      try {
+        let session: Awaited<ReturnType<typeof c.openLoginShell>> | undefined;
+        let finished = false;
+        let sent = false;
+        const watcher = new LoginWatcher((ev) => {
+          if (ev.kind === 'code-prompt' && !sent && session) {
+            sent = true;
+            session.send('wrong\r');
+          }
+          if ((ev.kind === 'signed-in' || ev.kind === 'failed') && !finished) {
+            finished = true;
+            session?.close();
+          }
+        });
+        const p = c.openLoginShell(commands.claudeLoginPlain, (text) => watcher.feed(text));
+        session = await p;
+        if (finished) session.close();
+        const end = await session.done;
+        expect(watcher.outcome).toBe('failed');
+        expect(watcher.detail).toMatch(/not accepted/);
+        expect(end.reason).toBe('client');
+        expect(mock.state.shells).toBe(before + 1);
+        expect(mock.state.fatal).toBe(0);
+      } finally {
+        delete process.env.MOCK_LOGIN_FAIL;
+      }
     }, SLOW);
   });
 

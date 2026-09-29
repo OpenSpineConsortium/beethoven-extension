@@ -10,11 +10,11 @@
 // refuses one of its own checks, and a check whose clock is still running is skipped with the
 // time left, never failed.
 import type { KV } from './audit';
-import { ackCovers, ackSubject, type Acknowledgement, ACK_KEY } from './disclosure';
-import { commands, consentSourceWords, parseDiscovery, paths, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
+import { statementFor, type Statements } from './disclosure';
+import { commands, consentSourceWords, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
 import { bindIdentity, identityNote } from './identity';
-import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, SESSION_SEEN_KEY, type LicenseState, type PortalSettings, type Prefs } from './keys';
+import { IDENTITY_KEY, KILLLIST_KEY, LICENSE_KEY, LOGIN_SEEN_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type LicenseState, type LoginSeen, type PortalSettings, type Prefs } from './keys';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import { verifyLicense, type KeyRing } from '../licensing/license';
 import type { PortalApi, SessionInfo } from './portal';
@@ -94,13 +94,8 @@ function discoveryOf(ctx: DiagCtx): Discovery | undefined {
   return ctx.cache.discovery;
 }
 
-const reached = (code: string | number | undefined) => {
-  const n = Number(code);
-  return Number.isFinite(n) && n > 0;
-};
-
-/** The one-sitting sign-in instruction, used wherever a check points at it. */
-export const SIGN_IN_INSTRUCTION = `Choose "Sign in to Claude on the cluster": it opens the portal's own shell where you run "${commands.claudeLogin}" yourself. That one command does Claude Code's paste-code sign-in on a compute node and then, if you have not answered "Enable Remote Control?" before, starts Claude Code once so you answer y and press Ctrl-C, all in one sitting. Never use setup-token: Remote Control needs a full sign-in.`;
+/** The sign-in instruction, used wherever a check points at it. */
+export const SIGN_IN_INSTRUCTION = `Choose "Sign in on the cluster": the strip at the top opens a small terminal, asks a compute node for Claude Code's own sign-in, opens Anthropic's sign-in page in a tab, and takes the code that page shows in one box; Claude Code exchanges the code on the compute node and Ashley Bridge never sees the credential. (The same sitting is "${commands.claudeLogin}" in the portal's own shell.) Never use setup-token: Remote Control needs a full sign-in.`;
 
 export function buildNodes(): DiagNode<DiagCtx>[] {
   return [
@@ -134,7 +129,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'browser',
       dependsOn: [],
       assumption: 'the student granted this extension access to exactly one origin, their Open OnDemand portal',
-      manualFix: 'Open your portal in a tab, then use the toolbar button and choose "Connect this portal".',
+      manualFix: 'Open your portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site.',
       fixAction: 'connect-portal',
       futureRisk: 'Firefox and Safari let a person revoke a site permission from the address bar; the grant is re-checked at every start',
       async check(ctx) {
@@ -302,7 +297,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Probe job has run on a compute node',
       layer: 'compute-node',
       dependsOn: ['files', 'login-discovery'],
-      assumption: 'a five-minute job on the default partition wrote <state_dir>/probe/probe.json: node-local temp and /dev/shm, user namespaces, the container running, and the reach of api.anthropic.com, platform.claude.com and claude.ai with and without the proxy',
+      assumption: 'a short job (ten minutes at most) on the default partition wrote <state_dir>/probe/probe.json: node-local temp and /dev/shm, user namespaces, the container running, and the reach of api.anthropic.com, platform.claude.com and claude.ai with and without the proxy',
       manualFix: 'Run "Set up the cluster" (it installs the tool), then "Run the probe job", and check again once the job has finished.',
       fixAction: 'run-probe',
       futureRisk: 'egress is the least uniform thing across campuses and can change without notice; the probe is cheap to rerun',
@@ -310,17 +305,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       async check(ctx) {
         const p = await probeFile(ctx);
         if (!p) return { ok: false, detail: `no probe.json at ${paths.probe(await stateDir(ctx))} yet: the probe job has not run (or has not finished)` };
-        const e = p.egress ?? {};
-        const bare = e.without_proxy_vars ?? {};
-        const env = e.with_inherited_env ?? {};
-        const reach = ['api.anthropic.com', 'platform.claude.com', 'claude.ai'].map((h) => `${h} ${env[h] ?? '?'}${bare[h] !== undefined && bare[h] !== env[h] ? ` (bare ${bare[h]})` : ''}`).join(', ');
-        const okEgress = e.class ? e.class !== 'none' : (reached(env['api.anthropic.com']) || reached(bare['api.anthropic.com'])) && (reached(env['platform.claude.com']) || reached(bare['platform.claude.com']));
-        const detail = `${p.when ? `probe of ${p.when.slice(0, 16)}` : 'probe'} on ${p.hostname ?? '?'}: node temp ${p.node_tmp?.ok ? `${p.node_tmp.free_gb ?? '?'} GB free at ${p.node_tmp.path ?? '?'}` : 'NOT usable'}, /dev/shm ${p.dev_shm?.writable ? `${Math.round((p.dev_shm.free_kb ?? 0) / 1e6)} GB free` : 'not writable'}, user namespaces ${p.user_namespaces?.unshare_works ? 'yes' : 'no'}, container ${p.runtime?.ok ? 'runs' : 'FAILS'}, egress ${e.class ?? '?'} (${reach})${e['statsig.anthropic.com'] && /no DNS/i.test(e['statsig.anthropic.com']) ? '; statsig.anthropic.com has no DNS record here' : ''}`;
-        if (!p.runtime?.ok) return { ok: false, detail: `${detail}. The container runtime could not run the image on the compute node.` };
-        if (!okEgress) return { ok: false, detail: `${detail}. Compute nodes cannot reach api.anthropic.com or platform.claude.com; ask your centre for an HTTP proxy (Claude Code refuses SOCKS).` };
-        if (!p.node_tmp?.ok) return { ok: false, detail: `${detail}. The node-local temp directory named by the profile is not usable.` };
-        const chain = p.sbatch_on_node === false ? '; the node cannot submit jobs itself, so a worker there runs one job at a time instead of staying on' : '';
-        return { ok: true, warn: !p.tmux?.present || p.sbatch_on_node === false, detail: `${detail}${p.tmux?.present ? '' : '; no tmux on the node (script -qfc is the fallback)'}${chain}` };
+        const v = probeVerdict(p);
+        return { ok: v.ok, warn: v.warn, detail: v.detail };
       },
     },
     {
@@ -349,6 +335,10 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       async check(ctx) {
         const p = await probeFile(ctx);
         const a = p?.claude_auth;
+        // a sign-in made from this browser's login terminal after the probe ran overtakes the probe's word
+        const seen = await ctx.env.local.get<LoginSeen>(LOGIN_SEEN_KEY);
+        const probeAt = p?.when ? new Date(p.when).getTime() : 0;
+        if (seen && new Date(seen.at).getTime() > probeAt) return { ok: true, detail: `signed in from this browser on ${seen.at.slice(0, 16).replace('T', ' ')}${seen.detail ? ` (${seen.detail})` : ''}; the next probe will confirm it` };
         if (!a) return { ok: false, detail: 'the probe reported nothing about the Claude sign-in' };
         if (!a.loggedIn) return { ok: false, detail: a.config_dir_present ? 'not signed in to Claude on the cluster' : 'not signed in to Claude on the cluster (the Claude folder named in the profile does not exist yet)' };
         const who = [a.email, a.subscriptionType].filter(Boolean).join(', ');
@@ -361,17 +351,21 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Remote Control consent recorded',
       layer: 'claude',
       dependsOn: ['claude-login'],
-      assumption: 'the student answered Claude Code\'s one-time "Enable Remote Control?" themselves; Claude Code records that answer in its own settings file (remoteDialogSeen) and the probe reads that one flag (a marker file is only the fallback); the image\'s `claude remote-control` accepts the flags the job uses',
-      manualFix: `${SIGN_IN_INSTRUCTION} If you signed in earlier without that question, "${commands.claudeConsent}" explains and does the same. If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
-      fixAction: 'sign-in-claude',
+      assumption: 'the student\'s answer to Claude Code\'s one-time "Enable Remote Control?" is on record: Claude Code\'s own settings file (remoteDialogSeen), or the marker file Ashley Bridge writes when the data statement is acknowledged; the probe reads that; the image\'s `claude remote-control` accepts the flags the job uses',
+      manualFix: `Make the data statement in the strip at the top: it writes the answer for your worker. ${SIGN_IN_INSTRUCTION} If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
+      fixAction: 'acknowledge',
       futureRisk: 'Anthropic can change Remote Control eligibility for a plan class at any time; a running job\'s status.json is where it would show',
       async check(ctx) {
         const p = await probeFile(ctx);
         if (p?.consent_recorded === undefined) return { ok: false, detail: 'the probe did not report on your Remote Control answer' };
-        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" is not on record yet (the job would wait in need_consent)' };
-        if (p.remote_control_flags === '') return { ok: false, detail: 'your answer is on record, but `claude remote-control --help` printed no flags inside the image: this Claude Code may be too old for Remote Control' };
+        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" was not on record when the probe ran (the data statement in the strip records it; the job waits for it otherwise)' };
+        if (p.remote_control_flags === '') {
+          // signed out, `claude remote-control --help` prints nothing (measured on the grid, probe of 2026-09-29 04:06Z); that says nothing about the version
+          if (!p.claude_auth?.loggedIn) return { ok: true, warn: true, detail: `your answer is ${consentSourceWords(p.consent_source) || 'on record'}; whether this Claude Code can host Remote Control is known once you are signed in (the probe ran signed out; the next probe after the sign-in tells)` };
+          return { ok: false, detail: 'your answer is on record, but Claude Code printed no Remote Control options inside the image while signed in: this Claude Code may be too old for Remote Control' };
+        }
         const trust = p.workspace_trusted === false ? '; the workspace is not yet trusted in Claude Code (the job records that itself at the first start)' : '';
-        return { ok: true, warn: p.consent_source === 'marker', detail: `your answer is ${consentSourceWords(p.consent_source) || 'on record'}${trust}${p.remote_control_flags ? `; remote-control flags: ${p.remote_control_flags.slice(0, 80)}` : ''}` };
+        return { ok: true, detail: `your answer is ${consentSourceWords(p.consent_source) || 'on record'}${trust}${p.remote_control_flags ? `; remote-control flags: ${p.remote_control_flags.slice(0, 80)}` : ''}` };
       },
     },
     {
@@ -397,8 +391,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Data classification acknowledged',
       layer: 'student',
       dependsOn: ['licence'],
-      assumption: 'the worker\'s workspace is not marked restricted (no .restricted file in it, no profile flag), and this browser session the student read where the transcript goes and stated that the workspace holds no FERPA, IRB, PHI, export-controlled or restricted data',
-      manualFix: 'Read the disclosure in the panel and tick the statement for the worker you will start (asked once per browser session). A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
+      assumption: 'the worker\'s workspace is not marked restricted (no .restricted file in it, read from the workspace\'s listing; no profile flag), and the student read where the transcript goes and made the data statement for this workspace on the text now in force (kept in this browser per workspace; asked again when the text or the workspace changes)',
+      manualFix: 'Read the disclosure in the strip and tick the statement for the worker you will start. A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
       fixAction: 'acknowledge',
       futureRisk: 'a change of plan class (Team, Enterprise, ZDR) changes what the disclosure must say',
       async check(ctx) {
@@ -409,15 +403,15 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         try {
           const sd = await stateDir(ctx);
           if (profileRestricts(ctx.cache.profile, name)) restricted = `the site profile marks the workspace of worker "${name}" restricted`;
-          else if ((await portalOf(ctx).readFileIfExists(paths.restrictedMarker(sd, name))) !== undefined) restricted = `the workspace ${paths.workspace(sd, name)} is marked restricted (.restricted file present)`;
+          else if (await portalOf(ctx).exists(paths.restrictedMarker(sd, name))) restricted = `the workspace ${paths.workspace(sd, name)} is marked restricted (.restricted file present)`;
           else markerNote = '; the workspace is not marked restricted';
         } catch {
           markerNote = '; the restricted marker could not be checked (no portal tab)';
         }
         if (restricted) return { ok: false, detail: `${restricted}; the worker will not start there` };
-        const ack = await ctx.env.session.get<Acknowledgement>(ACK_KEY);
-        const subject = ackSubject(name);
-        return ackCovers(ack, subject) ? { ok: true, detail: `acknowledged this session for worker "${name}"${markerNote}` } : { ok: false, detail: `not acknowledged this session for worker "${name}"${markerNote}` };
+        const ack = statementFor(await ctx.env.local.get<Statements>(STATEMENTS_KEY), name);
+        if (!ack) return { ok: false, detail: `the data statement has not been made for worker "${name}" on the text now in force${markerNote}` };
+        return { ok: true, warn: !ack.consent_written_at, detail: `statement made for worker "${name}" on ${ack.acknowledged_at.slice(0, 10)}${ack.consent_written_at ? '; the consent marker is written on the cluster' : '; the consent marker is written at the next start'}${markerNote}` };
       },
     },
     {

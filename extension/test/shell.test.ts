@@ -2,7 +2,7 @@
 // the one-line wrapper, marker extraction across split frames and control sequences, and the
 // 3146 reasons.
 import { describe, expect, it } from 'vitest';
-import { clean, explainClose, markerFor, scrapeCsrf, ShellTranscript, shellSocketUrl, wrapCommand } from '../src/core/shell';
+import { clean, explainClose, markerFor, scrapeCsrf, SESSION_MAX_MS, ShellTranscript, shellSocketUrl, wrapCommand } from '../src/core/shell';
 
 const INDEX_HBS = `<script>
   function get_url() {
@@ -74,5 +74,13 @@ describe('shell driver pieces', () => {
     expect(explainClose(3146, 'Host "x" not specified in allowlist or cluster configs.')).toMatch(/not allowed by the portal/);
     expect(explainClose(3146, '')).toMatch(/refused/);
     expect(explainClose(1006, '')).toMatch(/dropped/);
+    // an unknown code never leaks the number or the raw reason into the panel
+    const other = explainClose(1011, 'Internal error: ECONNRESET at ssh');
+    expect(other).toMatch(/closed early/);
+    expect(other).not.toMatch(/1011|ECONNRESET|ssh/);
+  });
+
+  it('closes the sign-in sitting after fifteen minutes, the number the privacy statement gives', () => {
+    expect(SESSION_MAX_MS).toBe(15 * 60_000);
   });
 });

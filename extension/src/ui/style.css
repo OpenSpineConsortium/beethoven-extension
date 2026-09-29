@@ -74,6 +74,24 @@ table.audit th, table.audit td { text-align: left; padding: 2px 6px; border-bott
 a { color: var(--accent); }
 .steps { counter-reset: s; padding-left: 1.4em; }
 details summary { cursor: pointer; }
+/* the flight strip: one status line, one button, the step's own input; a left rule carries the tone */
+.strip { border: 1px solid var(--line); border-left: 5px solid var(--muted); background: var(--panel); border-radius: 6px; padding: 10px 12px; margin: 0 0 10px; }
+.strip.busy, .strip.wait { border-left-color: var(--accent); }
+.strip.fail { border-left-color: var(--fail); }
+.strip.ok { border-left-color: var(--ok); }
+.strip-title { margin-bottom: 4px; }
+.strip-status { font-size: 1.02em; margin: 4px 0 6px; }
+.strip .statement ul { padding-left: 1.2em; }
+.details { margin-top: 6px; }
+.details > summary { color: var(--muted); font-size: 0.95em; padding: 4px 0; }
+.details h3 { margin-top: 14px; }
+h4 { font-size: 0.95em; margin: 8px 0 4px; }
+/* the sign-in terminal: the shell's text, codes stripped, auto-scrolled; the one box below it */
+.terminal { margin: 8px 0; }
+.term { height: 200px; max-height: 200px; overflow: auto; background: #101010; color: #d8d8d8; border: 1px solid var(--line); border-radius: 4px; padding: 8px; font-size: 0.85em; white-space: pre-wrap; word-break: break-word; }
+@media (prefers-color-scheme: dark) { .term { background: #0a0a0a; } }
+.strip .status.ok { color: var(--ok); }
+.strip .status.warn { color: var(--warn); }
 @media print {
   body { padding: 0; }
   .noprint { display: none !important; }

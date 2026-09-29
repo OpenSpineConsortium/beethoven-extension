@@ -65,11 +65,15 @@ licensor when it exists). The product name and identifier carry no university na
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; `LICENSE.txt` version 1, `PRIVACY.md` version 2 since the Google Drive step stores one
-  local boolean). The copies the extension ships in `extension/public/` must be byte-identical to
-  them at build time. Change a text and its version together (integer). Never pre-tick a box; the button
-  label is part of the record; a changed agreement is shown again and accepted again.
-- Never use the word "provenance". Versions are integers (1.0.0, 2.0.0), never fractional.
+  Edition; since 2026-09-29 `LICENSE.txt` is version 2 and `PRIVACY.md` version 3, for the sign-in
+  sitting and the per-workspace statement; `TERMS_VERSION` in `extension/src/core/terms.ts` is 2 to
+  match, and the framework's `VERSION` file is 2). The copies the extension ships in
+  `extension/public/` must be byte-identical to them at build time. Change a text and its version
+  together (integer). Never pre-tick a box; the button label is part of the record; a changed
+  agreement is shown again and accepted again.
+- Never use the p-word (the one that starts "prov" and ends "enance") for the history of a file or a
+  piece of data; say origin, source or record. Versions are integers (1.0.0, 2.0.0), never
+  fractional.
 - Match the surrounding code's style. Comment density like Ashley's: why, not what.
 - Branch `main`; commit directly to it, no feature branches. During the parallel build week the
   streams do not commit; the maintainer reviews and commits. Signing keys live in `~/.ashley-vendor`
@@ -150,10 +154,13 @@ directory when `connection.json` is younger than 4 h, else registers afresh in t
 `hpcworker claude login` is one sitting (`claude auth login`, then `claude remote-control` once in the
 workspace if `remoteDialogSeen` is not yet true; `claude consent` stays as an alias that explains);
 the panel's green *Open in Claude* button opens `environment_url` with `browser.tabs.create` (no
-`tabs` permission is needed for `create`) with *Copy link* beside it; an opt-in setting, off by
-default, starts the worker when the portal tab connects and status is not online, at the 60 s floor;
-a checklist step opens `https://claude.ai/settings/connectors` in a new tab with one sentence and a
-local *done* tick.
+`tabs` permission is needed for `create`) with *Copy link* beside it, and the link is opened by
+itself once per new link per browser when *open claude.ai when my worker connects* is on; the setting
+*start my worker when I open my portal* starts the worker when the portal tab connects and status is
+not online, at the 60 s floor, and is ON by default in the current build (`DEFAULT_PREFS` in
+`extension/src/core/keys.ts`; the earlier decision had it off, and the maintainer's review settles
+which ships); a checklist step opens `https://claude.ai/settings/connectors` in a new tab with one
+sentence and a local *done* tick.
 
 ## How to be useful here
 

@@ -1,6 +1,7 @@
-// Starting and stopping the worker, in one place, so the panel's buttons and the background's
-// "start when my portal opens" setting do exactly the same thing. Everything goes through the
-// portal client the caller hands in: the panel passes the relayed one, the background its own.
+// Starting and stopping the worker, in one place, so the strip, the Details buttons and the
+// background's "start when my portal opens" setting do exactly the same thing. Everything goes
+// through the portal client the caller hands in: the panel passes the relayed one, the
+// background its own.
 //
 // A start is one shell line (`hpcworker worker start`), which the chokepoint classes as a
 // scheduler call: once a minute, refused otherwise. A stop is the framework's stop file, touched
@@ -9,7 +10,7 @@
 // stop.done and ends its own chain, so the extra line is belt and braces, never the mechanism.
 import { FloorError } from './audit';
 import { commands, parseJobId, paths, profileRestricts, siteFrom, stateDirFrom, type StatusFile, type WorkerState } from './contract';
-import { ackCovers, ackSubject, type Acknowledgement } from './disclosure';
+import { ackCovers, ackSubject, consentFileContent, type Acknowledgement } from './disclosure';
 import type { PortalApi } from './portal';
 
 export interface ClusterContext {
@@ -30,14 +31,25 @@ export async function clusterContext(portal: PortalApi): Promise<ClusterContext>
 
 /**
  * Why the named workspace must not host a worker, or undefined when it may: the student's own
- * `.restricted` marker in the workspace, or a profile that marks it so.
+ * `.restricted` marker in the workspace (its presence read from the workspace's listing, never
+ * from a download), or a profile that marks it so.
  */
 export async function restrictedReason(portal: PortalApi, ctx: ClusterContext, workerName: string): Promise<string | undefined> {
   if (profileRestricts(ctx.profile, workerName)) return `the site profile marks the workspace of worker "${workerName}" restricted`;
   const marker = paths.restrictedMarker(ctx.stateDir, workerName);
-  const present = await portal.readFileIfExists(marker);
-  if (present !== undefined) return `the workspace ${paths.workspace(ctx.stateDir, workerName)} is marked restricted (it holds a ${marker.split('/').pop()} file); the worker will not start there`;
+  if (await portal.exists(marker)) return `the workspace ${paths.workspace(ctx.stateDir, workerName)} is marked restricted (it holds a ${marker.split('/').pop()} file); the worker will not start there`;
   return undefined;
+}
+
+/**
+ * The framework's fallback consent marker, ~/.hpcworker/consent: written when the student
+ * acknowledges the data statement, and again before a start when that write is still owed. Its
+ * presence is what lets the job answer Claude Code's one-time question for the student.
+ */
+export async function writeConsentFile(portal: PortalApi, home: string, installId: string, at = new Date().toISOString()): Promise<string> {
+  const path = paths.consent(home);
+  await portal.writeFile(path, consentFileContent(at, installId));
+  return path;
 }
 
 export interface StartOpts {
@@ -45,29 +57,39 @@ export interface StartOpts {
   permissionMode: string;
   /** the site name to fall back on when the profile names none */
   site: string;
-  /** this session's acknowledgement; the start is refused without one for this worker */
+  /** the acknowledgement for this worker's workspace; the start is refused without one */
   ack: Acknowledgement | undefined;
+  /** write the consent marker first when the acknowledgement has not been written to the cluster yet */
+  consent?: { installId: string; written: boolean };
 }
 
 export interface StartOutcome {
   job: string;
   site: string;
   stateDir: string;
+  home: string;
   output: string;
   /** the tool found the worker's job already pending or running and submitted nothing */
   alreadyRunning: boolean;
+  /** the consent marker was written by this start */
+  consentWritten: boolean;
 }
 
 export async function startWorker(portal: PortalApi, o: StartOpts): Promise<StartOutcome> {
-  if (!ackCovers(o.ack, ackSubject(o.name))) throw new Error(`Before a start: read "Where your work goes" and make the data statement for worker "${o.name}", this session.`);
+  if (!ackCovers(o.ack, ackSubject(o.name))) throw new Error(`Before a start: read "Where your work goes" and make the data statement for worker "${o.name}".`);
   const ctx = await clusterContext(portal);
-  if (!ctx.profile) throw new Error('hpcworker is not installed yet (no ~/.hpcworker/profile.json): choose "Set up the cluster" first.');
+  if (!ctx.profile) throw new Error('hpcworker is not installed yet (no ~/.hpcworker/profile.json): set up the cluster first.');
   const why = await restrictedReason(portal, ctx, o.name);
   if (why) throw new Error(`Not started: ${why}.`);
+  let consentWritten = false;
+  if (o.consent && (!o.consent.written || !(await portal.exists(paths.consent(ctx.home))))) {
+    await writeConsentFile(portal, ctx.home, o.consent.installId);
+    consentWritten = true;
+  }
   const r = await portal.shell(commands.workerStart(o.name, o.permissionMode), { timeoutMs: 90_000 });
   const job = parseJobId(r.output);
   if (!job) throw new Error(`the start command printed no job id (exit ${r.exitCode}); see its output`);
-  return { job, site: ctx.site ?? o.site, stateDir: ctx.stateDir, output: r.output, alreadyRunning: /already has job/i.test(r.output) };
+  return { job, site: ctx.site ?? o.site, stateDir: ctx.stateDir, home: ctx.home, output: r.output, alreadyRunning: /already has job/i.test(r.output), consentWritten };
 }
 
 export interface StopOutcome {

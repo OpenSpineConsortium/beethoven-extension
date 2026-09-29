@@ -42,6 +42,9 @@ export default defineConfig({
       homepage_url: 'https://openspineconsortium.com/ashley/bridge',
       permissions: ['storage', 'alarms', 'scripting', 'activeTab', ...(chromium ? ['sidePanel'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
+      // no default_popup: the toolbar button is the "go" button (action.onClicked opens the strip and,
+      // from a portal tab, asks for that one origin in the same gesture); WXT spells it browser_action on MV2
+      action: { default_title: 'Ashley Bridge' },
       ...(chromium ? { minimum_chrome_version: '148' } : {}),
       browser_specific_settings: {
         gecko: {

@@ -11,7 +11,8 @@
 # second worker on the same login joins the same environment.
 #
 # Environment knobs (tests and reviewers): MOCK_LOGGED_IN=false, MOCK_CONSENT=false,
-# MOCK_EGRESS=none change what the seeded probe reports; MOCK_ENV_ID sets the environment id.
+# MOCK_EGRESS=none change what the seeded probe reports; MOCK_ENV_ID sets the environment id;
+# MOCK_LOGIN_FAIL=1 makes `claude login --plain` end with HPCW-LOGIN-FAILED whatever code is typed.
 set -u
 HPCW_HOME="${HPCW_HOME:-$HOME/.hpcworker}"
 PROFILE="$HPCW_HOME/profile.json"
@@ -130,6 +131,29 @@ EOF
   claude)
     case "${2:-}" in
       login)
+        if [ "${3:-}" = "--plain" ]; then
+          # plain mode: the lines the extension's login terminal reads (contract.ts LOGIN_LINES), around a
+          # stand-in for Claude Code's paste-code sign-in; the typed code is read from standard input
+          echo "HPCW-LOGIN 1 plain"
+          echo "HPCW-LOGIN: asking the scheduler for a compute node (secp/secondary, 30 min)"
+          sleep 1
+          echo "HPCW-LOGIN: node01 allocated; starting Claude Code's sign-in"
+          echo "Browser didn't open? Use the url below to sign in:"
+          echo
+          echo "AUTH-URL: https://claude.ai/oauth/authorize?code=true&client_id=mock-client&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=user%3Ainference&state=mockstate$(date +%s)"
+          echo
+          printf 'Paste code here if prompted > '
+          code=""; IFS= read -r code || true
+          echo
+          if [ "${MOCK_LOGIN_FAIL:-}" = 1 ] || [ -z "$code" ] || ! printf '%s' "$code" | grep -q -E '^[A-Za-z0-9#_-]{6,}$'; then
+            echo "HPCW-LOGIN-FAILED the code was empty or not accepted (Claude Code's sign-in exited 1)"
+            exit 1
+          fi
+          mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent"
+          echo "Login successful. Press Enter to continue…"
+          echo "SIGNED-IN student@example.edu max (Remote Control answer on record)"
+          exit 0
+        fi
         echo "(mock) Sign in to Claude on the cluster, in one sitting: the real tool runs Claude Code's own 'claude auth login' inside an allocation on a compute node and never sees the credential;"
         echo "(mock) then, if Claude Code has not yet recorded your answer to \"Enable Remote Control?\" (remoteDialogSeen in its own settings file), it starts 'claude remote-control' once in your workspace so you answer y and press Ctrl-C."
         mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent";;
@@ -143,7 +167,7 @@ EOF
     ;;
   version) echo 1 ;;
   *)
-    echo "usage: hpcworker install [--profile NAME] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login|consent|status | diag [--json] | version" >&2
+    echo "usage: hpcworker install [--profile NAME] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login [--plain]|consent|status | diag [--json] | version" >&2
     exit 2
     ;;
 esac
