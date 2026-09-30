@@ -453,8 +453,10 @@ node beyond the one `sbatch`. The job's cleanup trap removes only its own node-l
 the incident of 2026-09-28). Compared with the VS Code edition's `worker.sbatch.tpl`, what changes
 is the payload (`claude remote-control` in `tmux` instead of the inbox daemon) and the status files;
 what stays is the `/dev/shm` scratch bound to `/tmp`, the `--signal=B:TERM@120`, `--requeue` with
-`--open-mode=append`, the read-only bind of the host's Slurm client into the container, and the
-refusal to start when a piece is missing.
+`--open-mode=append`, the refusal to start when a piece the worker needs (the image, the runtime,
+its temp folders) is missing, and the read-only bind of the host's Slurm client into the container
+(since framework 9, where the site profile asks for it; below), which, as there, is skipped rather
+than refused when a piece of it is missing on the node.
 
 **The workspace guide** (framework 8). Claude Code reads a `CLAUDE.md` in its working folder at the
 start of each session, so `hpcworker worker start` writes one into the worker's workspace
@@ -470,10 +472,50 @@ approval, export-controlled material, credentials, the Claude sign-in folder). I
 when the workspace has none (a workspace from before framework 8 gets it at its next start), with
 bash's noclobber, so a file already there, edited or left empty on purpose, is never replaced;
 `hpcworker worker guide` prints the current text and writes nothing. The extension's texts do not
-change for it. The guide does not assume the scheduler is reachable from inside the container: this
-framework's job binds no Slurm client there (the host-client bind named just above belongs to the VS
-Code edition's job and was not carried over), so the guide says to check `command -v sbatch` and,
-when it is missing, to write the job script into the workspace for the person to submit.
+change for it. What the guide says about the scheduler follows the flag in the next paragraph:
+without it, check `command -v sbatch` and, when it is missing, write the job script into the
+workspace for the person to submit.
+
+**Slurm inside the worker** (framework 9). The container has no scheduler of its own, so until
+framework 9 a worker's Claude Code could write a job script but not submit it. With
+`scheduler_in_worker: true` in the site profile (Wayne State's sets it; the default is false and
+every other site is unchanged), each worker job binds the host's own Slurm client into the container,
+the set the lab's VS Code tool measured on asx1 on 2026-09-28 and has used since: `/usr/bin` under
+`/opt/host/bin` (never the whole of it on the container's PATH), `/usr/lib64/slurm`, the munge
+library into `/usr/lib` (a default search folder, so no `LD_LIBRARY_PATH`), `/etc/slurm`, the munge
+socket's folder, and an `/etc/passwd` and `/etc/group` that add to the container's own the host's
+entries for `slurm.conf`'s `SlurmUser`, `munge` and the person (without the slurm user: "Invalid user
+for SlurmUser slurm"). Everything is read-only but the socket. `hpcw_slurm_in_container` in
+`lib/adapters/common.sh` makes the binds and five wrappers (`sbatch`, `squeue`, `sacct`, `scancel`,
+`sinfo`; not `scontrol`, whose host binary needs a `libreadline.so.6` the bookworm image lacks) on
+the compute node at the start of each job, under the job's `/dev/shm` directory (node-local, never
+swept, removed with the job), and the job adds them to every container start with the wrappers'
+folder `/opt/hpcw/slurm/bin` first on the container's PATH. A wrapper runs the host binary with the
+host's PATH and `LD_LIBRARY_PATH` and the job's original `TMPDIR`, and removes the container's
+`APPTAINER_`/`SINGULARITY_` variables, the worker's `XDG_RUNTIME_DIR` and the worker job's own
+`SLURM_` variables (`SLURM_CONF` kept), so a job Claude Code submits runs on the host much as if
+submitted from a terminal (the rest of Claude Code's environment, the worker's `HPCW_` variables
+included, goes along), with the person's module libraries rather than the container's
+`/.singularity.d/libs`, is not steered by the worker's `SLURM_CPUS_PER_TASK` or
+`SLURM_MEM_PER_NODE`, and outlives the worker. A piece missing on the node does not stop the worker:
+it starts without the client, and the job log, `status.json` (`scheduler_in_worker`,
+`scheduler_note`), `hpcworker worker status` and `hpcworker diag` (`hpcw.slurm-in-worker`) say
+which piece. `validate` refuses the flag for a scheduler other than Slurm or a runtime other than
+Apptainer or Singularity. An account's `profile.json` is a copy of the site profile kept since its
+install, so a field added later (`FIELDS_FROM_SITE`: this one) takes the site profile's value from
+the copy the command runs, until the account sets its own with `hpcworker profile set`. With the
+flag, the workspace guide says the commands are there, that a submitted job runs outside the
+container and outlives the worker, to cancel only its own jobs by id and never the worker's
+(`$HPCW_JOB`), to keep a container job's `APPTAINER_TMPDIR` and `APPTAINER_CACHEDIR` on node-local
+disk, and to have a submitted job write under the workspace, follow it at most once a minute and
+report what came out and where; a workspace that already has a `CLAUDE.md` keeps its own. Measured
+by one check job on the grid (`framework/tests/grid/slurm_in_container.sbatch`, job 40518457 on
+asx1, 2026-09-30, recorded in `framework/README.md`): from inside the container `squeue -u`,
+`sinfo -s`, `sacct -j`, `sbatch --test-only` (answered by the controller, nothing submitted) and
+`scancel --version` worked; `scontrol` did not, and the environment check showed the container's
+`LD_LIBRARY_PATH` reaching a submitted job. The two changes that followed (no `scontrol` wrapper,
+the host's `LD_LIBRARY_PATH` in the wrappers) have not been run on the grid, nor has a real
+submission by a worker's Claude Code from a Remote Control session.
 
 ### 4.3 The batch launch
 
@@ -831,6 +873,26 @@ From the report's "Security controls", in the order a reviewer will look for the
   enforced by the extension against the service's answer, so it keeps an approval from being shared
   casually and proves nothing against a modified copy; a move or a withdrawal reaches an
   installation holding a fresh yes within a day (7 days offline).
+- **Two gates between a request and a working installation: the group and the approval.** The
+  listing on the Chrome Web Store is private, so Chrome installs Beethoven only for the Google
+  accounts in the lab's Google Group `Beethoven-users`; the approval check then decides whether an
+  installation works. The access service records the steps on the student's record with their times:
+  submitted (the request form, which asks for the Google account), confirmed (the student's
+  *Confirm it is you* link from `<AccessID>@wayne.edu`, when `MAIL_STUDENTS` is `"1"`; until then the
+  maintainer's e-mail says the mailbox is not verified, and an unconfirmed request lapses after 7
+  days), decided (*Approve for Beethoven*, *Lab membership only* or *Deny*), invited and installed
+  (set when the first installation binds the seat). The group belongs to a personal Google account,
+  and Google has no programming interface for such a group's members (the Directory API serves only
+  groups a Google Workspace owns), so the invitation is a manual step the service tracks rather than
+  performs: the page after *Approve* shows the Google account in
+  a copy box, a link to the group's members page and a signed one-use *Done, invited* button, the
+  admin page has *Mark invited*, and a daily e-mail lists approvals not invited after an hour. A
+  `GROUP_MODE` `"workspace"` adapter (the Workspace Directory API's `members.insert`, a service
+  account with domain-wide delegation) is built behind a switch for a lab with a Google Workspace,
+  off by default and never called live; on any error it falls back to the manual step. Neither gate
+  carries anything from the extension: the extension never sees the group, and the group never sees
+  the extension's installation identifier. Removal takes both: Remove (or *Withdraw approval*) on the
+  service, and the account out of the group.
 - **The lab's shared copy is read-only to students.** The extension never writes into it: it reads
   its `VERSION` and types the one install line. The launcher in the student's home is a regular file,
   so no write in the student's account reaches the shared copy, and the published tree gives the

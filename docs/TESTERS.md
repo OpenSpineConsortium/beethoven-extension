@@ -8,9 +8,11 @@ out of date; this page replaces it.
 
 Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0, for 7.0.0, the first build named
 Beethoven, and for 8.0.0, the first build offered only through a private listing on the Chrome Web
-Store, with one installation per approved account. If you tested an earlier build under another
-name or loaded one by hand, remove it from your browser before you install this one; your approval
-carries over, and you accept the agreement once more.
+Store, with one installation per approved account; on 2026-09-30 also for the steps between the
+request and the installation (the mailbox confirmation and the invitation to the lab's Google
+Group). If you tested an earlier build under another name or loaded one by hand, remove it from your
+browser before you install this one; your approval carries over, and you accept the agreement once
+more.
 
 ## What you need
 
@@ -22,6 +24,8 @@ carries over, and you accept the agreement once more.
   until it is, your worker cannot start.
 - Google Chrome, signed in to the Chrome Web Store with the Google account you give on the request
   form. Beethoven is offered in no other browser and no other store, and there is no download.
+- Your Wayne State mailbox (`<AccessID>@wayne.edu`), in case the service asks you to confirm your
+  request from it (step 1).
 - The one computer and the one Chrome profile you will use it from (see step 2).
 
 ## 1. Ask for access
@@ -29,30 +33,55 @@ carries over, and you accept the agreement once more.
 Open `https://openspineconsortium.com/beethoven/request.html` and fill in the form: the account name
 your portal shows for you (at Wayne State your AccessID, two letters and four digits, such as
 `ab1234`; it is the name the portal's dashboard shows next to "Logged in as"), your name, your
-institutional e-mail, the Google account at which you want the invitation to the private listing,
-and a line on what you will use Beethoven for. You may attach a CV (PDF or Word, 5 MB at most); it
-is optional. Send it. If the page says to check your Wayne State mail, open the confirmation link
-there; otherwise there is nothing more to do. Greg approves requests, either for Beethoven or for
-lab membership only, and tells you when yours is approved.
+institutional e-mail, the Google account at which you want the invitation to the private listing
+(the one you sign in to Chrome with), and a line on what you will use Beethoven for. You may attach a
+CV (PDF or Word, 5 MB at most); it is optional. Send it. The page then says one of two things:
+
+- **"Sent. Check your Wayne State mail for a confirmation link."** The service e-mailed
+  `<AccessID>@wayne.edu` with what was asked in your name and a *Confirm it is you* link. Open it and
+  press *Confirm it is me*; only then does your request reach Greg. Anyone can type an AccessID, and
+  this proves the request came from the mailbox that owns it. The link works once and for 24 hours;
+  if you send the form again with anything changed, only the newest e-mail's link counts. A request
+  nobody confirms lapses after seven days. If the link expired or never came, send the form again:
+  it makes a new link (three a day at most).
+- **"Sent. You hear from the lab lead."** The service is not e-mailing students (how it runs on
+  2026-09-30, until its sending domain is set up), so the request went straight to Greg marked
+  "mailbox not verified", and he may check with you before approving. You also see this when you
+  send again, unchanged, a request you have already confirmed: it is with Greg.
+
+Greg then decides: **Approve for Beethoven**, **Lab membership only** (the lab, not Beethoven), or
+**Deny**. When the service e-mails students, an approval for Beethoven e-mails you too: you are
+approved; watch for the Google Groups invitation to `Beethoven-users` at your Google account and
+accept it; then install Beethoven from the private Chrome listing; and a link to how it works
+(`https://openspineconsortium.com/beethoven/`). Otherwise Greg tells you.
 
 If you skip this step, the extension cannot be installed at all: the private listing opens only for
-the Google accounts Greg has invited.
+the Google accounts in the lab's Google Group.
 
 ## 2. Install the extension, once, on the computer you will use
 
-When you are approved for Beethoven, Greg adds your Google account to the group that may open the
-private listing and sends you its link. In Chrome, signed in with that Google account, open the link
-and choose *Add to Chrome*, then *Add extension* in Chrome's own prompt. Updates come by themselves
-through Chrome.
+When you are approved for Beethoven, Greg adds the Google account you gave to the lab's Google Group
+**Beethoven-users**, the list of accounts the private listing opens for. Google then e-mails that
+account about the group (if it is an invitation, accept it); the link to the listing comes with that
+e-mail or from Greg. Nothing
+arrives at your Wayne State address for this step, and an invitation to a different Google account
+does not help: the listing checks the account Chrome is signed in with. In Chrome, signed in with
+that Google account, open the listing's link and choose *Add to Chrome*, then *Add extension* in
+Chrome's own prompt. Updates come by themselves through Chrome. If the listing does not open for you,
+either Chrome is signed in with another Google account or yours is not in the group yet: check the
+first, then ask Greg.
 
 One approved account, one installation. The first installation that checks your account is bound to
-it. Another computer, another Chrome profile or a reinstallation is a new installation, and it is
-refused: its panel says "This account is already set up on another computer. Ask your lab lead to
-move it here." If you change computers or reinstall, ask Greg to move your approval; the new
-installation works at its next check, and the old one stops at its own next check, within a day
-while it is online (it keeps a yes up to seven days when it cannot reach the service). The
-identifier behind this is a random number the extension makes for itself; it is not taken from your
-computer.
+it (Greg's list then shows you as installed). Another computer, another Chrome profile or a
+reinstallation is a new installation, and it is refused: its panel says "This account is already set
+up on another computer. Ask your lab lead to move it here." If you change computers or reinstall, ask
+Greg to move your approval; the new installation works at its next check, and the old one stops at
+its own next check, within a day while it is online (it keeps a yes up to seven days when it cannot
+reach the service). The identifier behind this is a random number the extension makes for itself; it
+is not taken from your computer, and Chrome does not sync it. So if Chrome Sync installs Beethoven on
+another computer where Chrome is signed in to the same Google account, that copy is a new
+installation and is refused: remove it there, or turn off syncing of extensions in Chrome's settings
+on the computers you do not use for Beethoven.
 
 The extension's setup page opens by itself. Read the agreement to its end (the button stays grey
 until you have), tick the four statements, type your name and choose *Accept and Continue*. That is

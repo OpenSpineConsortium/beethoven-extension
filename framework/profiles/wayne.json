@@ -64,6 +64,7 @@
   "poll_floor_seconds": 60
  },
  "xdg_runtime_fix": true,
+ "scheduler_in_worker": true,
  "home_filesystem": "panfs",
  "worker_defaults": {
   "cpus": 2,
@@ -72,5 +73,5 @@
   "permission_mode": "default",
   "capacity": 4
  },
- "notes": "Login node warrior is CentOS 7 (python3 is 3.6, no sysctl on PATH). $TMPDIR there points at CephFS, not the node. The image is an existing sandbox with Node 22 and Claude Code shared with Beethoven for VS Code; new images at this site should be SIF because the home is Panasas. claude_config_dir is the student's existing Claude Code login from Beethoven for VS Code; the framework only starts Claude Code there and reads 'claude auth status'. Until 2026-09-30 the lab folder was /rs/rs_grp_oschome/shared/ashley and the sign-in folder $HOME/.ashley/claude; both old names remain as links to the new ones, for builds older than Beethoven 8.0.0."
+ "notes": "Login node warrior is CentOS 7 (python3 is 3.6, no sysctl on PATH). $TMPDIR there points at CephFS, not the node. The image is an existing sandbox with Node 22 and Claude Code shared with Beethoven for VS Code; new images at this site should be SIF because the home is Panasas. claude_config_dir is the student's existing Claude Code login from Beethoven for VS Code; the framework only starts Claude Code there and reads 'claude auth status'. Until 2026-09-30 the lab folder was /rs/rs_grp_oschome/shared/ashley and the sign-in folder $HOME/.ashley/claude; both old names remain as links to the new ones, for builds older than Beethoven 8.0.0. scheduler_in_worker (framework 9): the host's Slurm client, its library, the munge library and socket, /etc/slurm and the slurm and munge users are bound into the worker's container, the set measured on asx1 on 2026-09-28 for the lab's VS Code tool."
 }

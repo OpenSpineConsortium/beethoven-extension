@@ -11,7 +11,9 @@ it.
 
 For the student:
 
-- A Wayne State AccessID on the approved list for the Trial Edition.
+- A Wayne State AccessID approved for Beethoven
+  ([From request to installation](#from-request-to-installation)); one approval covers one
+  installation.
 - The Wayne State VPN (GlobalProtect) connected: `https://ondemand.grid.wayne.edu/` is VPN-only.
 - An Open OnDemand login at that address (AccessID and password) and a grid account.
 - Membership of the grid group `oschome`, added by C&IT or the group's owner before the first run.
@@ -24,8 +26,9 @@ For the student:
   fast a student is added is not yet known.
 - A Claude Pro or Max subscription in the student's own name. Remote Control is available on Pro, Max,
   Team and Enterprise; API keys and `setup-token` credentials do not work.
-- A browser the extension supports (Chrome or Edge 148 and later, Firefox; Safari only if that edition
-  ships).
+- Google Chrome 148 or later, signed in with the Google account given on the request form. Beethoven
+  8.0.0 is offered only on a private Chrome Web Store listing, which opens for the members of the
+  lab's Google Group `Beethoven-users` and for no one else; there is no download and no other store.
 
 For the site profile (`framework/profiles/wayne.json`, `site: wayne`, so sessions are asked for as
 `wayne-<jobid>`): scheduler `slurm`, `submit_host: warrior`; `partition_cpu: secp` with `qos_cpu:
@@ -49,17 +52,59 @@ https://ondemand.grid.wayne.edu`; `ood_shell_host` `default` (measured 2026-09-2
 otherwise. The template submits with `-D` because `#SBATCH --output` resolves against the submit
 directory here, and chains with `afterany`, never `afterok`. Container temp and cache
 (`APPTAINER_TMPDIR`, `APPTAINER_CACHEDIR`) sit on the compute node's local disk; no container
-command runs on `warrior`.
+command runs on `warrior`. Since framework 9 the profile also sets `scheduler_in_worker: true`: each
+worker job binds the host's own Slurm client into its container on the compute node (the host's
+`/usr/bin`, read-only, under `/opt/host/bin` and off the container's PATH, with five wrappers that
+reach it; `/usr/lib64/slurm`, the munge library and socket, `/etc/slurm`, and
+user lists that add the `slurm` and `munge` accounts), so the student's Claude Code in the worker can
+submit, follow and cancel the student's own jobs with `sbatch`, `squeue`, `sacct`, `scancel` and
+`sinfo`. `scontrol` is not offered: on the node it needs a library the container lacks. No other
+site profile sets the flag.
+
+## From request to installation
+
+Five stages, each stamped with its time on the student's record in the access service (the Worker in
+the repository of Beethoven for VS Code, `tools/intake/`; `ACCESS_CHECK.md` there is the contract).
+The admin page (`https://openspineconsortium.com/beethoven/admin.html`, behind the admin token) and
+`admin.mjs list` show each account's stage.
+
+| Stage | What happens | Who acts | Recorded |
+|---|---|---|---|
+| Submitted | The form at `/beethoven/request.html`: AccessID, name, `<AccessID>@wayne.edu`, the Google account the student signs in to Chrome with, what it is for, an optional CV (PDF or Word, 5 MB) | student | `submitted_at` |
+| Confirmed | With `MAIL_STUDENTS` `"1"`, a *Confirm it is you* link goes to `<AccessID>@wayne.edu` (24 hours, one use), and the maintainer is e-mailed only once it is pressed; a request nobody confirms lapses after 7 days and the student can send the form again. With `"0"`, as deployed on 2026-09-30 (the sending domain is not verified at Resend yet), this stage is skipped and the maintainer's e-mail says the mailbox is not verified | student | `confirmed_at` |
+| Decided | *Approve for Beethoven*, *Lab membership only* or *Deny*, from the one-use links in the maintainer's e-mail or on the admin page | maintainer | `decided_at`, `decision` |
+| Invited | The maintainer adds the Google account to the Google Group `Beethoven-users` at `https://groups.google.com/g/beethoven-users/members`, then presses *Done, invited* on the page the Approve link shows, or *Mark invited* on the admin page. A daily e-mail (13:00 UTC, from `beethoven-access` only) lists every approval for Beethoven not invited after an hour, the store reviewers' mock account and accounts already installed aside, each with its own *Done, invited* link | maintainer | `invited_at`, `invited_by` |
+| Installed | The student installs from the private listing; its first approval check binds the account to that installation | student (the extension, by itself) | `installed_at` |
+
+The invitation is by hand because the group belongs to a personal Google account, and Google offers
+no programming interface for the members of such a group (its Directory API serves only groups a
+Google Workspace owns); the service's part is to remember who is approved and not yet invited, and to
+remind the maintainer once a day. When the lab has a Google
+Workspace, `GROUP_MODE` `"workspace"` makes Approve add the account itself through the Workspace
+Directory API (`members.insert` on `beethoven-users@openspineconsortium.com`, as a service account with
+domain-wide delegation acting for a Workspace administrator; its key is `google_group_sa.json` in the
+vendor folder, sent as the secret `GROUP_SA_KEY`); any error there falls back to the manual step with
+the error shown. That adapter is off by default, tested against a stub only, and has never been
+called against Google. Google sends no invitation when the service adds someone, so in that mode the
+student's approval e-mail says they are already in the group and that the maintainer sends the
+listing's link, and the Approve page and the admin page tell the maintainer to send it.
+
+When the service e-mails students, an approval for Beethoven also tells the student to watch for the
+Google Groups invitation at the Google account they gave and accept it, to install from the private
+listing once, and where the page that says how it works is (`ONBOARDING_PAGE`,
+`https://openspineconsortium.com/beethoven/`). Being in the group is what lets Chrome install
+Beethoven; the approval check is what lets an installation work. Both are needed, and removing
+someone means both: Remove on the admin page (or *Withdraw approval* in an e-mail), and taking the
+account out of the group.
 
 ## The student's three steps
 
 Once, before the first run: install the extension from its private listing on the Chrome Web Store
-(the link comes to the Google account the student gave, once approved; an approval covers one
-installation) and read and accept the agreement on its setup page. There is no key to paste: the
-extension reads the AccessID the portal's dashboard shows for the signed-in session and asks
-Licensor's access service whether that account is on the approved list. A student not yet on it
-presses *Ask for access* (the request page opens with the AccessID filled in); the maintainer
-approves in the admin console, and the next click of the icon re-checks.
+(above) and read and accept the agreement on its setup page. There is no key to paste: the extension
+reads the AccessID the portal's dashboard shows for the signed-in session and asks Licensor's access
+service whether that account is on the approved list. A student not yet on it presses *Ask for
+access* (the request page opens with the AccessID filled in), and the stages above follow; the next
+click of the icon after the approval re-checks.
 
 1. **Open the portal tab.** Connect the VPN, sign in at `ondemand.grid.wayne.edu`, and keep the tab
    open.
@@ -126,6 +171,14 @@ that guideline, a third-party AI bot. The request to C&IT presents it as what it
   run by typing the command in the portal's own shell. That follows the published grid policy (no
   more than 20 processes on Warrior;
   the login node is for job submission, status and transfers), not a new instruction.
+- From framework 9 the student's Claude Code inside the worker can submit, follow and cancel the
+  student's own jobs, through the host's own Slurm client bound into the container on the compute
+  node (read-only, but for the munge socket); none of it touches `warrior`. A job submitted that way is an ordinary job of the
+  student's account, under the same partitions, QoS and limits, runs outside the container and
+  outlives the worker. In the default permission mode the student approves each command in the
+  Remote Control interface, and the guide the framework writes into the workspace tells Claude Code
+  to follow a job at most once a minute, to cancel only its own jobs by id and never the worker, and
+  to keep a container job's temp and cache on the node's local disk.
 - Scheduler-facing calls never faster than once a minute, and every job has a wall time. These two
   are the product's own etiquette, taken from the strictest published rules in the twelve-site
   sample (FASRC's once-a-minute rule, TACC's "every few minutes") and from the licence terms of
@@ -187,6 +240,15 @@ Already measured:
   findings a to c): the page script not injected into the already-open tab; a cold per-user web server
   answering "Server Error" once; a missing `.restricted` read as present because the Files app answers
   a missing download with a 200 HTML page.
+- 2026-09-30, the Slurm client inside the worker's container (framework 9): check job 40518457 on
+  `asx1` (`secp/secondary`, five minutes asked, not a worker), with the binds made as a worker makes
+  them. Inside the container `squeue -u go2432`, `sinfo -s`, `sacct -j 40518457 -X` and
+  `scancel --version` (`slurm 23.02.6`) worked, and `sbatch --test-only -p secp -q secondary` was
+  answered by the controller without submitting anything; `scontrol show job` failed on a missing
+  `libreadline.so.6` and is not offered since. Two changes made after that job (no `scontrol`, the
+  host's `LD_LIBRARY_PATH` in the wrappers) have not been run on the grid, nor has a real
+  submission by a worker's Claude Code (`framework/README.md`, "What was run on the Wayne State
+  grid").
 
 To collect, in this order (each maps to `OPEN_QUESTIONS.md`):
 
@@ -199,12 +261,12 @@ To collect, in this order (each maps to `OPEN_QUESTIONS.md`):
 | Requeue and `--continue` (Q4) | let the always-on chain run past one wall time (the successor runs `--continue` when `connection.json` is younger than 4 h, else registers afresh in the same environment); separately, `scontrol requeue` a live session | whether the transcript continues; whether the environment URL stays the same; elapsed time |
 | Bash tool `EACCES` and the `/dev/shm` XDG fix (Q5) | the probe's smoke test with and without the variable, once a sign-in exists | pass/fail each way |
 | `/rnode/` for compute nodes (Q6, remainder) | signed in on the VPN: `GET /rnode/asx1/1/` | 404 or 503 |
-| Firefox cookie behaviour (Q8, Firefox half) | the same GET from content script and background under strict ETP | carried or not |
 | User namespaces and `srun --overlap` on nodes (Q10, remainder) | the probe job's `--overlap` test | pass/fail |
 | Service-worker WebSocket lifetime (Q11) | an instrumented bootstrap held 90 s with pings only; and the sign-in sitting's idle behaviour above | which side closes, when |
 | Login-node footprint | `ps -u $USER` on `warrior` during a full run including the sign-in sitting; `find /tmp -user $USER` afterwards | process count peak (must stay far under 20); nothing under `/tmp` |
 | Portal request rate | the extension's audit log over one hour of monitoring | requests per minute to the scheduler-facing routes (must be at most one) and to Files |
 | Time to first prompt | from the icon click to a prompt answered on the phone | seconds, with the queue wait and the sign-in separated out |
+| A job submitted from inside a worker (framework 9) | from a Remote Control session, ask the worker's Claude Code to submit a one-minute job with `sbatch`, follow it and report its output | whether it submits; the new job's environment (the host's PATH, no `SLURM_` variable of the worker's but `SLURM_CONF`); that it runs on after the worker stops; how often `squeue` or `sacct` was called |
 | Usage-limit effect | the plan's usage indicator before and after a one-hour supervised session | what a student should expect to spend |
 
 Each result goes into the results column of `OPEN_QUESTIONS.md` with date, node and the raw line, and
