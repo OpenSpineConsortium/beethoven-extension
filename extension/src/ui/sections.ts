@@ -5,7 +5,7 @@ import { browser } from 'wxt/browser';
 import { ackSubject, makeAcknowledgement, PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Acknowledgement, type Statements } from '../core/disclosure';
 import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
 import { ACCESS_KEY, CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, PREFS_KEY, SERVICES_KEY, type Checklist, type IdentityNote, type PortalSettings, type Prefs } from '../core/keys';
-import { recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
+import { PRODUCT_NAME, recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
 import { writeConsentFile } from '../core/worker';
 import { accessFact, type AccessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
@@ -45,7 +45,7 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
   const input = el('input', { type: 'text', class: 'wide', placeholder: 'ondemand.your-university.edu', 'aria-label': 'Portal address' });
   const status = el('div', { class: 'status', role: 'status' });
   add(box,
-    el('p', {}, 'Ashley Bridge works with one website: your Open OnDemand portal (its only other requests are the approval check and the daily list, section 2 above). The usual way in: open the portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site. Or type its address here.'),
+    el('p', {}, `${PRODUCT_NAME} works with one website: your Open OnDemand portal (its only other requests are the approval check and the daily list, section 2 above). The usual way in: open the portal in a tab and click the ${PRODUCT_NAME} button there; the browser asks you to allow that one site. Or type its address here.`),
     el('div', { class: 'row' }, input, el('button', {
       text: 'Connect',
       onClick: () => {
@@ -60,7 +60,7 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
         const granting = requestOrigin(origin);
         connectPortal(origin, undefined, granting)
           .then((out) => {
-            notify('ok', `Connected ${out.settings.hostname}. Open it in a tab and click the Ashley Bridge button there.`);
+            notify('ok', `Connected ${out.settings.hostname}. Open it in a tab and click the ${PRODUCT_NAME} button there.`);
             onChange();
           })
           .catch((e) => {
@@ -140,7 +140,7 @@ export async function statementSection(onChange: () => void, opts: { compact?: b
     current = w;
     where.textContent = w.known ? `workspace on the cluster: ${w.path}` : `workspace on the cluster: ${w.path} (the exact path is read from the profile once the portal is connected and the tool installed)`;
     restrictedLine.className = w.restricted ? 'fail small' : 'muted small';
-    restrictedLine.textContent = w.restricted ? `This workspace is marked restricted: the worker will not start there. To lift the mark, remove ${w.markerPath ?? RESTRICTED_MARKER} yourself in the portal's Files app; Ashley Bridge never deletes anything.` : w.known ? 'Not marked restricted.' : '';
+    restrictedLine.textContent = w.restricted ? `This workspace is marked restricted: the worker will not start there. To lift the mark, remove ${w.markerPath ?? RESTRICTED_MARKER} yourself in the portal's Files app; ${PRODUCT_NAME} never deletes anything.` : w.known ? 'Not marked restricted.' : '';
     markButton.hidden = !w.known || w.restricted;
   };
   markButton.addEventListener('click', async () => {
@@ -205,7 +205,7 @@ export async function driveStep(onChange: () => void, compact = false): Promise<
     return box;
   }
   add(box,
-    el('p', {}, 'In claude.ai, open Settings, then Connectors, and connect Google Drive; that is how your worker sessions can read files you keep in Drive. Ashley Bridge only opens the page for you and runs nothing there.'),
+    el('p', {}, `In claude.ai, open Settings, then Connectors, and connect Google Drive; that is how your worker sessions can read files you keep in Drive. ${PRODUCT_NAME} only opens the page for you and runs nothing there.`),
     el('div', { class: 'row' }, open, el('label', { for: 'drive-done' }, tick, ' Done: Google Drive is connected in claude.ai'), done ? el('span', { class: 'ok small', text: `ticked ${list.drive_connected_at!.slice(0, 10)}` }) : el('span', { class: 'muted small', text: '(kept on this device only)' })),
   );
   return box;

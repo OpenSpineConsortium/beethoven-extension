@@ -78,7 +78,7 @@ export interface StartOutcome {
 export async function startWorker(portal: PortalApi, o: StartOpts): Promise<StartOutcome> {
   if (!ackCovers(o.ack, ackSubject(o.name))) throw new Error(`Before a start: read "Where your work goes" and make the data statement for worker "${o.name}".`);
   const ctx = await clusterContext(portal);
-  if (!ctx.profile) throw new Error('hpcworker is not installed yet (no ~/.hpcworker/profile.json): set up the cluster first.');
+  if (!ctx.profile) throw new Error('the tool is not installed yet on the cluster (it has no profile there): set up the cluster first.');
   const why = await restrictedReason(portal, ctx, o.name);
   if (why) throw new Error(`Not started: ${why}.`);
   let consentWritten = false;

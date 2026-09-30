@@ -8,8 +8,9 @@
 // before the connection is called unanswered. The browser API is passed in, so the sequence is
 // tested against a fake.
 import { siteFromHostname, type PortalSettings } from './keys';
+import { PRODUCT_NAME } from './terms';
 
-export const SCRIPT_ID = 'ashley-bridge-portal';
+export const SCRIPT_ID = 'beethoven-portal';
 export const SCRIPT_FILE = '/content-scripts/portal.js';
 
 export interface ConnectApi {
@@ -54,7 +55,7 @@ export function normaliseOrigin(input: string): string {
   if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
   const u = new URL(s);
   // never an Anthropic site: the extension has no business on claude.ai, claude.com or anthropic.com (STORE_LISTING.md)
-  if (/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/i.test(u.hostname)) throw new Error('that is an Anthropic address, not a portal: Ashley Bridge never connects to claude.ai, claude.com or anthropic.com');
+  if (/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/i.test(u.hostname)) throw new Error(`that is an Anthropic address, not a portal: ${PRODUCT_NAME} never connects to claude.ai, claude.com or anthropic.com`);
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(u.hostname))) throw new Error('the portal must be an https address');
   return u.origin;
 }

@@ -13,9 +13,10 @@
 //     "sig": "ASHLEYREV1.<base64url(JSON of the fields above, without sig)>.<base64url(Ed25519 signature)>"
 //   }
 // The signature is detached from the readable copy: `sig` is a complete ASHLEYREV1 token whose
-// payload repeats the fields, signed over "ASHLEYREV1.<payload part>" exactly like Ashley's
-// revocation list (grid/license.js signRevocationList), so the same issuing tool and the same
-// public key serve both. Since version 4 the list withdraws versions only: access to Ashley Bridge
+// payload repeats the fields, signed over "ASHLEYREV1.<payload part>" exactly like the revocation
+// list of the vendor's VS Code extension (grid/license.js signRevocationList), so the same issuing
+// tool and the same public key serve both; ASHLEYREV1 is that format's tag, which the issuing tool
+// and verifyKillList both check. Since version 4 the list withdraws versions only: access to Beethoven
 // is granted and withdrawn by Licensor's access service (access.ts), not by anything in this file.
 //
 // Fail-safe by design: a fetch that fails keeps the last good list; a signature that fails is
@@ -23,7 +24,7 @@
 // going offline must never strand a campus.
 import { open, REV_PREFIX, type KeyRing } from './signed';
 
-export const KILLLIST_URL = 'https://openspineconsortium.com/ashley/bridge-killlist.json';
+export const KILLLIST_URL = 'https://openspineconsortium.com/beethoven/killlist.json';
 /** how often the background asks (minutes); Chrome's alarms floor is irrelevant at this scale */
 export const KILLLIST_PERIOD_MINUTES = 24 * 60;
 

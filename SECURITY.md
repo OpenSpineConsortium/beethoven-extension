@@ -2,8 +2,8 @@
 
 ## Reporting
 
-Report a security problem in Ashley Bridge privately to the maintainer through the Ashley support page
-(`https://openspineconsortium.com/ashley/support.html`, which carries the notice address), not in a
+Report a security problem in Beethoven privately to the maintainer through the support page
+(`https://openspineconsortium.com/beethoven/support.html`, which carries the notice address), not in a
 public place. Say what you found, how to reproduce it, and what you think it exposes. You will get an
 acknowledgement within five working days and a fix or a plan within thirty. Good-faith research within
 the law (including 17 U.S.C. 1201(j) and the security-research exemption in 37 C.F.R. 201.40) is
@@ -107,7 +107,7 @@ Extension:
 
 Cluster side:
 
-- Ashley Bridge never reads, stores, copies, prints or relays a Claude credential. The student signs in
+- Beethoven never reads, stores, copies, prints or relays a Claude credential. The student signs in
   with `claude auth login` on a compute node; the framework starts Claude Code where that credential is
   and reads only `claude auth status`. Every credential variable (`CLAUDE_CODE_OAUTH_TOKEN`,
   `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, the file-descriptor variants) is
@@ -154,13 +154,13 @@ Release pipeline and keys:
 - **2026-09-28, 22:34 local, Wayne State grid.** The student's whole `~/.ashley` folder was deleted
   while a Remote Control session spawned from the phone was open; the Claude Code login inside
   `~/.ashley/claude` was lost with it, and the open session stopped making progress. Which process
-  deleted the folder is not established from the files that remain. Nothing in Ashley Bridge should
+  deleted the folder is not established from the files that remain. Nothing in Beethoven should
   ever be able to do this, so two rules were added the same night and now stand in the controls above:
   the framework deletes nothing outside its own run directories and node-local temp, and a destructive
   subcommand refuses from an agent context or without a terminal. The login is redone with
   `hpcworker claude login`.
 
-## What Ashley Bridge holds, and where
+## What Beethoven holds, and where
 
 - In the browser: portal hostname and granted origin, preferences, the account name the portal's
   dashboard showed and the last approval answer with its time, the access service's address, the
@@ -179,7 +179,7 @@ Release pipeline and keys:
   `connection.json` (the session name and its claude.ai link), `rc.log`, the per-job token (0600), the
   successor job's id and the stop file, the consent marker `~/.hpcworker/consent` (one line: yes, the
   time, the browser's random installation identifier), and Claude Code's own sign-in (written by
-  Claude Code, never read by Ashley Bridge). On a compute node, for a sign-in sitting only: the
+  Claude Code, never read by Beethoven). On a compute node, for a sign-in sitting only: the
   sitting's transcript under `/dev/shm`, mode 0600, removed with the sitting.
 - With the maintainer: the access record (the account name, name and e-mail given on the request
   page, the approval and withdrawal decisions with their dates) and one line per approval check from

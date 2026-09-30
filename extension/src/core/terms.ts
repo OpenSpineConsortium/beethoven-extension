@@ -1,6 +1,6 @@
 // The acceptance record for the licence terms: what was shown, what was ticked, who signed, when.
-// Ported from Ashley's core/terms.ts; the mechanism is the same, the surface is a browser
-// extension page and the record lives in storage.local.
+// Ported from the vendor's VS Code extension (its core/terms.ts); the mechanism is the same, the
+// surface is a browser extension page and the record lives in storage.local.
 //
 // Why so much detail: the cases that enforce click-through terms turn on what the screen said and
 // what the click meant (Berman, Chabolla, Sellers, Kauders, In re StockX). The vendor bears that
@@ -15,9 +15,9 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-framework.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 5;
+export const TERMS_VERSION = 6;
 export const TERMS_DATE = '2026-09-29';
-export const PRODUCT_NAME = 'Ashley Bridge';
+export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Accept and Continue';
 export const EDITION = 'trial';

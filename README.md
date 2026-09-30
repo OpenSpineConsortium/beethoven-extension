@@ -1,6 +1,15 @@
-# Ashley Bridge (working name)
+# Beethoven (code name Ashley Bridge)
 
-Ashley Bridge puts a student's own Claude Code session, running as an ordinary batch job on their
+The public name is **Beethoven** (decided 2026-09-29): the extension, its store listings, its pages at
+`https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a reviewer sees
+say Beethoven, and it is not an Anthropic product. The repository and its code name stay Ashley Bridge,
+and a few internal names stay with them because changing them would break something or show nothing:
+the kill-list's format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster
+(never shown to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the
+extension sends to the access service. The name lives in one constant per place: `PRODUCT_NAME` in
+`extension/src/core/terms.ts` and the site map in the site repository's `tools/build_site.py`.
+
+Beethoven puts a student's own Claude Code session, running as an ordinary batch job on their
 university's cluster, inside claude.ai and the Claude phone app. It does this with a feature Anthropic
 already ships to Pro and Max subscribers, Claude Code Remote Control: the `claude` process in the job
 registers with Anthropic over outbound HTTPS and polls for work, and claude.ai/code or the app becomes
@@ -42,7 +51,7 @@ claude.ai/code, Claude app  ◀════════════════ 
   (sees the session by name;                                                                  ▲ registers,
    transcript stored while connected)                                                          │ polls for work
                                                                                                │
-Ashley Bridge extension ──▶ https://ondemand.<university>.edu ──▶ login node ──sbatch──▶ compute node (Slurm job)
+Beethoven extension     ──▶ https://ondemand.<university>.edu ──▶ login node ──sbatch──▶ compute node (Slurm job)
   (one origin, one            │ Shell WebSocket: one sbatch, then close;      (nothing else)   tmux ▶ apptainer exec
    content script;            │   once, held open for the sign-in sitting                      ▶ claude remote-control
    the icon runs the steps)   │ Files JSON: list, then read status.json, rc.log                 writes status.json,
@@ -57,7 +66,7 @@ the portal shows is approved; if it is not, the panel's one button is *Ask for a
 
 1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
    university requires it) and keep the tab open.
-2. **Click the Ashley Bridge icon.** The first click asks the browser once for access to that one
+2. **Click the Beethoven icon.** The first click asks the browser once for access to that one
    site. Then the extension does the rest by itself, in order, and says in one line what it is doing:
    wakes the portal up, checks it is signed in, confirms your account is approved, sets the
    framework up in your account if it is not there (pointing your account at the lab's shared copy
@@ -160,11 +169,12 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 6.0.0 (4.0.0 was the first version without licence keys;
-6.0.0 sets up the lab's shared copy of the framework where a site has one); the framework's `VERSION`
-file is 5; the agreement `LICENSE.txt` is version 4 and the extension's
-`TERMS_VERSION` (`extension/src/core/terms.ts`) is 4 to match; `PRIVACY.md` is version 5. All
-integers; a changed text moves its version with it.
+Versions in this tree: the extension is 7.0.0 (4.0.0 was the first version without licence keys;
+6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
+Beethoven, with new public addresses and nothing new about data); the framework's `VERSION` file is 6, and the lab's shared copy at Wayne State is v6;
+the agreement `LICENSE.txt` is version 6 and the extension's `TERMS_VERSION`
+(`extension/src/core/terms.ts`) is 6 to match; `PRIVACY.md` is version 7. All integers; a changed text
+moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -188,7 +198,7 @@ npm ci                 # pinned versions from package-lock.json
 npm run typecheck      # tsc --noEmit
 npm test               # vitest: 130+ tests, starts the mock portal itself
 npm run build          # -> .output/chrome-mv3 (Chrome, Edge) and .output/firefox-mv2 (Firefox)
-npm run zip:all        # -> .output/ashley-bridge-<version>-{chrome,firefox,edge,safari}.zip + -sources.zip
+npm run zip:all        # -> .output/beethoven-<version>-{chrome,firefox,edge,safari}.zip + -sources.zip
 ```
 
 `npm run build` first runs `scripts/sync-framework.mjs`, which copies `../framework/`, `../LICENSE.txt`
@@ -227,13 +237,15 @@ new terminal finds `hpcworker`; a terminal opened before the install needs
 lab's group `oschome` in both cases: the image, the shared copy and the state directory are all on the
 group's volume, which others cannot enter (`docs/OPEN_QUESTIONS.md`).
 
-**Site pages.** `python3 tools/site_bridge_build.py` renders the privacy statement and the agreement into
-the website checkout expected beside this repository (`../openspineconsortium.github.io/ashley/bridge/`)
-and checks that every word of the source texts is on the page; `--check-only` verifies without writing.
+**Site pages.** The website generates its own pages, the Beethoven ones included: run
+`python -X utf8 tools/build_site.py` in `../openspineconsortium.github.io` after changing
+`LICENSE.txt`, `PRIVACY.md` or a release, then publish the site (`docs/PUBLISHING_SITE.md`).
 
 **Access service.** The approval check the extension makes is served by the Cloudflare Worker in the
 `ashley` repository (`tools/intake/worker.js`, contract in `tools/intake/ACCESS_CHECK.md`); it is deployed
-from there, not from here.
+from there, not from here, under two names with the same code, stores and secrets:
+`beethoven-access.openspineconsortium.workers.dev` for 7.0.0 and later, and the old
+`ashley-service.openspineconsortium.workers.dev` for the VS Code product and builds 4.0.0 to 6.0.0.
 
 **Releasing a version.**
 
@@ -269,12 +281,16 @@ from there, not from here.
   live-portal findings of 2026-09-29.
 - `docs/STORE_LISTING.md`: single-purpose statement, permission justifications, privacy answers per
   store, reviewer access, the 13-item checklist.
+- `docs/store/`: the texts to paste into each store (`LISTING.md`), the submission steps
+  (`SUBMISSION.md`) and the hand test before upload (`TEST_BEFORE_UPLOAD.md`).
+- `docs/PUBLISHING_SITE.md`: the public pages, the services file and the kill-list, how they are built,
+  signed and checked, and what stays at the old addresses.
 - `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
 - `docs/MAC_AND_SAFARI.md`: what the Safari edition needs.
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; nothing to paste.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 4; the extension's
-  `TERMS_VERSION` is 4) and the privacy statement (version 5).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 6; the extension's
+  `TERMS_VERSION` is 6) and the privacy statement (version 7).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

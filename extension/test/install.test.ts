@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { classifyCommand } from '../src/core/audit';
 import { commands, paths, sharedInstallFrom, sharedRootOf } from '../src/core/contract';
-import { bundledSharedInstall, installFailureWords, installFramework, installNoteOf, sharedUnusable, toolWords } from '../src/core/install';
+import { bundledSharedInstall, hideSharedPath, installFailureWords, installFramework, installNoteOf, LAB_COPY, sharedUnusable, toolWords } from '../src/core/install';
 import type { PortalApi } from '../src/core/portal';
 
 const HOME = '/wsu/home/ab/ab12/ab1234';
@@ -119,8 +119,11 @@ describe('installing', () => {
     expect(dirs).toEqual([]);
     expect(r).toMatchObject({ ok: true, exitCode: 0, uploaded: 0, mode: 'shared', sharedDir: WAYNE_SHARED });
     expect(r.note).toBeUndefined();
-    expect(r.log).toContain(`running: ${EXACT}`);
-    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toEqual({ attempted_at: '2026-09-29T20:00:00.000Z', ok: true, detail: `exit 0, your lab's shared copy at ${WAYNE_SHARED}`, mode: 'shared', dir: WAYNE_SHARED });
+    // the line typed is the exact command; what the log shows names the folder in words, never by its path
+    expect(r.log).toContain("running the install of the lab's shared copy, one line through the portal's shell");
+    expect(r.log).toContain('installed: this account uses the shared copy of hpcworker 5 (nothing copied)');
+    expect(r.log).not.toContain('/rs/rs_grp_oschome/shared');
+    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toEqual({ attempted_at: '2026-09-29T20:00:00.000Z', ok: true, detail: "exit 0, the lab's shared copy", mode: 'shared', dir: WAYNE_SHARED });
   });
 
   it("falls back to the student's own copy when bash cannot open the shared launcher, waiting out the shell clock between the two lines", async () => {
@@ -131,14 +134,17 @@ describe('installing', () => {
     expect(writes).toEqual([`${HOME}/.hpcworker/bin/hpcworker`, `${HOME}/.hpcworker/VERSION`, `${HOME}/.hpcworker/profiles/wayne.json`]);
     expect(slept).toEqual([9_250]);
     expect(r).toMatchObject({ ok: true, mode: 'own', uploaded: 3, sharedDir: WAYNE_SHARED });
-    expect(r.note).toBe(`Your lab's shared copy of the tool at ${WAYNE_SHARED} could not be used from your account: your account may not read it. The tool was put in your own account instead.`);
+    expect(r.note).toBe("Your lab's shared copy of the tool could not be used from your account: your account may not read it. The tool was put in your own account instead.");
+    expect(r.log).toContain(`bash: ${LAB_COPY}: Permission denied`);
     const note = installNoteOf(r, new Date('2026-09-29T20:00:00Z'));
     expect(note).toMatchObject({ ok: true, mode: 'own', dir: WAYNE_SHARED, note: r.note, detail: 'exit 0, 3 file(s) uploaded' });
     // the same when the tool itself refused the folder (exit 3), with its reason in the note
     const refused = fakePortal([{ exitCode: 3, output: `hpcworker: the shared copy at ${WAYNE_SHARED} cannot be used from this account: it has no readable VERSION file. Nothing was changed.` }, { exitCode: 0, output: '' }]);
     const r2 = await installFramework(refused.p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
     expect(r2).toMatchObject({ ok: true, mode: 'own' });
-    expect(r2.note).toBe(`Your lab's shared copy of the tool at ${WAYNE_SHARED} could not be used from your account: it has no readable VERSION file. The tool was put in your own account instead.`);
+    expect(r2.note).toBe("Your lab's shared copy of the tool could not be used from your account: it has no readable VERSION file. The tool was put in your own account instead.");
+    expect(r2.log).toContain('hpcworker: the shared copy cannot be used from this account: it has no readable VERSION file.');
+    expect(r2.log).not.toContain('/rs/rs_grp_oschome/shared');
     expect(refused.shells).toHaveLength(2);
   });
 
@@ -166,14 +172,34 @@ describe('the tool line under Details', () => {
   it('says which copy runs, and for an own copy at a site with a shared one, why or how to move', () => {
     expect(toolWords(undefined)).toEqual([]);
     expect(toolWords({})).toEqual([]);
-    expect(toolWords({ installed: false, sharedRoot: WAYNE_SHARED })).toEqual([`tool: not set up yet; your lab keeps a shared copy at ${WAYNE_SHARED}`]);
-    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '5' } })).toEqual([`tool: shared copy, version 5 at ${WAYNE_SHARED}`]);
-    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, unreadable: "the portal's Files app could not read its VERSION file (403)" } })[0]).toBe(`tool: shared copy, version unknown at ${WAYNE_SHARED} (the portal's Files app could not read its VERSION file (403))`);
-    expect(toolWords({ installed: true, version: '5' })).toEqual(['tool: your copy, version 5']);
-    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED })).toEqual(['tool: your copy, version 5', `Your lab keeps a shared copy at ${WAYNE_SHARED}; "Set up the cluster again" moves your account to it.`]);
+    expect(toolWords({ installed: false, sharedRoot: WAYNE_SHARED })).toEqual(['tool: not set up yet; your lab keeps a shared copy']);
+    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '6' } })).toEqual(["tool: the lab's shared copy, version 6"]);
+    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, unreadable: "the portal's Files app could not read its VERSION file (403)" } })[0]).toBe("tool: the lab's shared copy, version unknown (the portal's Files app could not read its VERSION file (403))");
+    // the Files app's own error names the file it could not read; the line names the folder in words
+    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, unreadable: `the portal's Files app could not read its VERSION file (could not read ${WAYNE_SHARED}/VERSION (403))` } })[0]).toBe("tool: the lab's shared copy, version unknown (the portal's Files app could not read its VERSION file (could not read the lab's shared copy (403)))");
+    expect(toolWords({ installed: true, version: '5' })).toEqual(['tool: your own copy, version 5']);
+    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED })).toEqual(['tool: your own copy, version 5', 'Your lab keeps a shared copy; "Set up the cluster again" moves your account to it.']);
     const note = { attempted_at: 'x', ok: true, detail: 'exit 0', mode: 'own' as const, dir: WAYNE_SHARED, note: 'could not be used' };
-    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED }, note)).toEqual(['tool: your copy, version 5', 'could not be used']);
+    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED }, note)).toEqual(['tool: your own copy, version 5', 'could not be used']);
+    // no line names a path
+    for (const i of [{ installed: false, sharedRoot: WAYNE_SHARED }, { installed: true, shared: { dir: WAYNE_SHARED, version: '6' } }, { installed: true, version: '5', sharedRoot: WAYNE_SHARED }]) {
+      for (const line of toolWords(i)) expect(line).not.toMatch(/\/rs\/|\/shared\//);
+    }
     // once the account runs the shared copy, an old fallback note is history and is not shown
     expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '5' } }, note)).toHaveLength(1);
+  });
+});
+
+describe("the lab's folder in words", () => {
+  it('drops the path after "shared copy ... at", names any other path under the folder in words, and leaves the home alone', () => {
+    expect(hideSharedPath(`installed: this account uses the shared copy of hpcworker 6 at ${WAYNE_SHARED} (nothing copied into ${HOME}/.hpcworker)`, WAYNE_SHARED)).toBe(`installed: this account uses the shared copy of hpcworker 6 (nothing copied into ${HOME}/.hpcworker)`);
+    // the numbered copy beside `current` sits under the same parent
+    expect(hideSharedPath(`6 (shared copy at ${WAYNE_SHARED.replace(/current$/, 'v6')})`, WAYNE_SHARED)).toBe('6 (shared copy)');
+    expect(hideSharedPath(EXACT, WAYNE_SHARED)).toBe(`bash ${LAB_COPY} install --shared ${LAB_COPY} --profile 'wayne'`);
+    expect(hideSharedPath(`bash: ${WAYNE_SHARED}/bin/hpcworker: No such file or directory`, WAYNE_SHARED)).toBe(`bash: ${LAB_COPY}: No such file or directory`);
+    // a folder whose name only begins like the parent's is another folder
+    const sibling = `${WAYNE_SHARED.replace(/\/current$/, 'X')}/y stays`;
+    expect(hideSharedPath(sibling, WAYNE_SHARED)).toBe(sibling);
+    expect(hideSharedPath('nothing to hide here', undefined)).toBe('nothing to hide here');
   });
 });

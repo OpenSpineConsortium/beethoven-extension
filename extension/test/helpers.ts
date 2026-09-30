@@ -1,4 +1,4 @@
-// Test helpers: a signer that signs exactly as Ashley's grid/license.js does (so the kill-list tests
+// Test helpers: a signer that signs exactly as the vendor's issuing tool (grid/license.js) does (so the kill-list tests
 // need no vendor key), an in-memory KV, and a cookie-carrying network layer for the mock portal.
 import { createPrivateKey, generateKeyPairSync, sign as nodeSign, type KeyObject } from 'node:crypto';
 import WsWebSocket from 'ws';

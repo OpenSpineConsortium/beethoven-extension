@@ -1,4 +1,6 @@
-# Ashley Bridge: architecture
+# Beethoven: architecture
+
+Public name Beethoven since 7.0.0; the repository and its code name stay Ashley Bridge (`CLAUDE.md`).
 
 Distilled from the research report's "Build specification for the week of 28 September 2026"
 (`RESEARCH_REPORT.md`). Where this document and the report differ, the report governs; where the
@@ -38,7 +40,7 @@ extension 5.0.0: the lab's shared copy of the framework (2.1).
 | Framework (`framework/`, `hpcworker`) | Shell plus Python kept once per site in the lab's shared directory, or copied into the student's home where there is none (2.1): site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job, the sign-in sitting | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix; the plain sign-in sitting and its line contract (4.1) |
 | Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.ashley/claude` on Wayne State) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
 | Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The Ed25519 token verifier (`grid/license.js` `open()`, `ASHLEYREV1` tokens, public keys `k1` and `trial`), used for the signed kill-list only since 4.0.0 (Bridge has no licence keys); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
-| Access service | The vendor's access service (the Cloudflare Worker behind Ashley's request page) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/ashley/services.json`, body `{v, access_id, portal, product, version}`), from the same approved list the admin console manages for Ashley; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
+| Access service | The vendor's access service (the Cloudflare Worker behind the request page, deployed from the sibling `ashley` repository under two names with the same code, stores and secrets: `beethoven-access.openspineconsortium.workers.dev`, which 7.0.0 uses, and the old `ashley-service.openspineconsortium.workers.dev` for the VS Code product and builds 4.0.0 to 6.0.0) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/beethoven/services.json`, body `{v, access_id, portal, product, version}`, where `product` stays `bridge`), from the same approved list the admin console manages for the VS Code product; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
 
 Two things are deliberately absent (report, "Components and what each reuses"): any code on claude.ai
@@ -211,8 +213,12 @@ line under *Details*; any other failure is reported and not worked around. After
 a folder they read that folder's `VERSION` through the Files app in a guarded read of its own, so a
 403 or 500 there (what a student outside the lab's group, or a Files app that does not serve the lab's
 volume, would get) does not make the portal look asleep. A shared copy is never "outdated" against the
-one the extension carries: the lab's copy is the one that counts, and *Details* says "tool: shared
-copy, version N at <dir>". A student's own copy at a site that has a shared one is moved to the shared
+one the extension carries: the lab's copy is the one that counts, and *Details* says "the lab's
+shared copy, version N" (or "your own copy, version N"); since 7.0.0 the panel's own sentences and the
+check results name neither the shared copy's cluster path nor the tool's command name. Three places
+still show them, as records: the output boxes (the tool's output as it prints it), the terminal of the
+sign-in sitting, and the audit log's endpoints (at Wayne State every look at the cluster lists the
+Files read of the shared copy's `VERSION` with its full path; run F in `extension/store-assets/e2e/`). A student's own copy at a site that has a shared one is moved to the shared
 copy, not updated, when it is older than the copy the extension carries, and *Set up the cluster
 again* moves it at any time; the strip does not try the move while it knows a worker is running, and
 when the tool refuses because a worker still runs from the own copy, the step asks the student to
@@ -632,8 +638,8 @@ milliseconds. Messages are accepted only after checking `sender.id`.
 
 ### 6.1 The icon click, the strip and the step machine, the panel and the options page
 
-**The click.** The manifest's `action` has no `default_popup` (`action: { default_title: 'Ashley
-Bridge' }` in `wxt.config.ts`), so a left click on the toolbar icon fires `action.onClicked`
+**The click.** The manifest's `action` has no `default_popup` (`action: { default_title: 'Beethoven' }`
+in `wxt.config.ts`), so a left click on the toolbar icon fires `action.onClicked`
 (`browserAction.onClicked` in the Firefox MV2 build) in the background (`onActionClicked` in
 `entrypoints/background.ts`). The handler does everything that needs the gesture before its first
 `await`: it opens the panel (`sidePanel.open({tabId})` on Chrome and Edge, `sidebarAction.open()` on
@@ -643,8 +649,8 @@ Firefox, a tab with the panel page on Safari or when either refuses), reads the 
 hostname already connected), notes it (`bridge.click`), and, when it does, calls
 `permissions.request` for that one origin and hands the promise to the connect sequence, which
 registers the page script, loads it into the tab and pings it. When the clicked tab is not a portal
-and none is connected, the strip says "Open your Open OnDemand portal in a tab and click the Ashley
-Bridge button there" and offers the setup page; when a portal is connected, the strip uses the
+and none is connected, the strip says "Open your Open OnDemand portal in a tab and click the Beethoven
+button there" and offers the setup page; when a portal is connected, the strip uses the
 remembered portal tab. On install the options page (the setup page) opens, not a separate onboarding
 tab; the same page is reachable from the browser's extension menu and from the strip.
 
@@ -723,11 +729,11 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 | | `sidePanel` (Chrome/Edge only) | Opens the job monitor beside your portal tab when you click the icon |
 | `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab; access is requested at that click for that one origin only, and the extension refuses to work until it is granted |
 | `host_permissions` | none | |
-| `action` / `browser_action` | `{ default_title: "Ashley Bridge" }`, no `default_popup` | a click runs the steps and opens the panel |
+| `action` / `browser_action` | `{ default_title: "Beethoven" }`, no `default_popup` | a click runs the steps and opens the panel |
 | `options_ui` | the setup page | the agreement, the portal by address, the statement, the settings, the audit log, the Drive step |
 | never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger`, `identity`, `clipboardRead`, any `claude.ai`, `anthropic.com` or `claude.com` origin | stated in the negative in the listing and the privacy policy |
 | `minimum_chrome_version` | `"148"` | `browser.*` namespace, Promise-returning `onMessage` |
-| `browser_specific_settings.gecko` | `id`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }` | the approval check sends the institutional account name the portal shows (with the portal hostname, product and version); no crash reports and no usage data |
+| `browser_specific_settings.gecko` | `id` `beethoven@openspineconsortium.com`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }` | the approval check sends the institutional account name the portal shows (with the portal hostname, product and version); no crash reports and no usage data |
 | `content_security_policy` | MV3 default; no remote script sources | remote code: no |
 | Firefox target | `firefox-mv2` or `firefox-mv3` with alarms | Firefox still accepts MV2 |
 

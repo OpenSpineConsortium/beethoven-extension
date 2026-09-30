@@ -1,8 +1,8 @@
 // Anything token-shaped is replaced before it reaches the audit log, a message, or the screen.
 // The shell's CSRF token travels in a query string, a signed token (the kill-list's signature, or
-// an old Ashley token someone pastes into a shell) is a long base64url run, and a command's output
-// can contain whatever the student's shell printed; none of it belongs in a record the student may
-// export and send to someone.
+// a token of the vendor's VS Code extension someone pastes into a shell) is a long base64url run,
+// and a command's output can contain whatever the student's shell printed; none of it belongs in a
+// record the student may export and send to someone.
 const RULES: Array<[RegExp, string]> = [
   [/(csrf=)[^&\s"']+/gi, '$1[redacted]'],
   [/ASHLEY(?:REV)?1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[signed-token]'],

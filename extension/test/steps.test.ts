@@ -8,7 +8,7 @@ import { CONSENT_PATIENCE_MS, decide, FRESH_RUN_MS, LOGIN_RECHECK_PATIENCE_MS, L
 import type { AccessFact } from '../src/licensing/access';
 
 const NOW = Date.parse('2026-09-29T12:00:00Z');
-const REQUEST = 'https://openspineconsortium.com/ashley/request.html?access_id=ab1234';
+const REQUEST = 'https://openspineconsortium.com/beethoven/request.html?access_id=ab1234';
 
 /** an access fact as licensing/access.ts accessFact builds it, for one state */
 function access(state: AccessFact['state'], over: Partial<AccessFact> = {}): AccessFact {
@@ -110,9 +110,9 @@ describe('the step machine', () => {
     const denied = decide(f, NOW);
     same(denied, { step: 'access', primary: { label: 'Ask for access', action: 'ask-access' }, input: undefined, auto: undefined, tone: 'info' });
     expect(denied.status).toMatch(/ab1234 at ood\.example is not on the approved list yet/);
-    expect(denied.status).toMatch(/click the Ashley Bridge button again/);
+    expect(denied.status).toMatch(/click the Beethoven button again/);
     // withdrawn: said as such, with "ask again"
-    f.access = access('withdrawn', { detail: 'Access withdrawn: ask again if you still need Ashley Bridge (your account ab1234 at ood.example is no longer on the approved list; checked 2026-09-29 11:50 UTC)' });
+    f.access = access('withdrawn', { detail: 'Access withdrawn: ask again if you still need Beethoven (your account ab1234 at ood.example is no longer on the approved list; checked 2026-09-29 11:50 UTC)' });
     const withdrawn = decide(f, NOW);
     same(withdrawn, { step: 'access', primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
     expect(withdrawn.status).toMatch(/^Access withdrawn: ask again/);
@@ -128,7 +128,7 @@ describe('the step machine', () => {
     same(noId, { step: 'access', primary: { action: 'retry-access' }, tone: 'fail' });
     expect(noId.status).toMatch(/does not show who is signed in/);
     // a withdrawn version: no button, nothing automatic
-    f.access = access('version-revoked', { detail: 'This version of Ashley Bridge has been withdrawn; update to continue.' });
+    f.access = access('version-revoked', { detail: 'This version of Beethoven has been withdrawn; update to continue.' });
     same(decide(f, NOW), { step: 'access', primary: undefined, auto: undefined, tone: 'fail' });
     // an approval past its day but within seven: the strip goes on (the background re-asks quietly)
     f.access = access('stale', { needsCheck: true });

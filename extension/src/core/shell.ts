@@ -12,7 +12,7 @@
 // is the student's only shell).
 import type { PortalNet, WsLike } from './net';
 
-/** control sequences and carriage returns, as Ashley's phone.js strips them */
+/** control sequences and carriage returns, as the vendor's phone host (phone.js) strips them */
 export const ANSI = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b[()][A-Za-z0-9]|\r/g;
 
 export function clean(s: string): string {

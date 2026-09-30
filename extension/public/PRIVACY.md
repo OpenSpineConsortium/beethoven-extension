@@ -1,19 +1,19 @@
-# Ashley Bridge privacy statement
+# Beethoven privacy statement
 
-Version 6, 2026-09-29. Part of the Ashley Bridge Trial Edition License Agreement (LICENSE.txt) and of
-any Full Edition agreement that names it. You can save and print this text; it is also on the Ashley
-support page.
+Version 7, 2026-09-29. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+any Full Edition agreement that names it. You can save and print this text; it is also at
+`https://openspineconsortium.com/beethoven/privacy.html`.
 
-Who collects: Gregory Schwing, trading as OpenSpineConsortium ("Licensor"), the maintainer of Ashley
-Bridge. Questions and requests: the notice address on the Ashley support page. Ashley Bridge is
-licensed to individuals; it is not provided by or on behalf of any school, and Licensor is not acting
-for one.
+Who collects: Gregory Schwing, trading as OpenSpineConsortium ("Licensor"), the maintainer of
+Beethoven. Questions and requests: the notice address on the support page at
+`https://openspineconsortium.com/beethoven/support.html`. Beethoven is licensed to individuals; it
+is not provided by or on behalf of any school, and Licensor is not acting for one.
 
-Ashley Bridge is a browser extension that starts, watches and stops a job in your own cluster account
-through your university's Open OnDemand portal, and a set of scripts (the framework) that runs in that account.
-The job runs Claude Code, which you signed in to yourself. This statement says what stays in your
-browser, what your portal sees, what happens when you sign in to Claude, what Anthropic receives, what
-Licensor receives, and what is never collected.
+Beethoven is a browser extension that starts, watches and stops a job in your own cluster account
+through your university's Open OnDemand portal, and a set of scripts (the framework) that runs in
+that account. The job runs Claude Code, which you signed in to yourself. This statement says what
+stays in your browser, what your portal sees, what happens when you sign in to Claude, what
+Anthropic receives, what Licensor receives, and what is never collected.
 
 ## What stays in your browser
 
@@ -34,10 +34,10 @@ Licensor receives, and what is never collected.
 There is no durable secret in the extension's storage, and there is no key: your own sign-in to your
 portal identifies you. The extension never reads your portal's sign-in cookie: your browser attaches
 it to requests to that one website, as it does for the portal's own pages. The one thing it reads
-about you from the portal is the account name the portal's own dashboard page shows for your session;
-there is nowhere to type a different one. The extension never reads, stores, copies or relays a
-Claude credential: Claude Code keeps its own sign-in in your cluster account, and the framework reads
-only Claude Code's yes-or-no answer about whether it is signed in.
+about you from the portal is the account name the portal's own dashboard page shows for your
+session; there is nowhere to type a different one. The extension never reads, stores, copies or
+relays a Claude credential: Claude Code keeps its own sign-in in your cluster account, and the
+framework reads only Claude Code's yes-or-no answer about whether it is signed in.
 
 ## What goes to your own cluster account
 
@@ -46,30 +46,28 @@ read, and the job's status files. Where your university's lab keeps one shared c
 on the cluster, the scripts are not copied into your account: a small launcher that runs the shared
 copy, and a one-line note of where that copy is, take their place. Either way, the install adds a
 marked block of a few lines to `~/.bashrc` so that a terminal finds the tool. Nothing about your
-approval goes there. When you make the statement above for a worker,
-the extension also writes one small file in your account (the framework's own marker,
-`~/.hpcworker/consent`), one line: the word yes, the time, and the random installation identifier
-from your browser. Your worker gives that answer to Claude Code when Claude Code asks its one-time
-question "Enable Remote Control?", and after the first session Claude Code's own record of your answer
-takes over. Everything there is in your own account under your institution's rules; Licensor has no
-access to it.
+approval goes there. When you make the statement above for a worker, the extension also writes one
+small file in your account (the framework's own marker, `~/.hpcworker/consent`), one line: the word
+yes, the time, and the random installation identifier from your browser. Your worker gives that
+answer to Claude Code when Claude Code asks its one-time question "Enable Remote Control?", and
+after the first session Claude Code's own record of your answer takes over. Everything there is in
+your own account under your institution's rules; Licensor has no access to it.
 
 ## What your portal sees
 
 The extension makes requests to your university's Open OnDemand portal, and only to it, using the
-sign-in your browser already holds: waking the portal's own web server up if it is asleep, opening the
-portal's shell once to submit a job and closing it, holding the shell open once for the sign-in
+sign-in your browser already holds: waking the portal's own web server up if it is asleep, opening
+the portal's shell once to submit a job and closing it, holding the shell open once for the sign-in
 sitting described below and closing it when the sitting ends, listing and reading files in your own
 account through the portal's Files app (and, where your lab keeps a shared copy of the framework,
 reading that copy's version number) and writing the framework's files (unless the shared copy is
-used) and the marker there, listing
-your jobs, and cancelling a job when you ask. Your institution's logs record those requests as they
-record any use of the portal; the shell's page token appears in the portal's access log, as it does
-when you open the shell yourself. The extension never signs in for you and never touches a
-multi-factor step. It reads no other website and makes no request to claude.ai. When it opens a
-claude.ai page (your session's link when your worker connects, or the connectors page from the
-optional step) or Anthropic's sign-in page, it opens it in a new browser tab, as a bookmark would, and
-runs nothing there.
+used) and the marker there, listing your jobs, and cancelling a job when you ask. Your institution's
+logs record those requests as they record any use of the portal; the shell's page token appears in
+the portal's access log, as it does when you open the shell yourself. The extension never signs in
+for you and never touches a multi-factor step. It reads no other website and makes no request to
+claude.ai. When it opens a claude.ai page (your session's link when your worker connects, or the
+connectors page from the optional step) or Anthropic's sign-in page, it opens it in a new browser
+tab, as a bookmark would, and runs nothing there.
 
 ## What happens when you sign in to Claude
 
@@ -80,26 +78,26 @@ Anthropic's sign-in page, that it is waiting for the code, and Claude Code's own
 afterwards with the account and plan it reports), opens the sign-in page in a new tab, and shows you
 one box. Claude Code's own screen is never sent to your browser: it stays in a temporary file on the
 compute node that only you can read and that is removed when the sitting ends. You sign in on
-Anthropic's page with your own account, click *Authorize*, and paste the code the page shows into that
-box. The extension types the code once into the sitting on your cluster, through the same portal
-connection, and then forgets it: the code is not kept in any storage, not written to the audit log
-(which records only how many bytes were typed) and not sent to Licensor or anywhere else; on the
-compute node it is passed to Claude Code without being echoed. The extension never reads the sign-in
-page, never reads your clipboard, and never sees the credential Claude Code makes from the code; that
-credential stays in Claude Code's own folder in your cluster account. The sitting ends by itself
-within ten minutes of starting on the compute node, and the wait for a compute node is bounded too
-(the extension closes the connection after fifteen minutes at the latest); if it ends without a
-sign-in, nothing is kept and you can start it again.
+Anthropic's page with your own account, click *Authorize*, and paste the code the page shows into
+that box. The extension types the code once into the sitting on your cluster, through the same
+portal connection, and then forgets it: the code is not kept in any storage, not written to the
+audit log (which records only how many bytes were typed) and not sent to Licensor or anywhere else;
+on the compute node it is passed to Claude Code without being echoed. The extension never reads the
+sign-in page, never reads your clipboard, and never sees the credential Claude Code makes from the
+code; that credential stays in Claude Code's own folder in your cluster account. The sitting ends by
+itself within ten minutes of starting on the compute node, and the wait for a compute node is
+bounded too (the extension closes the connection after fifteen minutes at the latest); if it ends
+without a sign-in, nothing is kept and you can start it again.
 
 ## What Anthropic receives
 
-Through Claude Code, which you signed in to with your own account: your prompts, the files the worker
-reads, and every command's output. While you are connected through claude.ai or the Claude app, the
-session transcript, including your messages, Claude's responses and tool activity, is also stored on
-Anthropic's servers. On a personal plan Anthropic retains it five years if you have model training on
-and 30 days otherwise. No BAA covers a personal plan. Remote Control usage draws from your plan's shared
-limit. Anthropic's terms and privacy policy apply to that data, not this statement. The extension shows
-these facts before each job start.
+Through Claude Code, which you signed in to with your own account: your prompts, the files the
+worker reads, and every command's output. While you are connected through claude.ai or the Claude
+app, the session transcript, including your messages, Claude's responses and tool activity, is also
+stored on Anthropic's servers. On a personal plan Anthropic retains it five years if you have model
+training on and 30 days otherwise. No BAA covers a personal plan. Remote Control usage draws from
+your plan's shared limit. Anthropic's terms and privacy policy apply to that data, not this
+statement. The extension shows these facts before each job start.
 
 ## What Licensor receives
 
@@ -109,17 +107,17 @@ Licensor before you have accepted the agreement. After that:
 - **The approval check.** Once your portal is connected and the extension has read your account name
   from the portal's dashboard, it asks Licensor's access service whether that account is approved:
   when you connect, about once a day while it is in use, and again when you click the icon after a
-  day has passed or after a no. The request is
-  sent without cookies, over an encrypted connection, to the address named in the services file
-  below, and carries: the account name your portal shows for your session (never one you typed; there
-  is nowhere to type one), your portal's hostname, the product name (`bridge`) and the extension's
-  version; like any request, it arrives at a time. The service answers yes or no, and nothing else
-  about you or anyone else. The extension keeps a yes for up to a day, and for up to seven days when
-  the service cannot be reached, so an outage on Licensor's side does not stop your work; it keeps a
-  no for ten minutes, and while the answer is no it starts no worker and offers you a button to ask
-  for access.
-- **Two files, once a day.** `https://openspineconsortium.com/ashley/services.json` (the address of
-  the access service) and `https://openspineconsortium.com/ashley/bridge-killlist.json` (the signed
+  day has passed or after a no. The request is sent without cookies, over an encrypted connection,
+  to the address named in the services file below (Licensor's access service,
+  `https://beethoven-access.openspineconsortium.workers.dev`), and carries: the account name your
+  portal shows for your session (never one you typed; there is nowhere to type one), your portal's
+  hostname, the product name (`bridge`) and the extension's version; like any request, it arrives at
+  a time. The service answers yes or no, and nothing else about you or anyone else. The extension
+  keeps a yes for up to a day, and for up to seven days when the service cannot be reached, so an
+  outage on Licensor's side does not stop your work; it keeps a no for ten minutes, and while the
+  answer is no it starts no worker and offers you a button to ask for access.
+- **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
+  of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
   list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
   about you beyond what any web request carries (your network address, which the web host's ordinary
   server logs may record for a short time); the files hold addresses and the list only.
@@ -136,30 +134,33 @@ Those are the only requests the extension ever makes to Licensor. In particular:
 version, the time, a salted hash of your network address (the address itself is not kept) and the
 answer given. These lines sit with your access record.
 
-**The *Ask for access* button.** When the answer is no, the panel's one button opens Licensor's request
-page in a new tab with your account name in the page's address, so the form is filled in for you. As
-with any page you open, your browser's history and the web host's ordinary server logs may record
-that address.
+**The *Ask for access* button.** When the answer is no, the panel's one button opens Licensor's
+request page (`https://openspineconsortium.com/beethoven/request.html`) in a new tab with your
+account name in the page's address, so the form is filled in for you. As with any page you open,
+your browser's history and the web host's ordinary server logs may record that address.
 
-**Access requests.** If you ask for access on the Ashley support site (a web page, not the
-extension), the request form records what you enter: your account name, your name, your institutional
-e-mail, what you will use Ashley Bridge for, and the time.
+**Access requests.** If you ask for access on the request page (a web page, not the extension), the
+request form records what you enter: your account name, your name, your institutional e-mail, what
+you will use Beethoven for, and the time; it also tells the service that it is Beethoven's request
+page, which Licensor's notice of the request shows.
 
 **Your access record.** Licensor's records hold the approval and withdrawal decisions about your
-account, with the name and e-mail you gave when you asked, their dates, and the check lines above. The
-same approved list serves Licensor's other product, Ashley for VS Code, so one approval covers both.
+account, with the name and e-mail you gave when you asked, their dates, and the check lines above.
+The same approved list serves Licensor's other product, an extension for VS Code, so one approval
+covers both.
 
-**A notice under the agreement**, if you send one: what you write in it, kept with your access record.
+**A notice under the agreement**, if you send one: what you write in it, kept with your access
+record.
 
 ## What is never collected
 
 Stated in the negative because reviewers read for what is absent: the extension does not collect
-command text, file paths, prompt content, job output, portal cookies or tokens, the code you paste to
-sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It sends
-Licensor no error or crash reports, no usage data and no activation request; the approval check above
-is the only thing it sends about you. It has no access to claude.ai, requests no `cookies`, `tabs`,
-`webRequest`, `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission, and runs no
-code fetched from anywhere.
+command text, file paths, prompt content, job output, portal cookies or tokens, the code you paste
+to sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It sends
+Licensor no error or crash reports, no usage data and no activation request; the approval check
+above is the only thing it sends about you. It has no access to claude.ai, requests no `cookies`,
+`tabs`, `webRequest`, `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission, and
+runs no code fetched from anywhere.
 
 ## How Licensor uses and keeps it
 
@@ -180,41 +181,52 @@ by Licensor.
 Remove the site permission or uninstall the extension at any time; ask Licensor for a copy or
 deletion of your access records (deletion of your access record ends your approval and with it the
 license). Michigan residents and residents of other states may have further rights under their
-state's laws; Licensor honours requests it is obliged to honour and answers others where it reasonably
-can. Ashley Bridge is offered in the United States.
+state's laws; Licensor honours requests it is obliged to honour and answers others where it
+reasonably can. Beethoven is offered in the United States.
 
 ## Children
 
-Ashley Bridge is for adults, or minors with a parent's or guardian's consent (LICENSE.txt section 21).
+Beethoven is for adults, or minors with a parent's or guardian's consent (LICENSE.txt section 21).
 
 ## Changes
 
-A new version of this statement ships with the Ashley Bridge version it applies to and is shown for
+A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
 
-Version 6 (2026-09-29, Ashley Bridge 5.0.0): where your institution's lab keeps one shared, read-only copy
-of the cluster-side scripts, the extension no longer copies them into your account; it writes a small
-launcher, a one-line marker naming the lab's copy and your profile, and reads that copy's version file
-through your portal. Nothing new leaves your device and nothing new reaches Licensor. The install note
-the extension keeps is also written when you press "Set up the cluster again" under Details.
+Version 7 (2026-09-29, Beethoven 7.0.0): the product has a new name, Beethoven, and new addresses.
+Its pages, the support page and the request page are under
+`https://openspineconsortium.com/beethoven/`; the two daily files are
+`https://openspineconsortium.com/beethoven/services.json` and
+`https://openspineconsortium.com/beethoven/killlist.json`; the access service answers at
+`https://beethoven-access.openspineconsortium.workers.dev`, a second name for the same service,
+which keeps the same records. The request page now also tells the service which product's page a
+request was sent from. Nothing about the data changed: the extension keeps, sends and receives the
+same items as under version 6, and Licensor records the same.
 
-Version 5 (2026-09-29, Ashley Bridge 4.0.0): there are no license keys any more, and nothing to type
-or paste. Your own sign-in to your portal identifies you, by the account name the portal's dashboard
+Version 6 (2026-09-29, extension 5.0.0): where your institution's lab keeps one shared, read-only
+copy of the cluster-side scripts, the extension no longer copies them into your account; it writes a
+small launcher, a one-line marker naming the lab's copy and your profile, and reads that copy's
+version file through your portal. Nothing new leaves your device and nothing new reaches Licensor.
+The install note the extension keeps is also written when you press "Set up the cluster again" under
+Details.
+
+Version 5 (2026-09-29, extension 4.0.0): there are no license keys any more, and nothing to type or
+paste. Your own sign-in to your portal identifies you, by the account name the portal's dashboard
 shows; the extension confirms with Licensor's access service that this account is approved when you
 connect, when you click the icon and about once a day, and that check is now the one request that
 carries anything about you (the account name, the portal's hostname, the product and its version;
 Licensor records those with the time, a salted hash of the network address and the answer). The
 daily list withdraws versions only; the extension also reads a daily services file for the service's
 address. The table rows for the key and the identifier are replaced by the account name and the last
-answer; the *Ask for access* button, which carries your account name in the page's address, is named.
-Nothing else changed.
+answer; the *Ask for access* button, which carries your account name in the page's address, is
+named. Nothing else changed.
 
-Version 4 (2026-09-29): the statement now describes the software as built. Earlier versions described
-an activation request and optional error reports; the extension has neither (there is no code for
-them and no address to send them to), so the sections that described them are removed and the section
-"What Licensor receives" names the one request the extension makes to Licensor, the daily
-withdrawn-keys list. The record Licensor keeps when it issues a key is named for what it is. Nothing
-new leaves your device; less was ever leaving it than the earlier text said.
+Version 4 (2026-09-29): the statement now describes the software as built. Earlier versions
+described an activation request and optional error reports; the extension has neither (there is no
+code for them and no address to send them to), so the sections that described them are removed and
+the section "What Licensor receives" names the one request the extension makes to Licensor, the
+daily withdrawn-keys list. The record Licensor keeps when it issues a key is named for what it is.
+Nothing new leaves your device; less was ever leaving it than the earlier text said.
 
 Version 3 (2026-09-29): the extension now starts the Claude sign-in sitting for you and takes the
 pasted code in its own panel (the section "What happens when you sign in to Claude" is new); your
@@ -222,9 +234,10 @@ statement about a worker's workspace is kept per workspace in the browser instea
 session, and now includes your answer to Claude Code's Remote Control question, which the extension
 records in one marker file in your cluster account; the notes the extension keeps so its automatic
 steps do not repeat (the last sign-in it saw, the links it opened, the check job it submitted, the
-install it ran) are listed; the session-state row names everything the run record holds, including the last 4,000
-characters of the worker's own log; the preference "open claude.ai when my worker connects" is added;
-the audit-log row says what it never holds. Nothing new leaves your device or your accounts.
+install it ran) are listed; the session-state row names everything the run record holds, including
+the last 4,000 characters of the worker's own log; the preference "open claude.ai when my worker
+connects" is added; the audit-log row says what it never holds. Nothing new leaves your device or
+your accounts.
 
 Version 2 (2026-09-29): added the checklist tick, the start-by-itself preference and the session's
 claude.ai link to the table of what stays in your browser, and named the withdrawn-keys copy and the

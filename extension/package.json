@@ -1,13 +1,13 @@
 {
-  "name": "ashley-bridge",
-  "displayName": "Ashley Bridge",
-  "description": "Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.",
-  "version": "6.0.0",
+  "name": "beethoven",
+  "displayName": "Beethoven",
+  "description": "Starts, watches and stops a Claude Code worker on your university's Open OnDemand cluster and hands you its Remote Control link.",
+  "version": "7.0.0",
   "private": true,
   "type": "module",
   "license": "SEE LICENSE IN public/LICENSE.txt",
   "author": "OpenSpineConsortium",
-  "homepage": "https://openspineconsortium.com/ashley/bridge",
+  "homepage": "https://openspineconsortium.com/beethoven/",
   "engines": {
     "node": ">=22"
   },

@@ -4,8 +4,12 @@ What the four stores will be told, in the words they will be told it, and the ch
 green before submission. Sources: the report's "Extension architecture and permission manifest",
 "Store-compliance checklist", "Stores and universities accept one origin, no credential, and a signed
 kill-list", and the browser-platform and security research notes. The product name and identifier
-carry no university name. The named publisher on every store account is the LLC once it exists; until
-then, Gregory Schwing, trading as OpenSpineConsortium.
+carry no university name and no Anthropic mark: the public name is Beethoven (decided 2026-09-29; a
+name beginning with Anthropic's mark was set aside because it could draw store and brand objections),
+the Firefox id `beethoven@openspineconsortium.com`, and every listing says, in the same words, that
+Beethoven runs Claude Code and is not an Anthropic product. The repository and its code name stay
+Ashley Bridge; nothing a store or a student sees carries it. The named publisher on every store account
+is the LLC once it exists; until then, Gregory Schwing, trading as OpenSpineConsortium.
 
 ## Single-purpose statement
 
@@ -87,16 +91,18 @@ edition or an in-app purchase inside the host app.
 
 ## Privacy-practices answers, per store
 
-What leaves the device towards the vendor in 4.0.0 (decided 2026-09-29; the built bundle in
+What leaves the device towards the vendor since 4.0.0 (decided 2026-09-29; in 7.0.0 only the
+addresses changed; the built bundle in
 `extension/.output/` is to be read once more for every `fetch`, `WebSocket` and `tabs.create` before
 submission): (1) the approval check, a `POST` without cookies to the `access_check` address named in
-`https://openspineconsortium.com/ashley/services.json`, carrying the institutional account name the
+`https://openspineconsortium.com/beethoven/services.json` (the service's host is
+`beethoven-access.openspineconsortium.workers.dev`), carrying the institutional account name the
 portal's dashboard shows for the signed-in session (never a typed one), the portal's hostname, the
 product (`bridge`) and the version, answered yes or no; made only after acceptance and once the portal
 is connected, on each icon click and once a day (a yes is kept 24 h, up to 7 days when the service is
 unreachable; a no 10 minutes); the vendor records the check with the time, a salted hash of the
 network address and the answer. (2) One request a day each for `services.json` (the service address)
-and the signed withdrawn-versions list at `https://openspineconsortium.com/ashley/bridge-killlist.json`
+and the signed withdrawn-versions list at `https://openspineconsortium.com/beethoven/killlist.json`
 (`src/licensing/killlist.ts`), sent with `credentials: 'omit'`; they carry nothing about the person
 beyond the network address any web request carries. There is no licence key and no activation
 request. There are no error or crash reports and no usage data: the code has none and no address to
@@ -113,7 +119,7 @@ not repeat (the last sign-in it saw with the account and plan Claude Code report
 it opened, the check job and install it ran), the audit log, the last good kill-list, a random
 installation identifier and the ticks on optional checklist steps; for the browser session only, the
 job id, the session name and its claude.ai link, the tab the icon was clicked from and the last check
-results (the same list as `PRIVACY.md`, version 5). What passes through and is never kept: the one-time code the person
+results (the same list as `PRIVACY.md`, version 7). What passes through and is never kept: the one-time code the person
 pastes to sign in to Claude, typed once into their own cluster shell; the audit log holds one line for
 the sitting with the counts of bytes read and typed, never the text. What is never collected: command
 text, file paths, prompts, job output,
@@ -137,8 +143,8 @@ use.
 | Data collected: user activity | No (there are no crash or error reports and no usage data in the code) |
 | Data collected: location, financial, health | No |
 | Certifications | Not sold to third parties outside approved use cases; not used or transferred for purposes unrelated to the single purpose; not used to determine creditworthiness or for lending |
-| Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` (PRIVACY.md, version 5) |
-| Limited Use statement on the website | "Ashley Bridge's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements." |
+| Privacy policy URL | `https://openspineconsortium.com/beethoven/privacy.html` (PRIVACY.md, version 7) |
+| Limited Use statement on the website | "Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements." |
 
 ### Edge Add-ons (Partner Center, Privacy page)
 
@@ -149,7 +155,7 @@ use.
 | Are you using remote code? | No |
 | Does this extension access, collect, transmit or use personal information? | Yes: the institutional account name the portal shows, transmitted to the developer's access service in the approval check (with the portal hostname, product and version) to learn whether that account is approved; nothing else (the privacy policy says what and why) |
 | Data usage certification | same categories and answers as Chrome |
-| Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` |
+| Privacy policy URL | `https://openspineconsortium.com/beethoven/privacy.html` |
 | Test credentials or explanation | the reviewer-access plan below (no university account can be issued) |
 | Update channel | Partner Center only; no self-update |
 
@@ -208,27 +214,27 @@ submission therefore includes:
 
 ## Negative statements (listing text, privacy policy and reviewer notes, verbatim)
 
-- Ashley Bridge has no access to claude.ai or any Anthropic page. It does not run on those sites, does
+- Beethoven has no access to claude.ai or any Anthropic page. It does not run on those sites, does
   not read them and does not change them. It opens an Anthropic page in a new tab in two cases (the
   sign-in page Claude Code printed during a sitting you started; your session's claude.ai/code link
   when your worker connects) and the connectors settings page for the optional Google Drive step, as
   a bookmark would; nothing of the extension runs there.
-- Ashley Bridge never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own
+- Beethoven never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own
   page; the one-time code you paste into the extension's box is typed once into your own job's
   terminal on your cluster and is not stored, not logged and not sent anywhere else; the extension
   reads only whether Claude Code says it is signed in.
-- Ashley Bridge runs no code it did not ship with. Its daily update check downloads a signed list, not
+- Beethoven runs no code it did not ship with. Its daily update check downloads a signed list, not
   a program.
-- Ashley Bridge works with one website: the Open OnDemand portal you connect. It requests access to
+- Beethoven works with one website: the Open OnDemand portal you connect. It requests access to
   that site when you click its icon on that site's tab, and to nothing else. Its only other requests
   go to the maintainer: the approval check, which sends the account name your portal shows for you,
   your portal's address, the product name and its version, so the maintainer's access service can
   answer whether that account is approved; and a daily download, from the maintainer's website, of
   that service's address and the signed list of withdrawn versions, which carries nothing about you.
-- Ashley Bridge does not read your portal cookie and does not sign in for you. When your portal asks
+- Beethoven does not read your portal cookie and does not sign in for you. When your portal asks
   for a sign-in, the extension asks you to sign in in a tab. There is no key and nothing to paste:
   your institution's own sign-in identifies you.
-- Ashley Bridge sends its maintainer no usage data, no error reports and no activation request; the
+- Beethoven sends its maintainer no usage data, no error reports and no activation request; the
   approval check is the only thing it sends about you. Its audit log of what it asked your portal
   never contains what you typed to sign in and is never transmitted.
 
@@ -239,13 +245,13 @@ submission therefore includes:
 | 1 | Single-purpose statement, as above; must not read as two products | required | required | implicit | implicit | maintainer | drafted above; already the `description` in `extension/package.json` and `wxt.config.ts` |
 | 2 | Per-permission justification, one sentence each | Privacy practices tab | Partner Center Privacy page | reviewer notes | App Review notes | maintainer | drafted above (revised 2026-09-29 for the icon click and the options page) |
 | 3 | Remote code "No"; no `eval`, no fetched scripts; kill-list is JSON; the sign-in marker lines are parsed, never executed | required | required | required | 2.5.2 | extension stream | to verify in the built bundle (`.output/`) |
-| 4 | Privacy policy URL and data-use certifications; in-product disclosure and affirmative consent before first use, even for on-device data | required | required | required | 5.1.1 labels | maintainer + extension stream | root `PRIVACY.md` (version 5: no keys; the approval check is the one thing sent about the person) and `LICENSE.txt` (version 4: approval and withdrawal, no keys) written 2026-09-29 for 4.0.0; the policy URL is `https://openspineconsortium.com/ashley/bridge/privacy.html`; `extension/public/LICENSE.txt` and `PRIVACY.md` must be byte-identical copies of the root files at build time (the build's `sync-framework` step copies them) and `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match (the framework's `VERSION` is 5 since 2026-09-29; it does not follow the extension's version); setup page exists |
+| 4 | Privacy policy URL and data-use certifications; in-product disclosure and affirmative consent before first use, even for on-device data | required | required | required | 5.1.1 labels | maintainer + extension stream | root `PRIVACY.md` (version 7) and `LICENSE.txt` (version 6), rewritten 2026-09-29 for 7.0.0 from the 4.0.0 texts (no keys; approval and withdrawal; the approval check is the one thing sent about the person) with the shared copy of 5.0.0 and the new name and addresses of 7.0.0, which change nothing about data; the policy URL is `https://openspineconsortium.com/beethoven/privacy.html`; `extension/public/LICENSE.txt` and `PRIVACY.md` must be byte-identical copies of the root files at build time (the build's `sync-framework` step copies them) and `TERMS_VERSION` in `extension/src/core/terms.ts` is 6 to match (the framework's `VERSION` is 5 since 2026-09-29; it does not follow the extension's version); setup page exists |
 | 5 | "Payment required for full functionality" and the trial sentence in the listing | required | required | required ("Listings must disclose when payment is required") | 3.1.1: no key and no payment in 4.0.0; whether an approval-gated free edition passes as it is has not been asked of Apple | maintainer | drafted above (revised for 4.0.0: approval, no key) |
 | 6 | Readable, unobfuscated bundle; Firefox source zip with build instructions (`wxt zip -b firefox`) | minification allowed | no obfuscation | source required | | extension stream | `npm run zip` defined; build instructions for the AMO source zip in `extension/README.md` |
 | 7 | Reviewer access: public mock portal plus recorded walk-through | recommended | test credentials or explanation required | "testing information" required | review notes | maintainer + extension stream | mock portal exists at `extension/mock-ood/server.mjs` (`npm run mock`, port 8080 by default; the tests start it themselves) with the stand-in sign-in sitting, the cold-PUN 500 and the 200-HTML missing download; not yet hosted publicly; walk-through not recorded |
 | 8 | Developer account: two-step verification with a hardware key; no third-party OAuth grants on the account | required | | required | Apple ID 2FA | maintainer | to confirm per account |
 | 9 | Distribution channel while private: Unlisted / Hidden / unlisted-signed XPI (same review) | available | available | available | TestFlight or App Store only | maintainer | decision pending |
-| 10 | Firefox `data_collection_permissions` declared in the manifest | | | required for new extensions since 2025-11-03 | | extension stream | set in `wxt.config.ts` to `{ "required": ["personallyIdentifyingInfo"] }` on 2026-09-29 for 4.0.0 (the approval check sends the institutional account name; nothing else is collected), replacing the `["none"]` of 3.0.0, which was never uploaded (`strict_min_version` 140, gecko id `ashley-bridge@openspineconsortium.com`); the store kit is in `docs/store/` |
+| 10 | Firefox `data_collection_permissions` declared in the manifest | | | required for new extensions since 2025-11-03 | | extension stream | set in `wxt.config.ts` to `{ "required": ["personallyIdentifyingInfo"] }` on 2026-09-29 for 4.0.0 (the approval check sends the institutional account name; nothing else is collected), replacing the `["none"]` of 3.0.0, which was never uploaded (`strict_min_version` 140; gecko id `beethoven@openspineconsortium.com` since 7.0.0, a new add-on for Firefox, so nothing installed under the old id updates into it); the store kit is in `docs/store/` |
 | 11 | Trader status and phone number under the EU DSA if offered in the EU; otherwise geo-restrict to the US | required if EU | | | | maintainer | US only, to set in each dashboard |
 | 12 | Safari packaging: `xcrun safari-web-extension-packager` or the App Store Connect packager; Apple Developer Program membership; app record | | | | required | maintainer (needs a Mac) | not started; see MAC_AND_SAFARI.md |
 | 13 | Review time budgeted: days to weeks (Chrome), up to seven business days (Edge), up to 24 hours to sign (Firefox), undocumented (Apple) | | | | | maintainer | to schedule after item 7 |

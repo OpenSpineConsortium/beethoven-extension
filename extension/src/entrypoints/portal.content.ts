@@ -26,7 +26,7 @@ import type { ShellSession } from '../core/shell';
 import { local, portalSettings } from '../ext/storage';
 
 /** set on the page's window (the extension's own isolated world) by the first copy of this script in a tab */
-const LOADED_MARKER = '__ashleyBridgePortalScriptLoaded';
+const LOADED_MARKER = '__beethovenPortalScriptLoaded';
 
 export default defineContentScript({
   // registered at runtime for the granted origin only; nothing here is applied at install

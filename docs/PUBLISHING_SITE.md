@@ -1,150 +1,133 @@
 # Publishing the site pages and the kill-list
 
-The public pages the store listings point at, and the signed kill-list the extension fetches once a
-day, live in the site repository `openspineconsortium.github.io` (GitHub Pages, custom domain
-`openspineconsortium.com`), checked out beside this repository on the maintainer's machine. Nothing
-here commits or pushes: the tools write files, the maintainer reviews `git status` in the site
+The public pages the store listings point at, the services file and the signed kill-list the extension
+fetches once a day live in the site repository `openspineconsortium.github.io` (GitHub Pages, custom
+domain `openspineconsortium.com`), checked out beside this repository on the maintainer's machine.
+Nothing here commits or pushes: the tools write files, the maintainer reviews `git status` in the site
 repository, commits and pushes (network through WSL, as everywhere else).
 
-Written 2026-09-29. Addresses, fixed:
+Rewritten 2026-09-29 for 7.0.0, when the public name became Beethoven (the repository and its code
+name stay Ashley Bridge). Addresses, fixed:
 
 | Page | Address | Source |
 |---|---|---|
-| landing (store `homepage_url`) | `https://openspineconsortium.com/ashley/bridge/` | `docs/site/bridge/index.html`, copied as is |
-| privacy statement (the privacy-policy URL in every store dashboard) | `https://openspineconsortium.com/ashley/bridge/privacy.html` | `PRIVACY.md`, rendered |
-| license terms | `https://openspineconsortium.com/ashley/bridge/terms.html` | `LICENSE.txt`, rendered |
-| support and notice address (exists already, shared with Ashley) | `https://openspineconsortium.com/ashley/support.html` | the site repository, hand-written |
-| kill-list (`KILLLIST_URL` in `extension/src/licensing/killlist.ts`); since 4.0.0 it withdraws versions only | `https://openspineconsortium.com/ashley/bridge-killlist.json` | signed by the license tool, see below |
-| services file (since 4.0.0 the extension reads the `access_check` address from it once a day) | `https://openspineconsortium.com/ashley/services.json` | the Ashley repository's `docs/site/services.json`, rewritten and copied into the site by Ashley's `tools/intake/deploy.sh`; nothing in this repository writes it |
-| request page (the panel's *Ask for access* button opens it with `?access_id=<account>`) | `https://openspineconsortium.com/ashley/request.html` | the Ashley repository's `docs/site/request.html`, copied by the same deploy; nothing in this repository writes it |
+| landing (store `homepage_url`) | `https://openspineconsortium.com/beethoven/` | generated (the site repository's `tools/build_site.py`) |
+| privacy statement (the privacy-policy URL in every store dashboard) | `https://openspineconsortium.com/beethoven/privacy.html` | `PRIVACY.md`, rendered |
+| license terms | `https://openspineconsortium.com/beethoven/terms.html` | `LICENSE.txt`, rendered |
+| support and notice address | `https://openspineconsortium.com/beethoven/support.html` | generated (the site repository's `tools/build_site.py`) |
+| request page (the panel's *Ask for access* button opens it with `?access_id=<account>`) | `https://openspineconsortium.com/beethoven/request.html` | generated (the site repository's `tools/build_site.py`); it posts to the `request` address in the services file beside it, with `"product":"bridge"` |
+| services file (the extension reads `access_check` and `request_page` from it once a day) | `https://openspineconsortium.com/beethoven/services.json` | `docs/site/beethoven/services.json` here is the reference copy, placed in the site by hand; every route on `https://beethoven-access.openspineconsortium.workers.dev` |
+| kill-list (`KILLLIST_URL` in `extension/src/licensing/killlist.ts`); withdraws versions only | `https://openspineconsortium.com/beethoven/killlist.json` | signed by the license tool, see below; never written by the page build |
+| the old landing address | `https://openspineconsortium.com/ashley/bridge/` | a two-line page that sends the reader to the new landing page (kept as is) |
 
-The Ashley page `ashley/index.html` carries one added line, a link to `bridge/` in its Documents list.
-No other existing Ashley page is touched.
+The access service answers under two names: `beethoven-access.openspineconsortium.workers.dev` for
+7.0.0 and later, and the old `ashley-service.openspineconsortium.workers.dev` for Ashley in VS Code and
+for builds 4.0.0 to 6.0.0. They are the same Worker code with the same stores and secrets (the Ashley
+repository's `tools/intake/README.md` and `ACCESS_CHECK.md`), so one approval list serves every build.
+
+### What stays at the old addresses, and why
+
+Builds 4.0.0 to 6.0.0 are installed on testers' machines and keep fetching the addresses compiled into
+them, so none of these is removed: `ashley/bridge/privacy.html` and `ashley/bridge/terms.html` (the
+texts those builds accepted; the build never touches them), `ashley/bridge-killlist.json` (their
+kill-list), `ashley/services.json` and `ashley/request.html` (Ashley's own, written by the Ashley
+repository's `tools/intake/deploy.sh`). Only `ashley/bridge/index.html` changes, to the moved-page
+notice, and one line of `ashley/index.html` changes to name Beethoven and link `/beethoven/`. Nothing in
+the 7.0.0 build points at any old address.
 
 ## The pages
 
-```
-python -X utf8 tools/site_bridge_build.py [--site <path to openspineconsortium.github.io>] [--check-only]
-```
+Since 2026-09-30 every page of the site, the Beethoven pages included, is generated by the site
+repository's own generator: `python -X utf8 tools/build_site.py` in `openspineconsortium.github.io`.
+It holds the site map (one navigation definition for every page), renders `/beethoven/terms.html` and
+`/beethoven/privacy.html` from `LICENSE.txt` and `PRIVACY.md` in THIS repository (checked beside it as
+`../ashley-bridge`; the path is a constant at the top of the generator) and checks every word of both
+texts is on the page in order, writes the product page (`/` and `/beethoven/`, the same body), the
+support, request and reviewers pages, copies the release packages from `release/<version>/` into
+`/beethoven/downloads/` against their `SHA256SUMS.txt`, and stamps every asset with one `?v=` value per
+publish. Its README in the site repository is the manual. This repository no longer builds pages; its
+old builder (`tools/site_beethoven_build.py`) and templates are retired and are in git history.
 
-Default `--site` is `../openspineconsortium.github.io` relative to this repository. The script:
+What this repository still owns on the site:
+- the two texts (`LICENSE.txt`, `PRIVACY.md`): change them here, bump their `Version N` lines and
+  `TERMS_VERSION`, then run the site generator and publish the site;
+- `docs/site/beethoven/services.json`, the reference copy of `/beethoven/services.json` (the generator
+  checks the published file exists but does not write it; copy this file there when a route changes);
+- the signed kill-list (below);
+- the packages in `release/<version>/` (the generator's `VERSION` constant names the one it serves).
 
-1. copies `docs/site/bridge/index.html` to `<site>/ashley/bridge/index.html`. The landing page is
-   hand-written: what Ashley Bridge is in three sentences, the three student steps, the *Install*
-   section, the "never does" list (the six negative statements of `docs/STORE_LISTING.md`, verbatim),
-   the documents, the Chrome Limited Use sentence, and a box for reviewers and security offices with
-   the exact permission list of `extension/wxt.config.ts`;
-2. renders `PRIVACY.md` to `privacy.html` with pandoc (`-f markdown+pipe_tables -t html5`);
-3. turns `LICENSE.txt`, which is hard-wrapped plain text, into headings and paragraphs and renders
-   that with pandoc (`-f html -t html5`). The rule: blocks are separated by blank lines; the first
-   block is the title; a one-line all-caps block starting `N.` is a section heading; a line starting
-   `(a) ` begins a sub-item of its own; an indented line continues the line before it. 23 section
-   headings and 89 paragraphs came out of version 2;
-4. uses `docs/site/bridge/template.html` for both rendered pages: the CSS block of Ashley's own
-   pages (`ashley/tools/site_build.py`, byte for byte) plus a second small block for phones (word
-   breaking, tables that scroll inside their own box, the store buttons), a back link and *Support
-   and notices* at the top, and a *Save a copy* box with a back link at the bottom. Pandoc's default
-   stylesheet is not included (pandoc 3.8 ignores `-V document-css=false`; the template replaces it);
-5. checks the result against things outside the rendering, and exits non-zero naming the page and
-   the reason if any fails:
-   - every word of `PRIVACY.md` and of `LICENSE.txt` appears in its page, in order (a contiguous
-     word-sequence match after markdown punctuation and curly quotes are set aside), so the
-     conversion in step 3 cannot silently drop or reorder text;
-   - each page parses with Python's `html.parser` and its non-void tags balance;
-   - the banned word is on no page and in neither source text;
-   - each page has the viewport meta and the 16 px gutter, and carries the Ashley CSS block
-     unaltered; if `../ashley/tools/site_build.py` is present its CSS is compared too, and drift is
-     reported;
-   - the versions the landing page names for the privacy statement and the agreement are the
-     `Version N, YYYY-MM-DD` lines of the two texts (5 and 4 since 4.0.0; 4 and 2 when this was
-     written).
-
-   The last two checks earned their keep on the day they were written: `PRIVACY.md` moved from
-   version 3 to version 4 at 11:38 local on 2026-09-29, six minutes after `privacy.html` had been
-   rendered from version 3, and `--check-only` reported the stale page and the stale version on the
-   landing page before anything was pushed. Whenever a text changes, rebuild.
-
-`--check-only` runs the checks on whatever is in the site folder without writing. Pandoc is found on
-`PATH` or at `C:\Program Files\Pandoc\pandoc.exe` (3.8 was used).
-
-After running it: in the site repository, `git status` should show `ashley/bridge/` (three files) and
-nothing else changed by the script. Review the diff, commit, push. GitHub Pages publishes within a
-minute or two; the CDN caches for 600 s (`cache-control: max-age=600`).
-
-### When the store listings go live
-
-The three *Install* buttons are placeholders: `<a class="store" data-store="chrome|edge|firefox"
-data-status="pending" href="#install" aria-disabled="true">` with the text "listing pending review".
-For each store, once its listing is approved, edit `docs/site/bridge/index.html`: set `href` to the
-listing's address, set `data-status="live"`, remove `aria-disabled`, and change the small text to
-something like "for Chrome and Chromium browsers". Rebuild, review, commit, push. Do not edit the copy
-in the site repository directly; it is overwritten on the next build.
-
-### When PRIVACY.md or LICENSE.txt changes
-
-Change the text and its version together (integer), as `CLAUDE.md` says, and update the two
-`(version N)` mentions in `docs/site/bridge/index.html`; the build refuses otherwise. Then rebuild.
+When a store listing goes live, set its URL in `BROWSERS` at the top of the site generator and publish
+the site; the product page's card switches from "Direct download" to the store link.
 
 ## The kill-list
 
-`ashley/bridge-killlist.json` in the site repository is one JSON document with the readable fields
-`v`, `kid`, `issued`, `revoked_versions`, `revoked_lids`, `message` and a `sig` field: a complete
-`ASHLEYREV1` token whose payload repeats those fields, signed with Ashley's release key `k1` (the same
-Ed25519 key that signs Ashley's own licences, which Bridge no longer has; the extension's `keys.json`
-and Ashley's `grid/license_keys.json` hold the same two public keys, `k1` and `trial`). The extension trusts only the signed payload; the
-readable fields are for people. The verifier (`verifyKillList` in `killlist.ts`) checks the token's
-own payload part, exactly as Ashley's `open()` does, so no canonical key order is involved; the tool
-writes the fields in the documented order anyway.
+`beethoven/killlist.json` in the site repository is one JSON document with the readable fields `v`,
+`kid`, `issued`, `revoked_versions`, `revoked_lids`, `message` and a `sig` field: a complete token with
+the format tag `ASHLEYREV1` (the tag is part of the signed format the verifier checks, not a name
+anyone sees, and stays), whose payload repeats those fields, signed with the release key `k1` (the
+same Ed25519 key that signs the VS Code product's licences; this extension has none since 4.0.0; the
+extension's `keys.json` and the sibling repository's `grid/license_keys.json` hold the same two public
+keys, `k1` and `trial`). The extension trusts only the signed payload; the readable fields are for
+people. The verifier (`verifyKillList` in `killlist.ts`) checks the token's own payload part, so no
+canonical key order is involved; the tool writes the fields in the documented order anyway.
 
-**Since 4.0.0 the list withdraws versions only.** Ashley Bridge has no licence keys any more, so
-`revoked_lids` stays in the document (and in the tool's flags) only so that the format does not
-change; the extension reads it for compatibility and ignores it. A person's access is withdrawn in
-the access service instead (see "To withdraw a person's approval" below), not by this list.
+**The list withdraws versions only.** `revoked_lids` stays in the document (and in the tool's flags)
+only so that the format does not change; the extension reads it for compatibility and ignores it. A
+person's access is withdrawn in the access service instead (see "To withdraw a person's approval"
+below), not by this list.
 
-Two subcommands in Ashley's license tool do the work
-(`C:/Users/grego/OneDrive/Desktop/ashley/tools/license/ashley-license.mjs`; run from the Ashley
-repository with Node 22 on `PATH`; the private key stays in the vendor folder and is used only through
-that tool's own `privateKey()` helper, never printed, copied or moved):
+**Two lists while old builds are in use.** 7.0.0 reads `beethoven/killlist.json`; 4.0.0 to 6.0.0 read
+`ashley/bridge-killlist.json`. To withdraw an old version, sign the old list too (the same arguments,
+the other `--out`). The `message` is shown in the panel: write it without the product's old name.
+
+Two subcommands in the sibling repository's license tool do the work
+(`C:/Users/grego/OneDrive/Desktop/ashley/tools/license/ashley-license.mjs`; run from that repository
+with Node 22 on `PATH`; the private key stays in the vendor folder and is used only through that
+tool's own `privateKey()` helper, never printed, copied or moved):
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH
 cd /c/Users/grego/OneDrive/Desktop/ashley
 ASHLEY_VENDOR_DIR=/c/Users/grego/.ashley-vendor node tools/license/ashley-license.mjs sign-killlist \
-    [--kid k1] [--revoked-versions 1.0.0,2.0.0] [--revoked-lids L-abc,L-def] [--message "..."] \
-    --out /c/Users/grego/OneDrive/Desktop/openspineconsortium.github.io/ashley/bridge-killlist.json
+    [--kid k1] [--revoked-versions 1.0.0,2.0.0] [--message "..."] \
+    --out /c/Users/grego/OneDrive/Desktop/openspineconsortium.github.io/beethoven/killlist.json
 node tools/license/ashley-license.mjs verify-killlist <path>
 ```
 
-`--kid` defaults to the newest release key (`k1`; trial keys are never chosen by default); the two
-lists default to empty and are de-duplicated and sorted; versions must look like `1.0.0`, licence ids
-like `L-...` (leave `--revoked-lids` out: the 4.0.0 extension ignores that list); `--message`
-defaults to empty and is shown to the student; without `--out` the document
-goes to standard output. The tool verifies the document it just made against `grid/license_keys.json`
-before writing it. `verify-killlist` checks the signature against those public keys, requires `v: 1`,
-and also requires the readable fields to equal the signed payload (exit 2 and the field names if they
-differ, since a person would otherwise read one thing while the extension enforces another). If `k1`
-were ever encrypted the tool asks for `ASHLEY_VENDOR_PASSPHRASE`; on 2026-09-29 it was not.
+`--kid` defaults to the newest release key (`k1`; trial keys are never chosen by default); the
+version list defaults to empty and is de-duplicated and sorted; versions must look like `1.0.0`
+(leave `--revoked-lids` out: the extension ignores that list); `--message` defaults to empty and is
+shown to the student; without `--out` the document goes to standard output. The tool verifies the
+document it just made against `grid/license_keys.json` before writing it. `verify-killlist` checks the
+signature against those public keys, requires `v: 1`, and also requires the readable fields to equal
+the signed payload (exit 2 and the field names if they differ, since a person would otherwise read one
+thing while the extension enforces another). If `k1` were ever encrypted the tool asks for
+`ASHLEY_VENDOR_PASSPHRASE`; on 2026-09-29 it was not.
 
 **The list is whole, not a delta.** The extension keeps whichever verified list has the newest
 `issued`, so a new list replaces the old one entirely: every withdrawal that must stay in force is
 repeated on every signing. Re-signing with an empty `--revoked-versions` un-withdraws every version.
 
 Keep a note of the arguments used for each signing (a line in the vendor folder's own notes is
-enough; the ledger records licence revocations made with `revoke`, but the kill-list tool does not
-write the ledger).
+enough; the kill-list tool does not write the ledger).
+
+**Before 7.0.0 ships:** sign a first, empty list into `beethoven/killlist.json` with a message such as
+"Beethoven is current." and verify it. Done on 2026-09-30 at 01:36 UTC (the record is under "Built on
+2026-09-29 for 7.0.0" below); it goes out with the site's next push.
 
 ### To withdraw a version
 
 1. Sign a new list with the complete set `--revoked-versions` (every extension version that must
    stop sending commands and tell the student to update, including those already withdrawn) and a
-   one-sentence `--message` in plain words, since the panel shows it.
-2. `verify-killlist` the written file.
+   one-sentence `--message` in plain words, since the panel shows it. For 4.0.0 to 6.0.0, sign the
+   old list at `ashley/bridge-killlist.json` as well.
+2. `verify-killlist` each written file.
 3. In `extension/`, run `npx vitest run test/killlist.live.test.ts`. That test asserts that nothing is
    revoked, on purpose: it is a tripwire against a revocation nobody meant to publish. After a real
    withdrawal, change its `toEqual([])` expectation for the versions to the intended list in the same
    change, and only then commit.
 4. Commit and push the site repository. Then check the live file:
-   `curl -sI https://openspineconsortium.com/ashley/bridge-killlist.json` should answer `200` with
+   `curl -sI https://openspineconsortium.com/beethoven/killlist.json` should answer `200` with
    `content-type: application/json` and `access-control-allow-origin: *`; download it and
    `verify-killlist` the download.
 5. Every installation picks the new list up within 24 hours (`KILLLIST_PERIOD_MINUTES` is one day,
@@ -155,24 +138,16 @@ write the ledger).
 
 ### To withdraw a person's approval
 
-Not with the kill-list. Remove the account from the approved list in the admin console
-(`https://openspineconsortium.com/ashley/admin.html`) or, in the Ashley repository under WSL Node,
-`node tools/intake/admin.mjs remove <accessId>` (the admin token is read from the vendor folder,
-never given on the command line). The next approval check for that account answers no: on the
-person's next icon click, or within 24 hours otherwise; a cached yes lasts up to 7 days only when the
-service cannot be reached at all. The extension then starts no worker and its one button is *Ask for
-access*; a worker already running is not stopped by this and ends with its job or when the person
-stops it. The same removal withdraws the person's Ashley (VS Code) access, since one list serves
-both products; Cloudflare's storage can lag a write by up to a minute at the edge.
-
-### Signed on 2026-09-29
-
-`kid k1`, `issued 1790695956` (2026-09-29), nothing revoked, message "Ashley Bridge is current.".
-`verify-killlist`: ok. Two tampered copies were rejected as they should be (a changed readable field:
-"the readable fields differ from the signed payload: revoked_versions"; four changed signature
-characters: "the signature does NOT verify"). A second list with `--revoked-lids L-test2,L-test1
---revoked-versions 1.0.0` round-tripped (sorted, verified) and was discarded. The live vitest passed
-4 of 4 against the file in the site repository with `BUNDLED_KEYS`.
+Not with the kill-list. Remove the account from the approved list in the admin console (the
+maintainer's page in the site repository, `ashley/admin.html`) or, in the sibling repository under
+WSL Node, `node tools/intake/admin.mjs remove <accessId>` (the admin token is read from the vendor
+folder, never given on the command line). Both service names read the same list, so the next approval
+check for that account answers no under either: on the person's next icon click, or within 24 hours
+otherwise; a cached yes lasts up to 7 days only when the service cannot be reached at all. The
+extension then starts no worker and its one button is *Ask for access*; a worker already running is
+not stopped by this and ends with its job or when the person stops it. The same removal withdraws the
+person's VS Code product access, since one list serves both products; Cloudflare's storage can lag a
+write by up to a minute at the edge.
 
 ## CORS: the finding
 
@@ -180,7 +155,7 @@ The extension holds no host permission for `openspineconsortium.com` (and must n
 ever asks for is the student's portal), so the daily fetch from the background is a plain cross-origin
 request and the browser hands the JSON to the extension only if the server allows it with
 `Access-Control-Allow-Origin`. GitHub Pages does send it on every response. Confirmed 2026-09-29
-against a JSON file already on the site:
+against a JSON file already on the site (the old services file):
 
 ```
 $ curl -sI https://openspineconsortium.com/ashley/services.json
@@ -193,42 +168,54 @@ x-served-by: cache-dtw8020-DTW
 ...
 ```
 
-No `Vary: Origin`, no credentials (the fetch sends none), a wildcard: what the fetch needs. The same
-header will be on `bridge-killlist.json` once it is pushed, because Pages sends it for every file; run
-the `curl -sI` line in step 4 above after the first push to see it on the real address. Not verified
-today: the live `bridge-killlist.json` address itself (it answers 404 until the site is pushed).
+No `Vary: Origin`, no credentials (the fetch sends none), a wildcard: what the fetch needs. Pages
+sends the same header for every file, so `beethoven/services.json` and `beethoven/killlist.json` will
+carry it once they are pushed; run `curl -sI` on both after the first push to see it on the real
+addresses. Not verified today: either new address (they answer 404 until the site is pushed).
 
-Since 4.0.0 the same reasoning covers two more addresses: `services.json` (the file probed above,
-which the extension now reads once a day for the `access_check` address) and the access service's
-own `POST` answers, which must carry `Access-Control-Allow-Origin: *` and `Cache-Control: no-store`
-on every status (200, 400, 429) and answer `OPTIONS` with 204, since the background sends them with
-`Content-Type: text/plain;charset=UTF-8` and no credentials from an extension origin. That is the
-service's contract, checked by its own tests in the Ashley repository, not by anything here.
+The access service's own `POST` answers must carry `Access-Control-Allow-Origin: *` and
+`Cache-Control: no-store` on every status (200, 400, 429) and answer `OPTIONS` with 204, since the
+background sends them with `Content-Type: text/plain;charset=UTF-8` and no credentials from an
+extension origin. That is the service's contract, checked by its own tests in the sibling repository
+and, for the second name, by the `curl` proofs recorded there, not by anything here.
 
-## Rebuilt on 2026-09-29 for 4.0.0
+## Built on 2026-09-29 for 7.0.0 (history: the retired page builder)
 
-After `LICENSE.txt` moved to version 4 and `PRIVACY.md` to version 5 (no keys; the approval check),
-and the landing template's box, Testers line, three steps, negative statements, document versions
-and reviewer box were rewritten to match, `python -X utf8 tools/site_bridge_build.py` wrote the
-three pages again (10,925, 22,888 and 35,876 bytes) and its check line read: "privacy statement
-version 5, agreement version 4; every source word present in order; tags balance; banned word
-absent". In the site repository `git status` showed the three `ashley/bridge/` files changed by this
-script, and `ashley/request.html` and `ashley/services.json` changed by the service and site work of
-the same day (the `?access_id=` prefill and the `access_check` key), which this script does not
-touch. Nothing was committed or pushed. Not verified: the live pages.
+`python -X utf8 tools/site_beethoven_build.py --out <scratch folder>` wrote the six pages and files
+(index.html 11,584 bytes, privacy.html 25,146, terms.html 36,577, support.html 4,970, request.html
+8,582, services.json 583), the moved-page notice (469 bytes) and the rewritten Ashley index (one line
+changed, compared with `diff` against the site's copy), and its check line read: "privacy statement
+version 7, agreement version 6; every source word present in order; tags balance; banned word absent;
+old name absent; services.json on beethoven-access.openspineconsortium.workers.dev", with one note
+(no `killlist.json` yet). `--check-only` on ten tampered copies of that output refused every one: the
+old name put back on the landing page, the old host in `services.json`, a word dropped from the
+agreement, a stale version mention, the `product` field removed from the request page, a link back
+into `ashley/`, a changed moved-page notice, the Ashley index linking `bridge/` again, an unclosed
+list, and a changed notice address. The site checkout itself was not written. Served from the scratch
+folder on `127.0.0.1` and loaded in headless Chrome inside 360 px iframes, all five pages had
+`scrollWidth` equal to `clientWidth` (345 and 345: no horizontal page scroll), and the request page
+read `services.json` beside it and kept its status box hidden.
 
-## What was verified on 2026-09-29, and what was not
+At about 01:36 UTC on 2026-09-30 the build ran against the site checkout itself: the same six files in
+`beethoven/` with the same sizes, `ashley/bridge/index.html` (469 bytes) and the one changed line of
+`ashley/index.html`, the same check line and the same one note. `git status` in the site repository
+then showed `beethoven/` new and those two files changed by the build, beside the three pages whose
+*Get Involved* button links `/beethoven/` (`index.html`, `atlas/index.html`,
+`celebrate-life/index.html`), changed earlier in the rename and not by the build. The kill-list was
+signed into `beethoven/killlist.json` at 01:36:50 UTC (`kid k1`, `issued 1790732210`, nothing
+withdrawn, message "Beethoven is current."); `verify-killlist` answered `ok: true`, and
+`test/killlist.live.test.ts` in `extension/` passed its four tests against it. The 7.0.0 release build
+then ran end to end against the mock portal with `services.json` and `killlist.json` answered from these
+files in place of the live ones and the access check sent to the real second name (runs F, G and H in
+`extension/store-assets/e2e/`). Not verified: the live pages, the kill-list at its live address,
+Firefox and Safari, a true phone.
 
-Verified: pandoc 3.8 renders both documents (`privacy.html` was re-rendered from `PRIVACY.md`
-version 4 after the change above); all three pages parse with `html.parser` and balance;
-the banned word is absent from the pages, the sources, the scripts and this document; every word of
-both source texts is on its page in order; `npm run typecheck` passes with the new test file;
-`npx vitest run test/killlist.live.test.ts` passes 4 of 4; the `sign-killlist` / `verify-killlist`
-round trip; the CORS header on an existing Pages JSON file; at a 360 px viewport (headless Edge, each
-page inside a 360 px iframe) every page's `scrollWidth` equals its `clientWidth`, so there is no
-horizontal page scroll, and the 4-column privacy table scrolls inside its own box.
+## Earlier builds (history)
 
-Not verified: the pages on the live site (nothing was pushed); the store listing addresses (none
-exist yet); rendering in Firefox and Safari; a screenshot at true phone width (Edge's headless window
-would not go below its minimum width, so the visual check was done in the iframe measurement above
-and at 900 px).
+Until 7.0.0 the pages were built by `tools/site_bridge_build.py` from `docs/site/bridge/` into
+`ashley/bridge/` (retired with the rename; both are in the history of `main`). On 2026-09-29 that build
+wrote the 4.0.0 pages (privacy statement version 5, agreement version 4) and, later that day, the 6.0.0
+ones; its version check caught a stale `privacy.html` rendered six minutes before `PRIVACY.md` moved
+from version 3 to version 4, before anything was pushed. The old list at `ashley/bridge-killlist.json`
+was signed on 2026-09-29 (`kid k1`, `issued 1790695956`, nothing revoked) and verified; two tampered
+copies were rejected as they should be (a changed readable field; four changed signature characters).

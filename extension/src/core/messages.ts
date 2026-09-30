@@ -6,7 +6,7 @@
 import type { PortalOp } from './portal';
 
 /** the port name the panel connects to the portal page script with for the login terminal */
-export const LOGIN_PORT = 'ashley-bridge-login';
+export const LOGIN_PORT = 'beethoven-login';
 
 export type Request =
   /** the page script announcing itself from a portal tab */

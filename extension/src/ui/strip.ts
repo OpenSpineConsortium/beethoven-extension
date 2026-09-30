@@ -21,6 +21,7 @@ import { add, clear, el } from './dom';
 import { checkAccessNow, connectPortal, currentRun, markStopped, openEnvironment, openOptions, openPortalTab, originGranted, portal, portalAlive, portalTab, refreshRun, requestOrigin, startWorkerNow } from './rpc';
 import { statementSection } from './sections';
 import { openTerminal, type Terminal } from './terminal';
+import { PRODUCT_NAME } from '../core/terms';
 
 /** the run's files are read this often while the panel is open */
 const FAST_POLL_MS = 10_000;
@@ -305,7 +306,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     clear(root);
     const head = el('div', { class: `strip ${view.tone}` });
     add(head,
-      el('div', { class: 'strip-title' }, el('strong', { text: 'Ashley Bridge' }), el('span', { class: 'muted small', text: ` step ${view.index} of ${view.total}: ${view.title}` })),
+      el('div', { class: 'strip-title' }, el('strong', { text: PRODUCT_NAME }), el('span', { class: 'muted small', text: ` step ${view.index} of ${view.total}: ${view.title}` })),
       el('div', { class: 'strip-status', text: view.status }),
     );
     // the step's own input, when it has one
@@ -329,7 +330,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
           state ? el('button', { class: 'danger small', text: 'Stop', title: 'Writes the stop file; the job leaves on its own and ends its chain', onClick: () => runDetail('Stopping the worker', async () => { const o = await stopWorker(portal, state); await markStopped(); notify('ok', o.note); await tick(); }) }) : null,
         ),
         sessionName ? el('p', { class: 'small' }, 'Find ', el('span', { class: 'session-name', text: sessionName }), ' under Code in the Claude app.') : null,
-        el('p', { class: 'muted small', text: 'A first message cannot be typed for you on claude.ai: nothing of Ashley Bridge runs there.' }),
+        el('p', { class: 'muted small', text: `A first message cannot be typed for you on claude.ai: nothing of ${PRODUCT_NAME} runs there.` }),
       );
     }
     add(head, notice, log);

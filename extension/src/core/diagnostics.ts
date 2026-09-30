@@ -1,10 +1,12 @@
-// The diagnostics engine, ported from Ashley: every assumption the extension rests on is a node
-// with a cheap check, an optional safe repair, a plain-words fix and the risk it guards against.
-// A run goes in dependency order; a node whose dependency failed is reported "blocked" with the
-// root cause, so a failure names the one broken piece instead of a cascade.
+// The diagnostics engine, ported from the vendor's VS Code extension: every assumption the
+// extension rests on is a node with a cheap check, an optional safe repair, a plain-words fix and
+// the risk it guards against. A run goes in dependency order; a node whose dependency failed is
+// reported "blocked" with the root cause, so a failure names the one broken piece instead of a
+// cascade.
 //
-// Rule carried over from Ashley: no feature integrates until its pieces are nodes here.
+// Rule carried over from that extension: no feature integrates until its pieces are nodes here.
 // No browser import: the checks receive their environment, and the tests run the engine in Node.
+import { PRODUCT_NAME } from './terms';
 
 export type Layer = 'access' | 'browser' | 'portal' | 'login-node' | 'compute-node' | 'claude' | 'student';
 
@@ -154,7 +156,7 @@ export async function runDiagnostics<C>(nodes: DiagNode<C>[], ctx: C, opts: RunO
 /** A short text report, root causes first; what the student copies into a support message. */
 export function formatReport(rep: DiagReport): string {
   const icon: Record<NodeStatus, string> = { ok: 'PASS', warn: 'WARN', fail: 'FAIL', repaired: 'FIXD', blocked: 'BLKD', skipped: 'SKIP' };
-  const lines = [`Ashley Bridge checks ${rep.started} -> ${rep.finished}: ${rep.ok ? 'everything works' : `${rep.rootCauses.length} thing(s) to fix`}`];
+  const lines = [`${PRODUCT_NAME} checks ${rep.started} -> ${rep.finished}: ${rep.ok ? 'everything works' : `${rep.rootCauses.length} thing(s) to fix`}`];
   for (const r of rep.rootCauses) lines.push(`  FIX ${r.id}: ${r.detail}${r.manualFix ? `\n      how: ${r.manualFix}` : ''}`);
   for (const r of rep.reports) lines.push(`  ${icon[r.status]}  ${r.id.padEnd(24)} ${r.detail}${r.rootCause ? ` (root cause: ${r.rootCause})` : ''}${r.repair ? ` [repair: ${r.repair}]` : ''}`);
   return lines.join('\n');

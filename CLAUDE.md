@@ -1,11 +1,12 @@
-# Ashley Bridge — working context
+# Ashley Bridge (public name Beethoven) — working context
 
 A university-agnostic HPC worker framework (`framework/`, `hpcworker`) plus a lightweight browser
-extension (`extension/`, published as "Ashley Bridge") that make a student's own Claude Code worker,
-running as a batch job on their university cluster, available inside claude.ai through Claude Code
-Remote Control, using only the student's existing Open OnDemand browser session on the cluster side.
-Vendor: Gregory Schwing, trading as OpenSpineConsortium (an LLC is planned and becomes the named
-licensor when it exists). The product name and identifier carry no university name.
+extension (`extension/`, published as "Beethoven"; the repository and its code name stay Ashley
+Bridge) that make a student's own Claude Code worker, running as a batch job on their university
+cluster, available inside claude.ai through Claude Code Remote Control, using only the student's
+existing Open OnDemand browser session on the cluster side. Vendor: Gregory Schwing, trading as
+OpenSpineConsortium (an LLC is planned and becomes the named licensor when it exists). The product
+name and identifier carry no university name.
 
 ## Read first
 
@@ -22,6 +23,22 @@ licensor when it exists). The product name and identifier carry no university na
 
 ## Rules that are not negotiable
 
+- **The public name is Beethoven (decided 2026-09-29, extension 7.0.0).** A name beginning with
+  Anthropic's mark was set aside because it could draw store and brand objections. Everything a
+  student, a store reviewer or the public reads says Beethoven and never the code name: the manifest,
+  every page and screen of the extension, the check results, the audit export, the agreement and the
+  privacy statement, the store texts and the pages under `https://openspineconsortium.com/beethoven/`.
+  The name lives in one constant per place (`PRODUCT_NAME` in `extension/src/core/terms.ts`, the site map
+  in the site repository's `tools/build_site.py`). Wherever the product is described, the trademark sentence is:
+  Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are
+  Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher.
+  What keeps the old name, and why: the repository and its folder (private); the kill-list's format
+  tag `ASHLEYREV1` (the signer and the verifier check it); the cluster utility `hpcworker` and its
+  cluster paths (`/rs/rs_grp_oschome/shared/ashley/...`, `~/.ashley/claude`), which the panel never
+  shows (it says "the lab's shared copy, version N" or "your own copy, version N"); the storage keys
+  `bridge.*`; and the wire value `product: "bridge"` the access service maps to Beethoven. The old
+  addresses under `/ashley/bridge*` and the service name `ashley-service` stay up for Ashley in VS Code
+  and builds 4.0.0 to 6.0.0; nothing in 7.0.0 points at them (`docs/PUBLISHING_SITE.md`).
 - **Ashley Bridge never reads, stores, copies, prints or relays a Claude credential.** No
   `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no reading `~/.claude/.credentials.json` or
   `~/.ashley/claude/.credentials.json`. The student signs in with `claude auth login` on a compute node
@@ -72,12 +89,13 @@ licensor when it exists). The product name and identifier carry no university na
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-09-29 and extension 4.0.0 `LICENSE.txt` is version 4 and `PRIVACY.md` version
-  5; both describe the software as built (no keys; the approval check against the access service
-  with the account name the portal shows; the daily fetch of `services.json` and the
-  withdrawn-versions list; no activation step, no error reports; all requests only after acceptance);
-  `TERMS_VERSION` in `extension/src/core/terms.ts` is 4 to match; extension 6.0.0 keeps all three, and
-  the framework's `VERSION` file is 5). The copies the extension ships in
+  Edition; since 2026-09-29 and extension 7.0.0 `LICENSE.txt` is version 6 and `PRIVACY.md` version
+  7, which rename the product and give the new addresses and say nothing new about data; both
+  describe the software as built (no keys; the approval check against the access service with the
+  account name the portal shows; the daily fetch of `services.json` and the withdrawn-versions list;
+  no activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
+  `extension/src/core/terms.ts` is 6 to match, with `TERMS_DATE` 2026-09-29, and the framework's
+  `VERSION` file is 5). The copies the extension ships in
   `extension/public/` must be byte-identical to them at build time. Change a text and its version
   together (integer). Never pre-tick a box; the button label is part of the record; a changed
   agreement is shown again and accepted again.
@@ -109,9 +127,10 @@ licensor when it exists). The product name and identifier carry no university na
   (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock portal), `scripts/sync-framework.mjs`
   (copies `../framework/**` into `public/framework/` with a hashed manifest before every build and zip).
 - `docs/`: the report, the design documents, the pilot plan, open questions and measurements.
-- `tools/`: `push_via_grid.sh` and `push_org.sh` (the two remotes), `site_bridge_build.py` (the site
-  pages), `deploy_shared.sh` (publishes the framework to a site's shared copy over ssh, from the
-  laptop; on the login node only tar, chmod, setfacl and one link; older versions are kept).
+- `tools/`: `push_via_grid.sh` and `push_org.sh` (the two remotes), (the site pages are generated by the site repository's
+  `tools/build_site.py`, which reads `LICENSE.txt`, `PRIVACY.md` and `release/` from here),
+  `deploy_shared.sh` (publishes the framework to a site's shared copy over ssh, from the laptop; on
+  the login node only tar, chmod, setfacl and one link; older versions are kept).
 
 ## Building and testing
 

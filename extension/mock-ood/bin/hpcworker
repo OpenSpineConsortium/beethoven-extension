@@ -38,7 +38,7 @@ show() {
 }
 LAUNCHER_TAG='# hpcworker launcher for a shared copy (managed: "hpcworker install" rewrites this file)'
 default_profile() { # $1 = site name: what the stand-in writes when no profile of that name is at hand
-  printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.ashley/claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "$1" > "$PROFILE"
+  printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "$1" > "$PROFILE"
 }
 now() { date -u +%FT%TZ; }
 die() { echo "hpcworker: $*" >&2; exit 1; }

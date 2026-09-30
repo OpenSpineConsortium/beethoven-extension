@@ -99,6 +99,11 @@ just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls
   `bash -lc 'hpcworker version'` over ssh prints `5 (shared copy at
   /rs/rs_grp_oschome/shared/ashley/hpcworker/current)`. Only `go2432` read it; what a second
   member sees is still untested.
+- **Framework 6** (for extension 7.0.0). `deploy.log` records v6 published at 2026-09-30 01:05:53 UTC
+  (`new`, `current=v6`) and its README published in place at 01:26:15 UTC (`readme`); `v5` and
+  `v5.replaced-20260929-174504` stay beside it. Read back over ssh at 02:00 UTC: `current` links `v6`,
+  its `VERSION` is 6, and its `VERSION`, `README.md` and `bin/hpcworker` are SHA-256-identical to the
+  tree's. What a second member sees is still untested.
 
 | Question | Why it matters | First test | Result |
 |---|---|---|---|
@@ -114,6 +119,17 @@ Run in parallel with the above; both precede any paid licence (report, "Licensin
 |---|---|---|
 | Written approval from Wayne State C&IT, whose generative-AI guideline says "All AI tools must first be approved by C&IT; third-party AI bots are not approved for use at this time" | C&IT | Not yet requested in writing; see `WAYNE_STATE_PILOT.md` |
 | A written answer from Anthropic on hosting the unmodified binary under each student's own subscription, including Remote Control from a cluster job | Anthropic sales, through the route the Claude Code legal page names | A draft exists in Ashley's `docs/ANTHROPIC_REQUEST.md`; add Remote Control from an `sbatch` job to question 3 of it before sending |
+
+## Opened by the public name (decided 2026-09-29, night)
+
+The public name is Beethoven from 7.0.0 (`CLAUDE.md`). What the rename leaves open, none of it measured:
+
+| Question | Why it matters | First test | Result |
+|---|---|---|---|
+| Does the Chrome Web Store (and Edge) take a manifest `description` of 138 characters? | The sentence decided for 7.0.0 is 138 characters; Chrome's manifest documentation says 132 at most | Upload the 7.0.0 package as a draft item, or shorten first (`docs/store/LISTING.md` has a 128-character form) | Avoided, not measured: 7.0.0 carries the 128-character form (`extension/wxt.config.ts`), so no store sees the 138 |
+| Is the AMO slug `beethoven` free, and is the name clear of another listed extension in each store? | A taken slug changes the Firefox install link; a clash invites a name dispute in review | Search each store for the name; AMO shows a taken slug when the listing is created | Not yet looked up |
+| Do the pages at `/beethoven/` and the old `/ashley/bridge/` address answer as intended once pushed? | Reviewers open the privacy URL; the old landing address should send people to the new one | `curl -sI` each address after the push; open `/ashley/bridge/` in a browser | Not yet pushed |
+| Does the access service's second name answer exactly as the first? | 7.0.0 asks only the second name; 4.0.0 to 6.0.0 and the VS Code product ask only the first | The `curl` proofs listed in the sibling repository's `tools/intake/ACCESS_CHECK.md` | Answered yes, 2026-09-30 00:25 UTC, by curl from Windows against both names: `/health` `{"ok":true}`; `OPTIONS /access_check` 204 with `access-control-allow-origin: *`; `POST /access_check` for `zz9876` (product `bridge`) not approved with request page `https://openspineconsortium.com/beethoven/request.html`, for `st1234` approved; `/revoked` 200. The old name now also names the `/beethoven/` request page to 4.0.0 to 6.0.0 (they send product `bridge`), which is the intended change; `OPTIONS /request` from `https://openspineconsortium.com` answers 204 on the second name. Not tried: a real `POST /request` (it would file a request and send mail). The 7.0.0 release build asked the second name end to end on 2026-09-30 between 01:45 and 01:56 UTC (runs F, G and H in `extension/store-assets/e2e/`): `st1234` approved (portal `ondemand.wayne.localhost`, then `localhost`), `zz9999` not approved, whose *Ask for access* opened `https://openspineconsortium.com/beethoven/request.html?access_id=zz9999`; no request went to an old address |
 
 ## How to record an answer
 

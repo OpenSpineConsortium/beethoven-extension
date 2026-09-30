@@ -9,6 +9,7 @@
 // started -> worker online -> open in Claude.
 import type { WorkerState } from './contract';
 import type { AccessFact } from '../licensing/access';
+import { PRODUCT_NAME } from './terms';
 
 export type StepId = 'portal' | 'warm' | 'terms' | 'access' | 'install' | 'probe' | 'login' | 'statement' | 'start' | 'online' | 'open';
 
@@ -162,10 +163,10 @@ export function decide(f: Facts, now = Date.now()): StripView {
   // 1. the portal tab
   if (!f.portal.connected) {
     if (f.portal.candidate) return view('portal', { status: `This tab is ${f.portal.candidate.hostname}. Connect it as your portal; the browser will ask you to allow that one site.`, primary: { label: 'Connect this portal', action: 'connect' }, tone: 'info' });
-    return view('portal', { status: 'Open your Open OnDemand portal in a tab and click the Ashley Bridge button there.', primary: { label: 'Setup page', action: 'open-setup' }, tone: 'info' });
+    return view('portal', { status: `Open your Open OnDemand portal in a tab and click the ${PRODUCT_NAME} button there.`, primary: { label: 'Setup page', action: 'open-setup' }, tone: 'info' });
   }
   if (!f.portal.granted) return view('portal', { status: `Access to ${f.portal.hostname ?? 'your portal'} was taken away in the browser. Allow it again.`, primary: { label: 'Allow the portal again', action: 'connect' }, tone: 'fail' });
-  if (!f.portal.alive) return view('portal', { status: `Open ${f.portal.hostname ?? 'your portal'} in a tab and keep it open; Ashley Bridge works from that tab.`, primary: { label: 'Open my portal', action: 'open-portal' }, tone: 'info' });
+  if (!f.portal.alive) return view('portal', { status: `Open ${f.portal.hostname ?? 'your portal'} in a tab and keep it open; ${PRODUCT_NAME} works from that tab.`, primary: { label: 'Open my portal', action: 'open-portal' }, tone: 'info' });
 
   // 2. the portal is awake and signed in
   switch (f.warm.state) {
@@ -197,7 +198,7 @@ export function decide(f: Facts, now = Date.now()): StripView {
       case 'checking':
         return view('access', { status: 'Checking your access...', auto: a.needsCheck ? 'check-access' : undefined, tone: 'busy' });
       case 'denied':
-        return view('access', { status: `Your account ${a.accessId ?? ''}${a.portal ? ` at ${a.portal}` : ''} is not on the approved list yet. Ask for access; once it is approved, click the Ashley Bridge button again.`, primary: { label: 'Ask for access', action: 'ask-access' }, tone: 'info' });
+        return view('access', { status: `Your account ${a.accessId ?? ''}${a.portal ? ` at ${a.portal}` : ''} is not on the approved list yet. Ask for access; once it is approved, click the ${PRODUCT_NAME} button again.`, primary: { label: 'Ask for access', action: 'ask-access' }, tone: 'info' });
       case 'withdrawn':
         return view('access', { status: a.detail, primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
       case 'no-identity':

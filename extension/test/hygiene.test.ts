@@ -7,6 +7,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { PRODUCT_NAME } from '../src/core/terms';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -62,6 +63,53 @@ describe('what the source must not contain', () => {
     const banned = new RegExp(['prov', 'enance'].join(''), 'i');
     const files = [...SRC, ...walk(path.join(ROOT, 'test'), ['.ts']), ...walk(path.join(ROOT, 'mock-ood'), ['.mjs', '.mts']), path.join(ROOT, 'wxt.config.ts')];
     const hits = files.filter((p) => banned.test(read(p))).map(rel);
+    expect(hits).toEqual([]);
+  });
+});
+
+// The public name is Beethoven (7.0.0). The code name survives only where a format or the cluster
+// needs it: the signed lists' tag ASHLEYREV1 (and the older token tag the redaction still catches,
+// written ASHLEY(?:REV)?1 in its pattern), and the lab's folders under /shared/ashley/ on the Wayne
+// State volume, which the panel never shows. Everything else a person, a reviewer or a log reads
+// says Beethoven: the manifest, the package, the pages, the strip, the checks, the mock portal, the
+// store images' sources and this folder's README.
+describe('the name', () => {
+  const KEPT = [/ASHLEY\(\?:REV\)\?1/g, /ASHLEY(?:REV)?1/g, /\/shared\/ashley\//g];
+  const readable = [
+    ...SRC,
+    path.join(ROOT, 'wxt.config.ts'),
+    path.join(ROOT, 'package.json'),
+    path.join(ROOT, 'README.md'),
+    ...walk(path.join(ROOT, 'store-assets', 'src'), ['.html']),
+    // the mock's stand-in commands in bin/ have no extension
+    ...walk(path.join(ROOT, 'mock-ood'), ['.mjs', '.mts', '']),
+  ];
+
+  it('is Beethoven in the manifest and the package, with a description no longer than the 132 characters Chrome allows', () => {
+    const cfg = read(path.join(ROOT, 'wxt.config.ts'));
+    expect(PRODUCT_NAME).toBe('Beethoven');
+    expect(cfg).toContain(`name: '${PRODUCT_NAME}',`);
+    expect(cfg).toContain(`short_name: '${PRODUCT_NAME}',`);
+    expect(cfg).toContain(`default_title: '${PRODUCT_NAME}'`);
+    expect(cfg).toContain("id: 'beethoven@openspineconsortium.com',");
+    expect(cfg).toContain("homepage_url: 'https://openspineconsortium.com/beethoven/',");
+    const purpose = /const SINGLE_PURPOSE =\s*"([^"]+)";/.exec(cfg)?.[1] ?? '';
+    expect(purpose.length).toBeGreaterThan(0);
+    expect(purpose.length).toBeLessThanOrEqual(132);
+    const pkg = JSON.parse(read(path.join(ROOT, 'package.json'))) as Record<string, string>;
+    expect(pkg.name).toBe('beethoven');
+    expect(pkg.displayName).toBe(PRODUCT_NAME);
+    expect(pkg.description).toBe(purpose);
+    expect(pkg.homepage).toBe('https://openspineconsortium.com/beethoven/');
+  });
+
+  it('shows the old name nowhere but in the kept tag and cluster paths', () => {
+    const hits: string[] = [];
+    for (const p of readable) {
+      read(p).split('\n').forEach((line, i) => {
+        if (/ashley/i.test(KEPT.reduce((s, re) => s.replace(re, ''), line))) hits.push(`${rel(p)}:${i + 1}`);
+      });
+    }
     expect(hits).toEqual([]);
   });
 });

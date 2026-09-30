@@ -19,8 +19,8 @@
 // Beside the portal, for tests only, a stand-in for Licensor's access service with the wire
 // contract the extension codes to (src/licensing/access.ts). No build points at it: the extension
 // reads the address from services.json on Licensor's site, and a test hands it this one instead.
-//   GET  /ashley/services.json                 {"access_check": "<origin>/ashley/access_check", ...}, CORS open
-//   POST /ashley/access_check                  text/plain JSON {v, access_id, portal, product, version} ->
+//   GET  /beethoven/services.json              {"access_check": "<origin>/beethoven/access_check", ...}, CORS open
+//   POST /beethoven/access_check               text/plain JSON {v, access_id, portal, product, version} ->
 //                                              200 {"approved":true,...} for the ids in --approve (default st1234),
 //                                              200 {"approved":false,...} otherwise; 400 malformed; 429 past --access-limit
 //
@@ -142,7 +142,7 @@ export async function createMockPortal(opts = {}) {
       // the account's own copy, installed and current: the stand-in's own default profile, and the VERSION the build carries
       const hw = path.join(realHome, '.hpcworker');
       const profile = path.join(hw, 'profile.json');
-      if (!fs.existsSync(profile)) fs.writeFileSync(profile, `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', claude_config_dir: '$HOME/.ashley/claude', login_node_rules: { max_processes: 20, poll_floor_seconds: 60 }, worker_defaults: { cpus: 2, mem: '8G', hours: 8, permission_mode: 'default', capacity: 4 } })}\n`);
+      if (!fs.existsSync(profile)) fs.writeFileSync(profile, `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', claude_config_dir: '$HOME/.claude', login_node_rules: { max_processes: 20, poll_floor_seconds: 60 }, worker_defaults: { cpus: 2, mem: '8G', hours: 8, permission_mode: 'default', capacity: 4 } })}\n`);
       const version = path.join(hw, 'VERSION');
       if (!fs.existsSync(version)) fs.writeFileSync(version, `${carriedFrameworkVersion()}\n`);
     }
@@ -158,7 +158,7 @@ export async function createMockPortal(opts = {}) {
     fs.copyFileSync(path.join(BIN, 'hpcworker'), path.join(sharedReal, 'bin', 'hpcworker'));
     fs.writeFileSync(path.join(sharedReal, 'VERSION'), `${o.sharedVersion}\n`);
     fs.writeFileSync(path.join(sharedReal, 'README.md'), "The stand-in for the lab's shared copy of the tool (mock-ood).\n");
-    fs.writeFileSync(path.join(sharedReal, 'profiles', 'mock.json'), `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', shared_install: sharedVirtual, claude_config_dir: '$HOME/.ashley/claude' })}\n`);
+    fs.writeFileSync(path.join(sharedReal, 'profiles', 'mock.json'), `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', shared_install: sharedVirtual, claude_config_dir: '$HOME/.claude' })}\n`);
   }
   /** what bash is handed for the shared path: the directory, or, for an outsider, a path that is not there */
   const sharedForShell = sharedReal ? posix(o.sharedReadable ? sharedReal : `${sharedReal}.unreadable`) : undefined;
@@ -193,7 +193,7 @@ export async function createMockPortal(opts = {}) {
     state.accessBodies.push(j);
     const id = j.access_id.toLowerCase();
     if (o.approved.includes(id)) return accessJson(res, 200, { approved: true, access_id: id, checked: new Date().toISOString(), until: null });
-    return accessJson(res, 200, { approved: false, access_id: id, requestPage: 'https://openspineconsortium.com/ashley/request.html' });
+    return accessJson(res, 200, { approved: false, access_id: id, requestPage: 'https://openspineconsortium.com/beethoven/request.html' });
   };
 
   // the shell app's tokens: salt-hash, verified against a per-process secret (the csrf module's shape)
@@ -317,8 +317,8 @@ export async function createMockPortal(opts = {}) {
     }
     if (p === '/' ) return redirect(res, '/pun/sys/dashboard/');
     // the access-service stand-in is not the portal: no portal cookie, CORS open, as Licensor's Worker answers
-    if (p === '/ashley/services.json') return send(res, 200, JSON.stringify({ access_check: `${serverOrigin(req)}/ashley/access_check`, request_page: 'https://openspineconsortium.com/ashley/request.html' }), { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'max-age=600' });
-    if (p === '/ashley/access_check') return accessCheck(req, res);
+    if (p === '/beethoven/services.json') return send(res, 200, JSON.stringify({ access_check: `${serverOrigin(req)}/beethoven/access_check`, request_page: 'https://openspineconsortium.com/beethoven/request.html' }), { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'max-age=600' });
+    if (p === '/beethoven/access_check') return accessCheck(req, res);
     // everything else sits behind the portal's authentication (Apache + mod_auth_openidc)
     if (!hasCookie(req)) return redirect(res, `/login?redirect=${encodeURIComponent(p)}`);
     if (p === '/nginx/init') {
@@ -594,6 +594,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   else console.log(`  tool:      ${a.includes('--fresh-home') ? 'the stand-in command only (not set up: the strip uploads the real framework, whose install refuses a mock site)' : "the stand-in, set up as the account's own copy at the version the build carries"}`);
   console.log(`  user:      ${portal.user}`);
   console.log(`  shell:     ${portal.origin}/pun/sys/shell/ssh/default`);
-  console.log(`  access:    ${portal.origin}/ashley/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'})`);
+  console.log(`  access:    ${portal.origin}/beethoven/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'})`);
   console.log('  Ctrl-C to stop');
 }

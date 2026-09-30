@@ -45,6 +45,8 @@
 // The extension never deletes anything on the cluster: it writes files, touches the stop file and
 // types hpcworker's verbs. Removing a marker is done by the student in the portal's Files app. It
 // never writes into a shared folder either: it only reads <shared_install>/VERSION to show it.
+import { PRODUCT_NAME } from './terms';
+
 export const FRAMEWORK_DIR = '.hpcworker';
 export const HPCWORKER = `~/${FRAMEWORK_DIR}/bin/hpcworker`;
 /** the second line of ~/.hpcworker/bin/hpcworker when it is the launcher of a shared copy (framework 5 LAUNCHER_TAG); a full copy of the tool has no such line */
@@ -244,7 +246,7 @@ export type ConsentSource = 'claude_config' | 'marker' | 'none' | string;
 /** the consent source in the student's words (never the value itself) */
 export function consentSourceWords(src: ConsentSource | undefined): string {
   if (src === 'claude_config') return 'recorded by Claude Code itself';
-  if (src === 'marker') return 'recorded from your data statement (the marker file Ashley Bridge wrote)';
+  if (src === 'marker') return `recorded from your data statement (the marker file ${PRODUCT_NAME} wrote)`;
   if (src === 'none') return 'not recorded';
   return src ? 'recorded' : '';
 }
@@ -369,7 +371,7 @@ export function probeVerdict(p: ProbeFile): { ok: boolean; detail: string; reaso
   const env = e.with_inherited_env ?? {};
   const reach = ['api.anthropic.com', 'platform.claude.com', 'claude.ai'].map((h) => `${h} ${env[h] ?? '?'}${bare[h] !== undefined && bare[h] !== env[h] ? ` (bare ${bare[h]})` : ''}`).join(', ');
   const okEgress = e.class ? e.class !== 'none' : (reached(env['api.anthropic.com']) || reached(bare['api.anthropic.com'])) && (reached(env['platform.claude.com']) || reached(bare['platform.claude.com']));
-  const detail = `${p.when ? `probe of ${p.when.slice(0, 16)}` : 'probe'} on ${p.hostname ?? '?'}: node temp ${p.node_tmp?.ok ? `${p.node_tmp.free_gb ?? '?'} GB free at ${p.node_tmp.path ?? '?'}` : 'NOT usable'}, /dev/shm ${p.dev_shm?.writable ? `${Math.round((p.dev_shm.free_kb ?? 0) / 1e6)} GB free` : 'not writable'}, user namespaces ${p.user_namespaces?.unshare_works ? 'yes' : 'no'}, container ${p.runtime?.ok ? 'runs' : 'FAILS'}, egress ${e.class ?? '?'} (${reach})${e['statsig.anthropic.com'] && /no DNS/i.test(e['statsig.anthropic.com']) ? '; statsig.anthropic.com has no DNS record here' : ''}`;
+  const detail = `${p.when ? `probe of ${p.when.slice(0, 16)}` : 'probe'} on ${p.hostname ?? '?'}: node temp ${p.node_tmp?.ok ? `${p.node_tmp.free_gb ?? '?'} GB free` : 'NOT usable'}, /dev/shm ${p.dev_shm?.writable ? `${Math.round((p.dev_shm.free_kb ?? 0) / 1e6)} GB free` : 'not writable'}, user namespaces ${p.user_namespaces?.unshare_works ? 'yes' : 'no'}, container ${p.runtime?.ok ? 'runs' : 'FAILS'}, egress ${e.class ?? '?'} (${reach})${e['statsig.anthropic.com'] && /no DNS/i.test(e['statsig.anthropic.com']) ? '; statsig.anthropic.com has no DNS record here' : ''}`;
   if (!p.runtime?.ok) return { ok: false, detail: `${detail}. The container runtime could not run the image on the compute node.`, reason: 'The container could not run on the compute node.', warn: false };
   if (!okEgress) return { ok: false, detail: `${detail}. Compute nodes cannot reach api.anthropic.com or platform.claude.com; ask your centre for an HTTP proxy (Claude Code refuses SOCKS).`, reason: 'Compute nodes cannot reach Anthropic from your cluster; ask your research computing centre about an HTTP proxy.', warn: false };
   if (!p.node_tmp?.ok) return { ok: false, detail: `${detail}. The node-local temp directory named by the profile is not usable.`, reason: 'The node-local temp directory is not usable on the compute node.', warn: false };

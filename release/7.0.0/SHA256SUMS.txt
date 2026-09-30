@@ -1,0 +1,5 @@
+f13d0f021735453abba8d6212edaf1acbf5a988e83c906fb8679a553a8f403f1 *beethoven-7.0.0-chrome.zip
+f13d0f021735453abba8d6212edaf1acbf5a988e83c906fb8679a553a8f403f1 *beethoven-7.0.0-edge.zip
+73d6161d37844b80e0862357cc39a5abe2d89eb8da7575669aeb1bf31de566df *beethoven-7.0.0-firefox.zip
+5bcc05c3f41acedf86233bbedfcf6d96f43ad788d03c0d1a8a73a48cc632a7ad *beethoven-7.0.0-safari.zip
+407e0195e90348694931a13323de550e95a8ccab0bf580ca04f605132f8904af *beethoven-7.0.0-sources.zip

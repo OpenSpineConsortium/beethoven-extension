@@ -96,6 +96,29 @@ export function sharedUnusable(r: { exitCode: number; output: string }): string 
   return why || 'your account cannot use it';
 }
 
+/** what the panel calls the lab's shared folder: never its path */
+export const LAB_COPY = "the lab's shared copy";
+
+/**
+ * The install's output with the lab's shared folder named in words, not by its path. The tool
+ * prints the folder (and the numbered copies beside `current`, which live in the same parent), and
+ * the panel shows no cluster path (CLAUDE.md, the public name). Where the tool says "shared copy ...
+ * at PATH" the path is dropped ("the shared copy of hpcworker 6 at /x/current (nothing copied)"
+ * reads "the shared copy of hpcworker 6 (nothing copied)"); any other path under that parent
+ * becomes LAB_COPY. Paths anywhere else, such as the student's own ~/.hpcworker, are left as they are.
+ */
+export function hideSharedPath(text: string, dir: string | undefined): string {
+  const root = String(dir ?? '').replace(/\/+$/, '');
+  if (!root.startsWith('/')) return text;
+  const parent = root.slice(0, root.lastIndexOf('/')) || root;
+  const escaped = parent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // a path ends at white space, a quote, a bracket or punctuation bash and the tool put after one ("DIR: Permission denied")
+  const pathRe = `'?${escaped}(?![^/\\s'"(),;:])(?:/[^\\s'"(),;:]*)?'?`;
+  return text
+    .replace(new RegExp(`(shared copy(?: of hpcworker \\S+)?) at ${pathRe}`, 'g'), '$1')
+    .replace(new RegExp(pathRe, 'g'), LAB_COPY);
+}
+
 /** the strip's one line for an install that failed: the refusal a running worker causes in plain words, else the exit code */
 export function installFailureWords(r: { exitCode: number; log: string }): string {
   if (PROBE_BUSY.test(r.log)) return 'the check job on a compute node is still running from your own copy of the tool; try again once it has finished';
@@ -144,19 +167,21 @@ export async function installFramework(portal: PortalApi, o: InstallOptions): Pr
   const home = await portal.home();
   log.push(`home ${home}`);
   const sharedDir = await bundledSharedInstall(o.site, o.fetchAsset);
+  // what the log shows of the tool's output: the lab's folder in words (the line typed is the exact command all the same)
+  const hide = (text: string) => hideSharedPath(text, sharedDir);
   let note: string | undefined;
   if (sharedDir) {
     const line = commands.installShared(sharedDir, o.site);
-    log.push(`your lab keeps a shared copy of the tool at ${sharedDir}; nothing is uploaded`, `running: ${line}`);
+    log.push("your lab keeps a shared copy of the tool; nothing is uploaded", `running the install of ${LAB_COPY}, one line through the portal's shell`);
     show();
     await shellFree();
     const r = await portal.shell(line, { timeoutMs: 120_000 });
-    log.push(r.output.trimEnd(), `exit ${r.exitCode}`);
+    log.push(hide(r.output.trimEnd()), `exit ${r.exitCode}`);
     show();
     if (r.exitCode === 0) return { ok: true, exitCode: 0, uploaded: 0, log: log.join('\n'), mode: 'shared', sharedDir };
     const why = sharedUnusable(r);
     if (!why) return { ok: false, exitCode: r.exitCode, uploaded: 0, log: log.join('\n'), mode: 'shared', sharedDir };
-    note = `Your lab's shared copy of the tool at ${sharedDir} could not be used from your account: ${why}. The tool was put in your own account instead.`;
+    note = `Your lab's shared copy of the tool could not be used from your account: ${hide(why)}. The tool was put in your own account instead.`;
     log.push(note);
     show();
   }
@@ -183,7 +208,7 @@ export async function installFramework(portal: PortalApi, o: InstallOptions): Pr
   show();
   await shellFree();
   const r = await portal.shell(commands.install(o.site), { timeoutMs: 180_000 });
-  log.push(r.output, `exit ${r.exitCode}`);
+  log.push(hide(r.output), `exit ${r.exitCode}`);
   show();
   return { ok: r.exitCode === 0, exitCode: r.exitCode, uploaded: manifest.files.length, log: log.join('\n'), mode: 'own', ...(sharedDir ? { sharedDir } : {}), ...(note ? { note } : {}) };
 }
@@ -193,7 +218,7 @@ export function installNoteOf(r: InstallOutcome, at: Date): InstallNote {
   return {
     attempted_at: at.toISOString(),
     ok: r.ok,
-    detail: r.mode === 'shared' ? `exit ${r.exitCode}, your lab's shared copy at ${r.sharedDir}` : `exit ${r.exitCode}, ${r.uploaded} file(s) uploaded`,
+    detail: r.mode === 'shared' ? `exit ${r.exitCode}, ${LAB_COPY}` : `exit ${r.exitCode}, ${r.uploaded} file(s) uploaded`,
     mode: r.mode,
     ...(r.sharedDir ? { dir: r.sharedDir } : {}),
     ...(r.note ? { note: r.note } : {}),
@@ -201,17 +226,18 @@ export function installNoteOf(r: InstallOutcome, at: Date): InstallNote {
 }
 
 /**
- * The tool line under Details: "tool: shared copy, version N at DIR" or "tool: your copy, version
- * N", then, for an own copy at a site with a shared folder, either why the shared copy was not used
- * (the last install's note) or that the button moves the account to it. Empty until the home was read.
+ * The tool line under Details: "tool: the lab's shared copy, version N" or "tool: your own copy,
+ * version N", never with a path, then, for an own copy at a site with a shared folder, either why
+ * the shared copy was not used (the last install's note) or that the button moves the account to
+ * it. Empty until the home was read.
  */
 export function toolWords(install: Facts['install'] | undefined, note?: InstallNote): string[] {
   if (!install || install.installed === undefined) return [];
-  if (!install.installed) return [`tool: not set up yet${install.sharedRoot ? `; your lab keeps a shared copy at ${install.sharedRoot}` : ''}`];
+  if (!install.installed) return [`tool: not set up yet${install.sharedRoot ? '; your lab keeps a shared copy' : ''}`];
   const s = install.shared;
-  if (s) return [`tool: shared copy, version ${s.version ?? 'unknown'} at ${s.dir}${s.unreadable ? ` (${s.unreadable})` : ''}`];
-  const lines = [`tool: your copy, version ${install.version ?? 'unknown'}`];
+  if (s) return [`tool: ${LAB_COPY}, version ${s.version ?? 'unknown'}${s.unreadable ? ` (${hideSharedPath(s.unreadable, s.dir)})` : ''}`];
+  const lines = [`tool: your own copy, version ${install.version ?? 'unknown'}`];
   if (note?.note) lines.push(note.note);
-  else if (install.sharedRoot) lines.push(`Your lab keeps a shared copy at ${install.sharedRoot}; "Set up the cluster again" moves your account to it.`);
+  else if (install.sharedRoot) lines.push('Your lab keeps a shared copy; "Set up the cluster again" moves your account to it.');
   return lines;
 }

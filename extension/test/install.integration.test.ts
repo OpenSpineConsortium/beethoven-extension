@@ -88,9 +88,11 @@ describe("the lab's shared copy, for a member of the lab's group", () => {
     const progress: string[] = [];
     const r = await installFramework(c, { site: 'mock', fetchAsset: assets(SHARED), sleep, onProgress: (x) => progress.push(x) });
     expect(r).toMatchObject({ ok: true, exitCode: 0, uploaded: 0, mode: 'shared', sharedDir: SHARED });
-    expect(r.log).toContain(`running: bash '${SHARED}/bin/hpcworker' install --shared '${SHARED}' --profile 'mock'`);
+    // the log names the lab's folder in words (the panel shows no cluster path), while the line typed is the exact command
+    expect(r.log).toContain("running the install of the lab's shared copy, one line through the portal's shell");
+    expect(r.log).not.toContain('/lab/shared');
     // the mock seeds an own copy of the tool, so this is a move: framework 5's sentence, nothing deleted
-    expect(r.log).toMatch(/switched to the shared copy of hpcworker 5 at \/lab\/shared\/hpcworker\/current; your own copy was moved to \/home\/student\/\.hpcworker\/replaced\/\d{8}-\d{6} \(nothing deleted\)/);
+    expect(r.log).toMatch(/switched to the shared copy of hpcworker 5; your own copy was moved to \/home\/student\/\.hpcworker\/replaced\/\d{8}-\d{6} \(nothing deleted\)/);
     const replaced = await fs.readdir(path.join(mock.home, '.hpcworker', 'replaced'));
     expect(replaced).toHaveLength(1);
     expect((await fs.readdir(path.join(mock.home, '.hpcworker', 'replaced', replaced[0]!, 'bin')))).toEqual(['hpcworker']);
@@ -126,7 +128,7 @@ describe("the lab's shared copy, for a member of the lab's group", () => {
     const r = await installFramework(c, { site: 'mock', fetchAsset: assets(SHARED), sleep });
     expect(r).toMatchObject({ ok: true, mode: 'shared' });
     expect(r.log).toMatch(/profile\.json exists; kept/);
-    expect(r.log).toContain(`hpcworker 5: shared copy at ${SHARED}; launcher and marker refreshed (nothing copied)`);
+    expect(r.log).toContain('hpcworker 5: shared copy; launcher and marker refreshed (nothing copied)');
     expect(r.log).not.toMatch(/moved to/);
   }, SLOW);
 });
@@ -146,10 +148,12 @@ describe("an account outside the lab's group", () => {
     await expect(c.readFileIfExists(`${SHARED}/VERSION`)).rejects.toMatchObject({ status: 403 });
     clock.advance(61_000);
     const r = await installFramework(c, { site: 'mock', fetchAsset: assets(SHARED), sleep });
+    // bash names the mock's real folder here, which is not the path the profile gives (hideSharedPath's own cases are in install.test.ts)
     expect(r.log).toMatch(/bin\/hpcworker: No such file or directory/);
+    expect(r.log).not.toContain('/lab/shared');
     expect(r.log).toMatch(/^exit 127$/m);
     expect(r).toMatchObject({ ok: true, mode: 'own', uploaded: 3, sharedDir: SHARED });
-    expect(r.note).toBe(`Your lab's shared copy of the tool at ${SHARED} could not be used from your account: it is not there, or your account cannot reach it. The tool was put in your own account instead.`);
+    expect(r.note).toBe("Your lab's shared copy of the tool could not be used from your account: it is not there, or your account cannot reach it. The tool was put in your own account instead.");
     expect(r.log).toMatch(/installed hpcworker 1 at \/home\/student\/\.hpcworker/);
     expect((await c.readFile(paths.version(home))).trim()).toBe('5');
     const f = await toolFacts(c, SHARED, '5');
@@ -171,7 +175,7 @@ describe("an account outside the lab's group", () => {
     clock.advance(61_000);
     const r = await installFramework(c, { site: 'mock', fetchAsset: assets(SHARED), sleep });
     expect(r).toMatchObject({ ok: true, mode: 'own' });
-    expect(r.log).toMatch(/this account now uses its own copy; the shared copy at \/lab\/shared\/hpcworker\/current is no longer used \(its marker is in \/home\/student\/\.hpcworker\/replaced\/\d{8}-\d{6}\)/);
+    expect(r.log).toMatch(/this account now uses its own copy; the shared copy is no longer used \(its marker is in \/home\/student\/\.hpcworker\/replaced\/\d{8}-\d{6}\)/);
     expect(await c.readFileIfExists(paths.sharedMarker(home))).toBeUndefined();
     const after = await toolFacts(c, SHARED, '5');
     expect(after.install.shared).toBeUndefined();

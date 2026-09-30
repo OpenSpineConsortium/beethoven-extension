@@ -1,19 +1,19 @@
 // Signed tokens, checked offline in the browser with WebCrypto: the one verifier the kill-list
-// (killlist.ts) rides on. A port of the check in Ashley's grid/license.js, kept byte-compatible so
-// one issuing tool serves both products:
+// (killlist.ts) rides on. A port of the check in grid/license.js of the vendor's VS Code extension,
+// kept byte-compatible so one issuing tool serves both products:
 //
 //   <prefix>.<base64url(JSON payload)>.<base64url(Ed25519 signature)>
 //
 // The signature covers the ASCII text "<prefix>.<payload part>", so there is no JSON
 // canonicalisation to get wrong. Public keys are listed by key id in keys.json (raw 32-byte
-// Ed25519 keys, base64); the private keys never leave the issuer's machine. Ashley Bridge accepts
+// Ed25519 keys, base64); the private keys never leave the issuer's machine. Beethoven accepts
 // no token of any other kind: access is decided by Licensor's access service (access.ts).
 //
 // Nothing here touches the network or storage: the caller passes the token and the keys, which is
 // what makes the verifier testable with a key generated inside the test.
 import bundledKeys from './keys.json';
 
-/** the prefix of Ashley's revocation list and of the kill-list's signature */
+/** the prefix of the VS Code extension's revocation list and of the kill-list's signature (a format tag the issuing tool checks) */
 export const REV_PREFIX = 'ASHLEYREV1';
 
 export type KeyRing = Record<string, string>;

@@ -1,4 +1,4 @@
-# Ashley Bridge: the browser extension
+# Beethoven: the browser extension
 
 One codebase (WXT + TypeScript, plain DOM) for Chrome and Edge (MV3 service worker + side panel),
 Firefox (MV2 persistent background + sidebar) and a Safari build for Apple's packager. It starts,
@@ -6,6 +6,9 @@ monitors and stops a Claude Code worker on the student's own Open OnDemand clust
 the worker's Claude environment link and session name. It talks to the portal the student connects
 and, after the agreement is accepted, to the maintainer's access service and site (below); never to
 claude.ai.
+
+Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks,
+used here to say what it runs; "Open OnDemand" is the mark of its publisher.
 
 ## What it never does
 
@@ -59,7 +62,7 @@ src/core/
   keys.ts messages.ts       storage keys; the message bus types and the login port's frames
 src/licensing/
   access.ts                 the approval check: services.json, the POST to access_check, the caches (24 h yes, 7 days' grace, 10 min no), the pure decision
-  signed.ts keys.json       the Ed25519 token verifier (port of Ashley grid/license.js) and the one public key the kill-list is signed with
+  signed.ts keys.json       the Ed25519 token verifier (port of grid/license.js in the vendor's VS Code extension) and the one public key the kill-list is signed with
   killlist.ts               the signed kill-list: shape, verification, fail-safe refresh; withdraws versions only
 src/ext/                    storage.ts (browser.storage as the KV the core expects), connectApi.ts (the browser behind core/connect.ts)
 src/ui/                     strip.ts, terminal.ts, details.ts, options.ts, sections.ts, dom.ts, rpc.ts, style.css
@@ -133,8 +136,8 @@ it is the credential boundary, and the extension never reads an Anthropic page o
 
 **Details** (collapsed under the strip) keeps the worker card with the buttons (set up the cluster again, run the
 probe again, sign in on the cluster, start, stop, read status now) under one line saying which copy of the tool
-the account runs ("tool: shared copy, version N at DIR" or "tool: your copy, version N", with the one-line note
-when the shared copy could not be used), the seventeen checks, `rc.log`, the audit log with its export, the
+the account runs ("tool: the lab's shared copy, version N" or "tool: your own copy, version N", never with a path,
+with the one-line note when the shared copy could not be used), the seventeen checks, `rc.log`, the audit log with its export, the
 access line, the settings and the Google Drive step with its done box.
 
 ## What the strip and the buttons do on the cluster
@@ -216,7 +219,7 @@ Claude Code 2.1.283). Its `claude login --plain` prints the framework's lines (`
 `HPCW-LOGIN-FAILED`) and takes the typed code on its standard input; any code of six or more letters, digits, `#`,
 `_` or `-` is accepted (no mock authorize page is needed: the URL is only opened). Flags: `--port N`, `--host H`
 (`127.0.0.1` by default), `--user NAME` (the account the dashboard shows; `student` by default), `--home DIR`,
-`--approve a,b` and `--access-limit N` (the mock's own stand-in for the access service at `/ashley/access_check`, for
+`--approve a,b` and `--access-limit N` (the mock's own stand-in for the access service at `/beethoven/access_check`, for
 the tests only: no build points at it), `--rnode enabled` (503
 instead of 404 on `/rnode/`), `--no-clusters` (the shell closes 3146 "No clusters defined."), `--cold` (first request
 bounces through `/nginx/init`), `--cold-pun MS` (the first `/pun/` request after MS ms of quiet answers 500 once, as
@@ -237,7 +240,7 @@ at `https://ondemand.wayne.localhost:<port>` (Chromium resolves any `*.localhost
 the site `wayne` from the first click, as `ondemand.grid.wayne.edu` does.
 The CLI starts the home with the stand-in set up as the account's own copy: `~/.hpcworker/profile.json` and
 `~/.hpcworker/VERSION` at the version the build carries (`public/framework/files/VERSION`), so the strip finds the
-tool installed and current and uploads nothing; this is what the store reviewer's recipe sees (`tool: your copy,
+tool installed and current and uploads nothing; this is what the store reviewer's recipe sees (`tool: your own copy,
 version N` under Details). `--fresh-home` starts with the stand-in command only: the strip then uploads the real
 framework and runs its install, which refuses a mock site (it has no profile for `localhost`) and whose jobs the
 stand-in scheduler would never run anyway, so the upload path can be watched only up to that refusal.
@@ -266,7 +269,7 @@ real Shell app would crash there.
 
 ## The cluster-side contract
 
-`src/core/contract.ts` follows framework version 5 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
+`src/core/contract.ts` follows framework version 6 (`framework/VERSION`; `bin/hpcworker`, `lib/login_plain.sh`,
 `jobs/probe.sbatch`, `jobs/worker.sbatch.tpl`, `profiles/<site>.json`). The build (`scripts/sync-framework.mjs`, run before every build
 and zip) bundles `framework/**` as it is on disk, copies the root `LICENSE.txt` and `PRIVACY.md` over the shipped
 copies, and stops with exit 1 when the copied `LICENSE.txt`'s "Version N, date" line disagrees with `TERMS_VERSION`
@@ -315,24 +318,25 @@ that is asleep).
 There are no licence keys (decided 2026-09-29; `src/licensing/access.ts` has the contract in its header). Who
 the student is comes from their own sign-in to their Open OnDemand portal: the account name the dashboard shows
 for the signed-in session ("Logged in as ...", read by `PortalClient.session()`), never a typed name, never a
-cookie, and never the home directory's owner (that fallback names paths only). Whether they may use Ashley
-Bridge is the maintainer's approved list, asked by the background alone: it reads `access_check` from
-`https://openspineconsortium.com/ashley/services.json` (cached a day) and POSTs
-`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"5.0.0"}` as
+cookie, and never the home directory's owner (that fallback names paths only). Whether they may use
+Beethoven is the maintainer's approved list, asked by the background alone: it reads `access_check` from
+`https://openspineconsortium.com/beethoven/services.json` (cached a day) and POSTs
+`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"7.0.0"}` as
 `text/plain;charset=UTF-8` without cookies when the portal tab connects, about once a day, and on a toolbar click
 after a no or a failed attempt or once the last yes is a day old; never before the acceptance record is in
 storage (the same gate as the kill-list). A yes is kept 24 hours (up to 7 days while the service cannot be
 reached; check 1 turns WARN after the first day); a no is kept 10 minutes, and the strip's one button becomes *Ask for access*, which opens
-`https://openspineconsortium.com/ashley/request.html?access_id=<account>`. The one URL taken from an answer is a
+`https://openspineconsortium.com/beethoven/request.html?access_id=<account>`. The one URL taken from an answer is a
 page on that site. Workers start only while the answer is yes; read-only checks never wait on it.
 
 ## The signed kill-list
 
-Fetched once a day from `https://openspineconsortium.com/ashley/bridge-killlist.json` (the server must send
+Fetched once a day from `https://openspineconsortium.com/beethoven/killlist.json` (the server must send
 `Access-Control-Allow-Origin: *`: the extension holds no host permission for that origin). Shape and verification
 in `src/licensing/killlist.ts`: outer JSON `{v, kid, issued, revoked_versions, revoked_lids, message, sig}` where
 `sig` is `ASHLEYREV1.<base64url payload>.<base64url Ed25519 signature>` over `ASHLEYREV1.<payload>`, the same
-scheme and public key as Ashley's revocation list. Only the signed payload is trusted; offline keeps the last good
+scheme and public key as the revocation list of the vendor's VS Code extension (`ASHLEYREV1` is that format's tag,
+which the issuing tool checks). Only the signed payload is trusted; offline keeps the last good
 list; a withdrawn version stops sending commands (the chokepoint refuses anything that mutates) and still reads status.
 Since 4.0.0 the list withdraws versions only; `revoked_lids` is read for older lists and never acted on.
 

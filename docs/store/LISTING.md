@@ -1,11 +1,13 @@
 # Store listing texts, per store
 
-The exact texts to paste into each store's dashboard for Ashley Bridge 6.0.0, and the answers to
-each store's questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval
-of the account the portal shows, confirmed with the access service), `PRIVACY.md` version 5 and
-`LICENSE.txt` version 4, and brought up to date for 6.0.0 the same evening (the cluster-side tool may
-be one copy that the university's lab keeps for all its students); before anything is pasted, read
-the built extension (`extension/.output/`) once more for every `fetch`, `WebSocket` and
+The exact texts to paste into each store's dashboard for Beethoven 7.0.0, and the answers to each
+store's questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
+account the portal shows, confirmed with the access service), brought up to date for 6.0.0 the same
+evening (the cluster-side tool may be one copy that the university's lab keeps for all its students)
+and for 7.0.0 the same night (the public name is Beethoven; the pages, the services file and the
+kill-list moved to `/beethoven/` and the access service answers under a second name; `PRIVACY.md`
+version 7 and `LICENSE.txt` version 6, which say nothing new about data); before anything is
+pasted, read the built extension (`extension/.output/`) once more for every `fetch`, `WebSocket` and
 `tabs.create` and confirm the facts below.
 `SUBMISSION.md` beside this file says where each text goes, click by click. `../STORE_LISTING.md`
 is the longer compliance document these texts come from.
@@ -16,14 +18,16 @@ Facts every text below rests on:
   from the page script on the one origin the student granted, with the browser attaching the
   portal's session cookie as it does for the portal's own pages; the extension never reads that
   cookie. (2) The maintainer's access service, at the `access_check` address named in
-  `https://openspineconsortium.com/ashley/services.json`: the approval check, a POST sent without
-  cookies, carrying the account name the portal's dashboard shows for the signed-in session (never a
-  typed one), the portal's hostname, the product (`bridge`) and the version, answered yes or no. It
-  is made only after the agreement is accepted and the portal is connected: when the portal
-  connects, about once a day, and on an icon click after a no or once the last yes is a day old; a
-  yes is kept 24 h (up to 7 days when the service is unreachable), a no 10 minutes.
-  (3) `https://openspineconsortium.com/ashley/services.json` and
-  `https://openspineconsortium.com/ashley/bridge-killlist.json`, once a day each, GETs sent without
+  `https://openspineconsortium.com/beethoven/services.json`
+  (`https://beethoven-access.openspineconsortium.workers.dev/access_check`): the approval check, a
+  POST sent without cookies, carrying the account name the portal's dashboard shows for the
+  signed-in session (never a typed one), the portal's hostname, the product (`bridge`) and the
+  version, answered yes or no. It is made only after the agreement is accepted and the portal is
+  connected: when the portal connects, about once a day, and on an icon click after a no or once
+  the last yes is a day old; a yes is kept 24 h (up to 7 days when the service is unreachable), a
+  no 10 minutes.
+  (3) `https://openspineconsortium.com/beethoven/services.json` and
+  `https://openspineconsortium.com/beethoven/killlist.json`, once a day each, GETs sent without
   cookies for the service address and the signed list of withdrawn versions; they carry no data
   about the person.
 - It opens pages in new tabs and runs nothing on them: the portal's own pages, Anthropic's sign-in
@@ -41,14 +45,16 @@ Facts every text below rests on:
   way runs there.
 - There is no licence key, no activation request, no error or crash reporting and no usage data: the
   code has none. The person's own sign-in to the portal identifies them; nothing is typed or pasted.
-- Fixed public URLs: landing `https://openspineconsortium.com/ashley/bridge/`, privacy
-  `https://openspineconsortium.com/ashley/bridge/privacy.html`, terms
-  `https://openspineconsortium.com/ashley/bridge/terms.html`, support
-  `https://openspineconsortium.com/ashley/support.html`, request page
-  `https://openspineconsortium.com/ashley/request.html`.
-- The store packages are `extension/.output/ashley-bridge-6.0.0-chrome.zip` (Chrome Web Store and
-  Edge Add-ons), `extension/.output/ashley-bridge-6.0.0-firefox.zip` (Firefox) and
-  `extension/.output/ashley-bridge-6.0.0-sources.zip` (the source upload Firefox requires).
+- Fixed public URLs: landing `https://openspineconsortium.com/beethoven/`, privacy
+  `https://openspineconsortium.com/beethoven/privacy.html`, terms
+  `https://openspineconsortium.com/beethoven/terms.html`, support
+  `https://openspineconsortium.com/beethoven/support.html`, request page
+  `https://openspineconsortium.com/beethoven/request.html`.
+- The store packages are `extension/.output/beethoven-7.0.0-chrome.zip` (Chrome Web Store and
+  Edge Add-ons), `extension/.output/beethoven-7.0.0-firefox.zip` (Firefox) and
+  `extension/.output/beethoven-7.0.0-sources.zip` (the source upload Firefox requires).
+- Beethoven runs Claude Code and is not an Anthropic product. The name carries no Anthropic mark;
+  "Claude" and "Claude Code" appear in the texts only to say what it runs.
 - Publisher, until the LLC exists: Gregory Schwing, trading as OpenSpineConsortium. The product
   name and identifier carry no university name.
 
@@ -57,28 +63,34 @@ Facts every text below rests on:
 ### Name
 
 ```
-Ashley Bridge
+Beethoven
 ```
 
-### Short description (the manifest `description`; 125 characters; Chrome and Edge take it from the package)
+### Short description (the manifest `description`; 128 characters, within the 132 at most that Chrome's manifest documentation allows; Chrome and Edge take it from the package)
 
 ```
-Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.
+Starts, watches and stops a Claude Code worker on your university's Open OnDemand cluster and hands you its Remote Control link.
 ```
 
-### Detailed description (plain text; 4,726 characters; under every store's limit: Chrome 16,000, Edge 10,000)
+This is what the 7.0.0 package carries (`extension/wxt.config.ts` and `extension/package.json`;
+`extension/test/hygiene.test.ts` fails above 132). It is the sentence decided on 2026-09-29 without
+its leading name, which every store shows beside the description anyway. With the name the sentence
+was 138 characters (counted the way the 125, 4,726 and 241 of the earlier texts were), over the limit.
+Not tested: whether a store would have refused the 138.
+
+### Detailed description (plain text; 4,755 characters; under every store's limit: Chrome 16,000, Edge 10,000)
 
 ```
-Ashley Bridge starts, watches and stops a Claude Code worker in your own account on your university's cluster, through the Open OnDemand portal you already use, and hands you the link that shows that worker at claude.ai/code and in the Claude app (Anthropic's Remote Control feature).
+Beethoven starts, watches and stops a Claude Code worker in your own account on your university's cluster, through the Open OnDemand portal you already use, and hands you the link that shows that worker at claude.ai/code and in the Claude app (Anthropic's Remote Control feature).
 
 WHAT YOU NEED
 - An account on a cluster with an Open OnDemand portal (version 3 or 4, with its Shell and Files apps).
 - Your own Claude account on a plan that includes Claude Code Remote Control (Pro or Max).
-- Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/ashley/request.html with the account name your portal shows for you. Once you are approved the extension just works: there is no key and nothing to paste.
+- Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/beethoven/request.html with the account name your portal shows for you. Once you are approved the extension just works: there is no key and nothing to paste.
 
 HOW IT WORKS
 1. Open your portal in a tab and sign in as usual.
-2. Click the Ashley Bridge button on that tab. The first click asks your browser to allow that one site. The panel then does the steps by itself and says what it is doing: it wakes the portal up, checks you are signed in, confirms your account is approved, sets up its small set of scripts for your cluster account if they are not there (where your university's lab keeps one shared copy, it points your account at that copy), runs one short check job on a compute node, shows you where your work goes and takes your statement about it, starts your worker through the portal's own shell, and waits for Claude Code to connect.
+2. Click the Beethoven button on that tab. The first click asks your browser to allow that one site. The panel then does the steps by itself and says what it is doing: it wakes the portal up, checks you are signed in, confirms your account is approved, sets up its small set of scripts for your cluster account if they are not there (where your university's lab keeps one shared copy, it points your account at that copy), runs one short check job on a compute node, shows you where your work goes and takes your statement about it, starts your worker through the portal's own shell, and waits for Claude Code to connect.
 3. Sign in to Claude once, when the panel asks. It opens Anthropic's sign-in page in a new tab; you sign in with your own account, click Authorize, and paste the code the page shows into the panel's one box. The code is typed once into your own job's terminal and is not kept.
 
 When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off), and the panel shows a green "Open in Claude" button for later. The worker stays on by itself until you press Stop.
@@ -93,12 +105,12 @@ WHAT IT NEVER DOES
 - It never deletes your files. It removes only its own state files and cancels only the job it started.
 
 WHAT IT KEEPS
-On your device only: the portal address you connected, your preferences, your acceptance of the agreement, the account name your portal shows and the last approval answer, your statement about each workspace, and an audit log of every request it made to your portal, which you can read, export and clear. Privacy statement: https://openspineconsortium.com/ashley/bridge/privacy.html
+On your device only: the portal address you connected, your preferences, your acceptance of the agreement, the account name your portal shows and the last approval answer, your statement about each workspace, and an audit log of every request it made to your portal, which you can read, export and clear. Privacy statement: https://openspineconsortium.com/beethoven/privacy.html
 
 ACCESS AND TERMS
-Ashley Bridge is licensed, not sold, and works only from an institutional account the maintainer has approved. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. A paid Full Edition, if offered later, is a separate agreement. Terms: https://openspineconsortium.com/ashley/bridge/terms.html  Support: https://openspineconsortium.com/ashley/support.html
+Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. A paid Full Edition, if offered later, is a separate agreement. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
 
-Ashley Bridge runs Claude Code and is not an Anthropic product; "Claude" is Anthropic's mark. "Open OnDemand" is the mark of its publisher. Ashley Bridge is not provided by or on behalf of any university. It is a research and teaching tool, not a medical device. Offered in the United States.
+Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. Beethoven is not provided by or on behalf of any university. It is a research and teaching tool, not a medical device. Offered in the United States.
 ```
 
 ### Single-purpose statement
@@ -134,29 +146,29 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Question | Answer |
 |---|---|
 | Does the extension collect or transmit user data to the developer? | Yes, one item of personal information: the institutional account name your portal shows for you, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version) to answer whether that account is approved, when you connect, when you click the icon and about once a day. Nothing else: no authentication information, no communications, no website content, no browsing history, no user activity, no location, no financial or health data. The two daily GETs of the developer's services file and signed withdrawn-versions list carry no data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/ashley/bridge/privacy.html (it names the approval check, what the developer records from it, and what the extension keeps on the device: settings, the account name and last answer, an acceptance record and an audit log). |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (it names the approval check, what the developer records from it, and what the extension keeps on the device: settings, the account name and last answer, an acceptance record and an audit log). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
-| Limited Use statement (on the landing page) | Ashley Bridge's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
+| Limited Use statement (on the landing page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
 ### The negative statements (listing, privacy policy and reviewer notes, verbatim)
 
 ```
-- Ashley Bridge has no access to claude.ai or any Anthropic page. It does not run on those sites, does not read them and does not change them. It opens an Anthropic page in a new tab in two cases (the sign-in page Claude Code printed during a sitting you started; your session's claude.ai/code link when your worker connects) and the connectors settings page for the optional Google Drive step, as a bookmark would; nothing of the extension runs there.
-- Ashley Bridge never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own page; the one-time code you paste into the extension's box is typed once into your own job's terminal on your cluster and is not stored, not logged and not sent anywhere else; the extension reads only whether Claude Code says it is signed in.
-- Ashley Bridge runs no code it did not ship with. Its daily update check downloads a signed list, not a program.
-- Ashley Bridge works with one website: the Open OnDemand portal you connect. It requests access to that site when you click its icon on that site's tab, and to nothing else. Its only other requests go to the maintainer: the approval check, which sends the account name your portal shows for you, your portal's address, the product name and its version, so the maintainer's access service can answer whether that account is approved; and a daily download, from the maintainer's website, of that service's address and the signed list of withdrawn versions, which carries nothing about you.
-- Ashley Bridge does not read your portal cookie and does not sign in for you. When your portal asks for a sign-in, the extension asks you to sign in in a tab. There is no key and nothing to paste: your institution's own sign-in identifies you.
-- Ashley Bridge sends its maintainer no usage data, no error reports and no activation request; the approval check is the only thing it sends about you. Its audit log of what it asked your portal never contains what you typed to sign in and is never transmitted.
+- Beethoven has no access to claude.ai or any Anthropic page. It does not run on those sites, does not read them and does not change them. It opens an Anthropic page in a new tab in two cases (the sign-in page Claude Code printed during a sitting you started; your session's claude.ai/code link when your worker connects) and the connectors settings page for the optional Google Drive step, as a bookmark would; nothing of the extension runs there.
+- Beethoven never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own page; the one-time code you paste into the extension's box is typed once into your own job's terminal on your cluster and is not stored, not logged and not sent anywhere else; the extension reads only whether Claude Code says it is signed in.
+- Beethoven runs no code it did not ship with. Its daily update check downloads a signed list, not a program.
+- Beethoven works with one website: the Open OnDemand portal you connect. It requests access to that site when you click its icon on that site's tab, and to nothing else. Its only other requests go to the maintainer: the approval check, which sends the account name your portal shows for you, your portal's address, the product name and its version, so the maintainer's access service can answer whether that account is approved; and a daily download, from the maintainer's website, of that service's address and the signed list of withdrawn versions, which carries nothing about you.
+- Beethoven does not read your portal cookie and does not sign in for you. When your portal asks for a sign-in, the extension asks you to sign in in a tab. There is no key and nothing to paste: your institution's own sign-in identifies you.
+- Beethoven sends its maintainer no usage data, no error reports and no activation request; the approval check is the only thing it sends about you. Its audit log of what it asked your portal never contains what you typed to sign in and is never transmitted.
 ```
 
 ### URLs
 
 | Field | Value |
 |---|---|
-| Homepage / website | `https://openspineconsortium.com/ashley/bridge/` |
-| Privacy policy | `https://openspineconsortium.com/ashley/bridge/privacy.html` |
-| Terms (where a store asks, or in the description) | `https://openspineconsortium.com/ashley/bridge/terms.html` |
-| Support | `https://openspineconsortium.com/ashley/support.html` |
+| Homepage / website | `https://openspineconsortium.com/beethoven/` |
+| Privacy policy | `https://openspineconsortium.com/beethoven/privacy.html` |
+| Terms (where a store asks, or in the description) | `https://openspineconsortium.com/beethoven/terms.html` |
+| Support | `https://openspineconsortium.com/beethoven/support.html` |
 
 ### Images (all in `extension/store-assets/`, listed in its `manifest.txt`)
 
@@ -182,8 +194,8 @@ Suggested order for the five Chrome slots: 04 (online, green button), 03 (sign-i
 | Store icon | `extension/public/icon/128.png` |
 | Screenshots (1280x800) | the five named above |
 | Small promo tile (440x280), Marquee (1400x560) | `promo-tile-440x280.png`, `marquee-1400x560.png` (optional fields) |
-| Official URL / Homepage URL | `https://openspineconsortium.com/ashley/bridge/` (the "official" flag needs the domain verified in Google Search Console under the same Google account) |
-| Support URL | `https://openspineconsortium.com/ashley/support.html` |
+| Official URL / Homepage URL | `https://openspineconsortium.com/beethoven/` (the "official" flag needs the domain verified in Google Search Console under the same Google account) |
+| Support URL | `https://openspineconsortium.com/beethoven/support.html` |
 | Mature content | No |
 | Single purpose | the single-purpose statement above |
 | Permission justification: storage, alarms, scripting, activeTab, sidePanel | the sentences above, one per field |
@@ -192,7 +204,7 @@ Suggested order for the five Chrome slots: 04 (online, green button), 03 (sign-i
 | Data usage: personally identifiable information | ticked (the institutional account name the portal shows, sent in the approval check; the sentence from the privacy-practices table above) |
 | Data usage: every other category | unticked (nothing else is collected or transmitted to the developer) |
 | Certifications | the three, ticked |
-| Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` |
+| Privacy policy URL | `https://openspineconsortium.com/beethoven/privacy.html` |
 | Visibility (Distribution) | Unlisted first, then Public (section 1 of `SUBMISSION.md`) |
 | Regions | United States only (the terms say "offered in the United States"; this also keeps the EU trader declaration out of the picture) |
 | Payments | Free (no in-store payment; the maintainer approves institutional accounts, and the description says so) |
@@ -204,13 +216,13 @@ the text in `SUBMISSION.md`, section 4.
 
 | Field | Text |
 |---|---|
-| Package | `ashley-bridge-6.0.0-chrome.zip` (the same Chromium package) |
+| Package | `beethoven-7.0.0-chrome.zip` (the same Chromium package) |
 | Availability: Visibility | Hidden first (only people with the link can install), then Public |
 | Availability: Markets | United States |
 | Properties: Category | Developer tools |
-| Properties: Privacy policy URL | `https://openspineconsortium.com/ashley/bridge/privacy.html` |
-| Properties: Website URL | `https://openspineconsortium.com/ashley/bridge/` |
-| Properties: Support contact | `https://openspineconsortium.com/ashley/support.html` |
+| Properties: Privacy policy URL | `https://openspineconsortium.com/beethoven/privacy.html` |
+| Properties: Website URL | `https://openspineconsortium.com/beethoven/` |
+| Properties: Support contact | `https://openspineconsortium.com/beethoven/support.html` |
 | Properties: Mature content | No |
 | Properties: Does this extension access, collect, transmit or use personal information? | Yes (the institutional account name the portal shows, in the approval check; the privacy policy says what and why) |
 | Store listing (English (United States)): Description | the detailed description above |
@@ -224,7 +236,7 @@ the text in `SUBMISSION.md`, section 4.
 ### Reviewer notes (Edge "Notes for certification" and Firefox "Notes to reviewer")
 
 ```
-Ashley Bridge starts, watches and stops a Claude Code job in the user's own account on their university's cluster, through the Open OnDemand web portal (an open-source portal run by universities), and shows the user the link Claude Code prints when it registers with Anthropic's Remote Control feature.
+Beethoven starts, watches and stops a Claude Code job in the user's own account on their university's cluster, through the Open OnDemand web portal (an open-source portal run by universities), and shows the user the link Claude Code prints when it registers with Anthropic's Remote Control feature.
 
 Why no live test account can be given: the extension works only against a university's Open OnDemand portal, which needs a university account, its VPN and often a second factor. No reviewer can be issued one, and we cannot lend ours (one person, one account is a term of the portal and of Anthropic's service).
 
@@ -235,9 +247,11 @@ What you can do instead: the source package contains a mock portal (mock-ood/ser
   3. MOCK_LOGGED_IN=false node mock-ood/server.mjs --port 8443 --host localhost --user st1234 --cert cert.pem --key key.pem
   4. Load the built extension (.output/firefox-mv2/manifest.json as a temporary add-on; .output/chrome-mv3 unpacked). Open https://localhost:8443/login , accept the certificate exception, click "Sign in as st1234".
   5. On the extension's setup page (it opens on install): scroll the agreement to its end, tick the four statements, type a name, "Accept and Continue". There is no key and nothing else to enter.
-  6. Click the Ashley Bridge toolbar button on the portal tab. The browser asks to allow https://localhost:8443; allow it. The panel then runs the steps by itself: it reads the account name the mock's dashboard shows (st1234), asks our access service whether that account is approved (it is: st1234 is on the approved list for exactly this recipe), reads the mock's files, submits the stand-in check job, opens the sign-in step (the mock prints a real-looking claude.ai authorize link with a mock client id, which Anthropic's page declines: close that tab and type any six letters or digits into the panel's box), asks for the data statement, starts the stand-in worker and shows the green "Open in Claude" button with a claude.ai/code link the stand-in wrote. Under "Details", "Run the checks" runs the extension's seventeen checks against the mock. Run the mock with another --user and the panel's one button becomes "Ask for access", which opens our request page with that name filled in; that is the whole of what an unapproved person sees.
+  6. Click the Beethoven toolbar button on the portal tab. The browser asks to allow https://localhost:8443; allow it. The panel then runs the steps by itself: it reads the account name the mock's dashboard shows (st1234), asks our access service whether that account is approved (it is: st1234 is on the approved list for exactly this recipe), reads the mock's files, submits the stand-in check job, opens the sign-in step (the mock prints a real-looking claude.ai authorize link with a mock client id, which Anthropic's page declines: close that tab and type any six letters or digits into the panel's box), asks for the data statement, starts the stand-in worker and shows the green "Open in Claude" button with a claude.ai/code link the stand-in wrote. Under "Details", "Run the checks" runs the extension's seventeen checks against the mock. Run the mock with another --user and the panel's one button becomes "Ask for access", which opens our request page with that name filled in; that is the whole of what an unapproved person sees.
 
-What the extension never does: no code, host permission or content script on claude.ai, anthropic.com or claude.com (it opens those pages in a new tab only); no reading of any Claude credential (the user signs in on Anthropic's page; the one-time code they paste is relayed once to their own cluster shell and kept nowhere); no remote code (the daily update check fetches one signed JSON list and verifies it with WebCrypto); no cookies, tabs, webRequest, nativeMessaging, debugger or identity permission; no install-time host permission (the one portal origin is requested from the click); no licence key and no password of ours (the user's own portal sign-in identifies them). What it sends us: the approval check only (the account name the portal shows, the portal hostname, the product and the version, answered yes or no; we record those with the time, a salted hash of the network address and the answer); no analytics, no error reports, no activation. The only other requests to our site are the daily GETs of https://openspineconsortium.com/ashley/services.json and https://openspineconsortium.com/ashley/bridge-killlist.json without cookies. A campus can pin the extension with browser policy: the host list is the one portal origin the user grants.
+What the extension never does: no code, host permission or content script on claude.ai, anthropic.com or claude.com (it opens those pages in a new tab only); no reading of any Claude credential (the user signs in on Anthropic's page; the one-time code they paste is relayed once to their own cluster shell and kept nowhere); no remote code (the daily update check fetches one signed JSON list and verifies it with WebCrypto); no cookies, tabs, webRequest, nativeMessaging, debugger or identity permission; no install-time host permission (the one portal origin is requested from the click); no licence key and no password of ours (the user's own portal sign-in identifies them). What it sends us: the approval check only (the account name the portal shows, the portal hostname, the product and the version, answered yes or no; we record those with the time, a salted hash of the network address and the answer); no analytics, no error reports, no activation. The only other requests to our site are the daily GETs of https://openspineconsortium.com/beethoven/services.json and https://openspineconsortium.com/beethoven/killlist.json without cookies; the approval check goes to https://beethoven-access.openspineconsortium.workers.dev/access_check, and its product field reads "bridge", the extension's name on the wire since its first version. A campus can pin the extension with browser policy: the host list is the one portal origin the user grants.
+
+Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. It is not provided by or on behalf of any university, Anthropic or the Open OnDemand project.
 ```
 
 ## Firefox Add-ons (AMO)
@@ -245,21 +259,21 @@ What the extension never does: no code, host permission or content script on cla
 | Field | Text |
 |---|---|
 | Distribution | "On this site" (listed) for the public release; "On your own" (self-distributed, signed .xpi) is the equivalent of Chrome's unlisted channel and passes the same review (section 3 of `SUBMISSION.md`) |
-| Package | `ashley-bridge-6.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `ashley-bridge@openspineconsortium.com`) |
-| Name | Ashley Bridge |
-| Add-on URL (slug) | `ashley-bridge` |
+| Package | `beethoven-7.0.0-firefox.zip` (`manifest_version` 2, `strict_min_version` 140.0, id `beethoven@openspineconsortium.com`) |
+| Name | Beethoven |
+| Add-on URL (slug) | `beethoven` (if AMO has it taken, the nearest free slug, and the install link in `SUBMISSION.md` section 5 follows it) |
 | Summary (250 characters at most; this one is 241) | see below |
 | Description | the detailed description above |
 | Categories (Firefox) | Web Development; Other |
-| Support email / Support website | the notice address on the support page / `https://openspineconsortium.com/ashley/support.html` |
-| Homepage | `https://openspineconsortium.com/ashley/bridge/` |
-| Privacy policy | paste the text of `PRIVACY.md` (version 5); the field is free text, shown on the listing |
-| License | Custom license: paste `LICENSE.txt` (version 4); it is not an open-source licence |
+| Support email / Support website | the notice address on the support page / `https://openspineconsortium.com/beethoven/support.html` |
+| Homepage | `https://openspineconsortium.com/beethoven/` |
+| Privacy policy | paste the text of `PRIVACY.md` (version 7); the field is free text, shown on the listing |
+| License | Custom license: paste `LICENSE.txt` (version 6); it is not an open-source licence |
 | "This add-on requires payment, non-free services or software, or additional hardware" | ticked, with the sentence: "Requires approval of your institutional account by the maintainer, asked for on the maintainer's request page; there is no key. The Trial Edition is free for approved accounts; no payment is taken in this version. It also needs an account on a university cluster with an Open OnDemand portal and the user's own Claude account (Pro or Max)." |
 | Data collection (from the manifest) | `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }`; AMO shows it as required data collection, and the privacy policy text names the one item (the institutional account name in the approval check) |
-| Source code | Yes, upload `ashley-bridge-6.0.0-sources.zip` with the build note below |
+| Source code | Yes, upload `beethoven-7.0.0-sources.zip` with the build note below |
 | Notes to reviewer | the reviewer notes above, then the build note below |
-| Version notes (6.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped. Where your university's lab keeps one shared copy of the cluster-side tool, the extension points your account at it instead of uploading its own." |
+| Version notes (7.0.0) | "First store release. No licence key: your own sign-in to your university's portal identifies you, and the extension confirms with the maintainer's access service that your account is approved. The toolbar button runs the steps; the Claude sign-in happens inside the panel through the user's own cluster shell; the worker stays on by itself until stopped. Where your university's lab keeps one shared copy of the cluster-side tool, the extension points your account at it instead of uploading its own." |
 
 ### Summary (241 characters)
 
@@ -270,23 +284,25 @@ Starts, watches and stops your own Claude Code worker on your university's Open 
 ### Source-code upload note (the sources zip and how to rebuild)
 
 ```
-Source: ashley-bridge-6.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds, as text, the cluster-side scripts the extension uploads to the user's account where the university keeps no shared copy of them (with the site profiles, which say whether it does), and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
+Source: beethoven-7.0.0-sources.zip, produced by "npm run zip" (wxt zip -b firefox --mv2). It holds the extension project (package.json, package-lock.json, wxt.config.ts, src/, public/, scripts/, test/, mock-ood/, README.md). public/framework/ holds, as text, the cluster-side scripts the extension uploads to the user's account where the university keeps no shared copy of them (with the site profiles, which say whether it does), and public/LICENSE.txt and public/PRIVACY.md the agreement texts; all three are copied into the package unchanged.
 
 Build (Node 22, npm 10; we used Node 22.23.3):
   npm ci
   npm run build:firefox        # = wxt build -b firefox --mv2 ; output in .output/firefox-mv2
 
-That output is the content of the uploaded package: on 2026-09-29 a rebuild from this sources zip in a fresh folder gave 30 files, every one byte-identical to the uploaded package (SHA-256 compared). The bundle is minified by Vite for size and not obfuscated; every symbol is traceable to src/. Note: "npm run build" (both browsers) first runs scripts/sync-framework.mjs, which regenerates public/framework from a ../framework folder that sits outside the extension project; it is not needed to reproduce the package and the sources zip does not carry that folder.
+That output is the content of the uploaded package: on 2026-09-30 a rebuild from this sources zip in a fresh folder gave 30 files, every one byte-identical to the uploaded package (SHA-256 compared). The bundle is minified by Vite for size and not obfuscated; every symbol is traceable to src/. Note: "npm run build" (both browsers) first runs scripts/sync-framework.mjs, which regenerates public/framework from a ../framework folder that sits outside the extension project; it is not needed to reproduce the package and the sources zip does not carry that folder.
 ```
 
 (The rebuild check: unzip the sources zip into an empty folder, `npm ci`, `npm run build:firefox`, then
 hash every file under `.output/firefox-mv2` on both sides. Done for the 4.0.0 packages on
 2026-09-29 at 19:16 UTC with Node 22.23.3 and npm 10.9.9: the sources zip held 76 files; the rebuild gave 30
 files, every one SHA-256-identical to `.output/firefox-mv2` and to the content of
-`ashley-bridge-4.0.0-firefox.zip`. Done again for the 6.0.0 packages on 2026-09-29 at 22:26 UTC with the
-same Node and npm: the sources zip held 76 files; the rebuild gave 30 files, every one SHA-256-identical to
-`.output/firefox-mv2` and to the content of `ashley-bridge-6.0.0-firefox.zip` (the file in `release/6.0.0/`).
-Repeat it if the packages are rebuilt before upload, and change the date in the note above.)
+the 4.0.0 Firefox zip. Done again for the 6.0.0 packages on 2026-09-29 at 22:26 UTC with the same Node
+and npm: the sources zip held 76 files; the rebuild gave 30 files, every one SHA-256-identical to
+`.output/firefox-mv2` and to the content of the 6.0.0 Firefox zip in `release/6.0.0/`. Done for the
+7.0.0 packages on 2026-09-30 at 01:39 UTC with the same Node and npm: the sources zip held 76 files; the
+rebuild gave 30 files, every one SHA-256-identical to `.output/firefox-mv2` and to the content of
+`beethoven-7.0.0-firefox.zip`, the file in `release/7.0.0/`.)
 
 ## Safari
 

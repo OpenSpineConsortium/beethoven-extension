@@ -12,7 +12,7 @@ import { accessDue, accessFact, APPROVED_GRACE_MS, APPROVED_TTL_MS, askService, 
 const T0 = Date.parse('2026-09-29T12:00:00Z');
 const at = (ms: number) => new Date(ms);
 const iso = (ms: number) => new Date(ms).toISOString();
-const CHECK = 'https://ashley-service.openspineconsortium.workers.dev/access_check';
+const CHECK = 'https://beethoven-access.openspineconsortium.workers.dev/access_check';
 const SERVICES: StoredServices = { fetched_at: iso(T0), access_check: CHECK, request_page: REQUEST_PAGE_URL };
 
 interface Seen {
@@ -127,14 +127,14 @@ describe('the answers', () => {
   });
 
   it('takes the request page only from Licensor\'s own site, and fills the account name in', () => {
-    expect(safeSitePage('https://openspineconsortium.com/ashley/request.html')).toBe('https://openspineconsortium.com/ashley/request.html');
-    expect(safeSitePage('http://openspineconsortium.com/ashley/request.html')).toBeUndefined();
-    expect(safeSitePage('https://openspineconsortium.com.evil.example/ashley/request.html')).toBeUndefined();
+    expect(safeSitePage('https://openspineconsortium.com/beethoven/request.html')).toBe('https://openspineconsortium.com/beethoven/request.html');
+    expect(safeSitePage('http://openspineconsortium.com/beethoven/request.html')).toBeUndefined();
+    expect(safeSitePage('https://openspineconsortium.com.evil.example/beethoven/request.html')).toBeUndefined();
     expect(safeSitePage('https://evil.example/?x=openspineconsortium.com')).toBeUndefined();
     expect(safeSitePage(42)).toBeUndefined();
-    expect(requestUrl(undefined, 'st1234')).toBe('https://openspineconsortium.com/ashley/request.html?access_id=st1234');
-    expect(requestUrl('https://openspineconsortium.com/ashley/request.html', 'a.b@c')).toBe('https://openspineconsortium.com/ashley/request.html?access_id=a.b%40c');
-    expect(requestUrl('https://evil.example/request.html', 'st1234')).toBe('https://openspineconsortium.com/ashley/request.html?access_id=st1234');
+    expect(requestUrl(undefined, 'st1234')).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=st1234');
+    expect(requestUrl('https://openspineconsortium.com/beethoven/request.html', 'a.b@c')).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=a.b%40c');
+    expect(requestUrl('https://evil.example/request.html', 'st1234')).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=st1234');
     expect(requestUrl(undefined)).toBe(REQUEST_PAGE_URL);
   });
 });
@@ -227,7 +227,7 @@ describe('the pure decision', () => {
     const f = on(approvedRecord(3_600_000));
     expect(f.ok).toBe(true);
     expect(f.detail).toBe('Access approved for st1234 at ondemand.grid.wayne.edu (checked 2026-09-29 11:00 UTC)');
-    expect(f.requestUrl).toBe('https://openspineconsortium.com/ashley/request.html?access_id=st1234');
+    expect(f.requestUrl).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=st1234');
     expect(f.checkedAt).toBe(T0 - 3_600_000);
     expect(f.accessId).toBe('st1234');
     expect(f.portal).toBe('ondemand.grid.wayne.edu');
@@ -268,10 +268,10 @@ describe('against the mock portal\'s stand-in for the service', () => {
   it('approves st1234 and refuses another account, over the exact wire contract, with no cookie', async () => {
     const mock = await createMockPortal({ user: 'st1234', seedTool: false });
     try {
-      const servicesUrl = `${mock.origin}/ashley/services.json`;
+      const servicesUrl = `${mock.origin}/beethoven/services.json`;
       const yes = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl });
       expect(yes.record).toMatchObject({ approved: true, access_id: 'st1234', until: null });
-      expect(yes.services?.access_check).toBe(`${mock.origin}/ashley/access_check`);
+      expect(yes.services?.access_check).toBe(`${mock.origin}/beethoven/access_check`);
       const no = await checkAccess({ services: yes.services, accessId: 'zz9999', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl });
       expect(no.record).toMatchObject({ approved: false, access_id: 'zz9999', request_page: REQUEST_PAGE_URL });
       expect(mock.state.accessChecks).toBe(2);
@@ -284,11 +284,11 @@ describe('against the mock portal\'s stand-in for the service', () => {
         expect(h.cookie).toBe('');
       }
       // the preflight and the CORS headers the real Worker must send, so a browser lets the answer through
-      const pre = await fetch(`${mock.origin}/ashley/access_check`, { method: 'OPTIONS' });
+      const pre = await fetch(`${mock.origin}/beethoven/access_check`, { method: 'OPTIONS' });
       expect(pre.status).toBe(204);
       expect(pre.headers.get('access-control-allow-origin')).toBe('*');
       expect(pre.headers.get('access-control-allow-methods')).toMatch(/POST/);
-      const post = await fetch(`${mock.origin}/ashley/access_check`, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: '{"v":1' });
+      const post = await fetch(`${mock.origin}/beethoven/access_check`, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: '{"v":1' });
       expect(post.status).toBe(400);
       expect(post.headers.get('access-control-allow-origin')).toBe('*');
       expect(post.headers.get('cache-control')).toBe('no-store');
@@ -300,7 +300,7 @@ describe('against the mock portal\'s stand-in for the service', () => {
   it('a 429 from the service keeps the last word and says so', async () => {
     const mock = await createMockPortal({ user: 'st1234', seedTool: false, accessLimit: 1 });
     try {
-      const servicesUrl = `${mock.origin}/ashley/services.json`;
+      const servicesUrl = `${mock.origin}/beethoven/services.json`;
       const first = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl, now: () => at(T0) });
       expect(first.record.approved).toBe(true);
       const second = await checkAccess({ previous: first.record, services: first.services, accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl, now: () => at(T0 + APPROVED_TTL_MS + 1) });

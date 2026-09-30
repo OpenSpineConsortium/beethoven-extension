@@ -1,11 +1,13 @@
-# Ashley Bridge for testers
+# Beethoven for testers
 
 What you do, in order, from asking for access to your first worker. There is no key and nothing to
 paste anywhere: your own sign-in to your university's Open OnDemand portal identifies you, and the
 extension confirms with the maintainer's access service that your account is approved. If an
 instruction you were given earlier mentions a key, it is out of date; this page replaces it.
 
-Written 2026-09-29 for Ashley Bridge 4.0.0 and brought up to date for 6.0.0.
+Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0 and for 7.0.0, the first build named
+Beethoven. If you tested an earlier build under another name, remove it from your browser before you
+install this one; your approval carries over, and you accept the agreement once more.
 
 ## What you need
 
@@ -19,11 +21,11 @@ Written 2026-09-29 for Ashley Bridge 4.0.0 and brought up to date for 6.0.0.
 
 ## 1. Ask for access
 
-Open `https://openspineconsortium.com/ashley/request.html` and fill in the form with the account name
+Open `https://openspineconsortium.com/beethoven/request.html` and fill in the form with the account name
 your portal shows for you (at Wayne State your AccessID, two letters and four digits, such as
 `ab1234`; it is the name the portal's dashboard shows next to "Logged in as"), your name, your
-institutional e-mail and a line on what you will use it for. Send it. There is no automatic e-mail:
-Greg approves requests in his console and tells you when yours is approved.
+institutional e-mail and a line on what you will use it for. Send it. There is no automatic e-mail
+to you: Greg approves requests and tells you when yours is approved.
 
 If you skip this step, the extension still installs and still shows you the agreement, but its one
 button after that will read *Ask for access*; it opens the same form with your account name filled
@@ -45,7 +47,7 @@ all the setup page needs; nothing else is entered there.
 
 1. Open your portal in a tab and sign in the usual way (VPN first if your university requires it).
    Keep the tab open.
-2. Click the Ashley Bridge icon in the toolbar (pin it from the extensions menu if it is hidden).
+2. Click the Beethoven icon in the toolbar (pin it from the extensions menu if it is hidden).
    The first click asks your browser to allow that one site; allow it. The panel then does the
    steps by itself and says in one line what it is doing: it wakes the portal up, checks you are
    signed in, confirms your account is approved, sets up its small set of scripts for your own
@@ -87,8 +89,8 @@ product name and the extension's version, answered yes or no; the service record
 time, a salted hash of your network address and the answer. Once a day it also downloads, without
 cookies, two small files from the maintainer's website (the service address and the signed list of
 withdrawn versions), which carry nothing about you. No usage data, no error reports, no activation.
-The full statement is `PRIVACY.md` (version 5), also at
-`https://openspineconsortium.com/ashley/bridge/privacy.html`.
+The full statement is `PRIVACY.md` (version 7), also at
+`https://openspineconsortium.com/beethoven/privacy.html`.
 
 ## What to send when something does not work
 
@@ -96,6 +98,6 @@ The full statement is `PRIVACY.md` (version 5), also at
 - Under *Details*: *Run the checks*, then the list as it stands (a screenshot is fine).
 - The audit log's export from *Details* or the setup page; it holds one line per request the
   extension made to your portal and never what you typed.
-- If a worker started: the `rc.log` tail under *Details*.
+- If a worker started: the end of the worker's log under *Details*.
 
 Nothing you send this way contains a credential: the extension has none of yours to send.

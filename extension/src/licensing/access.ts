@@ -1,15 +1,15 @@
-// Approval by Licensor's access service. Ashley Bridge has no keys. The person is authenticated
+// Approval by Licensor's access service. Beethoven has no keys. The person is authenticated
 // by their own sign-in to their Open OnDemand portal (university single sign-on), and the
 // extension reads the account name the portal's dashboard shows for that session (core/portal.ts
 // session(), the same name check 4 records); nothing typed ever stands in for it, and no cookie
 // is read. Authorization is Licensor's approved list, asked through one small request, only after
 // the agreement is accepted and a portal is connected:
 //
-//   address:  https://openspineconsortium.com/ashley/services.json, key "access_check" (cached 24 h)
+//   address:  https://openspineconsortium.com/beethoven/services.json, key "access_check" (cached 24 h)
 //   request:  POST <access_check>, Content-Type text/plain;charset=UTF-8 (no preflight), no cookies
 //             {"v":1,"access_id":"st1234","portal":"ondemand.grid.wayne.edu","product":"bridge","version":"4.0.0"}
 //   answers:  200 {"approved":true,"access_id":"st1234","checked":"<iso>","until":null|"<iso>"}
-//             200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/ashley/request.html"}
+//             200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html"}
 //             400 a malformed body; 429 the service's rate limit. Anything else, or nothing, is "no answer".
 //
 // Caches and grace: an approval is good for 24 hours without asking again, and is kept up to
@@ -21,10 +21,11 @@
 //
 // Nothing here touches the browser: storage, fetch and the clock are handed in, so the whole
 // thing runs in Node against a fake service.
+import { PRODUCT_NAME } from '../core/terms';
 
-export const SERVICES_URL = 'https://openspineconsortium.com/ashley/services.json';
+export const SERVICES_URL = 'https://openspineconsortium.com/beethoven/services.json';
 export const SITE_ORIGIN = 'https://openspineconsortium.com';
-export const REQUEST_PAGE_URL = `${SITE_ORIGIN}/ashley/request.html`;
+export const REQUEST_PAGE_URL = `${SITE_ORIGIN}/beethoven/request.html`;
 export const PRODUCT = 'bridge';
 /** how often the background asks by itself (minutes) */
 export const ACCESS_PERIOD_MINUTES = 24 * 60;
@@ -193,7 +194,7 @@ export function accessFact(o: FactOpts): AccessFact {
   const url = requestUrl(r?.request_page ?? o.services?.request_page, id);
   const base = { accessId: id, portal: at, requestUrl: url, versionRevoked: !!o.versionRevoked, warn: false };
   const fact = (ok: boolean, state: AccessState, detail: string, needsCheck: boolean, extra: Partial<AccessFact> = {}): AccessFact => ({ ok, state, detail, needsCheck, ...base, ...extra });
-  if (o.versionRevoked) return fact(false, 'version-revoked', `This version of Ashley Bridge has been withdrawn; update to continue. ${o.revokedMessage ?? ''}`.trim(), false);
+  if (o.versionRevoked) return fact(false, 'version-revoked', `This version of ${PRODUCT_NAME} has been withdrawn; update to continue. ${o.revokedMessage ?? ''}`.trim(), false);
   if (o.checking) return fact(false, 'checking', "Checking your access with Licensor's service...", false);
   if (!id) return fact(false, 'no-identity', 'your access cannot be checked until your portal shows who is signed in (open it in a tab and sign in there)', true);
   const answered = r?.approved !== undefined;
@@ -201,17 +202,17 @@ export function accessFact(o: FactOpts): AccessFact {
   if (!r) return fact(false, 'checking', `not checked yet for ${id}${where}`, true);
   const checkedAt = r.checked_at ? new Date(r.checked_at).getTime() : undefined;
   const due = accessDue(r, o.now);
-  if (!answered) return fact(false, 'unreachable', `Licensor's access service has not answered yet (${r.last_error ?? 'no answer'}); Ashley Bridge starts no worker until it has`, due, { checkedAt });
+  if (!answered) return fact(false, 'unreachable', `Licensor's access service has not answered yet (${r.last_error ?? 'no answer'}); ${PRODUCT_NAME} starts no worker until it has`, due, { checkedAt });
   if (r.approved) {
     const untilT = r.until ? new Date(r.until).getTime() : NaN;
-    if (Number.isFinite(untilT) && untilT < o.now.getTime()) return fact(false, 'denied', `your approval for ${id}${where} ended on ${String(r.until).slice(0, 10)}; ask for access again if you still need Ashley Bridge`, due, { checkedAt });
+    if (Number.isFinite(untilT) && untilT < o.now.getTime()) return fact(false, 'denied', `your approval for ${id}${where} ended on ${String(r.until).slice(0, 10)}; ask for access again if you still need ${PRODUCT_NAME}`, due, { checkedAt });
     const age = ageMs(r.checked_at, o.now);
     const head = `Access approved for ${id}${where} (checked ${stamp(r.checked_at)})`;
     if (age < APPROVED_TTL_MS) return fact(true, 'approved', head, false, { checkedAt });
     if (age < APPROVED_GRACE_MS) return fact(true, 'stale', `${head}; the service has not confirmed it since${r.last_error ? ` (${r.last_error})` : ''}; kept for seven days`, due, { checkedAt, warn: true });
-    return fact(false, 'lapsed', `your approval for ${id}${where} was last confirmed ${stamp(r.checked_at)} and Licensor's access service has not answered for seven days${r.last_error ? ` (${r.last_error})` : ''}; Ashley Bridge starts no worker until it does`, due, { checkedAt });
+    return fact(false, 'lapsed', `your approval for ${id}${where} was last confirmed ${stamp(r.checked_at)} and Licensor's access service has not answered for seven days${r.last_error ? ` (${r.last_error})` : ''}; ${PRODUCT_NAME} starts no worker until it does`, due, { checkedAt });
   }
-  if (r.withdrawn) return fact(false, 'withdrawn', `Access withdrawn: ask again if you still need Ashley Bridge (your account ${id}${where} is no longer on the approved list; checked ${stamp(r.checked_at)})`, due, { checkedAt });
+  if (r.withdrawn) return fact(false, 'withdrawn', `Access withdrawn: ask again if you still need ${PRODUCT_NAME} (your account ${id}${where} is no longer on the approved list; checked ${stamp(r.checked_at)})`, due, { checkedAt });
   return fact(false, 'denied', `your account ${id}${where} is not on the approved list yet (checked ${stamp(r.checked_at)})`, due, { checkedAt });
 }
 

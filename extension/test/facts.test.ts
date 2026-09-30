@@ -148,7 +148,7 @@ describe('gathering the facts', () => {
     const ok = await gatherFacts(await env());
     expect(ok.facts.access).toMatchObject({ ok: true, state: 'approved', accessId: 'ab1234', portal: 'ood.example', needsCheck: false, warn: false });
     expect(ok.facts.access.detail).toBe(`Access approved for ab1234 at ood.example (checked ${iso(NOW_MS - 3_600_000).slice(0, 16).replace('T', ' ')} UTC)`);
-    expect(ok.facts.access.requestUrl).toBe('https://openspineconsortium.com/ashley/request.html?access_id=ab1234');
+    expect(ok.facts.access.requestUrl).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=ab1234');
     // past a day with the service silent: still good, warned, and due (the strip asks the background quietly)
     const stale = await gatherFacts(await env({ access: approved(APPROVED_TTL_MS + 1, { last_error: 'x', last_attempt_at: iso(NOW_MS - 3_600_000) }) }));
     expect(stale.facts.access).toMatchObject({ ok: true, state: 'stale', warn: true, needsCheck: true });

@@ -57,7 +57,7 @@ filled in); the maintainer approves in the admin console, and the next click of 
 
 1. **Open the portal tab.** Connect the VPN, sign in at `ondemand.grid.wayne.edu`, and keep the tab
    open.
-2. **Click the Ashley Bridge icon.** The first time, the browser asks once to allow that one site.
+2. **Click the Beethoven icon.** The first time, the browser asks once to allow that one site.
    Then the extension works through its steps by itself and says which one it is on: it wakes the
    portal's web server up, checks the sign-in, installs `hpcworker` into the account if it is not
    there (files through the Files app, one install line through the shell), runs one check job on
@@ -100,7 +100,7 @@ reads that page or the clipboard.
 
 Wayne State's generative-AI guideline says "All AI tools must first be approved by C&IT; third-party AI
 bots are not approved for use at this time," and bars FERPA data, PII, PHI, financial and HR records
-and "unsanitized research data" from AI tools. Until C&IT approves, Ashley Bridge is, on the face of
+and "unsanitized research data" from AI tools. Until C&IT approves, Beethoven is, on the face of
 that guideline, a third-party AI bot. The request to C&IT presents it as what it is:
 
 - The AI is the student's own Claude Code, under the student's own Anthropic subscription, running as an
@@ -144,7 +144,7 @@ measured: `default` reaches `warrior`).
 
 Both precede any paid edition; neither blocks the free, approved-list pilot on the maintainer's own account.
 
-1. **Wayne State C&IT:** written approval of Ashley Bridge as a supervised, user-run Claude Code inside
+1. **Wayne State C&IT:** written approval of Beethoven as a supervised, user-run Claude Code inside
    a batch job, under the generative-AI guideline, with the data restrictions above. Ask also whether
    the reverse proxy admits compute nodes.
 2. **Anthropic:** a written answer, through the route the Claude Code legal page names, on hosting the

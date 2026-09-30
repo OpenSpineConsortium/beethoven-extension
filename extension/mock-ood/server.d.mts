@@ -24,7 +24,7 @@ export interface MockPortalOptions {
   sharedVersion?: string;
   /** the home the seeded tool prints and records in place of the real one (MOCK_DISPLAY_HOME); default: the virtual home */
   displayHome?: string;
-  /** the account names the access-service stand-in (/ashley/access_check, tests only) approves; default ['st1234'] */
+  /** the account names the access-service stand-in (/beethoven/access_check, tests only) approves; default ['st1234'] */
   approved?: string[];
   /** access checks past this many answer 429; 0 = no limit */
   accessLimit?: number;

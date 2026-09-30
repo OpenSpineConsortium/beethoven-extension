@@ -11,12 +11,18 @@ import { local, portalSettings, session } from './storage';
 export const connectApi: ConnectApi = {
   containsOrigin: (origin) => browser.permissions.contains({ origins: [`${origin}/*`] }),
   async scriptRegisteredFor() {
-    const existing = await browser.scripting.getRegisteredContentScripts({ ids: [SCRIPT_ID] }).catch(() => []);
-    const m = existing[0]?.matches?.[0];
+    const all = await browser.scripting.getRegisteredContentScripts().catch(() => []);
+    // the extension registers one page script; one under another id is an earlier build's (7.0.0
+    // renamed the id), which a browser that keeps registrations across an update would go on loading
+    // into the portal, even after a disconnect, so it goes here
+    const stale = all.map((s) => s.id).filter((id) => id !== SCRIPT_ID);
+    if (stale.length) await browser.scripting.unregisterContentScripts({ ids: stale }).catch(() => undefined);
+    const m = all.find((s) => s.id === SCRIPT_ID)?.matches?.[0];
     return m ? m.replace(/\/\*$/, '') : undefined;
   },
   registerScript: (origin) => browser.scripting.registerContentScripts([{ id: SCRIPT_ID, js: [SCRIPT_FILE], matches: [`${origin}/*`], runAt: 'document_idle', persistAcrossSessions: true }]),
-  unregisterScript: () => browser.scripting.unregisterContentScripts({ ids: [SCRIPT_ID] }).catch(() => undefined),
+  // no filter: every page script this extension registered, an earlier build's included
+  unregisterScript: () => browser.scripting.unregisterContentScripts().catch(() => undefined),
   async inject(tabId) {
     await browser.scripting.executeScript({ target: { tabId }, files: [SCRIPT_FILE] });
   },

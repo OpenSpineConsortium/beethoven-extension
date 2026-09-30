@@ -17,7 +17,7 @@ import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, SERVICES_KEY, S
 import { accessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import type { PortalApi, SessionInfo } from './portal';
-import { recordInForce, TERMS_KEY } from './terms';
+import { PRODUCT_NAME, recordInForce, TERMS_KEY } from './terms';
 
 export interface DiagEnv {
   version: string;
@@ -93,7 +93,7 @@ function discoveryOf(ctx: DiagCtx): Discovery | undefined {
 }
 
 /** The sign-in instruction, used wherever a check points at it. */
-export const SIGN_IN_INSTRUCTION = `Choose "Sign in on the cluster": the strip at the top opens a small terminal, asks a compute node for Claude Code's own sign-in, opens Anthropic's sign-in page in a tab, and takes the code that page shows in one box; Claude Code exchanges the code on the compute node and Ashley Bridge never sees the credential. (The same sitting is "${commands.claudeLogin}" in the portal's own shell.) Never use setup-token: Remote Control needs a full sign-in.`;
+export const SIGN_IN_INSTRUCTION = `Choose "Sign in on the cluster": the strip at the top opens a small terminal, asks a compute node for Claude Code's own sign-in, opens Anthropic's sign-in page in a tab, and takes the code that page shows in one box; Claude Code exchanges the code on the compute node and ${PRODUCT_NAME} never sees the credential. Never use setup-token: Remote Control needs a full sign-in.`;
 
 export function buildNodes(): DiagNode<DiagCtx>[] {
   return [
@@ -103,7 +103,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'access',
       dependsOn: [],
       assumption: "the terms are accepted in this browser; Licensor's access service has confirmed, within the last day (an older answer is kept up to seven days when the service cannot be reached), that the account your portal's dashboard shows is on the approved list; the kill-list is valid and this version is not withdrawn",
-      manualFix: 'Open the setup page and accept the terms. If your account is not approved yet, ask for access with the button in the strip; once the maintainer has approved it, click the Ashley Bridge button again.',
+      manualFix: `Open the setup page and accept the terms. If your account is not approved yet, ask for access with the button in the strip; once the maintainer has approved it, click the ${PRODUCT_NAME} button again.`,
       fixAction: 'open-onboarding',
       futureRisk: 'an approval withdrawn from the list, a withdrawn release, or a service outage longer than seven days changes the answer without any change on the cluster',
       async check(ctx) {
@@ -127,7 +127,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'browser',
       dependsOn: [],
       assumption: 'the student granted this extension access to exactly one origin, their Open OnDemand portal',
-      manualFix: 'Open your portal in a tab and click the Ashley Bridge button there; the browser asks you to allow that one site.',
+      manualFix: `Open your portal in a tab and click the ${PRODUCT_NAME} button there; the browser asks you to allow that one site.`,
       fixAction: 'connect-portal',
       futureRisk: 'Firefox and Safari let a person revoke a site permission from the address bar; the grant is re-checked at every start',
       async check(ctx) {
@@ -142,7 +142,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'browser',
       dependsOn: ['origin-granted'],
       assumption: 'a portal tab is open, so the page script that carries your sign-in can answer (this extension never reads cookies; it works only from your own portal tab)',
-      manualFix: 'Open your portal in a tab and keep it open while Ashley Bridge works.',
+      manualFix: `Open your portal in a tab and keep it open while ${PRODUCT_NAME} works.`,
       fixAction: 'open-portal',
       futureRisk: 'a browser that unloads background tabs aggressively makes the page script disappear until the tab is shown again',
       async check(ctx) {
@@ -155,7 +155,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'portal',
       dependsOn: ['portal-tab'],
       assumption: 'GET /pun/sys/dashboard/ answers 200 with the dashboard (a redirect to a sign-in page or a VPN page means it does not)',
-      manualFix: 'Connect the VPN and sign in to your portal in its tab, then check again. Ashley Bridge never signs in for you.',
+      manualFix: `Connect the VPN and sign in to your portal in its tab, then check again. ${PRODUCT_NAME} never signs in for you.`,
       fixAction: 'open-portal',
       futureRisk: 'the portal session lasts about eight hours; a 302 or 401 after that is the sign to sign in again',
       async check(ctx) {
@@ -207,8 +207,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         const installed = l.files.some((f) => f.name === '.hpcworker' && f.type === 'd');
         // which copy: the shared-copy marker in ~/.hpcworker (framework 5) means the lab's; a listing that fails says nothing either way
         const inner = installed ? await portalOf(ctx).listDir(paths.root(h)).catch(() => undefined) : undefined;
-        const which = !inner ? '' : inner.files.some((f) => f.name === 'shared' && f.type !== 'd') ? " (your lab's shared copy)" : ' (your own copy)';
-        return { ok: true, warn: !uploads, detail: `${h}: ${l.files.length} entries${uploads ? ', uploads allowed' : ', uploads disabled at this site (writes still use PUT)'}${installed ? `; hpcworker is installed${which}` : '; hpcworker not installed yet'}` };
+        const which = !inner ? '' : inner.files.some((f) => f.name === 'shared' && f.type !== 'd') ? " (the lab's shared copy)" : ' (your own copy)';
+        return { ok: true, warn: !uploads, detail: `your home folder: ${l.files.length} entries${uploads ? ', uploads allowed' : ', uploads disabled at this site (writes still use PUT)'}${installed ? `; the tool is set up${which}` : '; the tool is not set up yet'}` };
       },
     },
     {
@@ -267,7 +267,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
           which = `the portal host (${host}), because the shell host is "default" and the discovery did not name the login node; a 404 here can also mean the proxy admits only compute nodes`;
         }
         const r = await portalOf(ctx).probeRnode(host);
-        return { ok: true, warn: r.state === 'unknown', detail: `${r.detail}; probed /rnode/${host}/1/, ${which}` };
+        return { ok: true, warn: r.state === 'unknown', detail: `${r.detail}; asked for ${which}` };
       },
     },
     {
@@ -305,7 +305,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       slow: true,
       async check(ctx) {
         const p = await probeFile(ctx);
-        if (!p) return { ok: false, detail: `no probe.json at ${paths.probe(await stateDir(ctx))} yet: the probe job has not run (or has not finished)` };
+        if (!p) return { ok: false, detail: 'no probe report yet: the probe job has not run (or has not finished)' };
         const v = probeVerdict(p);
         return { ok: v.ok, warn: v.warn, detail: v.detail };
       },
@@ -321,7 +321,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       async check(ctx) {
         const p = await probeFile(ctx);
         const v = p?.image?.claude_version;
-        return v ? { ok: true, detail: `claude ${v} (node ${p?.image?.node_version ?? '?'}, first exec ${p?.image?.first_exec_seconds ?? '?'} s)` } : { ok: false, detail: `the probe reported no Claude Code version${p?.image?.path ? ` from ${p.image.path}` : ''}` };
+        return v ? { ok: true, detail: `claude ${v} (node ${p?.image?.node_version ?? '?'}, first exec ${p?.image?.first_exec_seconds ?? '?'} s)` } : { ok: false, detail: 'the probe reported no Claude Code version from the worker image' };
       },
     },
     {
@@ -352,7 +352,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Remote Control consent recorded',
       layer: 'claude',
       dependsOn: ['claude-login'],
-      assumption: 'the student\'s answer to Claude Code\'s one-time "Enable Remote Control?" is on record: Claude Code\'s own settings file (remoteDialogSeen), or the marker file Ashley Bridge writes when the data statement is acknowledged; the probe reads that; the image\'s `claude remote-control` accepts the flags the job uses',
+      assumption: 'the student\'s answer to Claude Code\'s one-time "Enable Remote Control?" is on record: Claude Code\'s own settings file (remoteDialogSeen), or the marker file ' + PRODUCT_NAME + ' writes when the data statement is acknowledged; the probe reads that; the image\'s `claude remote-control` accepts the flags the job uses',
       manualFix: `Make the data statement in the strip at the top: it writes the answer for your worker. ${SIGN_IN_INSTRUCTION} If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
       fixAction: 'acknowledge',
       futureRisk: 'Anthropic can change Remote Control eligibility for a plan class at any time; a running job\'s status.json is where it would show',
@@ -382,9 +382,9 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         const x = p?.xdg_fix;
         if (!x) return { ok: true, warn: true, detail: 'the probe did not report on the runtime directory' };
         const inImage = x.in_image === true || (typeof x.in_image === 'string' && /^(true|ok|writable|yes)/i.test(x.in_image));
-        if (!x.host_writable) return { ok: false, detail: `${x.dir ?? '/dev/shm/$USER/xdg'} is not writable on the node` };
-        if (!inImage) return { ok: false, detail: `${x.dir ?? 'the runtime directory'} is writable on the node but not inside the image (${String(x.in_image ?? 'not reported')})` };
-        return { ok: true, detail: `${x.dir ?? '/dev/shm runtime directory'} works on the node and inside the image` };
+        if (!x.host_writable) return { ok: false, detail: 'the runtime directory in /dev/shm is not writable on the node' };
+        if (!inImage) return { ok: false, detail: `the runtime directory is writable on the node but not inside the image (${String(x.in_image ?? 'not reported')})` };
+        return { ok: true, detail: 'the runtime directory in /dev/shm works on the node and inside the image' };
       },
     },
     {
@@ -404,7 +404,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
         try {
           const sd = await stateDir(ctx);
           if (profileRestricts(ctx.cache.profile, name)) restricted = `the site profile marks the workspace of worker "${name}" restricted`;
-          else if (await portalOf(ctx).exists(paths.restrictedMarker(sd, name))) restricted = `the workspace ${paths.workspace(sd, name)} is marked restricted (.restricted file present)`;
+          else if (await portalOf(ctx).exists(paths.restrictedMarker(sd, name))) restricted = `the workspace of worker "${name}" is marked restricted (.restricted file present)`;
           else markerNote = '; the workspace is not marked restricted';
         } catch {
           markerNote = '; the restricted marker could not be checked (no portal tab)';
@@ -421,7 +421,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'portal',
       dependsOn: ['signed-in'],
       assumption: 'the portal session lasts about eight hours; after that (or on the first 302/401) the student signs in again in a tab and nothing is cached across the re-login',
-      manualFix: 'Sign in to the portal again in its tab. Ashley Bridge keeps nothing from the old session.',
+      manualFix: `Sign in to the portal again in its tab. ${PRODUCT_NAME} keeps nothing from the old session.`,
       fixAction: 'open-portal',
       async check(ctx) {
         const seen = await ctx.env.session.get<{ checked_at: string }>(SESSION_SEEN_KEY);

@@ -9,6 +9,7 @@
 // Storage is passed in (browser.storage.local in the content script, a Map in tests). Records are
 // redacted on the way in, never on the way out.
 import { auditEndpoint, redact } from './redact';
+import { PRODUCT_NAME } from './terms';
 
 export interface AuditRecord {
   /** UTC time */
@@ -195,7 +196,7 @@ export class Audit {
         const r = await this.revocation();
         if (r?.revoked) {
           await this.append(state, { ts: new Date(this.now()).toISOString(), ...base, bytes: 0, outcome: 'refused: this version has been withdrawn' });
-          return new RevokedError(`This version of Ashley Bridge has been withdrawn and no longer sends commands. ${r.message || 'Update to continue.'}`.trim());
+          return new RevokedError(`This version of ${PRODUCT_NAME} has been withdrawn and no longer sends commands. ${r.message || 'Update to continue.'}`.trim());
         }
       }
       state.last[meta.cls] = this.now();

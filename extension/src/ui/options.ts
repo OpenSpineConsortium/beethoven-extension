@@ -1,9 +1,9 @@
 // The setup page (manifest options_ui; opened on install, from right-click > Options, and from the
-// strip): the signing dialog (ported from Ashley's termsPanel), the access card, connecting or
-// disconnecting the portal by address, the settings, the audit log with its export, and the Google
-// Drive step. Built to the assent pattern the cases enforce: conspicuous notice, un-prechecked
-// boxes whose sentence names the exact button, a typed name, never install-equals-accept; and the
-// text stays exportable and printable.
+// strip): the signing dialog (ported from the termsPanel of the vendor's VS Code extension), the
+// access card, connecting or disconnecting the portal by address, the settings, the audit log with
+// its export, and the Google Drive step. Built to the assent pattern the cases enforce: conspicuous
+// notice, un-prechecked boxes whose sentence names the exact button, a typed name, never
+// install-equals-accept; and the text stays exportable and printable.
 import { browser } from 'wxt/browser';
 import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, PRODUCT_NAME, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, type Affirmation, type TermsRecord } from '../core/terms';
 import { browserName, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
@@ -175,7 +175,7 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
 
 /**
  * Your access: who you are is the account your portal shows once you are signed in there (your
- * university's own sign-in); whether you may use Ashley Bridge is Licensor's approved list, asked
+ * university's own sign-in); whether you may use Beethoven is Licensor's approved list, asked
  * by the background when the portal connects and about once a day. Nothing is typed here: the
  * card shows the last answer and offers the two things a person can do.
  */
@@ -183,7 +183,7 @@ function accessCard(s: AccessSummary, notify: Notify, done: () => Promise<void>)
   const a = s.access;
   const card = el('div', { class: 'card' });
   add(card,
-    el('p', {}, "There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and Ashley Bridge asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version. Not approved yet? Ask for access; the maintainer approves it, and the next click on the Ashley Bridge button checks again."),
+    el('p', {}, `There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and ${PRODUCT_NAME} asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version. Not approved yet? Ask for access; the maintainer approves it, and the next click on the ${PRODUCT_NAME} button checks again.`),
     accessLine(a),
     a.accessId
       ? el('div', { class: 'muted small', text: `account ${a.accessId}${a.portal ? ` at ${a.portal}` : ''}${a.checkedAt ? `; the service last answered ${fmtTime(new Date(a.checkedAt).toISOString())}` : '; the service has not answered yet'}` })

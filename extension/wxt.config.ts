@@ -1,4 +1,4 @@
-// Ashley Bridge: the manifest, exactly as the research report's permission table specifies it.
+// Beethoven: the manifest, exactly as the research report's permission table specifies it.
 // One codebase; WXT emits the Chrome/Edge MV3 service worker, the Firefox MV2 persistent
 // background with a sidebar, and the Safari build for Apple's packager.
 //
@@ -10,8 +10,10 @@
 // the withdrawn-versions list), with plain cross-origin fetches and no host permission.
 import { defineConfig } from 'wxt';
 
+// the manifest description: at most 132 characters in Chrome's manifest documentation; this is 128
+// (docs/store/LISTING.md, "Short description"), and test/hygiene.test.ts holds it to the limit
 const SINGLE_PURPOSE =
-  "Start, monitor and stop a Claude Code worker on your university's Open OnDemand cluster and hand you its Remote Control link.";
+  "Starts, watches and stops a Claude Code worker on your university's Open OnDemand cluster and hands you its Remote Control link.";
 
 export default defineConfig({
   hooks: {
@@ -39,20 +41,20 @@ export default defineConfig({
     // mock portal on plain http://localhost is grantable too; a release build never lists it.
     const hosts = ['https://*/*', ...(mode === 'development' ? ['http://localhost/*', 'http://127.0.0.1/*'] : [])];
     return {
-      name: 'Ashley Bridge',
-      short_name: 'Ashley Bridge',
+      name: 'Beethoven',
+      short_name: 'Beethoven',
       description: SINGLE_PURPOSE,
       author: 'OpenSpineConsortium',
-      homepage_url: 'https://openspineconsortium.com/ashley/bridge',
+      homepage_url: 'https://openspineconsortium.com/beethoven/',
       permissions: ['storage', 'alarms', 'scripting', 'activeTab', ...(chromium ? ['sidePanel'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
       // no default_popup: the toolbar button is the "go" button (action.onClicked opens the strip and,
       // from a portal tab, asks for that one origin in the same gesture); WXT spells it browser_action on MV2
-      action: { default_title: 'Ashley Bridge' },
+      action: { default_title: 'Beethoven' },
       ...(chromium ? { minimum_chrome_version: '148' } : {}),
       browser_specific_settings: {
         gecko: {
-          id: 'ashley-bridge@openspineconsortium.com',
+          id: 'beethoven@openspineconsortium.com',
           strict_min_version: '140.0',
           // Required by AMO for every new extension since 2025-11-03. Since 4.0.0 the truthful answer
           // is personallyIdentifyingInfo: the approval check sends the vendor's access service the

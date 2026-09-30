@@ -239,7 +239,7 @@ describe('diagnostics', () => {
     expect(by['login-discovery']!.detail).toMatch(/login node warrior/);
     expect(by['login-discovery']!.detail).toMatch(/scheduler slurm/);
     expect(by['login-discovery']!.detail).toMatch(/apptainer/);
-    expect(by['reverse-proxy']!.detail).toMatch(/probed \/rnode\/warrior\/1\/, the login node the shell reached/);
+    expect(by['reverse-proxy']!.detail).toMatch(/asked for the login node the shell reached \(warrior\)/);
     expect(by['probe-job']!.detail).toMatch(/egress direct/);
     expect(by['probe-job']!.detail).toMatch(/asx15/);
     expect(by['worker-binary']!.detail).toMatch(/2\.1\.283/);
@@ -268,10 +268,16 @@ describe('diagnostics', () => {
 
   it('the probe is read from the profile\'s shared_state_dir, expanded with the username', async () => {
     // without a profile the tool's own folder is assumed, so a probe written under the CephFS path is not found
-    const rep = await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE, withProfile: false }), ack: true }));
+    // (the check's words name no path, so where it looked is taken from the reads themselves)
+    const asked: string[] = [];
+    const base = fakePortal({}, { probe: GOOD_PROBE, withProfile: false });
+    const portal: PortalApi = { ...base, readFileIfExists: async (p) => { asked.push(p); return base.readFileIfExists(p); } };
+    const rep = await runDiagnostics(buildNodes(), await ctxWith({ portal, ack: true }));
     const probe = rep.reports.find((r) => r.id === 'probe-job')!;
     expect(probe.status).toBe('fail');
-    expect(probe.detail).toMatch(/\/home\/ab1234\/\.hpcworker\/probe\/probe\.json/);
+    expect(probe.detail).toBe('no probe report yet: the probe job has not run (or has not finished)');
+    expect(asked).toContain('/home/ab1234/.hpcworker/probe/probe.json');
+    expect(asked).not.toContain(`${STATE}/probe/probe.json`);
   });
 
   it('a probe that finds no egress, no sign-in or no consent says so in plain words', async () => {
@@ -357,6 +363,6 @@ describe('diagnostics', () => {
     const by = byId(rep);
     expect(by['shell']!.status).toBe('skipped');
     expect(by['files']!.status).toBe('ok');
-    expect(by['files']!.detail).toMatch(/hpcworker is installed/);
+    expect(by['files']!.detail).toMatch(/the tool is set up/);
   });
 });

@@ -1,0 +1,178 @@
+Beethoven 7.0.0 end to end, run G (account not on the approved list, zz9999), 2026-09-30
+
+Setup: the release build extension/.output/chrome-mv3 (7.0.0, framework 6 bundled) in Playwright Chromium (Chrome for
+Testing 153.0.8010.12), headless=false, a fresh persistent profile with the extension pinned; the mock portal
+(extension/mock-ood/server.mjs) over https, reached at https://localhost:8443,
+with --user zz9999 and MOCK_LOGGED_IN=false.
+The site pages are not published yet: https://openspineconsortium.com/beethoven/services.json and /beethoven/killlist.json were
+answered by the harness (route.fulfill) with the files the site build and the signer wrote into the site repository
+(openspineconsortium.github.io/beethoven/). The access check was not routed: it went to the real beethoven-access.openspineconsortium.workers.dev.
+The toolbar button was pressed on the portal tab with CDP Extensions.triggerAction (the action a click runs); the side panel
+was disabled first, so the background's own fallback opened the strip as a tab; the browser's permission prompt was
+answered with Windows UI Automation (Allow). claude.ai / claude.com / anthropic.com requests the harness could intercept were
+answered locally (STUB lines); a tab the extension opens with tabs.create is attached after its first request, so that one
+request is not intercepted. Times are UTC; "+s" is seconds since the harness started. Headers are not logged; the WebSocket
+token is redacted; lines typed into the portal's shell (SHELL-IN) and what it printed (SHELL-OUT) come from the WebSocket frames,
+with the pasted sign-in code redacted; the extension's own file loads (chrome-extension://) are counted, not listed.
+
+Summary
+  acceptance record written:                   2026-09-30 01:49:55.296  +  20.7 s; vendor requests before it: 0
+  agreement accepted:                          version 6; affirmation 1: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 6, 2026-09-29) and the Privacy Statement, which I have read.
+  first vendor request:                        2026-09-30 01:49:55.308  GET https://openspineconsortium.com/beethoven/killlist.json
+  access check:                                POST https://beethoven-access.openspineconsortium.workers.dev/access_check (content-type text/plain;charset=UTF-8; cookie header none) body {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"7.0.0"} -> 200 {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/beethoven/request.html"}
+  the access check went to the new host:       yes (1 POST(s))
+  requests to an old address (/ashley/*, ashley-service): 0
+  site profile name the extension used:        localhost (from the hostname localhost)
+  "Ask for access" opened:                     https://openspineconsortium.com/beethoven/request.html?access_id=zz9999
+  the old name in page text (whole pages, not only what is on screen):
+      strip: 0
+
+Events and requests, in order
+01:49:35.068 +   0.5 s  SETUP        mock portal: node mock-ood/server.mjs --port 8443 --host localhost --user zz9999 --home <path on this machine> --cert <path on this machine> --key <path on this machine> MOCK_LOGGED_IN=false
+01:49:35.070 +   0.5 s  SETUP        mock says: home dir:  <path on disk>  (shown to the extension as /home/zz9999; the seeded tool prints it as /home/zz9999)
+01:49:35.071 +   0.5 s  SETUP        mock says: tool:      the stand-in, set up as the account's own copy at the version the build carries
+01:49:35.071 +   0.5 s  SETUP        mock says: access:    https://localhost:8443/beethoven/access_check (tests only; approves st1234)
+01:49:35.073 +   0.5 s  SETUP        the mock home before the run: [".hpcworker/bin/hpcworker",".hpcworker/profile.json",".hpcworker/VERSION"]
+01:49:36.974 +   2.4 s  SETUP        Chromium 153.0.8010.12 with .output/chrome-mv3 (7.0.0, framework 6 bundled), fresh profile
+01:49:37.202 +   2.6 s  SETUP        extension id ljkjllefjpjebnnghebkppmdfmnakjoo
+01:49:53.949 +  19.4 s  SETUP-PAGE   page title "Beethoven: setup"
+01:49:53.949 +  19.4 s  CHECK        vendor requests before the agreement was accepted: 0
+01:49:54.378 +  19.8 s  DIALOG       heading: Beethoven Trial Edition License Agreement (version 6) and Privacy Statement
+01:49:54.390 +  19.8 s  DIALOG       first lines of the full text: BEETHOVEN TRIAL EDITION LICENSE AGREEMENT / Version 6, 2026-09-29. Applies to the Trial Edition of Beethoven 7.0.0 and later versions that ship / this text, as distributed through the Chrome Web Store, Microsoft Edge Add-ons, Firefox Add-ons and,
+01:49:55.246 +  20.7 s  DIALOG       tick label 1: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 6, 2026-09-29) and the Privacy Statement, which I have read.
+01:49:55.252 +  20.7 s  DIALOG       boxes ticked 4/4; name "A. Student"; "Accept and Continue" enabled: true
+01:49:55.252 +  20.7 s  CHECK        vendor requests before the agreement was accepted (just before the button): 0
+01:49:55.252 +  20.7 s  ACCEPT       pressed "Accept and Continue"
+01:49:55.308 +  20.7 s  REQUEST      GET https://openspineconsortium.com/beethoven/killlist.json  [extension background (service worker); fetch] -> 200 answer { "v": 1, "kid": "k1", "issued": 1790732210, "revoked_versions": [], "revoked_lids": [], "message": "Beethoven is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDczMjIxMCwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJCZWV0aG92ZW4gaXMgY3VycmVudC4ifQ.M34it
+01:49:55.311 +  20.7 s  ROUTE        GET https://openspineconsortium.com/beethoven/killlist.json answered from the site repository's beethoven/killlist.json (392 bytes)
+01:49:55.318 +  20.7 s  VENDOR-REQ   GET https://openspineconsortium.com/beethoven/killlist.json from extension background (service worker); cookie header none
+01:49:55.325 +  20.7 s  VENDOR-RES   200 https://openspineconsortium.com/beethoven/killlist.json answer { "v": 1, "kid": "k1", "issued": 1790732210, "revoked_versions": [], "revoked_lids": [], "message": "Beethoven is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDczMjIxMCwicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJCZWV0aG92ZW4gaXMgY3VycmVudC4ifQ.M34it
+01:49:55.434 +  20.9 s  ACCEPT       acceptance record in storage: terms_version 6, accepted_at 2026-09-30T01:49:55.296Z, license_sha256 b03b5d26238b51884c96e0acfaef1b8c267bd56383bf415fb07c3de0b3530195, privacy_sha256 c224280e1a0c3549dbc714d8cfcf83f7e83b7d8380962ab215e532836372ebf5, button "Accept and Continue"
+01:49:55.434 +  20.9 s  ACCEPT       affirmation 1 as recorded: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 6, 2026-09-29) and the Privacy Statement, which I have read. (checked true)
+01:49:55.534 +  21.0 s  REQUEST      GET https://localhost:8443/login?go=1&redirect=%2Fpun%2Fsys%2Fdashboard%2F  [tab navigation; document] -> 302
+01:49:55.566 +  21.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [tab navigation; document] -> 200
+01:49:55.733 +  21.2 s  PORTAL       signed in; the dashboard says "Logged in as zz9999"
+01:49:55.738 +  21.2 s  HARNESS      side panel disabled (so the strip opens as a tab through the background fallback)
+01:49:56.267 +  21.7 s  CLICK        toolbar action on the portal tab (Extensions.triggerAction, tab target 1F33980B...)
+01:49:58.829 +  24.2 s  PROMPT       pressed 'Allow' (invoke) in window 'Beethoven - Google Chrome for Testing' (pid 30692)
+01:49:58.831 +  24.2 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+01:49:58.832 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+01:49:58.848 +  24.3 s  GRANT        origin https://localhost:8443 granted: true; strip tab opened: true
+01:49:58.857 +  24.3 s  REQUEST      GET https://openspineconsortium.com/beethoven/services.json  [extension background (service worker); fetch] -> 200 answer { "access_check": "https://beethoven-access.openspineconsortium.workers.dev/access_check", "request": "https://beethoven-access.openspineconsortium.workers.dev/request", "revocation": "https://beethoven-access.openspineconsortium.workers.dev/revoked", "allowlist": "https://beethoven-access.openspine
+01:49:58.858 +  24.3 s  ROUTE        GET https://openspineconsortium.com/beethoven/services.json answered from the site repository's beethoven/services.json (583 bytes)
+01:49:58.862 +  24.3 s  VENDOR-REQ   GET https://openspineconsortium.com/beethoven/services.json from extension background (service worker); cookie header none
+01:49:58.868 +  24.3 s  STRIP        page title "Beethoven"
+01:49:58.872 +  24.3 s  ROUTE        POST https://beethoven-access.openspineconsortium.workers.dev/access_check sent on to the network
+01:49:58.872 +  24.3 s  REQUEST      POST https://beethoven-access.openspineconsortium.workers.dev/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"7.0.0"} answer {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/beethoven/request.html"}
+01:49:58.876 +  24.3 s  VENDOR-RES   200 https://openspineconsortium.com/beethoven/services.json answer { "access_check": "https://beethoven-access.openspineconsortium.workers.dev/access_check", "request": "https://beethoven-access.openspineconsortium.workers.dev/request", "revocation": "https://beethoven-access.openspineconsortium.workers.dev/revoked", "allowlist": "https://beethoven-access.openspine
+01:49:58.876 +  24.3 s  VENDOR-REQ   POST https://beethoven-access.openspineconsortium.workers.dev/access_check from extension background (service worker) body {"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"7.0.0"}; cookie header none
+01:49:58.877 +  24.3 s  SETTINGS     portal settings on file: {"connected_at":"2026-09-30T01:49:58.755Z","hostname":"localhost","origin":"https://localhost:8443","shell_host":"default","site":"localhost"}
+01:49:58.906 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+01:49:58.909 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+01:49:58.913 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+01:49:58.916 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+01:49:58.921 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+01:49:58.928 +  24.3 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999  [page script on the portal tab; fetch] -> 200
+01:49:58.956 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:58.960 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:58.965 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:58.998 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:58.998 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:58.999 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.023 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.027 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.031 +  24.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.060 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.067 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.074 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.100 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.106 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.112 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.124 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:59.129 +  24.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:59.143 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:49:59.157 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:49:59.161 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:49:59.171 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.177 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.203 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.210 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.232 +  24.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:49:59.237 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.243 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.266 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.271 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.277 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.301 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.306 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:49:59.312 +  24.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:49:59.335 +  24.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.359 +  24.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:49:59.382 +  24.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.070 +  25.5 s  VENDOR-RES   200 https://beethoven-access.openspineconsortium.workers.dev/access_check answer {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/beethoven/request.html"}
+01:50:00.095 +  25.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+01:50:00.132 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.138 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.145 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.176 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.183 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.192 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.196 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.209 +  25.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.233 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.246 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.251 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.259 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.272 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.297 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.310 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.316 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.324 +  25.7 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.337 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.362 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.375 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.383 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.389 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.403 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.430 +  25.8 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.444 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.451 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.458 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.472 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.506 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.516 +  25.9 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.569 +  26.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:00.597 +  26.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.624 +  26.0 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.656 +  26.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.685 +  26.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:00.715 +  26.1 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:00.914 +  26.3 s  ACCESS       record: {"access_id":"zz9999","approved":false,"checked_at":"2026-09-30T01:49:58.853Z","last_attempt_at":"2026-09-30T01:49:58.853Z","portal":"localhost","request_page":"https://openspineconsortium.com/beethoven/request.html","v":1}
+01:50:00.918 +  26.3 s  ACCESS       services on file: {"access_check":"https://beethoven-access.openspineconsortium.workers.dev/access_check","fetched_at":"2026-09-30T01:49:58.865Z","request_page":"https://openspineconsortium.com/beethoven/request.html"}
+01:50:00.946 +  26.4 s  STRIP        [access step] Your account zz9999 at localhost is not on the approved list yet. Ask for access; once it is approved, click the Beethoven button again.
+01:50:00.959 +  26.4 s  STRIP        the one button reads "Ask for access"; its title (the address it opens) is "null"
+01:50:01.824 +  27.2 s  SHOT         evidence G-strip-ask-for-access.png viewport 1280x800; "Beethoven" on screen 2x; on-screen text clean
+01:50:01.840 +  27.3 s  NAME-SCAN    the strip at the access step: 0 occurrence(s) of the old name in the page text
+01:50:02.000 +  27.4 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker  [page script on the portal tab; fetch] -> 200
+01:50:02.052 +  27.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/shared?download=1  [page script on the portal tab; fetch] -> 200
+01:50:02.092 +  27.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/VERSION?download=1  [page script on the portal tab; fetch] -> 200
+01:50:02.128 +  27.5 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/profile.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:02.160 +  27.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/probe/probe.json?download=1  [page script on the portal tab; fetch] -> 200
+01:50:02.189 +  27.6 s  REQUEST      GET https://localhost:8443/pun/sys/dashboard/files/fs/home/zz9999/.hpcworker/state/workspaces/worker  [page script on the portal tab; fetch] -> 404
+01:50:15.657 +  41.1 s  REQUEST-PAGE "Ask for access" opened https://openspineconsortium.com/beethoven/request.html?access_id=zz9999
+01:50:15.658 +  41.1 s  REQUEST-PAGE the tab's first request was not seen by the harness (a tab the extension opens is attached after its first request)
+01:50:15.658 +  41.1 s  WAIT         waits 75 s (one poll alarm, where "start my worker when I open my portal" runs) before reading the job list
+01:51:30.666 + 116.1 s  JOBS         the mock's job list (no jobs.json: nothing was ever submitted): []
+01:51:30.672 + 116.1 s  STRIP        still: Your account zz9999 at localhost is not on the approved list yet. Ask for access; once it is approved, click the Beethoven button again.
+01:51:30.674 + 116.1 s  HOME         the mock home after the run: [".hpcworker/bin/hpcworker",".hpcworker/profile.json",".hpcworker/VERSION"]
+01:51:30.675 + 116.1 s  HOME         .hpcworker/shared: absent
+01:51:30.675 + 116.1 s  HOME         .hpcworker/VERSION: "6\n"
+
+Extension file loads (chrome-extension://, not listed): 12
+Requests by initiator and host:
+     1  extension background (service worker) -> beethoven-access.openspineconsortium.workers.dev
+     2  extension background (service worker) -> openspineconsortium.com
+    87  page script on the portal tab -> localhost:8443
+     2  tab navigation -> localhost:8443
+
+Store screenshots taken in this run: none (evidence images kept outside the repository); on-screen leaks (machine path, user name, old name): []

@@ -18,6 +18,7 @@ import { assetUrl, local, session, version } from '../ext/storage';
 import { add, downloadText, el, fmtTime } from './dom';
 import { clearRun, markStopped, openEnvironment, openOptions, openPortalTab, originGranted, portal, portalAlive, refreshRun, startWorkerNow } from './rpc';
 import { accessCard, accessSummary, driveStep } from './sections';
+import { PRODUCT_NAME } from '../core/terms';
 
 export type Kind = 'ok' | 'warn' | 'fail' | 'info';
 export type Notify = (kind: Kind, text: string) => void;
@@ -59,7 +60,7 @@ export async function detailsSections(env: DetailsEnv): Promise<HTMLElement[]> {
     settingsSection(env, await session.get<AutoStartNote>(AUTO_START_KEY)),
     el('h3', { text: 'Google Drive (optional)' }),
     await driveStep(env.render, true),
-    el('p', { class: 'muted small', text: `Ashley Bridge ${version()}. It talks only to ${env.settings?.hostname ?? 'the portal you connect'}, reads the job's files at most once a minute, asks the scheduler at most once a minute, never deletes anything on the cluster, and keeps an audit log of every request on this device.` }),
+    el('p', { class: 'muted small', text: `${PRODUCT_NAME} ${version()}. It talks only to ${env.settings?.hostname ?? 'the portal you connect'}, reads the job's files at most once a minute, asks the scheduler at most once a minute, never deletes anything on the cluster, and keeps an audit log of every request on this device.` }),
   ];
 }
 
@@ -154,7 +155,7 @@ function actionsCard(env: DetailsEnv, approved: boolean, installNote: InstallNot
       el('button', {
         disabled: !ready || !approved,
         text: 'Set up the cluster again',
-        title: "Where your lab keeps a shared copy of the tool, points your account at it (nothing is uploaded); otherwise uploads the tool to ~/.hpcworker through the portal and runs its install once",
+        title: "Where your lab keeps a shared copy of the tool, points your account at it (nothing is uploaded); otherwise uploads the tool to your home folder through the portal and runs its install once",
         onClick: () =>
           run('Setting up the cluster', async () => {
             const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show });
@@ -271,7 +272,7 @@ export async function auditSection(env: { notify: Notify; render: () => Promise<
   add(box,
     el('h4', { text: `Audit log (${records.length} request(s) on this device; never sent anywhere)` }),
     el('div', { class: 'row' },
-      el('button', { text: 'Export (JSON lines)', onClick: () => downloadText(`ashley-bridge-audit-${new Date().toISOString().slice(0, 10)}.jsonl`, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'application/x-ndjson') }),
+      el('button', { text: 'Export (JSON lines)', onClick: () => downloadText(`beethoven-audit-${new Date().toISOString().slice(0, 10)}.jsonl`, records.map((r) => JSON.stringify(r)).join('\n') + '\n', 'application/x-ndjson') }),
       el('button', {
         text: 'Clear',
         title: 'Forgets the records; the once-a-minute clocks are kept',
@@ -306,10 +307,10 @@ export function settingsSection(env: { settings: PortalSettings | undefined; pre
   const openClaude = el('input', { type: 'checkbox', id: 'open-claude', checked: prefs.open_claude_on_connect });
   add(box,
     el('div', { class: 'row' }, el('label', { text: 'Shell host (the segment after /pun/sys/shell/ssh/; "default" lets the portal choose): ' }, shellHost)),
-    el('div', { class: 'row' }, el('label', { text: 'Site profile name (hpcworker install --profile; the session name the framework asks for starts with it): ' }, site)),
+    el('div', { class: 'row' }, el('label', { text: "Site profile name (the cluster's settings the tool is set up with; the session name starts with it): " }, site)),
     el('div', { class: 'row' }, el('label', { text: 'Worker permission mode: ' }, mode)),
     el('p', { class: 'muted small', text: 'Supervised mode is the default because several campuses require that an agent never runs a command without your approval. Choosing a broader mode is your decision. The worker name is set with the data statement.' }),
-    el('div', { class: 'box' }, auto, el('label', { for: 'auto-start' }, el('strong', { text: 'Start my worker when I open my portal' }), ' (on unless you turn it off). When on, Ashley Bridge starts your worker as soon as your portal tab connects and no worker of yours is alive, provided the agreement, your access, the tool, the sign-in and the data statement are in order. It asks the login node at most once a minute, never more; a start that would break that rule waits for the next minute. Your worker stays on by itself once started: the job submits its successor before its wall time ends, until you press Stop.')),
+    el('div', { class: 'box' }, auto, el('label', { for: 'auto-start' }, el('strong', { text: 'Start my worker when I open my portal' }), ` (on unless you turn it off). When on, ${PRODUCT_NAME} starts your worker as soon as your portal tab connects and no worker of yours is alive, provided the agreement, your access, the tool, the sign-in and the data statement are in order. It asks the login node at most once a minute, never more; a start that would break that rule waits for the next minute. Your worker stays on by itself once started: the job submits its successor before its wall time ends, until you press Stop.`)),
     el('div', { class: 'box' }, openClaude, el('label', { for: 'open-claude' }, el('strong', { text: 'Open claude.ai when the worker connects' }), ' (on unless you turn it off). The first time this browser sees your worker\'s link, it opens it in a new tab; afterwards the green button opens it.')),
     autoNote ? el('div', { class: 'muted small', text: `Last automatic start attempt ${fmtTime(autoNote.attempted_at)}: ${autoNote.outcome}` }) : null,
     el('div', { class: 'row' }, el('button', {
