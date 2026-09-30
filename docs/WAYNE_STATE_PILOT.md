@@ -14,13 +14,14 @@ For the student:
 - A Wayne State AccessID on the approved list for the Trial Edition.
 - The Wayne State VPN (GlobalProtect) connected: `https://ondemand.grid.wayne.edu/` is VPN-only.
 - An Open OnDemand login at that address (AccessID and password) and a grid account.
-- Membership of the grid group `oschome`, added by C&IT or the group's owner before the first run. The lab's
-  volume `/rs/rs_grp_oschome` is readable by that group only (`other::---`), and everything the worker needs
-  sits under it: the shared copy of the tool (`.../shared/ashley/hpcworker/current`), the container image, the
-  `claude` binary and the student's state directory. Without it neither install mode helps (read from the
-  permissions, not yet seen with a second account: the extension falls back to uploading its own copy, and the
-  probe then fails on the image). On 2026-09-29 the group had
-  two members (ab5188, go2432); how and how fast a student is added is not yet known.
+- Membership of the grid group `oschome`, added by C&IT or the group's owner before the first run.
+  The lab's volume `/rs/rs_grp_oschome` is readable by that group only (`other::---`), and
+  everything the worker needs sits under it: the shared copy of the tool
+  (`.../shared/beethoven/hpcworker/current`), the container image, the `claude` binary and the
+  student's state directory. Without it neither install mode helps (read from the permissions, not
+  yet seen with a second account: the extension falls back to uploading its own copy, and the probe
+  then fails on the image). On 2026-09-29 the group had two members (ab5188, go2432); how and how
+  fast a student is added is not yet known.
 - A Claude Pro or Max subscription in the student's own name. Remote Control is available on Pro, Max,
   Team and Enterprise; API keys and `setup-token` credentials do not work.
 - A browser the extension supports (Chrome or Edge 148 and later, Firefox; Safari only if that edition
@@ -28,24 +29,27 @@ For the student:
 
 For the site profile (`framework/profiles/wayne.json`, `site: wayne`, so sessions are asked for as
 `wayne-<jobid>`): scheduler `slurm`, `submit_host: warrior`; `partition_cpu: secp` with `qos_cpu:
-secondary` for interactive allocations (the sign-in sitting), the probe and tests; `partition_cpu_batch:
-reqp` with `qos_batch: requeue` for long workers; GPU partitions `gmsap` and `gvohp`; `shared_state_dir:
-/rs/rs_grp_oschome/$USER/hpcworker` (the CephFS volume; the home is a Panasas soft quota that was 93
-percent full, `home_filesystem: panfs`); `runtime: apptainer` with `runtime_module: apptainer/1.2.2`
-(measured to build and exec unprivileged sandboxes on `asx1`); `node_tmp: /tmp/$USER/hpcworker_$SLURM_JOB_ID`
-with `tmpdir_is_node_local: false`, because `$TMPDIR` on this grid points at CephFS; `ipc_dir:
-/dev/shm`; the image is the existing shared sandbox `/rs/rs_grp_oschome/shared/ashley/containers/claude-node22`
-with Node 22 and the pinned Claude Code (new images at this site should be SIF because the home is
-Panasas); `claude_config_dir: $HOME/.ashley/claude`, the student's existing Claude Code login folder
-from Ashley, which the framework only starts Claude Code in; `egress.class: direct` for the three named
-hosts (measured, below); `ood_base_url: https://ondemand.grid.wayne.edu`; `ood_shell_host` `default`
-(measured 2026-09-29: it reaches `warrior` without a password); `ood_rnode_enabled` false for the login
-node (measured 2026-09-29: `/rnode/warrior/1/` 404), compute nodes not yet probed; `vpn_required: true`;
-`login_node_rules: {max_processes: 20, poll_floor_seconds: 60}`; `xdg_runtime_fix: true` until question
-5 says otherwise. The template submits with `-D` because `#SBATCH --output` resolves against the submit
+secondary` for interactive allocations (the sign-in sitting), the probe and tests;
+`partition_cpu_batch: reqp` with `qos_batch: requeue` for long workers; GPU partitions `gmsap` and
+`gvohp`; `shared_state_dir: /rs/rs_grp_oschome/$USER/hpcworker` (the CephFS volume; the home is a
+Panasas soft quota that was 93 percent full, `home_filesystem: panfs`); `runtime: apptainer` with
+`runtime_module: apptainer/1.2.2` (measured to build and exec unprivileged sandboxes on `asx1`);
+`node_tmp: /tmp/$USER/hpcworker_$SLURM_JOB_ID` with `tmpdir_is_node_local: false`, because `$TMPDIR`
+on this grid points at CephFS; `ipc_dir: /dev/shm`; the image is the existing shared sandbox
+`/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22` with Node 22 and the pinned Claude
+Code (new images at this site should be SIF because the home is Panasas); `claude_config_dir:
+$HOME/.beethoven/claude`, the student's existing Claude Code login folder from Beethoven for VS
+Code, which the framework only starts Claude Code in (the lab folder and the sign-in folder were
+`shared/ashley` and `~/.ashley/claude` until 2026-09-30; both names are now links); `egress.class:
+direct` for the three named hosts (measured, below); `ood_base_url:
+https://ondemand.grid.wayne.edu`; `ood_shell_host` `default` (measured 2026-09-29: it reaches
+`warrior` without a password); `ood_rnode_enabled` false for the login node (measured 2026-09-29:
+`/rnode/warrior/1/` 404), compute nodes not yet probed; `vpn_required: true`; `login_node_rules:
+{max_processes: 20, poll_floor_seconds: 60}`; `xdg_runtime_fix: true` until question 5 says
+otherwise. The template submits with `-D` because `#SBATCH --output` resolves against the submit
 directory here, and chains with `afterany`, never `afterok`. Container temp and cache
-(`APPTAINER_TMPDIR`, `APPTAINER_CACHEDIR`) sit on the compute node's local disk; no container command
-runs on `warrior`.
+(`APPTAINER_TMPDIR`, `APPTAINER_CACHEDIR`) sit on the compute node's local disk; no container
+command runs on `warrior`.
 
 ## The student's three steps
 
@@ -73,7 +77,7 @@ filled in); the maintainer approves in the admin console, and the next click of 
    `secp` inside the worker image (`hpcworker claude login --plain`), opens Anthropic's sign-in page
    in a new tab, and shows one box. The student signs in with their own Claude account, clicks
    *Authorize*, and pastes the code the page shows into the box. The code is typed once into that
-   sitting and forgotten; Claude Code keeps the credential in `$HOME/.ashley/claude`; the sitting
+   sitting and forgotten; Claude Code keeps the credential in `$HOME/.beethoven/claude`; the sitting
    ends by itself within ten minutes. The worker is then started, registers, and the claude.ai tab
    opens by itself, once per new session link in this browser (the setting *open claude.ai when my
    worker connects* is on unless the student turns it off; the green *Open in Claude* button stays
@@ -121,10 +125,10 @@ that guideline, a third-party AI bot. The request to C&IT presents it as what it
   more than 20 processes on Warrior;
   the login node is for job submission, status and transfers), not a new instruction.
 - Scheduler-facing calls never faster than once a minute, and every job has a wall time. These two
-  are the product's own etiquette, taken from the strictest published rules in the twelve-site sample
-  (FASRC's once-a-minute rule, TACC's "every few minutes") and from Ashley's own licence terms; C&IT
-  has not asked for them, and the framework keeps them anyway: the job writes `status.json` and
-  clients read the file.
+  are the product's own etiquette, taken from the strictest published rules in the twelve-site
+  sample (FASRC's once-a-minute rule, TACC's "every few minutes") and from the licence terms of
+  Beethoven for VS Code; C&IT has not asked for them, and the framework keeps them anyway: the job
+  writes `status.json` and clients read the file.
 - Using the student's own portal session from the student's own browser is the student's own use under
   UP 00-1, which prohibits accessing another person's account and obtaining credentials through
   another's negligence, not software a user installs in their own browser. The extension does not touch
@@ -136,9 +140,9 @@ that guideline, a third-party AI bot. The request to C&IT presents it as what it
 - The exact host and permission list is published so C&IT can pin the extension to
   `ondemand.grid.wayne.edu` with browser policy if it manages any machines.
 
-Also to put to C&IT, from the earlier Ashley reports: the ownership question for a tool built by a
-university employee, and whether the reverse proxy admits compute nodes (the Shell app's host is now
-measured: `default` reaches `warrior`).
+Also to put to C&IT, from the earlier reports of the VS Code edition (then Ashley): the ownership
+question for a tool built by a university employee, and whether the reverse proxy admits compute
+nodes (the Shell app's host is now measured: `default` reaches `warrior`).
 
 ## The two written answers still needed
 
@@ -147,10 +151,10 @@ Both precede any paid edition; neither blocks the free, approved-list pilot on t
 1. **Wayne State C&IT:** written approval of Beethoven as a supervised, user-run Claude Code inside
    a batch job, under the generative-AI guideline, with the data restrictions above. Ask also whether
    the reverse proxy admits compute nodes.
-2. **Anthropic:** a written answer, through the route the Claude Code legal page names, on hosting the
-   unmodified binary under each student's own subscription with Remote Control started from a Slurm
-   job. The draft in Ashley's `docs/ANTHROPIC_REQUEST.md` covers the pattern; add Remote Control from an
-   `sbatch` job explicitly to its third question before sending.
+2. **Anthropic:** a written answer, through the route the Claude Code legal page names, on hosting
+   the unmodified binary under each student's own subscription with Remote Control started from a
+   Slurm job. The draft in the `docs/ANTHROPIC_REQUEST.md` of Beethoven for VS Code covers the
+   pattern; add Remote Control from an `sbatch` job explicitly to its third question before sending.
 
 ## Measurements to collect
 

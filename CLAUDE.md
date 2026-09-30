@@ -1,4 +1,4 @@
-# Ashley Bridge (public name Beethoven) — working context
+# Beethoven — working context
 
 A university-agnostic HPC worker framework (`framework/`, `hpcworker`) plus a lightweight browser
 extension (`extension/`, published as "Beethoven"; the repository and its code name stay Ashley
@@ -17,34 +17,42 @@ name and identifier carry no university name.
   what is not), `SECURITY.md`, `docs/STORE_LISTING.md`, `docs/WAYNE_STATE_PILOT.md`.
 - The research notes behind the report:
   `C:/Users/grego/OneDrive/Desktop/ashley/docs/research/research_notes/Browser extension HPC Claude worker/`.
-- The product being reused, read-only: `C:/Users/grego/OneDrive/Desktop/ashley` (`grid/worker.sbatch.tpl`,
-  `grid/bootstrap.sbatch`, `grid/phone.js`, `grid/license.js`, `extension/src/core/terms.ts`,
-  `extension/src/core/diagnostics.ts`, `docs/ARCHITECTURE.md`, `CLAUDE.md`). Never edit it from here.
+- The sibling product being reused, read-only: Beethoven for VS Code (Ashley for VS Code until
+  3.0.0; repository `OpenSpineConsortium/beethoven-vscode`, Desktop folder
+  `C:/Users/grego/OneDrive/Desktop/ashley` until the maintainer renames it)
+  (`grid/worker.sbatch.tpl`, `grid/bootstrap.sbatch`, `grid/phone.js`, `grid/license.js`,
+  `extension/src/core/terms.ts`, `extension/src/core/diagnostics.ts`, `docs/ARCHITECTURE.md`,
+  `CLAUDE.md`). Never edit it from here.
 
 ## Rules that are not negotiable
 
 - **The public name is Beethoven (decided 2026-09-29, extension 7.0.0).** A name beginning with
   Anthropic's mark was set aside because it could draw store and brand objections. Everything a
-  student, a store reviewer or the public reads says Beethoven and never the code name: the manifest,
-  every page and screen of the extension, the check results, the audit export, the agreement and the
-  privacy statement, the store texts and the pages under `https://openspineconsortium.com/beethoven/`.
-  The name lives in one constant per place (`PRODUCT_NAME` in `extension/src/core/terms.ts`, the site map
-  in the site repository's `tools/build_site.py`). Wherever the product is described, the trademark sentence is:
-  Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are
-  Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher.
-  What keeps the old name, and why: the repository and its folder (private); the kill-list's format
-  tag `ASHLEYREV1` (the signer and the verifier check it); the cluster utility `hpcworker` and its
-  cluster paths (`/rs/rs_grp_oschome/shared/ashley/...`, `~/.ashley/claude`), which the panel never
-  shows (it says "the lab's shared copy, version N" or "your own copy, version N"); the storage keys
-  `bridge.*`; and the wire value `product: "bridge"` the access service maps to Beethoven. The old
-  addresses under `/ashley/bridge*` and the service name `ashley-service` stay up for Ashley in VS Code
-  and builds 4.0.0 to 6.0.0; nothing in 7.0.0 points at them (`docs/PUBLISHING_SITE.md`).
-- **Ashley Bridge never reads, stores, copies, prints or relays a Claude credential.** No
+  student, a store reviewer or the public reads says Beethoven and never the code name: the
+  manifest, every page and screen of the extension, the check results, the audit export, the
+  agreement and the privacy statement, the store texts and the pages under
+  `https://openspineconsortium.com/beethoven/`. The name lives in one constant per place
+  (`PRODUCT_NAME` in `extension/src/core/terms.ts`, the site map in the site repository's
+  `tools/build_site.py`). Wherever the product is described, the trademark sentence is: Beethoven
+  runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's
+  marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. What keeps the
+  old name, and why: the repository and its folder (private); the kill-list's format tag
+  `ASHLEYREV1` (the signer and the verifier check it; the verifier also accepts `BEETHOVENREV1` from
+  8.0.0); the old cluster paths `/rs/rs_grp_oschome/shared/ashley` and `~/.ashley`, which since
+  framework 7 are links to `shared/beethoven` and `~/.beethoven` and stay for builds up to 7.0.0;
+  the cluster utility `hpcworker`, which the panel never shows (it says "the lab's shared copy,
+  version N" or "your own copy, version N"); the storage keys `bridge.*`; and the wire value
+  `product: "bridge"` the access service maps to Beethoven. The old addresses under
+  `/ashley/bridge*` and the service name `ashley-service` stay up for Ashley for VS Code 3.0.0 (the
+  sibling VS Code edition before it became Beethoven for VS Code 4.0.0) and builds 4.0.0 to 6.0.0;
+  nothing in 7.0.0 points at them (`docs/PUBLISHING_SITE.md`).
+- **Beethoven never reads, stores, copies, prints or relays a Claude credential.** No
   `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no reading `~/.claude/.credentials.json` or
-  `~/.ashley/claude/.credentials.json`. The student signs in with `claude auth login` on a compute node
-  themselves; the framework only starts Claude Code where its own credential already is
-  (`claude_config_dir` in the profile) and reads `claude auth status`. Every credential variable is
-  removed from the worker's environment; `claude auth logout` is never run. One person, one account.
+  `~/.beethoven/claude/.credentials.json` (or through its old name, `~/.ashley/claude`). The student
+  signs in with `claude auth login` on a compute node themselves; the framework only starts Claude
+  Code where its own credential already is (`claude_config_dir` in the profile) and reads `claude
+  auth status`. Every credential variable is removed from the worker's environment; `claude auth
+  logout` is never run. One person, one account.
 - **Tokens and secrets never appear on command lines, in argv, in logs, in job files or in
   `sbatch --export`.** Never echo one. The per-job token is a mode-0600 file.
 - **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's only
@@ -55,30 +63,33 @@ name and identifier carry no university name.
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
   refuses only on a verified revocation. Since 4.0.0 the list withdraws versions only.
-- **No licence keys in Ashley Bridge (decided 2026-09-29).** Authentication is the student's own
+- **No licence keys in Beethoven (decided 2026-09-29).** Authentication is the student's own
   sign-in to their Open OnDemand portal; authorization is the vendor's approved list, asked through
   the access service (`access_check` in `services.json`) for the account name the portal's dashboard
-  shows for the session, never a typed one. The extension never reads a cookie. Requests to the vendor
-  happen only after the agreement is accepted (the kill-list gate in `background.ts` is the model); a
-  confirmed approval is kept 24 h (7 days when the service is unreachable), a refusal 10 minutes. The
-  Ashley VS Code extension keeps its own key flow and the same approved list serves both.
+  shows for the session, never a typed one. The extension never reads a cookie. Requests to the
+  vendor happen only after the agreement is accepted (the kill-list gate in `background.ts` is the
+  model); a confirmed approval is kept 24 h (7 days when the service is unreachable), a refusal 10
+  minutes. The sibling Beethoven for VS Code (Ashley for VS Code until 3.0.0) keeps its own key flow
+  and the same approved list serves both.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
-  action; no container command on the login node and nothing of ours under its `/tmp`; container temp
-  and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne State
-  `$TMPDIR` is NOT node-local, it points at CephFS, so never trust `$TMPDIR` blindly); IPC under
-  `/dev/shm`; scheduler polling never faster than 60 s from clients (the job writes `status.json`;
-  clients read the file); every job has a wall time. Attribute these exactly when writing for anyone
-  outside: only "nothing container-related on `warrior` and nothing of ours under its `/tmp`" is
-  C&IT's instruction (2026-09-28); the 20-process login-node cap is Wayne State's published policy;
-  the 60 s floor and the wall-time rule are this product's own etiquette, taken from the strictest
-  published rules in the sample and Ashley's licence, and C&IT never stated them.
+  action; no container command on the login node and nothing of ours under its `/tmp`; container
+  temp and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne
+  State `$TMPDIR` is NOT node-local, it points at CephFS, so never trust `$TMPDIR` blindly); IPC
+  under `/dev/shm`; scheduler polling never faster than 60 s from clients (the job writes
+  `status.json`; clients read the file); every job has a wall time. Attribute these exactly when
+  writing for anyone outside: only "nothing container-related on `warrior` and nothing of ours under
+  its `/tmp`" is C&IT's instruction (2026-09-28); the 20-process login-node cap is Wayne State's
+  published policy; the 60 s floor and the wall-time rule are this product's own etiquette, taken
+  from the strictest published rules in the sample and the licence of the VS Code edition (then
+  Ashley's), and C&IT never stated them.
 - **Nothing is deleted outside the framework's own run directories and node-local temp.** On
   2026-09-28 at 22:34 local the student's whole `~/.ashley` folder on the grid was deleted while a
   Remote Control session spawned from the phone was open, and the Claude login inside it was lost;
   which process did it is not established. No software of ours may ever be able to do that: never
   the Claude Code login directory, the workspace, another run or anything else under `$HOME`. A
-  destructive subcommand refuses when `CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar agent marker is
-  in the environment, or when stdin is not a terminal.
+  destructive subcommand refuses when `CLAUDECODE`, `BEETHOVEN_REQUEST_ID` (or its older name
+  `ASHLEY_REQUEST_ID`) or a similar agent marker is in the environment, or when stdin is not a
+  terminal.
 - **The consent signal is Claude Code's own.** Claude Code records the student's answer to "Enable
   Remote Control?" in `<CLAUDE_CONFIG_DIR>/.claude.json` as `remoteDialogSeen: true` (with
   `remoteControlMachineId`), and directory trust as `projects[<dir>].hasTrustDialogAccepted: true`.
@@ -95,27 +106,26 @@ name and identifier carry no university name.
   account name the portal shows; the daily fetch of `services.json` and the withdrawn-versions list;
   no activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
   `extension/src/core/terms.ts` is 6 to match, with `TERMS_DATE` 2026-09-29, and the framework's
-  `VERSION` file is 5). The copies the extension ships in
-  `extension/public/` must be byte-identical to them at build time. Change a text and its version
-  together (integer). Never pre-tick a box; the button label is part of the record; a changed
-  agreement is shown again and accepted again.
+  `VERSION` file is 7). The copies the extension ships in `extension/public/` must be byte-identical
+  to them at build time. Change a text and its version together (integer). Never pre-tick a box; the
+  button label is part of the record; a changed agreement is shown again and accepted again.
 - Never use the p-word (the one that starts "prov" and ends "enance") for the history of a file or a
   piece of data; say origin, source or record. Versions are integers (1.0.0, 2.0.0), never
   fractional.
-- Match the surrounding code's style. Comment density like Ashley's: why, not what.
+- Match the surrounding code's style. Comment density like the VS Code edition's: why, not what.
 - Branch `main`; commit directly to it, no feature branches. During the parallel build week the
-  streams do not commit; the maintainer reviews and commits. Signing keys live in `~/.ashley-vendor`
-  and never enter the repository.
+  streams do not commit; the maintainer reviews and commits. Signing keys live in
+  `~/.beethoven-vendor` (`~/.ashley-vendor` is a junction to it) and never enter the repository.
 
 ## Layout and streams
 
-- `framework/`: bash 4.2 plus Python 3.6 standard library only (the Wayne State login node is
-  CentOS 7). `lib/profile.py` (site profile schema and CLI), `lib/adapters/{common,slurm,pbs,lsf}.sh`
-  (the eight-call adapter interface), `profiles/<site>.json`, the job template and probe job,
+- `framework/`: bash 4.2 plus Python 3.6 standard library only (the Wayne State login node is CentOS
+  7). `lib/profile.py` (site profile schema and CLI), `lib/adapters/{common,slurm,pbs,lsf}.sh` (the
+  eight-call adapter interface), `profiles/<site>.json`, the job template and probe job,
   `bin/hpcworker` (the one command) and `tests/` (`run.sh`, six unittest files, fixtures). Two
   install modes since framework 5 (`docs/ARCHITECTURE.md` 2.1): the lab's shared copy, kept once per
   site where the profile names `shared_install` (Wayne State:
-  `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`, a link to `v<N>/`, published with
+  `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`, a link to `v<N>/`, published with
   `tools/deploy_shared.sh`; `hpcworker install --shared` gives the student's `~/.hpcworker` a
   launcher, the marker `~/.hpcworker/shared` and the profile, and copies no code), and the student's
   own copy in `~/.hpcworker` (every other site, and the fallback). The student's state (profile,
@@ -166,16 +176,19 @@ node and never on the laptop.
 
 `go2432@grid.wayne.edu` (alias `wsu-grid`; network via WSL: `wsl -e bash -lc '...'`). Portal
 `https://ondemand.grid.wayne.edu` (VPN only). Profile: `framework/profiles/wayne.json`: `secp` with
-`--qos=secondary` for interactive and test allocations, `reqp` with `--qos=requeue` for long workers,
-`gmsap`/`gvohp` for GPU; state under `/rs/rs_grp_oschome/$USER/hpcworker` (CephFS; the home is a
-Panasas soft quota); node-local temp `/tmp/$USER/hpcworker_$SLURM_JOB_ID`; the shared worker image at
-`/rs/rs_grp_oschome/shared/ashley/containers/claude-node22` with `module load apptainer/1.2.2`; the
-student's Claude Code login in `$HOME/.ashley/claude` (the profile's `claude_config_dir`, Ashley's
-`CLAUDE_CONFIG_DIR`); the framework's shared copy at `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`
-(the profile's `shared_install`; group read and execute, no group write). Everything under
-`/rs/rs_grp_oschome` is group `oschome` with `other::---`, so every student must be in that group
-before a first run, in either install mode (two members on 2026-09-29; `docs/OPEN_QUESTIONS.md`). `#SBATCH --output` resolves against the submit directory (use `-D`); chain with
-`afterany`, never `afterok`; `/tmp` is swept while jobs run.
+`--qos=secondary` for interactive and test allocations, `reqp` with `--qos=requeue` for long
+workers, `gmsap`/`gvohp` for GPU; state under `/rs/rs_grp_oschome/$USER/hpcworker` (CephFS; the home
+is a Panasas soft quota); node-local temp `/tmp/$USER/hpcworker_$SLURM_JOB_ID`; the shared worker
+image at `/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22` with `module load
+apptainer/1.2.2`; the student's Claude Code login in `$HOME/.beethoven/claude` (the profile's
+`claude_config_dir`, the `CLAUDE_CONFIG_DIR` of Beethoven for VS Code); the framework's shared copy
+at `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current` (the profile's `shared_install`; group
+read and execute, no group write; until 2026-09-30 the lab folder was `shared/ashley` and the
+sign-in folder `~/.ashley/claude`, both now links). Everything under `/rs/rs_grp_oschome` is group
+`oschome` with `other::---`, so every student must be in that group before a first run, in either
+install mode (two members on 2026-09-29; `docs/OPEN_QUESTIONS.md`). `#SBATCH --output` resolves
+against the submit directory (use `-D`); chain with `afterany`, never `afterok`; `/tmp` is swept
+while jobs run.
 
 Measured 2026-09-28: compute-node egress from `asx15`, direct, `api.anthropic.com` 404 (reachable),
 `platform.claude.com` 200, `claude.ai` 403 to curl, `statsig.anthropic.com` no DNS record; paste-code

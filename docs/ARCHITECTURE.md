@@ -1,6 +1,6 @@
 # Beethoven: architecture
 
-Public name Beethoven since 7.0.0; the repository and its code name stay Ashley Bridge (`CLAUDE.md`).
+Public name Beethoven since 7.0.0; the repository is `OpenSpineConsortium/beethoven` since 2026-09-30 (`CLAUDE.md`).
 
 Distilled from the research report's "Build specification for the week of 28 September 2026"
 (`RESEARCH_REPORT.md`). Where this document and the report differ, the report governs; where the
@@ -35,24 +35,25 @@ extension 5.0.0: the lab's shared copy of the framework (2.1).
 
 ## 1. Components and what each reuses
 
-| Component | What it is | Reused from Ashley 2.0.0 | New here |
+| Component | What it is | Reused from the VS Code edition (Ashley for VS Code 2.0.0, now Beethoven for VS Code) | New here |
 |---|---|---|---|
 | Framework (`framework/`, `hpcworker`) | Shell plus Python kept once per site in the lab's shared directory, or copied into the student's home where there is none (2.1): site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job, the sign-in sitting | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix; the plain sign-in sitting and its line contract (4.1) |
-| Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.ashley/claude` on Wayne State) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
-| Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The Ed25519 token verifier (`grid/license.js` `open()`, `ASHLEYREV1` tokens, public keys `k1` and `trial`), used for the signed kill-list only since 4.0.0 (Bridge has no licence keys); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
-| Access service | The vendor's access service (the Cloudflare Worker behind the request page, deployed from the sibling `ashley` repository under two names with the same code, stores and secrets: `beethoven-access.openspineconsortium.workers.dev`, which 7.0.0 uses, and the old `ashley-service.openspineconsortium.workers.dev` for the VS Code product and builds 4.0.0 to 6.0.0) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/beethoven/services.json`, body `{v, access_id, portal, product, version}`, where `product` stays `bridge`), from the same approved list the admin console manages for the VS Code product; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
+| Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.beethoven/claude` on Wayne State, `$HOME/.ashley/claude` until 2026-09-30 and a link to it since) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
+| Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The Ed25519 token verifier (`grid/license.js` `open()`, `ASHLEYREV1` tokens and, from 8.0.0, `BEETHOVENREV1` ones, public keys `k1` and `trial`), used for the signed kill-list only since 4.0.0 (Bridge has no licence keys); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
+| Access service | The vendor's access service (the Cloudflare Worker behind the request page, deployed from the sibling repository of Beethoven for VS Code (`OpenSpineConsortium/beethoven-vscode`, Desktop folder `ashley`) under two names with the same code, stores and secrets: `beethoven-access.openspineconsortium.workers.dev`, which 7.0.0 uses, and the old `ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 and builds 4.0.0 to 6.0.0) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/beethoven/services.json`, body `{v, access_id, portal, product, version}`, where `product` stays `bridge`), from the same approved list the admin console manages for Beethoven for VS Code; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
 
-Two things are deliberately absent (report, "Components and what each reuses"): any code on claude.ai
-or any Anthropic page (no content script, no host permission, no fetch patch), and any handling of a
-Claude credential (no `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no read of
+Two things are deliberately absent (report, "Components and what each reuses"): any code on
+claude.ai or any Anthropic page (no content script, no host permission, no fetch patch), and any
+handling of a Claude credential (no `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no read of
 `~/.claude/.credentials.json`, no multi-account rotation). The one-time code the student pastes into
 the panel during the sign-in sitting is not a credential the extension holds: it is typed once into
-the student's own terminal on the cluster and forgotten (4.1, 7). What is carried over from Ashley's
-`grid/phone.js` is the behaviour, not the code: run `claude remote-control` in a pseudo-terminal, strip
-every credential variable and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` from its environment, take
-the one-time consent only from the student's own recorded answer (4.4), restart with backoff, parse the
-session name and link, and never run `claude auth logout` (it would revoke the login).
+the student's own terminal on the cluster and forgotten (4.1, 7). What is carried over from the VS
+Code edition's `grid/phone.js` is the behaviour, not the code: run `claude remote-control` in a
+pseudo-terminal, strip every credential variable and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` from
+its environment, take the one-time consent only from the student's own recorded answer (4.4),
+restart with backoff, parse the session name and link, and never run `claude auth logout` (it would
+revoke the login).
 
 ## 2. The site profile
 
@@ -118,8 +119,8 @@ student's account see them, then starts, watches and stops the worker.
 
 | Piece | Changes | Kept by, and where (Wayne State) | Updated by |
 |---|---|---|---|
-| The worker image, with Claude Code pinned inside | rarely | the lab, once: `image_store` `/rs/rs_grp_oschome/shared/ashley/containers/claude-node22`, `claude_bin` beside it | the maintainer, rebuilt inside a Slurm job (`jobs/build_image.sbatch`), never on the login node |
-| The framework (`hpcworker`) | with each framework version | the lab, once: `shared_install` `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`; at a site with no shared directory, each student's `~/.hpcworker` | the maintainer, with `tools/deploy_shared.sh`; a student's own copy by the extension, from the copy it carries, when that is newer |
+| The worker image, with Claude Code pinned inside | rarely | the lab, once: `image_store` `/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22`, `claude_bin` beside it | the maintainer, rebuilt inside a Slurm job (`jobs/build_image.sbatch`), never on the login node |
+| The framework (`hpcworker`) | with each framework version | the lab, once: `shared_install` `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`; at a site with no shared directory, each student's `~/.hpcworker` | the maintainer, with `tools/deploy_shared.sh`; a student's own copy by the extension, from the copy it carries, when that is newer |
 | The extension | with each extension version | the student's browser | the browser's store (nothing to build) |
 | The student's state: the profile, the consent marker, the log, the run directories, Claude Code's sign-in | as the student works | the student's account (`~/.hpcworker`, `shared_state_dir`, `claude_config_dir`) | nobody else; no install in either mode replaces it |
 
@@ -127,10 +128,12 @@ Fetching the framework from the private GitHub repository is not possible for a 
 token to give them) and is not designed.
 
 **The shared copy.** A site profile may name `shared_install`, an absolute directory holding a
-framework checkout (`bin/`, `lib/`, `jobs/`, `profiles/`, `VERSION`, `README.md`). At Wayne State it is
-`/rs/rs_grp_oschome/shared/ashley/hpcworker/current`, a symbolic link to a versioned directory
-`v<N>/` beside it. `hpcworker install --shared DIR` (DIR defaults to the profile's `shared_install`)
-sets up the student's home without copying code:
+framework checkout (`bin/`, `lib/`, `jobs/`, `profiles/`, `VERSION`, `README.md`). At Wayne State it
+is `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`, a symbolic link to a versioned directory
+`v<N>/` beside it (the lab folder was `shared/ashley` until 2026-09-30; that name is a link to
+`shared/beethoven`, and Beethoven 4.0.0 to 7.0.0 still reach the copy through it). `hpcworker
+install --shared DIR` (DIR defaults to the profile's `shared_install`) sets up the student's home
+without copying code:
 
 - `~/.hpcworker/bin/hpcworker`, a launcher of a few lines that runs `DIR/bin/hpcworker` with the
   same arguments. It is a regular file, never a symbolic link, so neither a write through the Files
@@ -227,14 +230,14 @@ statement, start, stop, status) calls `~/.hpcworker/bin/hpcworker` as before and
 copy answers.
 
 **Who can read the shared copy.** At Wayne State the lab's volume root `/rs/rs_grp_oschome` is mode
-2770 for group `oschome` with `other::---`, so an account outside the group cannot traverse it at all;
-on 2026-09-29 the group had two members (`OPEN_QUESTIONS.md`, "The lab's shared copy of the
+2770 for group `oschome` with `other::---`, so an account outside the group cannot traverse it at
+all; on 2026-09-29 the group had two members (`OPEN_QUESTIONS.md`, "The lab's shared copy of the
 framework"). That held before the shared copy existed, since the image, `claude_bin` and every
-student's `shared_state_dir` sit under the same root: every student must be in `oschome` before their
-first run, in either mode, and the per-user fallback does not help a student outside the group there.
-The published tree gives the group read and execute and no write, so a member can run the lab's code
-and cannot change it; the directory above it, `shared/ashley`, stays group-writable, so a member could
-still rename `hpcworker/` itself (`OPEN_QUESTIONS.md`).
+student's `shared_state_dir` sit under the same root: every student must be in `oschome` before
+their first run, in either mode, and the per-user fallback does not help a student outside the group
+there. The published tree gives the group read and execute and no write, so a member can run the
+lab's code and cannot change it; the directory above it, `shared/beethoven`, stays group-writable,
+so a member could still rename `hpcworker/` itself (`OPEN_QUESTIONS.md`).
 
 **Where workflow-engine templates would go.** Not built now. A site profile already holds what a
 workflow engine's configuration for a cluster needs (partitions and QoS, account, runtime and image,
@@ -390,10 +393,11 @@ sign-in asks `claude auth status` four times, ten seconds apart, before it says 
 worker waiting in `need_login` asks again every minute (`LOGIN_RECHECK_S`, 60 s); its `status.json`
 carries `needs` (`login`, `consent` or `nothing`) and a one-sentence `hint` for the strip's line.
 
-Remote Control requires a full-scope login: `setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` credentials can
-only make model requests, and a `CLAUDE_CODE_OAUTH_TOKEN` in the environment outranks the stored login
-and would silently disable Remote Control in any process that inherits it. This is why Ashley's
-earlier `setup-token` capture is gone rather than supplemented.
+Remote Control requires a full-scope login: `setup-token` and `CLAUDE_CODE_OAUTH_TOKEN` credentials
+can only make model requests, and a `CLAUDE_CODE_OAUTH_TOKEN` in the environment outranks the stored
+login and would silently disable Remote Control in any process that inherits it. This is why the VS
+Code edition's earlier `setup-token` capture (Ashley for VS Code 1.0.0) is gone rather than
+supplemented.
 
 Not yet measured: the first live sitting end to end (the three kinds of line on a real `srun`, the
 time from the click to `AUTH-URL:`), and whether the portal's five-minute shell idle timer closes a
@@ -437,14 +441,14 @@ Fixed body, in order:
    worker is always on until the student stops it; `afterany`, never `afterok`, so a predecessor that
    ends non-zero for a trivial reason does not strand the chain.
 
-All persistence lives on shared storage; `/tmp` is treated as ephemeral; nothing runs on the login node
-beyond the one `sbatch`. The job's cleanup trap removes only its own node-local temp and its `/dev/shm`
-directory; the framework deletes nothing outside its own run directories (`SECURITY.md`, the incident
-of 2026-09-28). Compared with Ashley's `worker.sbatch.tpl`, what changes is the payload
-(`claude remote-control` in `tmux` instead of the inbox daemon) and the status files; what stays is the
-`/dev/shm` scratch bound to `/tmp`, the `--signal=B:TERM@120`, `--requeue` with `--open-mode=append`,
-the read-only bind of the host's Slurm client into the container, and the refusal to start when a piece
-is missing.
+All persistence lives on shared storage; `/tmp` is treated as ephemeral; nothing runs on the login
+node beyond the one `sbatch`. The job's cleanup trap removes only its own node-local temp and its
+`/dev/shm` directory; the framework deletes nothing outside its own run directories (`SECURITY.md`,
+the incident of 2026-09-28). Compared with the VS Code edition's `worker.sbatch.tpl`, what changes
+is the payload (`claude remote-control` in `tmux` instead of the inbox daemon) and the status files;
+what stays is the `/dev/shm` scratch bound to `/tmp`, the `--signal=B:TERM@120`, `--requeue` with
+`--open-mode=append`, the read-only bind of the host's Slurm client into the container, and the
+refusal to start when a piece is missing.
 
 ### 4.3 The batch launch
 
@@ -455,12 +459,13 @@ tmux new-session -d -s rc \
 ```
 
 then a loop that waits for the registration line in `rc.log`, writes `connection.json` and sets
-`status.json` to `state: online`. `tmux` supplies the pty the trust check requires ("when its standard
-input or output isn't a terminal, the command can't ask and exits with a `Workspace not trusted`
-error") and detaches the process from the job's lack of a controlling terminal; `script -qfc` is the
-fallback, and is what Ashley's `phone.js` uses today. Supervised mode (`--permission-mode default`) is
-the default so every command is approved from the app, which is what Utah, NERSC and USC require of
-agents on their systems; a student may choose a broader mode knowingly, on the options page.
+`status.json` to `state: online`. `tmux` supplies the pty the trust check requires ("when its
+standard input or output isn't a terminal, the command can't ask and exits with a `Workspace not
+trusted` error") and detaches the process from the job's lack of a controlling terminal;
+`script -qfc` is the fallback, and is what the VS Code edition's `phone.js` uses today. Supervised mode
+(`--permission-mode default`) is the default so every command is approved from the app, which is
+what Utah, NERSC and USC require of agents on their systems; a student may choose a broader mode
+knowingly, on the options page.
 
 The same loop answers Claude Code's two one-time prompts, and only those, from the student's own
 recorded answer: when the terminal shows `Enable Remote Control? (y/n)` (or the trust question, if
@@ -812,10 +817,11 @@ From the report's "Security controls", in the order a reviewer will look for the
   `sbatch --export`.
 - **Nothing deleted outside the run directories.** The framework removes only what is under its own
   `<shared_state_dir>/<run>/`, the job's node-local temp and `/dev/shm` directories, and the sign-in
-  sitting's own `/dev/shm` directory; never the Claude Code login directory, the workspace, another run
-  or anything else under `$HOME`. A destructive subcommand refuses when `CLAUDECODE`,
-  `ASHLEY_REQUEST_ID` or a similar agent marker is in the environment, or when stdin is not a terminal.
-  Added after the incident of 2026-09-28 (`SECURITY.md`).
+  sitting's own `/dev/shm` directory; never the Claude Code login directory, the workspace, another
+  run or anything else under `$HOME`. A destructive subcommand refuses when `CLAUDECODE`,
+  `BEETHOVEN_REQUEST_ID` (or its older name `ASHLEY_REQUEST_ID`) or a similar agent marker is in the
+  environment, or when stdin is not a terminal. Added after the incident of 2026-09-28
+  (`SECURITY.md`).
 - **Claude Code's settings file, two keys.** `<claude_config_dir>/.claude.json` is read for
   `remoteDialogSeen` and the workspace's `hasTrustDialogAccepted` only, and rewritten only to seed
   `hasCompletedOnboarding`, `theme` and that trust key, only in the sign-in sitting or when a worker is

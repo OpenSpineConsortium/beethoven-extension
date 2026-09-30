@@ -7,7 +7,8 @@ To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
 
 ## Before you start (once)
 
-- Your AccessID is on the approved list (`node tools/intake/admin.mjs list` in the ashley repo shows it).
+- Your AccessID is on the approved list (`node tools/intake/admin.mjs list` in the repository of
+  Beethoven for VS Code, Desktop folder `ashley`, shows it).
 - Your Claude sign-in on the grid is current: `hpcworker claude status` over ssh says the sign-in folder is
   present and consent is recorded.
 - Know the state of the worker chain: `hpcworker worker status --name worker`. If a worker is online, the
@@ -17,8 +18,9 @@ To rebuild: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
   storage carries an old agreement record and, before 4.0.0, a key; 4.0.0 does not know the lab's shared
   copy, so on an account that uses it (yours since 2026-09-29) it would upload its own copy of the tool over
   the launcher; and two builds would both answer the icon on the portal tab.
-- The lab's shared copy is published: over ssh, `bash -lc 'hpcworker version'` prints `6 (shared copy at
-  /rs/rs_grp_oschome/shared/ashley/hpcworker/current)`.
+- The lab's shared copy is published: over ssh, `bash -lc 'hpcworker version'` prints `7 (shared
+  copy at /rs/rs_grp_oschome/shared/beethoven/hpcworker/current)` (framework 7, published
+  2026-09-30).
 - Have the phone with the Claude app signed in to the same Claude account.
 
 ## What a full pass looks like (every browser)

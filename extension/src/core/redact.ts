@@ -6,6 +6,7 @@
 const RULES: Array<[RegExp, string]> = [
   [/(csrf=)[^&\s"']+/gi, '$1[redacted]'],
   [/ASHLEY(?:REV)?1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[signed-token]'],
+  [/BEETHOVEN(?:REV)?1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[signed-token]'],
   [/sk-ant-[A-Za-z0-9_-]+/g, '[redacted]'],
   [/\b(Bearer)\s+\S+/g, '$1 [redacted]'],
   [/\b(token|secret|password|passwd|api[_-]?key|authorization)(\s*[=:]\s*)\S+/gi, '$1$2[redacted]'],

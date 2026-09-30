@@ -1,9 +1,10 @@
-# Beethoven (code name Ashley Bridge)
+# Beethoven
 
 The public name is **Beethoven** (decided 2026-09-29): the extension, its store listings, its pages at
 `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a reviewer sees
-say Beethoven, and it is not an Anthropic product. The repository and its code name stay Ashley Bridge,
-and a few internal names stay with them because changing them would break something or show nothing:
+say Beethoven, and it is not an Anthropic product. The repository is `OpenSpineConsortium/beethoven`
+(it was called ashley-bridge until 2026-09-30), and a few internal names stay because changing them would
+break something installed or show nothing:
 the kill-list's format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster
 (never shown to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the
 extension sends to the access service. The name lives in one constant per place: `PRODUCT_NAME` in
@@ -120,9 +121,9 @@ From the report's "deliberately absent" list and its security controls:
   worker's workspace is recorded in Claude Code's settings by the framework when a worker starts.
 - No deleting outside its own run directories and node-local temp: never the Claude Code login
   folder, the workspace, another run or anything else in the student's home. A destructive
-  subcommand refuses to run from an agent context (`CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar
-  marker in the environment) or without a terminal on standard input. `SECURITY.md` records the
-  incident of 2026-09-28 behind this rule.
+  subcommand refuses to run from an agent context (`CLAUDECODE`, `BEETHOVEN_REQUEST_ID`, its older
+  name `ASHLEY_REQUEST_ID`, or a similar marker in the environment) or without a terminal on
+  standard input. `SECURITY.md` records the incident of 2026-09-28 behind this rule.
 - No install-time host permission. Access to the one portal origin is requested from the click on
   the icon (or the *Connect* button on the setup page).
 - No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
@@ -186,9 +187,10 @@ downloaded at run time by the product; the build needs the network only for `npm
 site pages; `bash`; `pandoc` only for the site pages; `unzip`/`sha256sum` (Git Bash has both). No
 cluster account is needed for any test: the tests run against the mock portal in `extension/mock-ood`.
 
-**Clone.** `git clone https://github.com/OpenSpineConsortium/ashley-bridge.git` (the organisation's
-private copy; the maintainer's personal copy is `GregorySchwing/ashley-bridge`). Keep the line endings
-as they are in the repository (LF); Windows Git may warn about CRLF and is harmless.
+**Clone.** `git clone https://github.com/OpenSpineConsortium/beethoven.git` (the organisation's
+private repository, the only remote since 2026-09-30; the personal copy
+`GregorySchwing/ashley-bridge` is retired). Keep the line endings as they are in the repository
+(LF); Windows Git may warn about CRLF and is harmless.
 
 **Extension.**
 
@@ -213,19 +215,21 @@ scheduler). The framework reaches a student's account in one of
 two ways (`docs/ARCHITECTURE.md` 2.1):
 
 - *The lab's shared copy*, where the site profile names `shared_install` (Wayne State's does:
-  `/rs/rs_grp_oschome/shared/ashley/hpcworker/current`, a link to a versioned directory `v<N>/` beside
-  it). The maintainer publishes each framework version there from the laptop with
-  `bash tools/deploy_shared.sh` (options in its header; `--dry-run` says what it would do): it checks
-  the two version lines, the line endings and the shell syntax, packs the framework's files with a
-  SHA-256 manifest, unpacks them over ssh into a new `v<N>/` (file work only on the login node), gives
-  the group read and traverse without write, switches `current` in one rename, keeps every older
-  version (a running worker stays on the one it started with until it is started again), and prints
-  what changed, the tree and the ACLs. A student's account is set up with one line, which the
-  extension types through the portal's shell:
-  `bash <shared_install>/bin/hpcworker install --shared <shared_install> --profile <site>`. The account
-  gets a launcher, a marker naming the shared directory and the profile, and no code; an own copy
-  already there is moved aside into `~/.hpcworker/replaced/`, never deleted. `hpcworker version` then
-  says "5 (shared copy at ...)". The extension never replaces or updates a shared copy.
+  `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`, a link to a versioned directory `v<N>/`
+  beside it; `shared/ashley`, the lab folder's name until 2026-09-30, is a link to
+  `shared/beethoven`). The maintainer publishes each framework version there from the laptop with
+  `bash tools/deploy_shared.sh` (options in its header; `--dry-run` says what it would do): it
+  checks the two version lines, the line endings and the shell syntax, packs the framework's files
+  with a SHA-256 manifest, unpacks them over ssh into a new `v<N>/` (file work only on the login
+  node), gives the group read and traverse without write, switches `current` in one rename, keeps
+  every older version (a running worker stays on the one it started with until it is started again),
+  and prints what changed, the tree and the ACLs. A student's account is set up with one line, which
+  the extension types through the portal's shell:
+  `bash <shared_install>/bin/hpcworker install --shared <shared_install> --profile <site>`. The
+  account gets a launcher, a marker naming the shared directory and the profile, and no code; an
+  own copy already there is moved aside into `~/.hpcworker/replaced/`, never deleted.
+  `hpcworker version` then says "7 (shared copy at ...)" (the shared copy's version; 7 since
+  2026-09-30). The extension never replaces or updates a shared copy.
 - *The student's own copy*, at every other site and as the fallback when the account cannot use the
   shared copy: copy `framework/` to the cluster and run
   `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through the
@@ -242,10 +246,12 @@ group's volume, which others cannot enter (`docs/OPEN_QUESTIONS.md`).
 `LICENSE.txt`, `PRIVACY.md` or a release, then publish the site (`docs/PUBLISHING_SITE.md`).
 
 **Access service.** The approval check the extension makes is served by the Cloudflare Worker in the
-`ashley` repository (`tools/intake/worker.js`, contract in `tools/intake/ACCESS_CHECK.md`); it is deployed
-from there, not from here, under two names with the same code, stores and secrets:
+repository of Beethoven for VS Code (`OpenSpineConsortium/beethoven-vscode`, the Desktop folder
+`ashley`; `tools/intake/worker.js`, contract in `tools/intake/ACCESS_CHECK.md`); it is deployed from
+there, not from here, under two names with the same code, stores and secrets:
 `beethoven-access.openspineconsortium.workers.dev` for 7.0.0 and later, and the old
-`ashley-service.openspineconsortium.workers.dev` for the VS Code product and builds 4.0.0 to 6.0.0.
+`ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 (the VS Code edition
+before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0.0 to 6.0.0.
 
 **Releasing a version.**
 

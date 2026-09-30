@@ -121,12 +121,12 @@ Cluster side:
   the job writes `status.json` and clients read the file.
 - The worker refuses to start in a directory marked restricted and when Remote Control is unavailable
   under Zero Data Retention.
-- The framework never deletes anything outside its own run directories
-  (`<shared_state_dir>/<run>/`) and the job's node-local temp and `/dev/shm` directory: never the
-  Claude Code login directory, the workspace, another run, or anything else under `$HOME`. Any
-  destructive subcommand refuses when `CLAUDECODE`, `ASHLEY_REQUEST_ID` or a similar agent marker is in
-  the environment, or when stdin is not a terminal, so neither an agent nor a script can run it.
-  Written after the incident recorded below.
+- The framework never deletes anything outside its own run directories (`<shared_state_dir>/<run>/`)
+  and the job's node-local temp and `/dev/shm` directory: never the Claude Code login directory, the
+  workspace, another run, or anything else under `$HOME`. Any destructive subcommand refuses when
+  `CLAUDECODE`, `BEETHOVEN_REQUEST_ID` (or its older name `ASHLEY_REQUEST_ID`) or a similar agent
+  marker is in the environment, or when stdin is not a terminal, so neither an agent nor a script
+  can run it. Written after the incident recorded below.
 - Claude Code's own settings file, `<claude_config_dir>/.claude.json`, is read for two boolean keys
   only, `remoteDialogSeen` (the student's own answer to "Enable Remote Control?") and the workspace's
   `hasTrustDialogAccepted`, and rewritten only to seed `hasCompletedOnboarding`, `theme` and that

@@ -64,9 +64,10 @@ question 6.
 
 Since framework 5 a site profile may name `shared_install`, one copy of the framework the lab keeps
 for all its students (`ARCHITECTURE.md` 2.1); at Wayne State it is
-`/rs/rs_grp_oschome/shared/ashley/hpcworker/current`. What was measured before it was published and
-just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls -l`, `getfacl`,
-`getent`, `readlink`, `find`), then the questions it leaves open.
+`/rs/rs_grp_oschome/shared/beethoven/hpcworker/current` (`shared/ashley/...` until 2026-09-30, the
+name the records below use; it is now a link to `shared/beethoven`). What was measured before it was
+published and just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls -l`,
+`getfacl`, `getent`, `readlink`, `find`), then the questions it leaves open.
 
 - **Who can reach the lab's volume.** `/rs/rs_grp_oschome` is a symbolic link to the CephFS volume;
   the volume root is `drwxrws---+ go2432:oschome`, ACL `group::rwx`, `other::---`. `getent group
@@ -78,12 +79,12 @@ just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls
   all under the same root. The per-user fallback does not help a student outside the group: the tool
   would go into the home, and the probe and the worker would still fail on the image and the state
   directory.
-- **Group write.** `shared/ashley` carries `group::rwx` with `default:group::rwx`, so anything created
-  under it is group-writable by default; `tools/deploy_shared.sh` removes group write from the tree it
-  publishes (the `hpcworker/` directory included), so a member can run the lab's code and cannot
-  change it or switch `current`. `shared/ashley` itself stays group-writable, so a member could still
-  rename what sits directly in it (`hpcworker/`, as already `containers/`); tightening it is the
-  maintainer's decision.
+- **Group write.** `shared/ashley` (now `shared/beethoven`) carries `group::rwx` with
+  `default:group::rwx`, so anything created under it is group-writable by default;
+  `tools/deploy_shared.sh` removes group write from the tree it publishes (the `hpcworker/`
+  directory included), so a member can run the lab's code and cannot change it or switch `current`.
+  The lab folder itself stays group-writable, so a member could still rename what sits directly in
+  it (`hpcworker/`, as already `containers/`); tightening it is the maintainer's decision.
 - **The image directory's group.** `containers/claude-node22` is owned by `go2432` with group `wsu`,
   not `oschome` (`group::r-x`, `other::---`). Whether a second member of `oschome` can run the image
   has not been tried.
@@ -107,7 +108,7 @@ just after, over `ssh wsu-grid` on 2026-09-29 with read-only commands (`id`, `ls
 
 | Question | Why it matters | First test | Result |
 |---|---|---|---|
-| Can the portal's Files app read `.../hpcworker/current/VERSION` through the `current` link? | The panel shows the shared copy's version from that read. The install does not depend on it: whether the account can use the shared copy is judged by the install line in the shell, and a failed read is reported, not treated as a cold portal | Signed in as a member, in the portal: list `/rs/rs_grp_oschome/shared/ashley/hpcworker/` and download `.../current/VERSION` | Not yet measured. The Files app served paths under `/rs/rs_grp_oschome/go2432/` on 2026-09-29, so `/rs` is inside its allowlist; `shared/` was never read through it |
+| Can the portal's Files app read `.../hpcworker/current/VERSION` through the `current` link? | The panel shows the shared copy's version from that read. The install does not depend on it: whether the account can use the shared copy is judged by the install line in the shell, and a failed read is reported, not treated as a cold portal | Signed in as a member, in the portal: list `/rs/rs_grp_oschome/shared/beethoven/hpcworker/` and download `.../current/VERSION`, then the same through the old name `shared/ashley` (7.0.0 reads through it) | Not yet measured. The Files app served paths under `/rs/rs_grp_oschome/go2432/` on 2026-09-29, so `/rs` is inside its allowlist; `shared/` was never read through it |
 | What does an account outside `oschome` see? | The words the panel shows that student, and whether the fallback's note is the right one | A second account, or the first run of a student not yet in the group | Not yet measured; no second account was available. Expected from the ACLs, not observed: bash cannot open the shared copy's `bin/hpcworker` (`Permission denied`, exit 126), the extension falls back to the upload, and the probe then fails on the image |
 | How is a student added to `oschome`, by whom, and how long does it take? | Nothing works at Wayne State without it | Ask C&IT (the group owner may be able to add members; not established) | Not yet asked |
 
@@ -118,7 +119,7 @@ Run in parallel with the above; both precede any paid licence (report, "Licensin
 | Question | Who answers | Status |
 |---|---|---|
 | Written approval from Wayne State C&IT, whose generative-AI guideline says "All AI tools must first be approved by C&IT; third-party AI bots are not approved for use at this time" | C&IT | Not yet requested in writing; see `WAYNE_STATE_PILOT.md` |
-| A written answer from Anthropic on hosting the unmodified binary under each student's own subscription, including Remote Control from a cluster job | Anthropic sales, through the route the Claude Code legal page names | A draft exists in Ashley's `docs/ANTHROPIC_REQUEST.md`; add Remote Control from an `sbatch` job to question 3 of it before sending |
+| A written answer from Anthropic on hosting the unmodified binary under each student's own subscription, including Remote Control from a cluster job | Anthropic sales, through the route the Claude Code legal page names | A draft exists in the repository of Beethoven for VS Code (`docs/ANTHROPIC_REQUEST.md`); add Remote Control from an `sbatch` job to question 3 of it before sending |
 
 ## Opened by the public name (decided 2026-09-29, night)
 
@@ -128,7 +129,7 @@ The public name is Beethoven from 7.0.0 (`CLAUDE.md`). What the rename leaves op
 |---|---|---|---|
 | Does the Chrome Web Store (and Edge) take a manifest `description` of 138 characters? | The sentence decided for 7.0.0 is 138 characters; Chrome's manifest documentation says 132 at most | Upload the 7.0.0 package as a draft item, or shorten first (`docs/store/LISTING.md` has a 128-character form) | Avoided, not measured: 7.0.0 carries the 128-character form (`extension/wxt.config.ts`), so no store sees the 138 |
 | Is the AMO slug `beethoven` free, and is the name clear of another listed extension in each store? | A taken slug changes the Firefox install link; a clash invites a name dispute in review | Search each store for the name; AMO shows a taken slug when the listing is created | Not yet looked up |
-| Do the pages at `/beethoven/` and the old `/ashley/bridge/` address answer as intended once pushed? | Reviewers open the privacy URL; the old landing address should send people to the new one | `curl -sI` each address after the push; open `/ashley/bridge/` in a browser | Not yet pushed |
+| Do the pages at `/beethoven/` and the old `/ashley/bridge/` address answer as intended once pushed? | Reviewers open the privacy URL; the old landing address should send people to the new one | `curl -sI` each address after the push; open `/ashley/bridge/` in a browser | Pushed (site commits 816e9c4, be44925). Measured 2026-09-30 with curl from WSL: `/beethoven/` and `/beethoven/privacy.html` answer 200; `/ashley/bridge/` answers 200 with the two-line page that forwards to `/beethoven/` (query and fragment kept). Not yet opened in a browser |
 | Does the access service's second name answer exactly as the first? | 7.0.0 asks only the second name; 4.0.0 to 6.0.0 and the VS Code product ask only the first | The `curl` proofs listed in the sibling repository's `tools/intake/ACCESS_CHECK.md` | Answered yes, 2026-09-30 00:25 UTC, by curl from Windows against both names: `/health` `{"ok":true}`; `OPTIONS /access_check` 204 with `access-control-allow-origin: *`; `POST /access_check` for `zz9876` (product `bridge`) not approved with request page `https://openspineconsortium.com/beethoven/request.html`, for `st1234` approved; `/revoked` 200. The old name now also names the `/beethoven/` request page to 4.0.0 to 6.0.0 (they send product `bridge`), which is the intended change; `OPTIONS /request` from `https://openspineconsortium.com` answers 204 on the second name. Not tried: a real `POST /request` (it would file a request and send mail). The 7.0.0 release build asked the second name end to end on 2026-09-30 between 01:45 and 01:56 UTC (runs F, G and H in `extension/store-assets/e2e/`): `st1234` approved (portal `ondemand.wayne.localhost`, then `localhost`), `zz9999` not approved, whose *Ask for access* opened `https://openspineconsortium.com/beethoven/request.html?access_id=zz9999`; no request went to an old address |
 
 ## How to record an answer

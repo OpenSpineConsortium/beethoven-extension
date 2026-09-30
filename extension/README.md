@@ -234,7 +234,7 @@ portal's own `/home/<user>`, so the strip's output box reads like a cluster wher
 bash cannot open the shared launcher, exit 127); `MOCK_SHARED_INSTALL=PATH` in the server's environment does
 what `--shared-install PATH` does. The strip takes the shared path from the bundled profile of the
 site named in Settings, so to see the shared mode by hand, set the site profile name to one whose bundled profile
-names the `--shared-install` path (for `wayne`, `--shared-install /rs/rs_grp_oschome/shared/ashley/hpcworker/current`;
+names the `--shared-install` path (for `wayne`, `--shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current`;
 from Git Bash prefix `MSYS_NO_PATHCONV=1`, or the path reaches node rewritten as a Windows path); or open the mock
 at `https://ondemand.wayne.localhost:<port>` (Chromium resolves any `*.localhost` name to this machine), which makes
 the site `wayne` from the first click, as `ondemand.grid.wayne.edu` does.
@@ -335,9 +335,10 @@ Fetched once a day from `https://openspineconsortium.com/beethoven/killlist.json
 `Access-Control-Allow-Origin: *`: the extension holds no host permission for that origin). Shape and verification
 in `src/licensing/killlist.ts`: outer JSON `{v, kid, issued, revoked_versions, revoked_lids, message, sig}` where
 `sig` is `ASHLEYREV1.<base64url payload>.<base64url Ed25519 signature>` over `ASHLEYREV1.<payload>`, the same
-scheme and public key as the revocation list of the vendor's VS Code extension (`ASHLEYREV1` is that format's tag,
-which the issuing tool checks). Only the signed payload is trusted; offline keeps the last good
-list; a withdrawn version stops sending commands (the chokepoint refuses anything that mutates) and still reads status.
+scheme and public key as the revocation list of the vendor's VS Code extension, Beethoven for VS Code
+(`ASHLEYREV1` is that format's tag, which the issuing tool checks; from 8.0.0 the verifier accepts `BEETHOVENREV1`
+as well). Only the signed payload is trusted; offline keeps the last good list; a withdrawn version stops sending
+commands (the chokepoint refuses anything that mutates) and still reads status.
 Since 4.0.0 the list withdraws versions only; `revoked_lids` is read for older lists and never acted on.
 
 ## Store listing pointers

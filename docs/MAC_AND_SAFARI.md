@@ -43,11 +43,12 @@ who develops on Windows today.
 
 ## Moving development to a Mac
 
-Ashley's `docs/MAC.md` covers the mechanics that carry over unchanged: `xcode-select --install`,
-Homebrew `node@22`, the grid SSH block (`MACs +hmac-sha1`, `AddressFamily inet`), and moving the vendor
-signing keys by encrypted archive, never through git or e-mail. For Beethoven add: `npm ci` in
-`extension/`, the WXT build for each target, and the packager step above. The repository is LF; scripts
-that name `/c/Users/grego/...` are the Windows machine's.
+The `docs/MAC.md` of Beethoven for VS Code (the sibling repository, Desktop folder `ashley`) covers
+the mechanics that carry over unchanged: `xcode-select --install`, Homebrew `node@22`, the grid SSH
+block (`MACs +hmac-sha1`, `AddressFamily inet`), and moving the vendor signing keys by encrypted
+archive, never through git or e-mail. For Beethoven add: `npm ci` in `extension/`, the WXT build for
+each target, and the packager step above. The repository is LF; scripts that name
+`/c/Users/grego/...` are the Windows machine's.
 
 ## What is not decided
 

@@ -1,12 +1,13 @@
 # Diagnostics
 
-Every assumption Beethoven makes, from the approval of your account to the pseudo-terminal on the compute node,
-is a check with a plain-words message for the student, a technical test for the engineer and a fix
-hint. The model is Ashley's (`extension/src/core/diagnostics.ts`): each check is a node with an `id`, a
-`title`, `dependsOn`, a one-sentence `assumption`, a `check`, a `manualFix`, a `futureRisk` and,
-where safe to run unattended, a `repair`. A run goes in dependency order; a node whose dependency
-failed is reported blocked with the root cause, so one broken piece reads as one problem, not a
-cascade. Ashley's rule carries over: no feature integrates until its pieces are nodes here.
+Every assumption Beethoven makes, from the approval of your account to the pseudo-terminal on the
+compute node, is a check with a plain-words message for the student, a technical test for the
+engineer and a fix hint. The model is the VS Code edition's (Beethoven for VS Code, called Ashley
+for VS Code until 3.0.0; `extension/src/core/diagnostics.ts` there): each check is a node with an
+`id`, a `title`, `dependsOn`, a one-sentence `assumption`, a `check`, a `manualFix`, a `futureRisk`
+and, where safe to run unattended, a `repair`. A run goes in dependency order; a node whose
+dependency failed is reported blocked with the root cause, so one broken piece reads as one problem,
+not a cascade. Its rule carries over: no feature integrates until its pieces are nodes here.
 
 Since 2026-09-29 the panel a student sees is not the list of checks. It is the strip: the step the
 extension is on (the first section below), one line of plain words, and one button when a person must

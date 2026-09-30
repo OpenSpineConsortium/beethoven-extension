@@ -7,8 +7,8 @@ kill-list", and the browser-platform and security research notes. The product na
 carry no university name and no Anthropic mark: the public name is Beethoven (decided 2026-09-29; a
 name beginning with Anthropic's mark was set aside because it could draw store and brand objections),
 the Firefox id `beethoven@openspineconsortium.com`, and every listing says, in the same words, that
-Beethoven runs Claude Code and is not an Anthropic product. The repository and its code name stay
-Ashley Bridge; nothing a store or a student sees carries it. The named publisher on every store account
+Beethoven runs Claude Code and is not an Anthropic product. The repository is
+`OpenSpineConsortium/beethoven`. The named publisher on every store account
 is the LLC once it exists; until then, Gregory Schwing, trading as OpenSpineConsortium.
 
 ## Single-purpose statement

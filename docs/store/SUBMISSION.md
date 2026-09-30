@@ -59,7 +59,8 @@ Have these in hand, and check each once:
    must answer `{"approved":true,"access_id":"st1234",...}` with `access-control-allow-origin: *`.
    If it answers `approved:false`, add the account in the admin console (or
    `node tools/intake/admin.mjs add st1234 "Store reviewer (mock portal)" st1234@wayne.edu "store-reviewer mock username"`
-   in the sibling `ashley` repository, token from the vendor folder, never on the command line).
+   in the sibling repository of Beethoven for VS Code, Desktop folder `ashley`; token from the vendor
+   folder, never on the command line).
    Nothing is pasted anywhere: there is no key. The `product` field stays `bridge`, the extension's
    name on the wire since 4.0.0; the service shows it as Beethoven.
 6. Accounts, one person, with a hardware security key or an authenticator app as the second factor

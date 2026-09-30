@@ -98,6 +98,18 @@ describe('audit chokepoint', () => {
     expect(auditEndpoint('/pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user')).toBe('/pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user');
   });
 
+  it('labels the signed tokens of the new prefix (BEETHOVEN1, BEETHOVENREV1) like the old ones, even when too short for the catch-all', async () => {
+    // segments shorter than 40 characters: only the prefix rule can catch these
+    expect(redact('key BEETHOVEN1.eyJ2IjoxfQ.c2lnbmF0dXJl here')).toBe('key [signed-token] here');
+    expect(redact('list BEETHOVENREV1.eyJ2IjoxfQ.c2lnbmF0dXJl ok')).toBe('list [signed-token] ok');
+    expect(redact('key ASHLEY1.eyJ2IjoxfQ.c2lnbmF0dXJl here')).toBe('key [signed-token] here');
+    expect(redact('BEETHOVEN1.eyJ2IjoxfQ.c2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJl')).toBe('[signed-token]');
+    const { audit } = clockAudit();
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shell' }, ok(1, 5, 'exit 0; printed BEETHOVEN1.eyJ2IjoxfQ.c2lnbmF0dXJl'));
+    const [r] = (await audit.records()) as AuditRecord[];
+    expect(r!.outcome).toBe('exit 0; printed [signed-token]');
+  });
+
   it('is bounded: only the newest records are kept', async () => {
     const { audit, kv } = clockAudit({ maxRecords: 5 });
     for (let i = 0; i < 12; i++) await audit.request({ method: 'GET', endpoint: `/f/${i}`, cls: 'files' }, ok(i));
