@@ -20,19 +20,19 @@
  "tmpdir_is_node_local": false,
  "ipc_dir": "/dev/shm",
  "shared_state_dir": "/rs/rs_grp_oschome/$USER/hpcworker",
- "shared_install": "/rs/rs_grp_oschome/shared/ashley/hpcworker/current",
+ "shared_install": "/rs/rs_grp_oschome/shared/beethoven/hpcworker/current",
  "runtime": "apptainer",
  "runtime_module": "apptainer/1.2.2",
  "runtime_bin": "/wsu/el7/gnu7/apptainer/1.2.2/bin/apptainer",
  "image_store": {
   "type": "sandbox",
-  "path": "/rs/rs_grp_oschome/shared/ashley/containers/claude-node22"
+  "path": "/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22"
  },
- "claude_bin": "/rs/rs_grp_oschome/shared/ashley/npm-claude-node22/bin/claude",
+ "claude_bin": "/rs/rs_grp_oschome/shared/beethoven/npm-claude-node22/bin/claude",
  "binds": [
   "$HOME",
   "/rs/rs_grp_oschome/$USER",
-  "/rs/rs_grp_oschome/shared/ashley"
+  "/rs/rs_grp_oschome/shared/beethoven"
  ],
  "cache_dir": "",
  "fakeroot_rung": null,
@@ -50,9 +50,10 @@
    "statsig.anthropic.com": "no DNS record"
   }
  },
- "claude_config_dir": "$HOME/.ashley/claude",
+ "claude_config_dir": "$HOME/.beethoven/claude",
  "consent_markers": [
-  "$HOME/.ashley/claude/.ashley-remote-consent"
+  "$HOME/.beethoven/claude/.beethoven-remote-consent",
+  "$HOME/.beethoven/claude/.ashley-remote-consent"
  ],
  "ood_base_url": "https://ondemand.grid.wayne.edu",
  "ood_shell_host": "",
@@ -71,5 +72,5 @@
   "permission_mode": "default",
   "capacity": 4
  },
- "notes": "Login node warrior is CentOS 7 (python3 is 3.6, no sysctl on PATH). $TMPDIR there points at CephFS, not the node. The image is an existing sandbox with Node 22 and Claude Code shared by the Ashley product; new images at this site should be SIF because the home is Panasas. claude_config_dir is the student's existing Claude Code login from Ashley; the framework only starts Claude Code there and reads 'claude auth status'."
+ "notes": "Login node warrior is CentOS 7 (python3 is 3.6, no sysctl on PATH). $TMPDIR there points at CephFS, not the node. The image is an existing sandbox with Node 22 and Claude Code shared with Beethoven for VS Code; new images at this site should be SIF because the home is Panasas. claude_config_dir is the student's existing Claude Code login from Beethoven for VS Code; the framework only starts Claude Code there and reads 'claude auth status'. Until 2026-09-30 the lab folder was /rs/rs_grp_oschome/shared/ashley and the sign-in folder $HOME/.ashley/claude; both old names remain as links to the new ones, for builds older than Beethoven 8.0.0."
 }

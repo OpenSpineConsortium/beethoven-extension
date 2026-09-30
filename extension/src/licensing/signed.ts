@@ -1,6 +1,6 @@
 // Signed tokens, checked offline in the browser with WebCrypto: the one verifier the kill-list
-// (killlist.ts) rides on. A port of the check in grid/license.js of the vendor's VS Code extension,
-// kept byte-compatible so one issuing tool serves both products:
+// (killlist.ts) rides on. A port of the check in grid/license.js of Beethoven for VS Code, kept
+// byte-compatible so one issuing tool serves both editions:
 //
 //   <prefix>.<base64url(JSON payload)>.<base64url(Ed25519 signature)>
 //
@@ -13,8 +13,14 @@
 // what makes the verifier testable with a key generated inside the test.
 import bundledKeys from './keys.json';
 
-/** the prefix of the VS Code extension's revocation list and of the kill-list's signature (a format tag the issuing tool checks) */
+/** the prefix of the VS Code edition's revocation list and of the kill-list's signature (a format tag the issuing tool checks) */
 export const REV_PREFIX = 'ASHLEYREV1';
+/**
+ * Both spellings of that tag. Beethoven 4.0.0 to 7.0.0 accept ASHLEYREV1 only, so the issuing tool keeps
+ * signing it; from 8.0.0 BEETHOVENREV1 is accepted beside it, so the tag can be switched once every older
+ * build is retired (the issuing tool, beethoven-license.mjs, says when; its --prefix beethoven does the switch).
+ */
+export const REV_PREFIXES: readonly string[] = [REV_PREFIX, 'BEETHOVENREV1'];
 
 export type KeyRing = Record<string, string>;
 /** the public key compiled into this build (k1: the release key the kill-list is signed with) */
@@ -49,11 +55,15 @@ export interface Opened {
   error?: 'missing' | 'malformed' | 'unknown-key' | 'bad-signature';
 }
 
-/** Split and check a signed token; the signature is over "<prefix>.<payload part>" exactly as license.js signs it. */
-export async function open(prefix: string, token: string, keys: KeyRing): Promise<Opened> {
+/**
+ * Split and check a signed token; the signature is over "<prefix>.<payload part>" exactly as license.js
+ * signs it, so it covers the prefix the token carries. `prefix` is the one accepted, or a list of them.
+ */
+export async function open(prefix: string | readonly string[], token: string, keys: KeyRing): Promise<Opened> {
   if (typeof token !== 'string') return { error: 'missing' };
   const parts = token.trim().split('.');
-  if (parts.length !== 3 || parts[0] !== prefix) return { error: 'malformed' };
+  const accepted = typeof prefix === 'string' ? [prefix] : prefix;
+  if (parts.length !== 3 || !accepted.includes(parts[0]!)) return { error: 'malformed' };
   let payload: Record<string, unknown>;
   try {
     payload = JSON.parse(new TextDecoder().decode(b64uDecode(parts[1]!)));

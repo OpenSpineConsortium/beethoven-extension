@@ -14,15 +14,18 @@
 //   }
 // The signature is detached from the readable copy: `sig` is a complete ASHLEYREV1 token whose
 // payload repeats the fields, signed over "ASHLEYREV1.<payload part>" exactly like the revocation
-// list of the vendor's VS Code extension (grid/license.js signRevocationList), so the same issuing
-// tool and the same public key serve both; ASHLEYREV1 is that format's tag, which the issuing tool
-// and verifyKillList both check. Since version 4 the list withdraws versions only: access to Beethoven
-// is granted and withdrawn by Licensor's access service (access.ts), not by anything in this file.
+// list of Beethoven for VS Code (grid/license.js signRevocationList), so the same issuing tool and
+// the same public key serve both; ASHLEYREV1 is that format's tag, which the issuing tool and
+// verifyKillList both check. From 8.0.0 the tag may also be spelled BEETHOVENREV1 (REV_PREFIXES in
+// signed.ts): the signature covers whichever tag the token carries. The published list stays
+// ASHLEYREV1 while any build before 8.0.0 is installed, since those read that spelling only. Since
+// version 4 the list withdraws versions only: access to Beethoven is granted and withdrawn by
+// Licensor's access service (access.ts), not by anything in this file.
 //
 // Fail-safe by design: a fetch that fails keeps the last good list; a signature that fails is
 // ignored and reported; the extension refuses only on a verified revocation. A one-person vendor
 // going offline must never strand a campus.
-import { open, REV_PREFIX, type KeyRing } from './signed';
+import { open, REV_PREFIXES, type KeyRing } from './signed';
 
 export const KILLLIST_URL = 'https://openspineconsortium.com/beethoven/killlist.json';
 /** how often the background asks (minutes); Chrome's alarms floor is irrelevant at this scale */
@@ -50,8 +53,8 @@ const strings = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : []
 export async function verifyKillList(doc: unknown, keys: KeyRing): Promise<KillListCheck> {
   if (!doc || typeof doc !== 'object') return { ok: false, detail: 'kill-list is not a JSON object' };
   const sig = (doc as { sig?: unknown }).sig;
-  if (typeof sig !== 'string' || !sig.startsWith(`${REV_PREFIX}.`)) return { ok: false, detail: 'kill-list carries no signature' };
-  const opened = await open(REV_PREFIX, sig, keys);
+  if (typeof sig !== 'string' || !REV_PREFIXES.some((p) => sig.startsWith(`${p}.`))) return { ok: false, detail: 'kill-list carries no signature' };
+  const opened = await open(REV_PREFIXES, sig, keys);
   if (opened.error) return { ok: false, detail: `kill-list signature rejected (${opened.error})` };
   const p = opened.payload as Record<string, unknown>;
   if (p.v !== 1) return { ok: false, detail: 'kill-list payload malformed' };
