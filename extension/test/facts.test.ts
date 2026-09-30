@@ -1,15 +1,16 @@
 // Fact gathering against a fake portal serving the framework's files: the sign-in made from this
-// browser outlives a live job's older "not signed in", the tool's VERSION is compared with the
-// bundled one (an own copy only: the lab's shared copy, named by the marker, is never outdated, and
-// a shared VERSION the Files app refuses is said without making the portal look asleep), an
-// update that ran and changed nothing is reported rather than repeated, and the
-// access service's record is read (never fetched) for the account the dashboard showed.
+// browser outlives a live job's older "not signed in"; the tool is the lab's shared copy, named by
+// the marker, with its own VERSION (a shared VERSION the Files app refuses is said without making
+// the portal look asleep), or an own copy a build before 8.0.0 left, named with its version and
+// never set up again; an account with no usable shared copy gets the one sentence, not an install;
+// and the access service's record is read (never fetched) for the account the dashboard showed.
 import { describe, expect, it } from 'vitest';
 import { makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
-import { gatherFacts, INSTALL_RETRY_MS, type FactsEnv, type RunLike } from '../src/core/facts';
-import { ACCESS_KEY, IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, type InstallNote, type LoginSeen, type PortalSettings } from '../src/core/keys';
+import { gatherFacts, type FactsEnv, type RunLike } from '../src/core/facts';
+import { noSharedForSite } from '../src/core/install';
+import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, type LoginSeen, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
-import { decide, LOGIN_SEEN_FRESH_MS } from '../src/core/steps';
+import { decide, LOGIN_SEEN_FRESH_MS, NEEDS_SHARED_COPY } from '../src/core/steps';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
 import { APPROVED_GRACE_MS, APPROVED_TTL_MS, type AccessRecord } from '../src/licensing/access';
 import { memoryKV, NOW } from './helpers';
@@ -52,14 +53,13 @@ function fakePortal(files: Record<string, string>, denied: string[] = []): Porta
 /** the access service's last word: approved for ab1234 at ood.example an hour ago (as the background records it) */
 const approved = (checkedAgoMs = 3_600_000, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'ab1234', portal: 'ood.example', approved: true, checked_at: iso(NOW_MS - checkedAgoMs), until: null, last_attempt_at: iso(NOW_MS - checkedAgoMs), ...extra });
 
-async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs?: number; /** null: a build that carries no framework */ bundled?: string | null; installNote?: InstallNote; access?: AccessRecord | null; /** the shared folder the bundled site profile names */ shared?: string; denied?: string[] } = {}): Promise<FactsEnv> {
+async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs?: number; access?: AccessRecord | null; /** the shared folder the bundled site profile names */ shared?: string; denied?: string[] } = {}): Promise<FactsEnv> {
   const local = memoryKV();
   await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
   if (o.access !== null) await local.set(ACCESS_KEY, o.access ?? approved());
   await local.set(IDENTITY_KEY, { username: 'ab1234' });
   await local.set(STATEMENTS_KEY, { 'workspaces/worker': { ...makeAcknowledgement('worker'), consent_written_at: iso(NOW_MS - 3_600_000) } } satisfies Statements);
   if (o.seenAgoMs !== undefined) await local.set(LOGIN_SEEN_KEY, { at: iso(NOW_MS - o.seenAgoMs), detail: 'a@wayne.edu max' } satisfies LoginSeen);
-  if (o.installNote) await local.set(INSTALL_KEY, o.installNote);
   const settings: PortalSettings = { origin: 'https://ood.example', hostname: 'ood.example', connected_at: '2026-09-28T00:00:00Z', shell_host: 'default', site: 'wayne' };
   const files = { [`${HOME}/.hpcworker/profile.json`]: PROFILE, [`${HOME}/.hpcworker/VERSION`]: '2\n', [`${STATE}/probe/probe.json`]: JSON.stringify(PROBE), ...(o.files ?? {}) };
   return {
@@ -73,7 +73,6 @@ async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs
     portal: () => fakePortal(files, o.denied),
     run: o.run,
     transient: { warm: { state: 'warm' } },
-    bundledFrameworkVersion: async () => (o.bundled === null ? undefined : o.bundled ?? '2'),
     bundledSharedInstall: async (site) => (site === 'wayne' ? o.shared : undefined),
   };
 }
@@ -124,24 +123,23 @@ describe('gathering the facts', () => {
     const g = await gatherFacts(await env());
     expect(g.facts.login.loggedIn).toBe(false);
     expect(g.facts.install).toMatchObject({ installed: true });
-    expect(g.facts.install.outdated).toBeUndefined();
     expect(decide(g.facts, NOW_MS).step).toBe('login');
   });
 
-  it('compares ~/.hpcworker/VERSION with the bundled VERSION: older or missing means set up again', async () => {
-    const older = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' } }));
-    expect(older.facts.install).toMatchObject({ installed: true, outdated: { installed: '1', bundled: '2' } });
-    expect(decide(older.facts, NOW_MS)).toMatchObject({ step: 'install', auto: 'install' });
+  it('an own copy a build before 8.0.0 left is named with its version and never set up again, whatever the version', async () => {
+    for (const v of ['1', '2', '9']) {
+      const g = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: `${v}\n` } }));
+      expect(g.facts.install).toMatchObject({ installed: true, version: v });
+      expect(g.facts.install.failed).toBeUndefined();
+      expect(decide(g.facts, NOW_MS).step).toBe('login');
+    }
     const e = await env();
-    // a copy without a VERSION file (the mock's stand-in tool) counts as older
+    // a copy without a VERSION file (the mock's stand-in tool) is just a version not known
     e.portal = () => fakePortal({ [`${HOME}/.hpcworker/profile.json`]: PROFILE, [`${STATE}/probe/probe.json`]: JSON.stringify(PROBE) });
     const missing = await gatherFacts(e);
-    expect(missing.facts.install.outdated).toEqual({ installed: 'unknown', bundled: '2' });
-    // no bundled VERSION (a build without the framework): nothing to compare, nothing to update
-    const none = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, bundled: null }));
-    expect(none.facts.install).toMatchObject({ installed: true });
-    expect(none.facts.install.outdated).toBeUndefined();
-    expect(none.facts.install.failed).toBeUndefined();
+    expect(missing.facts.install).toMatchObject({ installed: true });
+    expect(missing.facts.install.version).toBeUndefined();
+    expect(decide(missing.facts, NOW_MS).step).toBe('login');
   });
 
   it('reads the access record for the account the dashboard showed: approved, stale, lapsed, refused, withdrawn, none, another account; and never fetches', async () => {
@@ -193,26 +191,24 @@ describe('gathering the facts', () => {
     expect(v.auto).toBeUndefined();
   });
 
-  it("the lab's shared copy: the marker names it, its own VERSION is shown, and it is never outdated against the bundled one", async () => {
-    const g = await gatherFacts(await env({ files: sharedFiles('5'), bundled: '9', shared: SHARED }));
+  it("the lab's shared copy: the marker names it and its own VERSION is shown", async () => {
+    const g = await gatherFacts(await env({ files: sharedFiles('5'), shared: SHARED }));
     expect(g.facts.install).toMatchObject({ installed: true, shared: { dir: SHARED, version: '5' }, sharedRoot: SHARED });
-    expect(g.facts.install.outdated).toBeUndefined();
     expect(g.facts.install.failed).toBeUndefined();
     expect(g.facts.install.version).toBeUndefined();
     expect(decide(g.facts, NOW_MS).step).toBe('login');
     // a marker at a site whose bundled profile names no shared folder is still the account's truth
-    const elsewhere = await gatherFacts(await env({ files: sharedFiles('6'), bundled: '9' }));
+    const elsewhere = await gatherFacts(await env({ files: sharedFiles('6') }));
     expect(elsewhere.facts.install.shared).toEqual({ dir: SHARED, version: '6' });
     expect(elsewhere.facts.install.sharedRoot).toBeUndefined();
   });
 
   it("a shared VERSION the Files app will not serve is said, not taken for a cold portal, and does not set the tool up again", async () => {
-    const g = await gatherFacts(await env({ files: sharedFiles(undefined), bundled: '9', shared: SHARED, denied: [`${SHARED}/VERSION`] }));
+    const g = await gatherFacts(await env({ files: sharedFiles(undefined), shared: SHARED, denied: [`${SHARED}/VERSION`] }));
     expect(g.facts.warm.state).toBe('warm');
     expect(g.facts.install.shared?.dir).toBe(SHARED);
     expect(g.facts.install.shared?.version).toBeUndefined();
     expect(g.facts.install.shared?.unreadable).toMatch(/could not read its VERSION file.*403/);
-    expect(g.facts.install.outdated).toBeUndefined();
     // the rest of the facts were still read: the probe, then the sign-in
     expect(g.facts.probe.present).toBe(true);
     expect(decide(g.facts, NOW_MS).step).toBe('login');
@@ -229,41 +225,41 @@ describe('gathering the facts', () => {
     expect(own.facts.install).toMatchObject({ installed: true, version: '2', sharedRoot: SHARED });
   });
 
-  it('an own copy at a site with a shared folder: shown with its version, and moved to the shared copy when it is older', async () => {
-    const same = await gatherFacts(await env({ shared: SHARED }));
-    expect(same.facts.install).toMatchObject({ installed: true, version: '2', sharedRoot: SHARED });
-    expect(same.facts.install.shared).toBeUndefined();
-    expect(same.facts.install.outdated).toBeUndefined();
-    const older = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, shared: SHARED }));
-    expect(older.facts.install.outdated).toEqual({ installed: '1', bundled: '2' });
-    const v = decide(older.facts, NOW_MS);
-    expect(v).toMatchObject({ step: 'install', auto: 'install' });
-    expect(v.status).toBe("Moving your account to your lab's shared copy of the tool (your own copy is version 1)...");
-    // while a worker runs from the own copy the move waits (framework 5 would refuse it), and the strip goes on
-    const busy = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, shared: SHARED, run: { ...needLoginRun(30_000), status: { ...needLoginRun(30_000).status!, state: 'online', needs: 'nothing', claude_login: { loggedIn: true } } } }));
-    expect(busy.facts.run.live).toBe(true);
-    expect(busy.facts.install.outdated).toBeUndefined();
-    expect(busy.facts.install.version).toBe('1');
-    // at a site with no shared folder an older own copy is updated as before, running worker or not
-    const plain = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, run: { ...needLoginRun(30_000), status: { ...needLoginRun(30_000).status!, state: 'online' } } }));
-    expect(plain.facts.install.outdated).toEqual({ installed: '1', bundled: '2' });
-    // not installed yet: the first set-up says it uses the lab's copy
+  it("an own copy at a site with a shared folder: shown with its version and left running; a first set-up uses the lab's copy", async () => {
+    const own = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, shared: SHARED }));
+    expect(own.facts.install).toMatchObject({ installed: true, version: '1', sharedRoot: SHARED });
+    expect(own.facts.install.shared).toBeUndefined();
+    expect(decide(own.facts, NOW_MS).step).toBe('login');
+    // not installed yet: the first set-up says it uses the lab's copy, and runs by itself
     const e = await env({ shared: SHARED });
     e.portal = () => fakePortal({});
     const fresh = await gatherFacts(e);
     expect(fresh.facts.install).toMatchObject({ installed: false, sharedRoot: SHARED });
-    expect(decide(fresh.facts, NOW_MS).status).toBe("Setting up the cluster with your lab's shared copy of the tool...");
+    expect(fresh.facts.install.noSharedCopy).toBeUndefined();
+    expect(decide(fresh.facts, NOW_MS)).toMatchObject({ step: 'install', auto: 'install', status: "Setting up the cluster with your lab's shared copy of the tool..." });
   });
 
-  it('an update that just ran and left the old version behind is reported once, not run again every minute', async () => {
-    const note: InstallNote = { attempted_at: iso(NOW_MS - 60_000), ok: true, detail: 'exit 0' };
-    const g = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, installNote: note }));
-    expect(g.facts.install.outdated).toBeUndefined();
-    expect(g.facts.install.failed).toMatch(/still reports version 1 after the update to version 2/);
-    expect(decide(g.facts, NOW_MS)).toMatchObject({ step: 'install', primary: { action: 'retry-install' } });
-    // the note ages out and the update is tried again
-    const old: InstallNote = { attempted_at: iso(NOW_MS - INSTALL_RETRY_MS - 1), ok: true, detail: 'exit 0' };
-    const again = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, installNote: old }));
-    expect(again.facts.install.outdated).toEqual({ installed: '1', bundled: '2' });
+  it('no usable shared copy: the one sentence and a button, never an install by itself, and nothing to upload instead', async () => {
+    // a site whose bundled profile names no shared folder
+    const e = await env();
+    e.portal = () => fakePortal({});
+    const g = await gatherFacts(e);
+    expect(g.facts.install).toMatchObject({ installed: false, noSharedCopy: noSharedForSite('wayne') });
+    const v = decide(g.facts, NOW_MS);
+    expect(v).toMatchObject({ step: 'install', status: NEEDS_SHARED_COPY, primary: { label: 'Try again', action: 'retry-install' }, tone: 'fail' });
+    expect(v.auto).toBeUndefined();
+    expect(v.status).toBe("Beethoven needs your lab's shared copy of the tool on the cluster, and your account cannot use it yet: ask your lab lead (Details says why).");
+    // the install line said the account cannot use the shared copy (the panel's last attempt): the same sentence, with that reason
+    const why = "your lab's shared copy of the tool cannot be used from your account: your account may not read it";
+    const e2 = await env({ shared: SHARED });
+    e2.portal = () => fakePortal({});
+    e2.transient = { warm: { state: 'warm' }, installNoShared: why };
+    const g2 = await gatherFacts(e2);
+    expect(g2.facts.install).toMatchObject({ installed: false, sharedRoot: SHARED, noSharedCopy: why });
+    expect(decide(g2.facts, NOW_MS)).toMatchObject({ step: 'install', status: NEEDS_SHARED_COPY, primary: { action: 'retry-install' } });
+    // an account that is set up is never held on this, whatever the site's profile says
+    const g3 = await gatherFacts(await env());
+    expect(g3.facts.install.noSharedCopy).toBeUndefined();
+    expect(decide(g3.facts, NOW_MS).step).toBe('login');
   });
 });

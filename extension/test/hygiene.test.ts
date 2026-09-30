@@ -2,10 +2,14 @@
 // cookie anywhere (the extension is authenticated by the person's own portal sign-in and reads
 // only the account name the dashboard shows), no cookies permission and no host on an Anthropic
 // domain in the manifest, no key acceptance or key wording left in the code the student's browser
-// runs, and the one banned word nowhere in the project.
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// runs, and the one banned word nowhere in the project. And what the built package must never
+// contain (8.0.0): any cluster-side code (the tool lives in the lab's shared copy; the package
+// carries the site profiles as data only), or JavaScript a person could read as source (Vite
+// minifies it; no source map, no comment survives).
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_NAME } from '../src/core/terms';
 
@@ -57,6 +61,12 @@ describe('what the source must not contain', () => {
     // the one key that remains is the public one the kill-list is signed with
     const ring = JSON.parse(read(path.join(ROOT, 'src', 'licensing', 'keys.json'))) as Record<string, string>;
     expect(Object.keys(ring)).toEqual(['k1']);
+  });
+
+  it('reads no framework file: the package carries none, only the site profiles', () => {
+    const hits = SRC.filter((p) => /['"`]\/framework\/|files\.json|bundledFrameworkVersion/.test(read(p))).map(rel);
+    expect(hits).toEqual([]);
+    expect(existsSync(path.join(ROOT, 'scripts', 'sync-framework.mjs'))).toBe(false);
   });
 
   it('never uses the banned word', () => {
@@ -111,5 +121,137 @@ describe('the name', () => {
       });
     }
     expect(hits).toEqual([]);
+  });
+});
+
+// The built package, as the stores and the direct downloads on the site get it: every build folder
+// in .output whose manifest carries this version (npm run build), and the store zips of this
+// version beside them (npm run zip); folders and zips left there by earlier versions are not
+// looked at. The package carries no cluster-side code at all since 8.0.0: no script, no job
+// template, no copy of the tool, no README or VERSION of it, no file list; the site profiles are
+// there as data, without their free-text notes. Its JavaScript is Vite's minified output, which a
+// store's rules allow (Chrome forbids obfuscation, not minification): long lines, no comment left,
+// no source map and no pointer to one. Skipped, and shown as skipped, when .output holds no build
+// of this version (a fresh checkout: npm test before npm run build).
+describe('the built package', () => {
+  const OUT = path.join(ROOT, '.output');
+  const VERSION = (JSON.parse(read(path.join(ROOT, 'package.json'))) as { version: string }).version;
+  const builds = existsSync(OUT)
+    ? readdirSync(OUT)
+        .map((n) => path.join(OUT, n))
+        .filter((d) => statSync(d).isDirectory() && existsSync(path.join(d, 'manifest.json')))
+        .filter((d) => (JSON.parse(read(path.join(d, 'manifest.json'))) as { version?: string }).version === VERSION)
+    : [];
+  const zips = existsSync(OUT) ? readdirSync(OUT).filter((n) => n.startsWith(`beethoven-${VERSION}-`) && n.endsWith('.zip')).map((n) => path.join(OUT, n)) : [];
+  const storeZips = zips.filter((z) => !z.endsWith('-sources.zip'));
+  const sourcesZip = zips.find((z) => z.endsWith('-sources.zip'));
+
+  /** every file of a package: its path inside, and its bytes on demand */
+  type Entry = { name: string; bytes: () => Buffer };
+  const folderEntries = (dir: string): Entry[] => {
+    const out: Entry[] = [];
+    const walkAll = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const p = path.join(d, n);
+        if (statSync(p).isDirectory()) walkAll(p);
+        else out.push({ name: path.relative(dir, p).replace(/\\/g, '/'), bytes: () => readFileSync(p) });
+      }
+    };
+    walkAll(dir);
+    return out;
+  };
+  /** a zip's entries from its central directory (stored or deflated, as wxt zip writes them) */
+  const zipEntries = (file: string): Entry[] => {
+    const buf = readFileSync(file);
+    let eocd = buf.length - 22;
+    while (eocd >= 0 && buf.readUInt32LE(eocd) !== 0x06054b50) eocd--;
+    if (eocd < 0) throw new Error(`${file}: no end of central directory`);
+    const count = buf.readUInt16LE(eocd + 10);
+    let at = buf.readUInt32LE(eocd + 16);
+    const out: Entry[] = [];
+    for (let i = 0; i < count; i++) {
+      if (buf.readUInt32LE(at) !== 0x02014b50) throw new Error(`${file}: bad central directory entry ${i}`);
+      const method = buf.readUInt16LE(at + 10);
+      const size = buf.readUInt32LE(at + 20);
+      const nameLen = buf.readUInt16LE(at + 28);
+      const extraLen = buf.readUInt16LE(at + 30);
+      const commentLen = buf.readUInt16LE(at + 32);
+      const local = buf.readUInt32LE(at + 42);
+      const name = buf.toString('utf8', at + 46, at + 46 + nameLen);
+      at += 46 + nameLen + extraLen + commentLen;
+      if (name.endsWith('/')) continue;
+      out.push({
+        name,
+        bytes: () => {
+          const start = local + 30 + buf.readUInt16LE(local + 26) + buf.readUInt16LE(local + 28);
+          const raw = buf.subarray(start, start + size);
+          if (method === 0) return Buffer.from(raw);
+          if (method === 8) return inflateRawSync(raw);
+          throw new Error(`${file}: ${name} uses compression method ${method}`);
+        },
+      });
+    }
+    return out;
+  };
+  const packages: Array<{ label: string; entries: Entry[] }> = [
+    ...builds.map((d) => ({ label: `.output/${path.basename(d)}`, entries: folderEntries(d) })),
+    ...storeZips.map((z) => ({ label: `.output/${path.basename(z)}`, entries: zipEntries(z) })),
+  ];
+
+  // a comment in the source, long enough that finding it in the bundle can only mean it was kept
+  const COMMENTS = [...new Set(SRC.filter((p) => p.endsWith('.ts')).flatMap((p) => read(p).split('\n').map((l) => /^\s*(?:\/\/|\*|\/\*\*)\s?(.*)$/.exec(l)?.[1]?.trim() ?? '').filter((c) => c.length >= 40 && !/["'`]/.test(c))))];
+
+  it.skipIf(packages.length === 0)(`carries no cluster-side code, only the site profiles as data (${VERSION})`, () => {
+    const CODE = /\.(sh|bash|py|pyc|tpl|sbatch|pbs|lsf|pl|rb|ts|mts|map)$/i;
+    const TOOL_FILES = /(^|\/)(hpcworker|VERSION|files\.json|README[^/]*)$/i;
+    const framework = (() => {
+      try {
+        return readdirSync(path.join(ROOT, '..', 'framework', 'profiles')).filter((n) => n.endsWith('.json')).sort();
+      } catch {
+        return undefined;
+      }
+    })();
+    for (const { label, entries } of packages) {
+      const names = entries.map((e) => e.name);
+      expect(names.filter((n) => CODE.test(n) || TOOL_FILES.test(n) || /(^|\/)framework\//.test(n)), label).toEqual([]);
+      // the profiles, as data: JSON objects named by their site, with no free-text notes
+      const profiles = entries.filter((e) => e.name.startsWith('profiles/'));
+      for (const e of profiles) {
+        expect(e.name, label).toMatch(/^profiles\/[A-Za-z0-9_-]+\.json$/);
+        const p = JSON.parse(e.bytes().toString('utf8')) as Record<string, unknown>;
+        expect(p.notes, `${label} ${e.name}`).toBeUndefined();
+        expect(`profiles/${String(p.site)}.json`, label).toBe(e.name);
+      }
+      if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
+      // nothing beside the manifest, the pages, the scripts, the styles, the icons, the profiles and the two texts
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|icon\/\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js)$/.test(n));
+      expect(other, label).toEqual([]);
+    }
+  });
+
+  it.skipIf(packages.length === 0)(`ships its JavaScript minified, with no comment and no source map (${VERSION})`, () => {
+    expect(COMMENTS.length).toBeGreaterThan(200);
+    for (const { label, entries } of packages) {
+      const scripts = entries.filter((e) => e.name.endsWith('.js'));
+      expect(scripts.length, label).toBeGreaterThan(3);
+      for (const e of scripts) {
+        const text = e.bytes().toString('utf8');
+        const where = `${label} ${e.name}`;
+        expect(text, where).not.toMatch(/sourceMappingURL|sourceURL=/);
+        const lines = text.split('\n');
+        // minified: a few very long lines (the breaks left are inside template strings), never source-shaped ones
+        expect(text.length / lines.length, where).toBeGreaterThan(200);
+        expect(Math.max(...lines.map((l) => l.length)), where).toBeGreaterThan(2000);
+        expect(lines.filter((l) => /^\s*(?:\/\/|\/\*)/.test(l)), where).toEqual([]);
+        expect(text, where).not.toMatch(/\/\*\*|\/\*!|@license|@preserve/);
+        expect(COMMENTS.filter((c) => text.includes(c)), where).toEqual([]);
+      }
+    }
+  });
+
+  it.skipIf(!sourcesZip)(`the sources zip (for the Firefox review, not published) carries no framework either (${VERSION})`, () => {
+    const names = zipEntries(sourcesZip!).map((e) => e.name);
+    expect(names.filter((n) => n.startsWith('public/framework/') || n === 'scripts/sync-framework.mjs')).toEqual([]);
+    expect(names).toContain('scripts/sync-profiles.mjs');
   });
 });

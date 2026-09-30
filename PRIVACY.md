@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 7, 2026-09-29. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 8, 2026-09-30. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -21,13 +21,13 @@ Anthropic receives, what Licensor receives, and what is never collected.
 |---|---|---|---|
 | The portal address you connected from its tab or typed, and the one website you granted the extension access to | the extension's own storage (`storage.local`) | to reach your portal | the options page; removing the site permission in your browser; uninstalling |
 | Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker starts by itself when your portal tab connects, and whether the claude.ai tab opens by itself when your worker connects (in this build both are on until you turn them off; the options page says so where each is switched) | `storage.local` | convenience | the options page |
-| The account name your portal's dashboard showed for your session, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | disconnecting the portal on the options page; uninstalling |
+| The account name your portal's dashboard showed for your session, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (your account is set up on another installation; this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | disconnecting the portal on the options page; uninstalling |
 | Your acceptance of the agreement: its version and text hashes, the statements you ticked with their wording, your typed name, the time, and the exact texts shown | `storage.local`, with a copy you can save | to prove the agreement and its terms, for you and for Licensor | it is yours to read, copy and print; uninstalling removes it |
 | Your statement about a worker's workspace: that it holds none of the restricted data the notice names, and that Remote Control will be enabled for that worker; kept as the workspace name, the exact text and its version, the time, and the time the marker below was written, one record per workspace | `storage.local` | so the notice is shown at every start but you are not asked to tick it again for the same workspace | making it again for a workspace on the options page; uninstalling. It is asked again when the text or the workspace changes |
 | A note of the last sign-in to Claude made from this browser: the time, and what Claude Code's own report said afterwards (the account it is signed in as and its plan) | `storage.local` | so the sign-in step is not offered again while a newer check has not yet confirmed it | uninstalling |
-| The claude.ai links to your sessions that the extension already opened by itself, so each opens once; a note of the check job it submitted by itself (the time and the job number), so it is not submitted again while it runs; and a note of the install or update it ran by itself in your cluster account (the time, whether it succeeded, and how many files it uploaded or which shared copy of your lab's it used, with one line when it could not use that copy), so a failing one is not repeated in a loop | `storage.local` | so the automatic steps do not repeat themselves | uninstalling |
+| The claude.ai links to your sessions that the extension already opened by itself, so each opens once; a note of the check job it submitted by itself (the time and the job number), so it is not submitted again while it runs; and a note of the install it ran by itself in your cluster account (the time, whether it succeeded, which shared copy of your lab's it used, and one line when it could not use that copy), so a failing one is not repeated in a loop | `storage.local` | so the automatic steps do not repeat themselves | uninstalling |
 | Your tick on the optional step *Connect Google Drive in claude.ai*: a yes or no. The step opens that claude.ai settings page in a new tab; the extension does nothing on it | `storage.local` | so the checklist remembers what you finished | untick it; uninstalling |
-| The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier created in your browser | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you | uninstalling |
+| The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier the extension makes for itself when you accept the agreement, from the browser's random number generator and from nothing about your device | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you; and, sent in the approval check, so that an approval is used from one installation (see *What Licensor receives*) | uninstalling (a reinstallation makes a new identifier) |
 | Connection state while a job runs: the worker's name and its folder on the cluster, the job number, what the worker's status file last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it), the portal tab the extension talks to and the tab the icon was clicked from, when your portal sign-in was last seen, what the last automatic start did, and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
 | The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed is never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and on the options page (view, export, clear); it is never transmitted |
 
@@ -41,17 +41,17 @@ framework reads only Claude Code's yes-or-no answer about whether it is signed i
 
 ## What goes to your own cluster account
 
-The framework's scripts and settings, the job files, a random per-job token in a file only you can
-read, and the job's status files. Where your university's lab keeps one shared copy of the framework
-on the cluster, the scripts are not copied into your account: a small launcher that runs the shared
-copy, and a one-line note of where that copy is, take their place. Either way, the install adds a
-marked block of a few lines to `~/.bashrc` so that a terminal finds the tool. Nothing about your
-approval goes there. When you make the statement above for a worker, the extension also writes one
-small file in your account (the framework's own marker, `~/.hpcworker/consent`), one line: the word
-yes, the time, and the random installation identifier from your browser. Your worker gives that
-answer to Claude Code when Claude Code asks its one-time question "Enable Remote Control?", and
-after the first session Claude Code's own record of your answer takes over. Everything there is in
-your own account under your institution's rules; Licensor has no access to it.
+The framework's settings, the job files, a random per-job token in a file only you can read, and the
+job's status files. The framework's scripts are not copied into your account: they stay in the one
+shared copy your university's lab keeps on the cluster, and a small launcher that runs that copy,
+and a one-line note of where that copy is, take their place. The install also adds a marked block of
+a few lines to `~/.bashrc` so that a terminal finds the tool. Nothing about your approval goes
+there. When you make the statement above for a worker, the extension also writes one small file in
+your account (the framework's own marker, `~/.hpcworker/consent`), one line: the word yes, the time,
+and the random installation identifier from your browser. Your worker gives that answer to Claude
+Code when Claude Code asks its one-time question "Enable Remote Control?", and after the first
+session Claude Code's own record of your answer takes over. Everything there is in your own account
+under your institution's rules; Licensor has no access to it.
 
 ## What your portal sees
 
@@ -59,15 +59,14 @@ The extension makes requests to your university's Open OnDemand portal, and only
 sign-in your browser already holds: waking the portal's own web server up if it is asleep, opening
 the portal's shell once to submit a job and closing it, holding the shell open once for the sign-in
 sitting described below and closing it when the sitting ends, listing and reading files in your own
-account through the portal's Files app (and, where your lab keeps a shared copy of the framework,
-reading that copy's version number) and writing the framework's files (unless the shared copy is
-used) and the marker there, listing your jobs, and cancelling a job when you ask. Your institution's
-logs record those requests as they record any use of the portal; the shell's page token appears in
-the portal's access log, as it does when you open the shell yourself. The extension never signs in
-for you and never touches a multi-factor step. It reads no other website and makes no request to
-claude.ai. When it opens a claude.ai page (your session's link when your worker connects, or the
-connectors page from the optional step) or Anthropic's sign-in page, it opens it in a new browser
-tab, as a bookmark would, and runs nothing there.
+account through the portal's Files app (and reading the version number of your lab's shared copy of
+the framework) and writing the marker there, listing your jobs, and cancelling a job when you ask.
+Your institution's logs record those requests as they record any use of the portal; the shell's page
+token appears in the portal's access log, as it does when you open the shell yourself. The extension
+never signs in for you and never touches a multi-factor step. It reads no other website and makes no
+request to claude.ai. When it opens a claude.ai page (your session's link when your worker connects,
+or the connectors page from the optional step) or Anthropic's sign-in page, it opens it in a new
+browser tab, as a bookmark would, and runs nothing there.
 
 ## What happens when you sign in to Claude
 
@@ -111,11 +110,17 @@ Licensor before you have accepted the agreement. After that:
   to the address named in the services file below (Licensor's access service,
   `https://beethoven-access.openspineconsortium.workers.dev`), and carries: the account name your
   portal shows for your session (never one you typed; there is nowhere to type one), your portal's
-  hostname, the product name (`bridge`) and the extension's version; like any request, it arrives at
-  a time. The service answers yes or no, and nothing else about you or anyone else. The extension
-  keeps a yes for up to a day, and for up to seven days when the service cannot be reached, so an
-  outage on Licensor's side does not stop your work; it keeps a no for ten minutes, and while the
-  answer is no it starts no worker and offers you a button to ask for access.
+  hostname, the product name (`bridge`), the extension's version and the random installation
+  identifier described above; like any request, it arrives at a time. The service answers yes or no,
+  and nothing else about you or anyone else. A no may carry one of three reasons: that your account
+  is already set up on another installation (the panel then says so and offers no button: your lab
+  lead moves the approval), that this installation is already set up for another account (the panel
+  says so and offers no button: your lab lead releases it), or that this version is too old (the
+  panel asks you to install the current one from the lab's private listing). The extension keeps a
+  yes for up to a day, and for up to seven days when the service cannot be reached, so an outage on
+  Licensor's side does not stop your work; it keeps a no for ten minutes, and while the answer is no
+  it starts no worker and, unless the reason is one of those three, offers you a button to ask for
+  access.
 - **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
   of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
   list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
@@ -134,20 +139,41 @@ Those are the only requests the extension ever makes to Licensor. In particular:
 version, the time, a salted hash of your network address (the address itself is not kept) and the
 answer given. These lines sit with your access record.
 
+**One approved account, one installation.** The first installation that asks about an approved
+account is bound to it: the service keeps that installation's identifier with the product, the
+version and the times it first and last asked, and, for that identifier, the account it is bound to.
+A check for the same account from any other installation (another computer, another browser profile,
+a reinstallation) is refused, and so is a check from that installation for any other account; the
+service counts such refusals and keeps the times of the first and the last one and the first eight
+characters of a one-way hash of the refused installation's identifier. When another installation
+asks about an account, the service e-mails Licensor, at most once a day per account, with a link
+that can move the approval to that installation, so that Licensor can move it or withdraw it. The
+identifier is random: it is not read from your device or derived from it, and Licensor cannot tell
+from it which computer it is on.
+
 **The *Ask for access* button.** When the answer is no, the panel's one button opens Licensor's
 request page (`https://openspineconsortium.com/beethoven/request.html`) in a new tab with your
 account name in the page's address, so the form is filled in for you. As with any page you open,
 your browser's history and the web host's ordinary server logs may record that address.
 
 **Access requests.** If you ask for access on the request page (a web page, not the extension), the
-request form records what you enter: your account name, your name, your institutional e-mail, what
-you will use Beethoven for, and the time; it also tells the service that it is Beethoven's request
-page, which Licensor's notice of the request shows.
+request form records what you enter: your account name, your name, your institutional e-mail, the
+Google account at which you want the invitation to Beethoven's private listing on the Chrome Web
+Store, what you will use Beethoven for, your CV if you attach one (PDF or Word, 5 MB at most), and
+the time; it also tells the service that it is Beethoven's request page, which Licensor's notice of
+the request shows. That notice is an e-mail to Licensor carrying those items, with a link to the CV
+that works for 14 days instead of the CV itself. When mailbox confirmation is on (the request page
+says so after you send), the service first e-mails a link to your university mailbox and passes the
+request on when you open it, and records the time you did; otherwise the notice says that the
+mailbox was not confirmed. If you are approved for Beethoven, Licensor adds that Google account to
+the Google Group whose members may open the private listing; Google then holds it as a member of
+that group, under Google's own terms.
 
 **Your access record.** Licensor's records hold the approval and withdrawal decisions about your
-account, with the name and e-mail you gave when you asked, their dates, and the check lines above.
-The same approved list serves Licensor's other product, an extension for VS Code, so one approval
-covers both.
+account (an approval is for Beethoven, or for membership of Licensor's lab only), with the name and
+e-mail you gave when you asked, their dates, the installation your approval is bound to, and the
+check lines above. The same approved list serves Licensor's other product, an extension for VS Code,
+so one approval covers both.
 
 **A notice under the agreement**, if you send one: what you write in it, kept with your access
 record.
@@ -156,18 +182,23 @@ record.
 
 Stated in the negative because reviewers read for what is absent: the extension does not collect
 command text, file paths, prompt content, job output, portal cookies or tokens, the code you paste
-to sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It sends
-Licensor no error or crash reports, no usage data and no activation request; the approval check
-above is the only thing it sends about you. It has no access to claude.ai, requests no `cookies`,
-`tabs`, `webRequest`, `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission, and
-runs no code fetched from anywhere.
+to sign in to Claude, browsing activity, or anything from claude.ai or any Anthropic page. It reads
+no hardware address, serial number or other identifier from your device and derives none from it:
+the one identifier of the installation is the random number described above. It sends Licensor no
+error or crash reports, no usage data and no activation request; the approval check above is the
+only thing it sends about you. It has no access to claude.ai, requests no `cookies`, `tabs`,
+`webRequest`, `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission, and runs no
+code fetched from anywhere.
 
 ## How Licensor uses and keeps it
 
-Access records, including the check lines, are kept for the life of your access and six years after,
-to prove the agreement and for accounting and disputes. Nothing is sold or used for advertising. The
-web host that serves the two daily files sees the requests any web server sees and nothing more.
-Processors acting for Licensor (hosting; the access service) see only what they need to run the
+A CV attached to a request is deleted twelve months after Licensor decides on the request (twelve
+months after the request, if no decision is made), or at once if the request is refused or the
+approval withdrawn. The other access records, including the check lines and the installation record,
+are kept for the life of your access and six years after, to prove the agreement and for accounting
+and disputes. Nothing is sold or used for advertising. The web host that serves the two daily files
+sees the requests any web server sees and nothing more. Processors acting for Licensor (hosting; the
+access service; the e-mail service that carries its notices) see only what they need to run the
 service. Licensor's use of data complies with the Chrome Web Store's Limited Use requirements.
 
 ## Security and breaches
@@ -178,11 +209,11 @@ by Licensor.
 
 ## Your choices and rights
 
-Remove the site permission or uninstall the extension at any time; ask Licensor for a copy or
-deletion of your access records (deletion of your access record ends your approval and with it the
-license). Michigan residents and residents of other states may have further rights under their
-state's laws; Licensor honours requests it is obliged to honour and answers others where it
-reasonably can. Beethoven is offered in the United States.
+Remove the site permission or uninstall the extension at any time; ask Licensor to move your
+approval to another installation, or for a copy or deletion of your access records (deletion of your
+access record ends your approval and with it the license). Michigan residents and residents of other
+states may have further rights under their state's laws; Licensor honours requests it is obliged to
+honour and answers others where it reasonably can. Beethoven is offered in the United States.
 
 ## Children
 
@@ -192,6 +223,18 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 8 (2026-09-30, Beethoven 8.0.0): the extension no longer carries the framework's scripts and
+never copies them into your account. It works only with the one shared copy your university's lab
+keeps on the cluster; where there is none, or your account cannot use it, it says so and names whom
+to ask, and uploads nothing. The note of the install it ran no longer counts uploaded files. One
+approved account, one installation: the approval check now also sends the random installation
+identifier the extension already kept, and the service binds an approval to the first installation
+that asks, refuses any other until Licensor moves the approval, refuses that installation for any
+other account, and keeps what *One approved account, one installation* says. Beethoven is offered
+only through a private listing on the Chrome Web Store. The request page now also asks for the
+Google account that receives the invitation to that listing, takes an optional CV (deleted twelve
+months after the decision), and may ask you to confirm your university mailbox.
 
 Version 7 (2026-09-29, Beethoven 7.0.0): the product has a new name, Beethoven, and new addresses.
 Its pages, the support page and the request page are under

@@ -14,8 +14,10 @@ export interface MockPortalOptions {
   jobComposer?: boolean;
   shellHosts?: string[];
   seedTool?: boolean;
-  /** with seedTool: also profile.json and VERSION (the version the build carries), so the strip finds the tool installed and current; default false (the CLI sets it unless --fresh-home or --shared-install) */
+  /** with seedTool: also profile.json and VERSION, the stand-in as the account's own copy, as a build before 8.0.0 left an account; default false (the CLI sets it with --own-copy) */
   seedInstalled?: boolean;
+  /** with sharedInstall and a readable copy: the account already set up on the lab's shared copy by the stand-in's own install --shared (seedTool is then ignored); default false (the CLI sets it unless --shared-install, --fresh-home, --own-copy or --shared-unreadable) */
+  seedShared?: boolean;
   /** the virtual path of the lab's shared copy of the tool (framework 5 shared_install), served read-only; undefined: the site keeps none */
   sharedInstall?: string;
   /** false plays an account outside the lab's group: the Files routes answer 403 there and bash cannot open the launcher (exit 127); default true */
@@ -28,6 +30,10 @@ export interface MockPortalOptions {
   approved?: string[];
   /** access checks past this many answer 429; 0 = no limit */
   accessLimit?: number;
+  /** installations already bound, {access_id: install_id} (the CLI's --seat); the stand-in binds each other approved account to the first installation that asks, unless another account's seat names that installation (reason "other_account") */
+  seats?: Record<string, string>;
+  /** false plays the service with REQUIRE_INSTALL_ID "0" (the CLI's --install-optional): an approved account asking without an installation identifier is approved; default true, which answers reason "update_required" */
+  requireInstallId?: boolean;
   tls?: { cert: string; key: string };
   log?: (line: string) => void;
 }
@@ -62,7 +68,11 @@ export interface MockPortal {
     /** POSTs the access-service stand-in has taken */
     accessChecks: number;
     /** their parsed bodies, in order */
-    accessBodies: Array<{ v: number; access_id: string; portal: string; product: string; version: string }>;
+    accessBodies: Array<{ v: number; access_id: string; portal: string; product: string; version: string; install_id?: string }>;
+    /** the installation each approved account is bound to, {access_id: install_id}; a test moves one by writing here */
+    seats: Record<string, string>;
+    /** how many times each account was asked about from an installation other than its own */
+    conflicts: Record<string, number>;
     /** the content-type, origin and cookie headers each POST carried */
     accessHeaders: Array<{ 'content-type': string; origin: string; cookie: string }>;
   };
@@ -70,3 +80,9 @@ export interface MockPortal {
 }
 
 export function createMockPortal(opts?: MockPortalOptions): Promise<MockPortal>;
+
+/** where the CLI keeps the lab's shared copy when neither --shared-install PATH nor MOCK_SHARED_INSTALL names one */
+export const DEFAULT_SHARED_INSTALL: string;
+
+/** the options the CLI starts the mock with, from its arguments (without node and the script) and environment */
+export function cliOptions(args: string[], env?: Record<string, string | undefined>): MockPortalOptions;

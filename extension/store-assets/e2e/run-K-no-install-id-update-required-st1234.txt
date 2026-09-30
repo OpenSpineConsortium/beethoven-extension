@@ -1,0 +1,41 @@
+Beethoven 8.0.0, run K (a client that sends no installation identifier, played with curl against the mock's access stub), 2026-09-30
+
+No browser: the mock's stand-in for the access service (extension/mock-ood/server.mjs, POST /beethoven/access_check) was
+asked directly with curl (Git for Windows curl.exe, -k for the self-signed certificate). The first mock plays the service
+as it is meant to run once 8.0.0 is on the private listing (the identifier required); the second plays it with
+--install-optional, which is what the deployed service does while its REQUIRE_INSTALL_ID variable is "0". Line 2 records
+what the stub does with an explicit null (the real service treats null like an absent identifier). Times are UTC.
+
+Summary: 9 of 9 answers as expected
+
+14:33:27.925  SETUP   mock: node mock-ood/server.mjs --port 8443 --host localhost --user st1234 --home <scratch> --cert <scratch> --key <scratch>
+14:33:27.930  SETUP   mock says: access:    https://localhost:8443/beethoven/access_check (tests only; approves st1234, one installation each)
+14:33:28.152  CURL    1. a build before 8.0.0 (version 7.0.0, no install_id), approved account
+14:33:28.153          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"7.0.0"}' https://localhost:8443/beethoven/access_check
+14:33:28.154          -> HTTP 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"update_required"}   [as expected]
+14:33:28.289  CURL    2. the same with install_id null
+14:33:28.290          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"7.0.0","install_id":null}' https://localhost:8443/beethoven/access_check
+14:33:28.290          -> HTTP 400 {"error":"install_id is the 32 hexadecimal characters the extension made when it was installed"}   [as expected]
+14:33:28.426  CURL    3. an account not on the list, no install_id
+14:33:28.427          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"zz9999","portal":"localhost","product":"bridge","version":"7.0.0"}' https://localhost:8443/beethoven/access_check
+14:33:28.427          -> HTTP 200 {"approved":false,"access_id":"zz9999","requestPage":"https://openspineconsortium.com/beethoven/request.html"}   [as expected]
+14:33:28.585  CURL    4. 8.0.0 with an identifier: binds the account
+14:33:28.585          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"c0a0bbb4f13b8a3c55efb45d404c4213"}' https://localhost:8443/beethoven/access_check
+14:33:28.585          -> HTTP 200 {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:33:28.572Z","until":null}   [as expected]
+14:33:28.741  CURL    5. again without an identifier, now that a seat exists
+14:33:28.741          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"7.0.0"}' https://localhost:8443/beethoven/access_check
+14:33:28.741          -> HTTP 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"update_required"}   [as expected]
+14:33:28.877  CURL    6. a malformed identifier
+14:33:28.877          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"not-hex"}' https://localhost:8443/beethoven/access_check
+14:33:28.877          -> HTTP 400 {"error":"install_id is the 32 hexadecimal characters the extension made when it was installed"}   [as expected]
+14:33:32.102  SETUP   mock: node mock-ood/server.mjs --port 8443 --host localhost --user st1234 --home <scratch> --cert <scratch> --key <scratch> --install-optional
+14:33:32.103  SETUP   mock says: access:    https://localhost:8443/beethoven/access_check (tests only; approves st1234, one installation each; a check without an installation identifier is approved)
+14:33:32.259  CURL    7. --install-optional (the service with REQUIRE_INSTALL_ID "0"): no install_id
+14:33:32.259          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"7.0.0"}' https://localhost:8443/beethoven/access_check
+14:33:32.259          -> HTTP 200 {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:33:32.239Z","until":null}   [as expected]
+14:33:32.413  CURL    8. --install-optional: 8.0.0 with an identifier still binds
+14:33:32.413          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"2066f29141a2e36c20c2aee20c8c1b4b"}' https://localhost:8443/beethoven/access_check
+14:33:32.413          -> HTTP 200 {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:33:32.400Z","until":null}   [as expected]
+14:33:32.549  CURL    9. --install-optional: another identifier is still refused
+14:33:32.550          curl -sk -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"c0a0bbb4f13b8a3c55efb45d404c4213"}' https://localhost:8443/beethoven/access_check
+14:33:32.550          -> HTTP 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}   [as expected]

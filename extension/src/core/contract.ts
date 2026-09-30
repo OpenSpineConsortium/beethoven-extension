@@ -12,10 +12,12 @@
 // whole tool, maintained by the lab in one place; `hpcworker install --shared <that folder>` then
 // sets up the account without copying code (a launcher, a marker, the profile, log/).
 //
+// Since 8.0.0 the extension sets up only the second mode below and carries no copy of the tool; the
+// first is what a build before 8.0.0 left in an account, which the framework keeps running.
 // Layout, in either of two modes:
-//   the student's own copy (a site with no shared folder, or the fallback when the account cannot read it):
-//   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/), uploaded by the extension
-//   ~/.hpcworker/VERSION                      the installed tool's integer version; the strip compares it with the bundled one
+//   the student's own copy (set up by a build before 8.0.0):
+//   ~/.hpcworker/                             the installed tool (bin/, lib/, jobs/, profiles/)
+//   ~/.hpcworker/VERSION                      the installed tool's integer version, shown under Details
 //   the lab's shared copy (framework 5):
 //   <shared_install>/                         bin/, lib/, jobs/, profiles/, VERSION, README.md, kept by the lab
 //   ~/.hpcworker/shared                       the marker: one line naming <shared_install>; while it exists the account runs that copy
@@ -74,14 +76,14 @@ export const paths = {
   consent: (home: string) => `${home}/${FRAMEWORK_DIR}/consent`,
   /** the shared-copy marker `hpcworker install --shared` writes: one line, the shared folder */
   sharedMarker: (home: string) => `${home}/${FRAMEWORK_DIR}/shared`,
-  /** the shared copy's own VERSION: the lab's copy is the one that counts, never the bundled one */
+  /** the shared copy's own VERSION: the lab's copy is the one that counts (the package carries none) */
   sharedVersion: (dir: string) => `${dir}/VERSION`,
 };
 
 /**
  * A shared folder the extension will name on a command line: absolute, made of letters, digits and
- * . _ + - only, no "." or ".." segment. Anything else is not used (the tool is then uploaded to the
- * student's own account as before), so no path from a profile or a marker is ever quoted around.
+ * . _ + - only, no "." or ".." segment. Anything else is not used (the site then reads as keeping no
+ * shared copy, and nothing is set up), so no path from a profile or a marker is ever quoted around.
  */
 export function sharedRootOf(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
@@ -156,10 +158,8 @@ function safe(s: string): string {
 
 /** The command lines the extension types, each exactly one line, each one of hpcworker's own verbs. */
 export const commands = {
-  /** after the files are uploaded: make the tool executable and install with the site profile (it strips CR endings itself) */
-  install: (profile: string) => `chmod 755 ${HPCWORKER} 2>/dev/null; bash ${HPCWORKER} install --profile '${safe(profile)}'`,
   /**
-   * The lab's shared copy (framework 5): nothing is uploaded; the shared tool sets up the account
+   * The lab's shared copy (framework 5), the only install the extension types: nothing is uploaded; the shared tool sets up the account
    * itself (launcher, marker, profile, the PATH block). `dir` has passed sharedRootOf, so it holds
    * no quote or space; the quotes are the same habit as every other argument here.
    */

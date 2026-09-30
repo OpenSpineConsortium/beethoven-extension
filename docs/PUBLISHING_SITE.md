@@ -1,10 +1,11 @@
 # Publishing the site pages and the kill-list
 
-The public pages the store listings point at, the services file and the signed kill-list the extension
-fetches once a day live in the site repository `openspineconsortium.github.io` (GitHub Pages, custom
-domain `openspineconsortium.com`), checked out beside this repository on the maintainer's machine.
-Nothing here commits or pushes: the tools write files, the maintainer reviews `git status` in the site
-repository, commits and pushes (network through WSL, as everywhere else).
+The public pages the private Chrome Web Store listing points at, the services file and the signed
+kill-list the extension fetches once a day live in the site repository
+`openspineconsortium.github.io` (GitHub Pages, custom domain `openspineconsortium.com`), checked out
+beside this repository on the maintainer's machine. Nothing here commits or pushes: the tools write
+files, the maintainer reviews `git status` in the site repository, commits and pushes (network
+through WSL, as everywhere else).
 
 Rewritten 2026-09-29 for 7.0.0, when the public name became Beethoven (the repository followed on
 2026-09-30: `OpenSpineConsortium/beethoven`). Addresses, fixed:
@@ -12,7 +13,7 @@ Rewritten 2026-09-29 for 7.0.0, when the public name became Beethoven (the repos
 | Page | Address | Source |
 |---|---|---|
 | landing (store `homepage_url`) | `https://openspineconsortium.com/beethoven/` | generated (the site repository's `tools/build_site.py`) |
-| privacy statement (the privacy-policy URL in every store dashboard) | `https://openspineconsortium.com/beethoven/privacy.html` | `PRIVACY.md`, rendered |
+| privacy statement (the privacy-policy URL in the store dashboard) | `https://openspineconsortium.com/beethoven/privacy.html` | `PRIVACY.md`, rendered |
 | license terms | `https://openspineconsortium.com/beethoven/terms.html` | `LICENSE.txt`, rendered |
 | support and notice address | `https://openspineconsortium.com/beethoven/support.html` | generated (the site repository's `tools/build_site.py`) |
 | request page (the panel's *Ask for access* button opens it with `?access_id=<account>`) | `https://openspineconsortium.com/beethoven/request.html` | generated (the site repository's `tools/build_site.py`); it posts to the `request` address in the services file beside it, with `"product":"bridge"` |
@@ -47,11 +48,15 @@ It holds the site map (one navigation definition for every page), renders `/beet
 and `/beethoven/privacy.html` from `LICENSE.txt` and `PRIVACY.md` in THIS repository (found beside
 it as `../beethoven`, else `../ashley-bridge` until the folder is renamed; `BEETHOVEN_REPO`
 overrides both) and checks every word of both texts is on the page in order, writes the product page
-(`/` and `/beethoven/`, the same body), the support, request and reviewers pages, copies the release
-packages from `release/<version>/` into `/beethoven/downloads/` against their `SHA256SUMS.txt`, and
-stamps every asset with one `?v=` value per publish. Its README in the site repository is the
-manual. This repository no longer builds pages; its old builder (`tools/site_beethoven_build.py`)
-and templates are retired and are in git history.
+(`/` and `/beethoven/`, the same body), the support, request and reviewers pages, and stamps every
+asset with one `?v=` value per publish. Its README in the site repository is the manual. Since 8.0.0
+(2026-09-30) the site offers no download: `/beethoven/downloads/` is gone, and the product page
+shows one install card, Chrome, "Private listing, by invitation: after approval you receive an
+invitation at the Google account you gave", with no link; no other browser is named. The listing's
+link goes only to approved students (`docs/store/SUBMISSION.md`). The 7.0.0 zips stay in the site
+repository's git history (commit 816e9c4) unless the maintainer rewrites it. This repository no
+longer builds pages; its old builder (`tools/site_beethoven_build.py`) and templates are retired and
+are in git history.
 
 What this repository still owns on the site:
 - the two texts (`LICENSE.txt`, `PRIVACY.md`): change them here, bump their `Version N` lines and
@@ -61,10 +66,11 @@ What this repository still owns on the site:
   the generator checks it but never writes it; copy the published file here when it changes, as on
   2026-09-30 when it gained `report`);
 - the signed kill-list (below);
-- the packages in `release/<version>/` (the generator's `VERSION` constant names the one it serves).
+- nothing else: the packages in `release/<version>/` are the maintainer's record and are not
+  published on the site.
 
-When a store listing goes live, set its URL in `BROWSERS` at the top of the site generator and publish
-the site; the product page's card switches from "Direct download" to the store link.
+The listing is private, so its URL is never set in `BROWSERS` at the top of the site generator: the
+card stays "Private listing, by invitation".
 
 ## The kill-list
 
@@ -220,7 +226,7 @@ withdrawn, message "Beethoven is current."); `verify-killlist` answered `ok: tru
 then ran end to end against the mock portal with `services.json` and `killlist.json` answered from these
 files in place of the live ones and the access check sent to the real second name (runs F, G and H in
 `extension/store-assets/e2e/`). Not verified: the live pages, the kill-list at its live address,
-Firefox and Safari, a true phone.
+a true phone.
 
 ## Earlier builds (history)
 

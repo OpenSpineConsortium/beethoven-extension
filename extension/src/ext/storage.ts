@@ -33,7 +33,12 @@ export async function prefs(): Promise<Prefs> {
   return { ...DEFAULT_PREFS, ...((await local.get<Partial<Prefs>>(PREFS_KEY)) ?? {}) };
 }
 
-/** a random id for the acceptance record and the consent marker; never an identity */
+/**
+ * This installation's random identifier, made once from the browser's random generator and from
+ * nothing about the device. It names the acceptance record and the consent marker, and the approval
+ * check sends it so that one approved account is used from one installation (licensing/access.ts).
+ * Uninstalling removes it and a reinstall makes a new one; nothing here ever clears it.
+ */
 export async function installId(): Promise<string> {
   let id = await local.get<string>(INSTALL_ID_KEY);
   if (!id) {
@@ -57,5 +62,5 @@ export function browserName(): string {
 
 export const version = (): string => browser.runtime.getManifest().version;
 
-/** a bundled file's URL; the framework files are generated at build time, so their paths are not in WXT's typed list */
+/** a bundled file's URL; the site profiles are generated at build time, so their paths are not in WXT's typed list */
 export const assetUrl = (path: string): string => browser.runtime.getURL(path as never);

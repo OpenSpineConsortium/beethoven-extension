@@ -8,7 +8,7 @@
 // tool installed -> probe run -> signed in to Claude on the cluster -> data statement -> worker
 // started -> worker online -> open in Claude.
 import type { WorkerState } from './contract';
-import type { AccessFact } from '../licensing/access';
+import { OTHER_ACCOUNT, OTHER_INSTALLATION, UPDATE_REQUIRED, type AccessFact } from '../licensing/access';
 import { PRODUCT_NAME } from './terms';
 
 export type StepId = 'portal' | 'warm' | 'terms' | 'access' | 'install' | 'probe' | 'login' | 'statement' | 'start' | 'online' | 'open';
@@ -52,14 +52,14 @@ export interface Facts {
   install: {
     /** undefined until the home directory has been listed */
     installed?: boolean;
-    /** the tool on the cluster is older than the one this build carries (~/.hpcworker/VERSION against the bundled VERSION); never set for the lab's shared copy */
-    outdated?: { installed: string; bundled: string };
     /** the account runs the lab's shared copy (~/.hpcworker/shared names its folder); its VERSION as the Files app read it, or why it could not be read */
     shared?: { dir: string; version?: string; unreadable?: string };
-    /** the account's own copy's VERSION (~/.hpcworker/VERSION), when it runs its own copy */
+    /** the VERSION of the account's own copy (~/.hpcworker/VERSION), when it still runs one set up by a build before 8.0.0 */
     version?: string;
-    /** the shared folder the bundled site profile names: the install links to it instead of uploading */
+    /** the shared folder the bundled site profile names: the one way the tool is set up */
     sharedRoot?: string;
+    /** why the account cannot use a lab's shared copy (the site profile names none, or the install line said so), for Details; nothing is uploaded instead */
+    noSharedCopy?: string;
     installing?: boolean;
     failed?: string;
   };
@@ -144,6 +144,9 @@ export interface StripView {
   tone: 'info' | 'busy' | 'wait' | 'fail' | 'ok';
 }
 
+/** the strip's one sentence when the account has no usable shared copy of the tool; Details says why */
+export const NEEDS_SHARED_COPY = `${PRODUCT_NAME} needs your lab's shared copy of the tool on the cluster, and your account cannot use it yet: ask your lab lead (Details says why).`;
+
 /** a run recorded this recently may still be queued with no status.json yet */
 export const FRESH_RUN_MS = 10 * 60_000;
 /** a probe submitted this recently is still running or queued; do not submit another */
@@ -201,6 +204,13 @@ export function decide(f: Facts, now = Date.now()): StripView {
         return view('access', { status: `Your account ${a.accessId ?? ''}${a.portal ? ` at ${a.portal}` : ''} is not on the approved list yet. Ask for access; once it is approved, click the ${PRODUCT_NAME} button again.`, primary: { label: 'Ask for access', action: 'ask-access' }, tone: 'info' });
       case 'withdrawn':
         return view('access', { status: a.detail, primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
+      // one approved account, one installation: only the lab lead can move it, so no button
+      case 'other-installation':
+        return view('access', { status: OTHER_INSTALLATION, tone: 'fail' });
+      case 'other-account':
+        return view('access', { status: OTHER_ACCOUNT, tone: 'fail' });
+      case 'update-required':
+        return view('access', { status: UPDATE_REQUIRED, tone: 'fail' });
       case 'no-identity':
         return view('access', { status: "Your portal's dashboard does not show who is signed in, so your access cannot be checked. Open the portal in a tab, sign in there, and try again.", primary: { label: 'Check again', action: 'retry-access' }, tone: 'fail' });
       case 'lapsed':
@@ -211,16 +221,16 @@ export function decide(f: Facts, now = Date.now()): StripView {
     }
   }
 
-  // 5. the tool on the cluster: the lab's shared copy where the site keeps one (nothing uploaded),
-  // else the student's own copy (uploaded); the line says which
-  const lab = !!f.install.sharedRoot;
-  if (f.install.installing) return view('install', { status: lab ? "Setting up the cluster (pointing your account at your lab's shared copy of the tool)..." : 'Setting up the cluster (uploading the tool and installing it once)...', tone: 'busy' });
+  // 5. the tool on the cluster: the lab's shared copy, the one way it is set up (nothing is ever
+  // uploaded); without a usable one the strip says so and whom to ask. An account that still runs
+  // its own copy from a build before 8.0.0 is installed and goes on.
+  if (f.install.installing) return view('install', { status: "Setting up the cluster (pointing your account at your lab's shared copy of the tool)...", tone: 'busy' });
   if (f.install.failed) return view('install', { status: `Setting up the cluster failed: ${f.install.failed}`, primary: { label: 'Try again', action: 'retry-install' }, tone: 'fail' });
   if (f.install.installed === undefined) return view('install', { status: 'Looking at your cluster home...', auto: 'poll', tone: 'busy' });
-  if (!f.install.installed) return view('install', { status: lab ? "Setting up the cluster with your lab's shared copy of the tool..." : 'Setting up the cluster...', auto: 'install', tone: 'busy' });
-  // an older own copy is set up again: the same way (upload, one install line), or, where the lab
-  // keeps a shared copy, by moving to that; either way the tool keeps the profile
-  if (f.install.outdated) return view('install', { status: lab ? `Moving your account to your lab's shared copy of the tool (your own copy is version ${f.install.outdated.installed})...` : `Updating the tool on the cluster (version ${f.install.outdated.installed} to ${f.install.outdated.bundled})...`, auto: 'install', tone: 'busy' });
+  if (!f.install.installed) {
+    if (f.install.noSharedCopy || !f.install.sharedRoot) return view('install', { status: NEEDS_SHARED_COPY, primary: { label: 'Try again', action: 'retry-install' }, tone: 'fail' });
+    return view('install', { status: "Setting up the cluster with your lab's shared copy of the tool...", auto: 'install', tone: 'busy' });
+  }
 
   // 6. the probe: once, in the background
   if (f.probe.submitting) return view('probe', { status: 'Asking for a compute node to check (a short job (ten minutes at most))...', tone: 'busy' });

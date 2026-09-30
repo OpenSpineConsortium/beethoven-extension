@@ -8,8 +8,8 @@
 import type { KV } from './audit';
 import { isEnvironmentUrl, LAUNCHER_TAG, paths, probeVerdict, profileRestricts, sharedRootOf, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
 import { ackSubject, statementFor, type Statements } from './disclosure';
-import { frameworkOlder } from './install';
-import { ACCESS_KEY, IDENTITY_KEY, INSTALL_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, SERVICES_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type InstallNote, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
+import { noSharedForSite } from './install';
+import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, OPENED_KEY, PROBE_KEY, SERVICES_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type LoginSeen, type OpenedLinks, type PortalSettings, type Prefs, type ProbeNote } from './keys';
 import type { PortalApi } from './portal';
 import { LOGIN_SEEN_FRESH_MS, type Facts } from './steps';
 import { recordInForce, TERMS_KEY } from './terms';
@@ -39,6 +39,8 @@ export interface Transient {
   accessFailed?: string;
   installing?: boolean;
   installFailed?: string;
+  /** the last install in this panel found the lab's shared copy unusable from this account, in the student's words (install.ts noShared) */
+  installNoShared?: string;
   probeSubmitting?: boolean;
   probeFailed?: string;
   loginInProgress?: boolean;
@@ -48,9 +50,6 @@ export interface Transient {
   /** the student pressed the start button; kept while the floor is waited out, cleared once the start went through or failed */
   startRequested?: boolean;
 }
-
-/** an automatic update that ran this recently and still reads the old version is reported, not repeated */
-export const INSTALL_RETRY_MS = 10 * 60_000;
 
 export interface FactsEnv {
   version: string;
@@ -64,8 +63,6 @@ export interface FactsEnv {
   run?: RunLike;
   click?: ClickNote;
   transient: Transient;
-  /** the VERSION file of the framework this build carries (install.ts bundledFrameworkVersion); absent when the caller cannot read its own files */
-  bundledFrameworkVersion?(): Promise<string | undefined>;
   /** the shared folder the bundled profile of this site names (install.ts bundledSharedInstall); absent or undefined: the site has none */
   bundledSharedInstall?(site: string): Promise<string | undefined>;
 }
@@ -170,7 +167,7 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
 
   // the cluster, only from a live, warm portal tab
   f.warm = t.warm ?? { state: 'unknown' };
-  f.install = { installing: t.installing, failed: t.installFailed };
+  f.install = { installing: t.installing, failed: t.installFailed, ...(t.installNoShared ? { noSharedCopy: t.installNoShared } : {}) };
   f.probe = { ...f.probe, submitting: t.probeSubmitting, failed: t.probeFailed };
   f.login = { inProgress: t.loginInProgress, failed: t.loginFailed, seenAt };
   const portal = env.portal();
@@ -182,13 +179,15 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     // for paths only: the dashboard's name, else the directory's owner or its last segment
     const user = observed ?? (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
     out.user = user;
-    // the site's shared folder, from the profile this build carries: it only changes the words of the install step here
+    // the site's shared folder, from the profile this build carries: without one there is nothing to set up
     const sharedRoot = s && env.bundledSharedInstall ? await env.bundledSharedInstall(s.site).catch(() => undefined) : undefined;
     if (sharedRoot) f.install.sharedRoot = sharedRoot;
     f.install.installed = await portal.exists(paths.profile(home));
-    if (!f.install.installed) return out;
-    // which copy does the account run? The marker names the lab's shared copy: that copy is the lab's
-    // to keep current, so it is never "outdated" against the one this build carries
+    if (!f.install.installed) {
+      if (!sharedRoot && !f.install.noSharedCopy) f.install.noSharedCopy = noSharedForSite(s?.site);
+      return out;
+    }
+    // which copy does the account run? The marker names the lab's shared copy, which the lab keeps current
     const marker = ((await portal.readFileIfExists(paths.sharedMarker(home))) ?? '').trim();
     // the marker alone does not prove it: a full copy uploaded over the launcher leaves the marker behind
     // and the tool then runs that copy (the framework's own rule); the launcher's second line is the tell
@@ -197,21 +196,10 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
     const runsTheMarker = launcher === undefined || (launcher.split('\n')[1] ?? '').trim() === LAUNCHER_TAG;
     if (marker && runsTheMarker) f.install.shared = await sharedCopy(portal, marker);
     else {
-      // its own copy: is it this build's framework? ~/.hpcworker/VERSION against the bundled VERSION;
-      // an older (or missing) one is set up again (at a site with a shared folder, by moving to it),
-      // unless that just ran and changed nothing, which is said instead
+      // its own copy, set up by a build before 8.0.0: it keeps running (the framework handles it) and
+      // is only named with its version; this build carries no tool to compare it with or replace it by
       const have = ((await portal.readFileIfExists(paths.version(home))) ?? '').trim();
       if (/^\d+$/.test(have)) f.install.version = have;
-      const bundled = env.bundledFrameworkVersion ? await env.bundledFrameworkVersion() : undefined;
-      // the move to a shared copy waits while a worker runs from the own copy: framework 5 refuses to
-      // move code from under a running job, and the strip would sit on a failed install meanwhile
-      const moveWaits = !!sharedRoot && f.run.live;
-      if (bundled && frameworkOlder(have, bundled) && !moveWaits) {
-        const note = await env.local.get<InstallNote>(INSTALL_KEY);
-        const justRan = !!note && note.ok && now - new Date(note.attempted_at).getTime() < INSTALL_RETRY_MS;
-        if (justRan) f.install.failed = f.install.failed ?? `the tool on the cluster still reports version ${have || 'unknown'} after the update to version ${bundled} ran (see Details)`;
-        else f.install.outdated = { installed: have || 'unknown', bundled };
-      }
     }
     const profile = await portal.readFileIfExists(paths.profile(home));
     out.profile = profile;

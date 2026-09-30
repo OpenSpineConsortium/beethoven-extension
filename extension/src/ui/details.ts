@@ -150,17 +150,17 @@ function actionsCard(env: DetailsEnv, approved: boolean, installNote: InstallNot
   const [tool, ...toolMore] = toolWords(env.install, installNote);
   add(box,
     tool ? el('p', { class: 'small', text: tool }) : null,
-    ...toolMore.map((t) => el('p', { class: installNote?.note === t ? 'warn small' : 'muted small', text: t })),
+    ...toolMore.map((t) => el('p', { class: installNote?.note === t || t.startsWith('Why:') ? 'warn small' : 'muted small', text: t })),
     el('div', { class: 'row' },
       el('button', {
         disabled: !ready || !approved,
         text: 'Set up the cluster again',
-        title: "Where your lab keeps a shared copy of the tool, points your account at it (nothing is uploaded); otherwise uploads the tool to your home folder through the portal and runs its install once",
+        title: "Points your account at your lab's shared copy of the tool, one line through the portal's shell (nothing is uploaded)",
         onClick: () =>
           run('Setting up the cluster', async () => {
             const r = await installFramework(portal, { site: settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: show });
             await local.set(INSTALL_KEY, installNoteOf(r, new Date()));
-            notify(r.ok ? (r.note ? 'warn' : 'ok') : 'fail', r.ok ? (r.mode === 'shared' ? "Your account now uses your lab's shared copy of the tool." : r.note ?? 'The tool is installed in your account.') : `The install command ended with exit ${r.exitCode}; see its output.`);
+            notify(r.ok ? 'ok' : r.noShared ? 'warn' : 'fail', r.ok ? "Your account now uses your lab's shared copy of the tool." : r.noShared ? `Nothing was changed: ${r.noShared}. Ask your lab lead.` : `The install command ended with exit ${r.exitCode}; see its output.`);
             await render();
           }),
       }),

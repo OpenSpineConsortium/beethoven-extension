@@ -53,11 +53,13 @@ command runs on `warrior`.
 
 ## The student's three steps
 
-Once, before the first run: install the extension from the store and read and accept the agreement on
-its setup page. There is no key to paste: the extension reads the AccessID the portal's dashboard shows
-for the signed-in session and asks Licensor's access service whether that account is on the approved
-list. A student not yet on it presses *Ask for access* (the request page opens with the AccessID
-filled in); the maintainer approves in the admin console, and the next click of the icon re-checks.
+Once, before the first run: install the extension from its private listing on the Chrome Web Store
+(the link comes to the Google account the student gave, once approved; an approval covers one
+installation) and read and accept the agreement on its setup page. There is no key to paste: the
+extension reads the AccessID the portal's dashboard shows for the signed-in session and asks
+Licensor's access service whether that account is on the approved list. A student not yet on it
+presses *Ask for access* (the request page opens with the AccessID filled in); the maintainer
+approves in the admin console, and the next click of the icon re-checks.
 
 1. **Open the portal tab.** Connect the VPN, sign in at `ondemand.grid.wayne.edu`, and keep the tab
    open.

@@ -11,7 +11,7 @@ import { browser } from 'wxt/browser';
 import type { RunState } from '../entrypoints/background';
 import { commands, parseJobId } from '../core/contract';
 import { gatherFacts, type Transient } from '../core/facts';
-import { bundledFrameworkVersion, bundledSharedInstall, installFailureWords, installFramework, installNoteOf } from '../core/install';
+import { bundledSharedInstall, installFailureWords, installFramework, installNoteOf } from '../core/install';
 import { ACCESS_KEY, CLICK_KEY, IDENTITY_KEY, INSTALL_KEY, PORTAL_KEY, PREFS_KEY, PROBE_KEY, STATEMENTS_KEY, type ClickNote, type IdentityNote, type PortalSettings, type ProbeNote } from '../core/keys';
 import { decide, type Action, type Facts, type StripView } from '../core/steps';
 import { stopWorker } from '../core/worker';
@@ -48,8 +48,6 @@ const FLOOR_REASON = /at most once a minute|asked less than a minute|asked less 
 
 export async function mountStrip(root: HTMLElement): Promise<void> {
   const transient: Transient = {};
-  // the framework version this build carries, read once: the facts compare it with ~/.hpcworker/VERSION
-  const bundledVersion = bundledFrameworkVersion((p) => fetch(assetUrl(p)));
   // the shared folder the bundled profile of a site names (framework 5 shared_install), read once per site name
   const sharedBySite = new Map<string, Promise<string | undefined>>();
   const sharedFor = (site: string): Promise<string | undefined> => {
@@ -111,7 +109,6 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
       run: state,
       click,
       transient,
-      bundledFrameworkVersion: () => bundledVersion,
       bundledSharedInstall: sharedFor,
     });
     const view = decide(g.facts);
@@ -183,12 +180,14 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
         case 'retry-install': {
           transient.installing = true;
           transient.installFailed = undefined;
+          transient.installNoShared = undefined;
           await tick();
           try {
             const r = await installFramework(portal, { site: snap.settings!.site, fetchAsset: (p) => fetch(assetUrl(p)), onProgress: showLog });
-            if (!r.ok) transient.installFailed = installFailureWords(r);
-            // remembered so an update that changed nothing is reported once, not run again every minute,
-            // and so Details can say which copy was set up (and why not the lab's, when it fell back)
+            // no usable shared copy is its own step (whom to ask), not a failed command; nothing was uploaded either way
+            if (r.noShared) transient.installNoShared = r.noShared;
+            else if (!r.ok) transient.installFailed = installFailureWords(r);
+            // remembered so Details can say which copy was set up, or why the lab's could not be used
             await local.set(INSTALL_KEY, installNoteOf(r, new Date()));
           } catch (e) {
             transient.installFailed = (e as Error).message;
@@ -375,6 +374,8 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     return undefined;
   });
   browser.storage.onChanged.addListener((changes, area) => {
+    // another site profile name may name a shared copy: look again rather than repeat the last answer
+    if (area === 'local' && changes[PORTAL_KEY]) transient.installNoShared = undefined;
     if (area === 'local' && (changes[PORTAL_KEY] || changes[PREFS_KEY] || changes[ACCESS_KEY] || changes[IDENTITY_KEY] || changes[STATEMENTS_KEY] || changes['bridge.terms'])) void tick();
     if (area === 'session' && changes[CLICK_KEY]) void tick();
   });

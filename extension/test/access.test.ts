@@ -2,18 +2,23 @@
 // the service codes to, every answer it can give lands in the record it should, the caches and
 // grace windows hold (a day for an approval, seven days without the service, ten minutes for a
 // refusal, fifteen minutes after no answer, a click asks again), a withdrawn approval is told
-// apart from a plain refusal, the request page carries the account name, and the pure decision
-// turns each record into the one state the strip and check 1 show. The last block runs the same
-// client against the mock portal's stand-in for the service.
+// apart from a plain refusal, the request page carries the account name, the installation's
+// identifier goes with every check and the service's two reasons (another installation, a build
+// too old) are said in their own sentences, and the pure decision turns each record into the one
+// state the strip and check 1 show. The last block runs the same client against the mock portal's
+// stand-in for the service, which binds an approved account to the first installation that asks.
 import { describe, expect, it } from 'vitest';
-import { createMockPortal } from '../mock-ood/server.mjs';
-import { accessDue, accessFact, APPROVED_GRACE_MS, APPROVED_TTL_MS, askService, checkAccess, DENIED_TTL_MS, fetchServices, normalizeAccount, PRODUCT, REQUEST_PAGE_URL, requestUrl, RETRY_MS, safeSitePage, SERVICES_TTL_MS, SERVICES_URL, type AccessRecord, type StoredServices } from '../src/licensing/access';
+import { cliOptions, createMockPortal } from '../mock-ood/server.mjs';
+import { accessDue, accessFact, APPROVED_GRACE_MS, APPROVED_TTL_MS, askService, checkAccess, DENIED_TTL_MS, fetchServices, INSTALL_ID_RE, normalizeAccount, OTHER_ACCOUNT, OTHER_INSTALLATION, PRODUCT, REQUEST_PAGE_URL, requestUrl, RETRY_MS, safeSitePage, SERVICES_TTL_MS, SERVICES_URL, UPDATE_REQUIRED, type AccessRecord, type StoredServices } from '../src/licensing/access';
 
 const T0 = Date.parse('2026-09-29T12:00:00Z');
 const at = (ms: number) => new Date(ms);
 const iso = (ms: number) => new Date(ms).toISOString();
 const CHECK = 'https://beethoven-access.openspineconsortium.workers.dev/access_check';
 const SERVICES: StoredServices = { fetched_at: iso(T0), access_check: CHECK, request_page: REQUEST_PAGE_URL };
+/** an installation identifier as ext/storage.ts installId makes one, and a second installation's */
+const INSTALL = '0123456789abcdef0123456789abcdef';
+const OTHER = 'fedcba9876543210fedcba9876543210';
 
 interface Seen {
   url: string;
@@ -47,9 +52,9 @@ const approvedRecord = (checkedAgoMs: number, extra: Partial<AccessRecord> = {})
 const deniedRecord = (checkedAgoMs: number, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', approved: false, checked_at: iso(T0 - checkedAgoMs), request_page: REQUEST_PAGE_URL, last_attempt_at: iso(T0 - checkedAgoMs), ...extra });
 
 describe('the wire request', () => {
-  it('is one POST with a text/plain JSON body of exactly {v, access_id, portal, product, version}, without cookies', async () => {
+  it('is one POST with a text/plain JSON body of exactly {v, access_id, portal, product, version, install_id}, without cookies', async () => {
     const { fetchFn, seen } = fakeService();
-    const out = await checkAccess({ accessId: 'ST1234', portal: 'OnDemand.grid.wayne.edu', version: '4.0.0', fetchFn, now: () => at(T0) });
+    const out = await checkAccess({ accessId: 'ST1234', portal: 'OnDemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn, now: () => at(T0) });
     expect(out.asked).toBe(true);
     expect(out.fresh).toBe(true);
     expect(out.record).toMatchObject({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', approved: true, until: null, checked_at: iso(T0), last_attempt_at: iso(T0) });
@@ -62,8 +67,9 @@ describe('the wire request', () => {
     expect(post.credentials).toBe('omit');
     expect(post.cache).toBe('no-store');
     expect(post.redirect).toBe('error');
-    expect(JSON.parse(String(post.body))).toEqual({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', product: 'bridge', version: '4.0.0' });
-    expect(Object.keys(JSON.parse(String(post.body)))).toEqual(['v', 'access_id', 'portal', 'product', 'version']);
+    // v stays 1: the service before 8.0.0 refuses any other v and ignores install_id
+    expect(JSON.parse(String(post.body))).toEqual({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', product: 'bridge', version: '4.0.0', install_id: INSTALL });
+    expect(Object.keys(JSON.parse(String(post.body)))).toEqual(['v', 'access_id', 'portal', 'product', 'version', 'install_id']);
     expect(PRODUCT).toBe('bridge');
     expect(seen[0]!.init.credentials).toBe('omit');
     // the address came from services.json, and the services are handed back to be stored
@@ -72,10 +78,19 @@ describe('the wire request', () => {
 
   it('refuses to ask for anything that is not an account name, and asks about nothing typed', async () => {
     const { fetchFn, seen } = fakeService();
-    await expect(checkAccess({ accessId: 'not an account', portal: 'p', version: '4.0.0', fetchFn })).rejects.toThrow(/not an account name/);
-    await expect(checkAccess({ accessId: '', portal: 'p', version: '4.0.0', fetchFn })).rejects.toThrow(/not an account name/);
-    await expect(checkAccess({ accessId: 'st1234', portal: '', version: '4.0.0', fetchFn })).rejects.toThrow(/no portal/);
+    await expect(checkAccess({ accessId: 'not an account', portal: 'p', version: '4.0.0', installId: INSTALL, fetchFn })).rejects.toThrow(/not an account name/);
+    await expect(checkAccess({ accessId: '', portal: 'p', version: '4.0.0', installId: INSTALL, fetchFn })).rejects.toThrow(/not an account name/);
+    await expect(checkAccess({ accessId: 'st1234', portal: '', version: '4.0.0', installId: INSTALL, fetchFn })).rejects.toThrow(/no portal/);
+    // nor without this installation's identifier, in the one shape installId() makes it
+    for (const bad of ['', 'abc', `${INSTALL}0`, 'g'.repeat(32), undefined as unknown as string]) {
+      await expect(checkAccess({ accessId: 'st1234', portal: 'p', version: '4.0.0', installId: bad, fetchFn })).rejects.toThrow(/not this installation's identifier/);
+    }
     expect(seen).toHaveLength(0);
+    expect(INSTALL_ID_RE.test(INSTALL)).toBe(true);
+    // upper case is taken and sent lower-cased
+    const up = fakeService();
+    await checkAccess({ accessId: 'st1234', portal: 'p', version: '4.0.0', installId: INSTALL.toUpperCase(), fetchFn: up.fetchFn, now: () => at(T0) });
+    expect(JSON.parse(String(up.seen[1]!.init.body)).install_id).toBe(INSTALL);
     expect(normalizeAccount(' ST1234 ')).toBe('st1234');
     expect(normalizeAccount('a.b_c-d@e')).toBe('a.b_c-d@e');
     expect(normalizeAccount('/home/st1234')).toBeUndefined();
@@ -86,18 +101,65 @@ describe('the wire request', () => {
 describe('the answers', () => {
   it('200 approved:false is a refusal with the request page; approved:false after an approval is a withdrawal', async () => {
     const { fetchFn } = fakeService({ approved: [] });
-    const first = await checkAccess({ accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn, now: () => at(T0) });
+    const first = await checkAccess({ accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn, now: () => at(T0) });
     expect(first.record).toMatchObject({ approved: false, request_page: REQUEST_PAGE_URL, checked_at: iso(T0) });
     expect(first.record.withdrawn).toBeUndefined();
     expect(first.detail).toMatch(/not on the approved list yet/);
-    const later = await checkAccess({ previous: approvedRecord(2 * APPROVED_TTL_MS), accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn, now: () => at(T0) });
+    const later = await checkAccess({ previous: approvedRecord(2 * APPROVED_TTL_MS), accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn, now: () => at(T0) });
     expect(later.record).toMatchObject({ approved: false, withdrawn: true });
     expect(later.record.until).toBeUndefined();
     expect(later.detail).toMatch(/withdrawn/);
     // approved again later: the withdrawal is forgotten
-    const again = await checkAccess({ previous: later.record, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService().fetchFn, now: () => at(T0 + DENIED_TTL_MS + 1) });
+    const again = await checkAccess({ previous: later.record, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0 + DENIED_TTL_MS + 1) });
     expect(again.record).toMatchObject({ approved: true });
     expect(again.record.withdrawn).toBeUndefined();
+  });
+
+  it('one approved account, one installation: the reason is kept and said in its own sentence, ahead of a withdrawal; a reason this version does not know is a plain no', async () => {
+    const W = 'ondemand.grid.wayne.edu';
+    const fact = (record: AccessRecord, t = T0) => accessFact({ record, accessId: 'st1234', portal: W, now: at(t) });
+    const otherBody = { approved: false, access_id: 'st1234', requestPage: REQUEST_PAGE_URL, reason: 'other_installation' };
+    // the exact sentences the strip shows
+    expect(OTHER_INSTALLATION).toBe('This account is already set up on another computer. Ask your lab lead to move it here.');
+    expect(UPDATE_REQUIRED).toBe("Install the current Beethoven from the lab's private listing.");
+    // a second installation asking for an approved account: refused with the reason, never called a withdrawal
+    const second = await checkAccess({ accessId: 'st1234', portal: W, version: '8.0.0', installId: OTHER, fetchFn: fakeService({ body: otherBody }).fetchFn, now: () => at(T0) });
+    expect(second.record).toMatchObject({ approved: false, reason: 'other_installation', checked_at: iso(T0) });
+    expect(second.record.withdrawn).toBeUndefined();
+    expect(second.detail).toBe('st1234 is already set up on another computer');
+    expect(fact(second.record)).toMatchObject({ ok: false, state: 'other-installation', detail: OTHER_INSTALLATION, needsCheck: false });
+    expect(fact(second.record, T0 + DENIED_TTL_MS + 1).needsCheck).toBe(true);
+    // the approval moved away from an installation that had it: the reason, not "Access withdrawn"
+    const moved = await checkAccess({ previous: approvedRecord(2 * APPROVED_TTL_MS), accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService({ body: otherBody }).fetchFn, now: () => at(T0) });
+    expect(moved.record).toMatchObject({ approved: false, withdrawn: true, reason: 'other_installation' });
+    expect(fact(moved.record)).toMatchObject({ state: 'other-installation', detail: OTHER_INSTALLATION });
+    // later withdrawn outright: the reason goes and the withdrawal is said
+    const gone = await checkAccess({ previous: moved.record, accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService({ approved: [] }).fetchFn, now: () => at(T0 + DENIED_TTL_MS + 1) });
+    expect(gone.record.reason).toBeUndefined();
+    expect(fact(gone.record, T0 + DENIED_TTL_MS + 1)).toMatchObject({ state: 'withdrawn' });
+    // or moved back here: approved, with neither the reason nor the withdrawal left
+    const back = await checkAccess({ previous: moved.record, accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0 + DENIED_TTL_MS + 1) });
+    expect(back.record).toMatchObject({ approved: true });
+    expect(back.record.reason).toBeUndefined();
+    expect(back.record.withdrawn).toBeUndefined();
+    // the service asks for the current build
+    const old = await checkAccess({ accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService({ body: { approved: false, access_id: 'st1234', reason: 'update_required' } }).fetchFn, now: () => at(T0) });
+    expect(old.record.reason).toBe('update_required');
+    expect(old.detail).toMatch(/current Beethoven from the lab's private listing/);
+    expect(fact(old.record)).toMatchObject({ ok: false, state: 'update-required', detail: UPDATE_REQUIRED });
+    // this installation is set up for another approved account: its own sentence, never "not on the approved list yet"
+    expect(OTHER_ACCOUNT).toBe('This installation of Beethoven is already set up for another account. Ask your lab lead to move it to yours.');
+    const taken = await checkAccess({ accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService({ body: { approved: false, access_id: 'st1234', requestPage: REQUEST_PAGE_URL, reason: 'other_account' } }).fetchFn, now: () => at(T0) });
+    expect(taken.record).toMatchObject({ approved: false, reason: 'other_account' });
+    expect(taken.detail).toBe('this installation is already set up for an account other than st1234');
+    expect(fact(taken.record)).toMatchObject({ ok: false, state: 'other-account', detail: OTHER_ACCOUNT });
+    // askService alone: a known reason is carried, an unknown one dropped, and a reason on a yes changes nothing
+    const body = { v: 1 as const, access_id: 'st1234', portal: 'p', product: 'bridge' as const, version: '8.0.0', install_id: INSTALL };
+    expect(await askService(CHECK, body, fakeService({ body: otherBody }).fetchFn)).toEqual({ kind: 'denied', requestPage: REQUEST_PAGE_URL, reason: 'other_installation' });
+    const unknown = await askService(CHECK, body, fakeService({ body: { approved: false, reason: 'something_new' } }).fetchFn);
+    expect(unknown).toEqual({ kind: 'denied', requestPage: undefined });
+    expect('reason' in unknown).toBe(false);
+    expect((await askService(CHECK, body, fakeService({ body: { approved: true, access_id: 'st1234', reason: 'other_installation' } }).fetchFn)).kind).toBe('approved');
   });
 
   it('400, 429, 5xx, no network, not JSON, an unknown shape and a different account are "no answer": the record keeps its last word', async () => {
@@ -112,7 +174,7 @@ describe('the answers', () => {
       [{ body: { approved: true, access_id: 'zz9999' } }, /different account/],
     ];
     for (const [o, why] of cases) {
-      const out = await checkAccess({ previous: prev, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService(o).fetchFn, now: () => at(T0) });
+      const out = await checkAccess({ previous: prev, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService(o).fetchFn, now: () => at(T0) });
       expect(out.asked, why.source).toBe(true);
       expect(out.fresh, why.source).toBe(false);
       expect(out.record.approved, why.source).toBe(true);
@@ -122,8 +184,8 @@ describe('the answers', () => {
       expect(out.detail, why.source).toMatch(why);
     }
     // askService alone, for the two answers it accepts
-    expect(await askService(CHECK, { v: 1, access_id: 'st1234', portal: 'p', product: 'bridge', version: '4.0.0' }, fakeService({ body: { approved: true, access_id: 'st1234', checked: 'x', until: '2027-01-01T00:00:00Z' } }).fetchFn)).toEqual({ kind: 'approved', checked: 'x', until: '2027-01-01T00:00:00Z' });
-    expect(await askService(CHECK, { v: 1, access_id: 'st1234', portal: 'p', product: 'bridge', version: '4.0.0' }, fakeService({ body: { approved: false, requestPage: 'https://evil.example/x' } }).fetchFn)).toEqual({ kind: 'denied', requestPage: undefined });
+    expect(await askService(CHECK, { v: 1, access_id: 'st1234', portal: 'p', product: 'bridge', version: '4.0.0', install_id: INSTALL }, fakeService({ body: { approved: true, access_id: 'st1234', checked: 'x', until: '2027-01-01T00:00:00Z' } }).fetchFn)).toEqual({ kind: 'approved', checked: 'x', until: '2027-01-01T00:00:00Z' });
+    expect(await askService(CHECK, { v: 1, access_id: 'st1234', portal: 'p', product: 'bridge', version: '4.0.0', install_id: INSTALL }, fakeService({ body: { approved: false, requestPage: 'https://evil.example/x' } }).fetchFn)).toEqual({ kind: 'denied', requestPage: undefined });
   });
 
   it('takes the request page only from Licensor\'s own site, and fills the account name in', () => {
@@ -162,7 +224,7 @@ describe('services.json', () => {
     expect(d.detail).toMatch(/names no access_check/);
     expect((await fetchServices(d.current, noKey.fetchFn, () => at(T0 + RETRY_MS - 1))).fresh).toBe(false);
     expect((await fetchServices(d.current, noKey.fetchFn, () => at(T0 + RETRY_MS + 1))).fresh).toBe(true);
-    const out = await checkAccess({ services: d.current, accessId: 'st1234', portal: 'p.example', version: '4.0.0', fetchFn: noKey.fetchFn, now: () => at(T0) });
+    const out = await checkAccess({ services: d.current, accessId: 'st1234', portal: 'p.example', version: '4.0.0', installId: INSTALL, fetchFn: noKey.fetchFn, now: () => at(T0) });
     expect(out.asked).toBe(false);
     expect(out.record.last_error).toMatch(/address of Licensor's access service is not known/);
     // only https addresses are taken
@@ -176,13 +238,13 @@ describe('the caches and the grace windows', () => {
     const fresh = approvedRecord(APPROVED_TTL_MS - 1);
     expect(accessDue(fresh, at(T0))).toBe(false);
     expect(accessDue(fresh, at(T0), true)).toBe(false);
-    const held = await checkAccess({ previous: fresh, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService().fetchFn, now: () => at(T0), force: true });
+    const held = await checkAccess({ previous: fresh, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0), force: true });
     expect(held.asked).toBe(false);
     expect(held.record).toBe(fresh);
     expect(accessDue(approvedRecord(APPROVED_TTL_MS + 1), at(T0))).toBe(true);
     // the service is down: the approval is kept, the attempt is noted, and the next attempt waits fifteen minutes
     const down = fakeService({ throwOn: 'check' });
-    const kept = await checkAccess({ previous: approvedRecord(APPROVED_TTL_MS + 1), services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: down.fetchFn, now: () => at(T0) });
+    const kept = await checkAccess({ previous: approvedRecord(APPROVED_TTL_MS + 1), services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: down.fetchFn, now: () => at(T0) });
     expect(kept.record.approved).toBe(true);
     expect(kept.record.last_error).toMatch(/could not be reached/);
     expect(accessDue(kept.record, at(T0 + RETRY_MS - 1))).toBe(false);
@@ -201,17 +263,17 @@ describe('the caches and the grace windows', () => {
     expect(accessDue(denied, at(T0))).toBe(false);
     expect(accessDue(denied, at(T0), true)).toBe(true);
     expect(accessDue(deniedRecord(DENIED_TTL_MS + 1), at(T0))).toBe(true);
-    const held = await checkAccess({ previous: denied, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService().fetchFn, now: () => at(T0) });
+    const held = await checkAccess({ previous: denied, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0) });
     expect(held.asked).toBe(false);
     expect(held.detail).toMatch(/less than ten minutes old/);
-    const clicked = await checkAccess({ previous: denied, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService().fetchFn, now: () => at(T0), force: true });
+    const clicked = await checkAccess({ previous: denied, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0), force: true });
     expect(clicked.asked).toBe(true);
     expect(clicked.record.approved).toBe(true);
   });
 
   it('a record for another account or another portal is discarded, not updated', async () => {
     const other = approvedRecord(0, { access_id: 'zz9999' });
-    const out = await checkAccess({ previous: other, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', fetchFn: fakeService().fetchFn, now: () => at(T0) });
+    const out = await checkAccess({ previous: other, services: SERVICES, accessId: 'st1234', portal: 'ondemand.grid.wayne.edu', version: '4.0.0', installId: INSTALL, fetchFn: fakeService().fetchFn, now: () => at(T0) });
     expect(out.asked).toBe(true);
     expect(out.record.access_id).toBe('st1234');
     const elsewhere = approvedRecord(0, { portal: 'ondemand.osc.edu' });
@@ -269,16 +331,18 @@ describe('against the mock portal\'s stand-in for the service', () => {
     const mock = await createMockPortal({ user: 'st1234', seedTool: false });
     try {
       const servicesUrl = `${mock.origin}/beethoven/services.json`;
-      const yes = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl });
+      const yes = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', installId: INSTALL, fetchFn: fetch, servicesUrl });
       expect(yes.record).toMatchObject({ approved: true, access_id: 'st1234', until: null });
       expect(yes.services?.access_check).toBe(`${mock.origin}/beethoven/access_check`);
-      const no = await checkAccess({ services: yes.services, accessId: 'zz9999', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl });
+      const no = await checkAccess({ services: yes.services, accessId: 'zz9999', portal: '127.0.0.1', version: '4.0.0', installId: INSTALL, fetchFn: fetch, servicesUrl });
       expect(no.record).toMatchObject({ approved: false, access_id: 'zz9999', request_page: REQUEST_PAGE_URL });
       expect(mock.state.accessChecks).toBe(2);
       expect(mock.state.accessBodies).toEqual([
-        { v: 1, access_id: 'st1234', portal: '127.0.0.1', product: 'bridge', version: '4.0.0' },
-        { v: 1, access_id: 'zz9999', portal: '127.0.0.1', product: 'bridge', version: '4.0.0' },
+        { v: 1, access_id: 'st1234', portal: '127.0.0.1', product: 'bridge', version: '4.0.0', install_id: INSTALL },
+        { v: 1, access_id: 'zz9999', portal: '127.0.0.1', product: 'bridge', version: '4.0.0', install_id: INSTALL },
       ]);
+      // the approved account is bound to the installation that asked; the other is bound to nothing
+      expect(mock.state.seats).toEqual({ st1234: INSTALL });
       for (const h of mock.state.accessHeaders) {
         expect(h['content-type']).toBe('text/plain;charset=UTF-8');
         expect(h.cookie).toBe('');
@@ -301,13 +365,89 @@ describe('against the mock portal\'s stand-in for the service', () => {
     const mock = await createMockPortal({ user: 'st1234', seedTool: false, accessLimit: 1 });
     try {
       const servicesUrl = `${mock.origin}/beethoven/services.json`;
-      const first = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl, now: () => at(T0) });
+      const first = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', installId: INSTALL, fetchFn: fetch, servicesUrl, now: () => at(T0) });
       expect(first.record.approved).toBe(true);
-      const second = await checkAccess({ previous: first.record, services: first.services, accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', fetchFn: fetch, servicesUrl, now: () => at(T0 + APPROVED_TTL_MS + 1) });
+      const second = await checkAccess({ previous: first.record, services: first.services, accessId: 'st1234', portal: '127.0.0.1', version: '4.0.0', installId: INSTALL, fetchFn: fetch, servicesUrl, now: () => at(T0 + APPROVED_TTL_MS + 1) });
       expect(second.asked).toBe(true);
       expect(second.fresh).toBe(false);
       expect(second.record.approved).toBe(true);
       expect(second.record.last_error).toMatch(/too many checks/);
+    } finally {
+      await mock.close();
+    }
+  });
+
+  it('binds an approved account to the first installation, refuses a second until the approval is moved, and asks a build without an identifier to update', async () => {
+    const mock = await createMockPortal({ user: 'st1234', seedTool: false });
+    try {
+      const servicesUrl = `${mock.origin}/beethoven/services.json`;
+      const check = `${mock.origin}/beethoven/access_check`;
+      // force: a person's click, so a refusal on file is asked again at once
+      const ask = (installId: string, previous?: AccessRecord, t = T0, accessId = 'st1234') => checkAccess({ previous, accessId, portal: '127.0.0.1', version: '8.0.0', installId, fetchFn: fetch, servicesUrl, now: () => at(t), force: true });
+      const first = await ask(INSTALL);
+      expect(first.record).toMatchObject({ approved: true });
+      expect(mock.state.seats).toEqual({ st1234: INSTALL });
+      // the same installation again: still approved, the seat as it was
+      expect((await ask(INSTALL)).record.approved).toBe(true);
+      // another computer, another browser profile or a reinstall: a new identifier, refused, the seat unchanged, the conflict counted
+      const second = await ask(OTHER);
+      expect(second.record).toMatchObject({ approved: false, reason: 'other_installation', request_page: REQUEST_PAGE_URL });
+      expect(accessFact({ record: second.record, accessId: 'st1234', portal: '127.0.0.1', now: at(T0) })).toMatchObject({ state: 'other-installation', detail: OTHER_INSTALLATION });
+      expect(mock.state.seats).toEqual({ st1234: INSTALL });
+      expect(mock.state.conflicts).toEqual({ st1234: 1 });
+      // the maintainer's "Move the approval to the new installation": the second is approved at its next check
+      mock.state.seats.st1234 = OTHER;
+      const movedHere = await ask(OTHER, second.record, T0 + 1);
+      expect(movedHere.record).toMatchObject({ approved: true });
+      expect(movedHere.record.reason).toBeUndefined();
+      // and the first, once its day is up, hears the reason, not "Access withdrawn"
+      const movedAway = await ask(INSTALL, first.record, T0 + APPROVED_TTL_MS + 1);
+      expect(movedAway.record).toMatchObject({ approved: false, withdrawn: true, reason: 'other_installation' });
+      expect(accessFact({ record: movedAway.record, accessId: 'st1234', portal: '127.0.0.1', now: at(T0 + APPROVED_TTL_MS + 1) }).state).toBe('other-installation');
+      // an account not on the list: a plain no, and it is bound to nothing
+      const stranger = await ask(OTHER, undefined, T0, 'zz9999');
+      expect(stranger.record).toMatchObject({ approved: false });
+      expect(stranger.record.reason).toBeUndefined();
+      expect(mock.state.seats.zz9999).toBeUndefined();
+      // a build before 8.0.0 sends no identifier: refused with update_required
+      const post = (body: unknown) => fetch(check, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify(body) });
+      const legacy = await post({ v: 1, access_id: 'st1234', portal: '127.0.0.1', product: 'bridge', version: '7.0.0' });
+      expect(await legacy.json()).toMatchObject({ approved: false, access_id: 'st1234', reason: 'update_required' });
+      // an identifier that is not one is a malformed request
+      expect((await post({ v: 1, access_id: 'st1234', portal: '127.0.0.1', product: 'bridge', version: '8.0.0', install_id: 'x' })).status).toBe(400);
+    } finally {
+      await mock.close();
+    }
+  });
+
+  it('one installation, one account: an installation bound to one approved account is refused for another, which stays unbound', async () => {
+    const mock = await createMockPortal({ user: 'st1234', seedTool: false, approved: ['st1234', 'ab5678'] });
+    try {
+      const servicesUrl = `${mock.origin}/beethoven/services.json`;
+      const ask = (accessId: string, installId: string) => checkAccess({ accessId, portal: '127.0.0.1', version: '8.0.0', installId, fetchFn: fetch, servicesUrl, now: () => at(T0), force: true });
+      expect((await ask('st1234', INSTALL)).record.approved).toBe(true);
+      const friend = await ask('ab5678', INSTALL);
+      expect(friend.record).toMatchObject({ approved: false, reason: 'other_account' });
+      expect(accessFact({ record: friend.record, accessId: 'ab5678', portal: '127.0.0.1', now: at(T0) })).toMatchObject({ state: 'other-account', detail: OTHER_ACCOUNT });
+      expect(mock.state.seats).toEqual({ st1234: INSTALL });
+      // on an installation of its own the second account is bound as usual
+      expect((await ask('ab5678', OTHER)).record.approved).toBe(true);
+      expect(mock.state.seats).toEqual({ st1234: INSTALL, ab5678: OTHER });
+    } finally {
+      await mock.close();
+    }
+  });
+
+  it('with the identifier optional (the service\'s REQUIRE_INSTALL_ID "0") a build before 8.0.0 is approved; a seat can be bound beforehand', async () => {
+    expect(cliOptions([], {})).toMatchObject({ seats: {}, requireInstallId: true });
+    const opts = cliOptions(['--seat', `ST1234=${OTHER}`, '--install-optional'], {});
+    expect(opts).toMatchObject({ seats: { st1234: OTHER }, requireInstallId: false });
+    const mock = await createMockPortal({ user: 'st1234', seedTool: false, seats: opts.seats, requireInstallId: opts.requireInstallId });
+    try {
+      const legacy = await fetch(`${mock.origin}/beethoven/access_check`, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=UTF-8' }, body: JSON.stringify({ v: 1, access_id: 'st1234', portal: '127.0.0.1', product: 'bridge', version: '7.0.0' }) });
+      expect(await legacy.json()).toMatchObject({ approved: true });
+      const here = await checkAccess({ accessId: 'st1234', portal: '127.0.0.1', version: '8.0.0', installId: INSTALL, fetchFn: fetch, servicesUrl: `${mock.origin}/beethoven/services.json`, now: () => at(T0) });
+      expect(here.record).toMatchObject({ approved: false, reason: 'other_installation' });
     } finally {
       await mock.close();
     }

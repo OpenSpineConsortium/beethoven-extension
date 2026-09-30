@@ -183,7 +183,7 @@ function accessCard(s: AccessSummary, notify: Notify, done: () => Promise<void>)
   const a = s.access;
   const card = el('div', { class: 'card' });
   add(card,
-    el('p', {}, `There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and ${PRODUCT_NAME} asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version. Not approved yet? Ask for access; the maintainer approves it, and the next click on the ${PRODUCT_NAME} button checks again.`),
+    el('p', {}, `There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and ${PRODUCT_NAME} asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version, and this installation's identifier (a random number ${PRODUCT_NAME} made when you accepted its agreement, not taken from your computer). An approval is for one installation: a second computer, another browser profile or a reinstall is refused until your lab lead moves the approval to it. Not approved yet? Ask for access; the maintainer approves it, and the next click on the ${PRODUCT_NAME} button checks again.`),
     accessLine(a),
     a.accessId
       ? el('div', { class: 'muted small', text: `account ${a.accessId}${a.portal ? ` at ${a.portal}` : ''}${a.checkedAt ? `; the service last answered ${fmtTime(new Date(a.checkedAt).toISOString())}` : '; the service has not answered yet'}` })

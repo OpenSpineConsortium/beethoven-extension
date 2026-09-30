@@ -3,11 +3,14 @@
 What you do, in order, from asking for access to your first worker. There is no key and nothing to
 paste anywhere: your own sign-in to your university's Open OnDemand portal identifies you, and the
 extension confirms with the maintainer's access service that your account is approved. If an
-instruction you were given earlier mentions a key, it is out of date; this page replaces it.
+instruction you were given earlier mentions a key, a download or a package to load by hand, it is
+out of date; this page replaces it.
 
-Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0 and for 7.0.0, the first build named
-Beethoven. If you tested an earlier build under another name, remove it from your browser before you
-install this one; your approval carries over, and you accept the agreement once more.
+Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0, for 7.0.0, the first build named
+Beethoven, and for 8.0.0, the first build offered only through a private listing on the Chrome Web
+Store, with one installation per approved account. If you tested an earlier build under another
+name or loaded one by hand, remove it from your browser before you install this one; your approval
+carries over, and you accept the agreement once more.
 
 ## What you need
 
@@ -17,27 +20,39 @@ install this one; your approval carries over, and you accept the agreement once 
   person, one account; you sign in yourself, once, and the extension never sees that sign-in.
 - At Wayne State, your grid account in the lab's research-storage group. Ask Greg to have it added;
   until it is, your worker cannot start.
-- Chrome, Edge or Firefox. Safari is not offered yet.
+- Google Chrome, signed in to the Chrome Web Store with the Google account you give on the request
+  form. Beethoven is offered in no other browser and no other store, and there is no download.
+- The one computer and the one Chrome profile you will use it from (see step 2).
 
 ## 1. Ask for access
 
-Open `https://openspineconsortium.com/beethoven/request.html` and fill in the form with the account name
+Open `https://openspineconsortium.com/beethoven/request.html` and fill in the form: the account name
 your portal shows for you (at Wayne State your AccessID, two letters and four digits, such as
 `ab1234`; it is the name the portal's dashboard shows next to "Logged in as"), your name, your
-institutional e-mail and a line on what you will use it for. Send it. There is no automatic e-mail
-to you: Greg approves requests and tells you when yours is approved.
+institutional e-mail, the Google account at which you want the invitation to the private listing,
+and a line on what you will use Beethoven for. You may attach a CV (PDF or Word, 5 MB at most); it
+is optional. Send it. If the page says to check your Wayne State mail, open the confirmation link
+there; otherwise there is nothing more to do. Greg approves requests, either for Beethoven or for
+lab membership only, and tells you when yours is approved.
 
-If you skip this step, the extension still installs and still shows you the agreement, but its one
-button after that will read *Ask for access*; it opens the same form with your account name filled
-in.
+If you skip this step, the extension cannot be installed at all: the private listing opens only for
+the Google accounts Greg has invited.
 
-## 2. Install the extension
+## 2. Install the extension, once, on the computer you will use
 
-Once the store listings are live, install from your browser's store like any other extension. Until
-then Greg sends you the package for your browser; load it as its README says (Chrome and Edge: the
-extensions page, developer mode, *Load unpacked*, the unzipped folder; Firefox: `about:debugging`,
-*This Firefox*, *Load Temporary Add-on*, the `manifest.json` in the unzipped folder; a temporary
-add-on is gone after Firefox restarts and is loaded again the same way).
+When you are approved for Beethoven, Greg adds your Google account to the group that may open the
+private listing and sends you its link. In Chrome, signed in with that Google account, open the link
+and choose *Add to Chrome*, then *Add extension* in Chrome's own prompt. Updates come by themselves
+through Chrome.
+
+One approved account, one installation. The first installation that checks your account is bound to
+it. Another computer, another Chrome profile or a reinstallation is a new installation, and it is
+refused: its panel says "This account is already set up on another computer. Ask your lab lead to
+move it here." If you change computers or reinstall, ask Greg to move your approval; the new
+installation works at its next check, and the old one stops at its own next check, within a day
+while it is online (it keeps a yes up to seven days when it cannot reach the service). The
+identifier behind this is a random number the extension makes for itself; it is not taken from your
+computer.
 
 The extension's setup page opens by itself. Read the agreement to its end (the button stays grey
 until you have), tick the four statements, type your name and choose *Accept and Continue*. That is
@@ -50,11 +65,10 @@ all the setup page needs; nothing else is entered there.
 2. Click the Beethoven icon in the toolbar (pin it from the extensions menu if it is hidden).
    The first click asks your browser to allow that one site; allow it. The panel then does the
    steps by itself and says in one line what it is doing: it wakes the portal up, checks you are
-   signed in, confirms your account is approved, sets up its small set of scripts for your own
-   cluster account (at Wayne State it points your account at the copy the lab keeps for everyone
-   instead of copying them), runs one short check job on a compute node the first time, shows you
-   where your work goes and takes your statement about it, starts your worker through the portal's
-   own shell, and waits for Claude Code to connect.
+   signed in, confirms your account is approved, points your cluster account at the copy of its
+   scripts the lab keeps for everyone, runs one short check job on a compute node the first time,
+   shows you where your work goes and takes your statement about it, starts your worker through the
+   portal's own shell, and waits for Claude Code to connect.
 3. Sign in to Claude once, when the panel asks. It opens Anthropic's sign-in page in a new tab; sign
    in with your own Claude account, click *Authorize*, and paste the code that page shows into the
    panel's one box. That code is the only thing you ever paste, it goes once into your own job's
@@ -76,20 +90,33 @@ you stopped it, or if the cluster ended the chain (the panel's one button then r
 
 ## If the panel says "Ask for access"
 
-Your account is not approved yet, or the approval was withdrawn. Press the button (it opens the
-request form with your account name filled in) or tell Greg. After he approves you, click the icon
-again; if it still says *Ask for access*, wait ten minutes and click again (the extension keeps a
-"no" for ten minutes, and the service's storage can take a minute to catch up). If it still says so
-after that, send Greg the account name the panel shows under *Details* (check 4, "signed in as").
+Your account is not approved for Beethoven yet (an approval for lab membership only does not cover
+it), or the approval was withdrawn. Press the button (it opens the request form with your account
+name filled in) or tell Greg. After he approves you, click the icon again; if it still says *Ask for
+access*, wait ten minutes and click again (the extension keeps a "no" for ten minutes, and the
+service's storage can take a minute to catch up). If it still says so after that, send Greg the
+account name the panel shows under *Details* (check 4, "signed in as").
+
+## If the panel says "This account is already set up on another computer"
+
+Your approval is bound to another installation: another computer, another Chrome profile, or this
+one before a reinstallation. There is no button; ask Greg to move the approval here, then click the
+icon again. If it says "Install the current Beethoven from the lab's private listing.", your copy is
+older than the service accepts: update it from the private listing's page.
+
+If it says "This installation of Beethoven is already set up for another account.", this browser's
+Beethoven was first used with someone else's account, and one installation serves one account. Use
+your own installation, or ask Greg to release this one for you.
 
 ## What the extension sends the maintainer, so you know
 
 Only the approval check: the account name your portal shows for you, your portal's hostname, the
-product name and the extension's version, answered yes or no; the service records those with the
-time, a salted hash of your network address and the answer. Once a day it also downloads, without
-cookies, two small files from the maintainer's website (the service address and the signed list of
-withdrawn versions), which carry nothing about you. No usage data, no error reports, no activation.
-The full statement is `PRIVACY.md` (version 7), also at
+product name, the extension's version and the random identifier of this installation, answered yes
+or no; the service records those with the time, a salted hash of your network address and the
+answer, and keeps which installation your approval is bound to. Once a day it also downloads,
+without cookies, two small files from the maintainer's website (the service address and the signed
+list of withdrawn versions), which carry nothing about you. No usage data, no error reports, no
+activation. The full statement is `PRIVACY.md` (version 8), also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
 ## What to send when something does not work

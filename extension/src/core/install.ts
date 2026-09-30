@@ -1,55 +1,43 @@
-// Setting up the cluster, in one of two ways.
+// Setting up the cluster: the lab's shared copy of the tool, the only way since 8.0.0.
 //
-// The lab's shared copy (framework 5): when the site profile this build carries names a
-// "shared_install" folder (profiles/<site>.json), nothing is uploaded. One line through the
-// bootstrap shell runs the shared tool's own install (`bash <dir>/bin/hpcworker install --shared
-// <dir> --profile <site>`), which gives the account a small launcher, a marker naming the folder,
-// the profile and the PATH block. The lab keeps that copy up to date in one place, so a shared
-// install is never "outdated" against the copy this build carries.
+// The package carries no cluster-side code. The tool lives once, read-only, in the folder the lab
+// keeps on its volume, which the site profile names as "shared_install"; the profiles this build
+// carries (public/profiles/<site>.json, written by scripts/sync-profiles.mjs) are data only.
+// Setting up is one line through the bootstrap shell, the shared tool's own install (`bash
+// <dir>/bin/hpcworker install --shared <dir> --profile <site>`), which gives the account a small
+// launcher, a marker naming the folder, the profile and the PATH block, and copies no code. The
+// lab keeps that copy current in one place, so the extension never calls it outdated.
 //
-// The student's own copy: upload whatever scripts/sync-framework.mjs bundled from ../framework to
-// ~/.hpcworker through the Files app (PUT, one file at a time, no floor), then one install line
-// through the bootstrap shell (the tool strips CR endings itself and copies nothing when it
-// already runs from ~/.hpcworker). This is the way at a site with no shared folder, and the
-// fallback when the shared copy cannot be used from the student's account: bash could not open
-// its launcher (exit 126, no permission; 127, not there) or the tool refused the folder (exit 3,
-// "the shared copy at DIR cannot be used from this account: ..."). Any other failure is reported
-// as it is, notably the tool's refusal to move an own copy aside while a worker still runs from
-// it. Whether the account can use the shared copy is judged by that shell line, the same account
-// and path the jobs use, and not by the portal's Files app, whose view of a lab volume was never
-// measured.
+// When the site's profile names no shared folder, or the account cannot use it (bash could not
+// open its launcher: exit 126, no permission; 127, not there; or the tool refused the folder: exit
+// 3, "the shared copy at DIR cannot be used from this account: ..."), nothing is uploaded instead:
+// the strip says the lab's shared copy is needed and to ask the lab lead, and Details says why.
+// Any other failure is reported as it is, notably the tool's refusal to move an own copy aside
+// while a worker still runs from it. Whether the account can use the shared copy is judged by that
+// shell line, the same account and path the jobs use, and not by the portal's Files app, whose
+// view of a lab volume was never measured.
 //
-// The strip runs this by itself when the tool is missing, and again when ~/.hpcworker/VERSION is
-// older than the VERSION this build carries (the upload rewrites VERSION with the files and the
-// tool's install keeps the profile and says "upgraded"; at a site with a shared folder that update
-// is the move to the shared copy); the Details section keeps a button for it. The bundled files are
-// read through `fetchAsset`, which the pages implement with the extension's own URL.
-import { commands, paths, sharedInstallFrom } from './contract';
+// An account set up by a build before 8.0.0 may still run its own copy in ~/.hpcworker. The
+// framework keeps running it, the panel says "your own copy, version N", and "Set up the cluster
+// again" under Details moves it to the lab's copy where the site has one; nothing here updates it.
+// The site profile is read through `fetchAsset`, which the pages implement with the extension's own URL.
+import { commands, sharedInstallFrom } from './contract';
 import type { InstallNote } from './keys';
 import type { PortalApi } from './portal';
 import type { Facts } from './steps';
 
-/** the VERSION file of the framework this build carries: an integer, or undefined when the build has none */
-export async function bundledFrameworkVersion(fetchAsset: (path: string) => Promise<Response>): Promise<string | undefined> {
-  try {
-    const res = await fetchAsset('/framework/files/VERSION');
-    if (!res.ok) return undefined;
-    const v = (await res.text()).trim();
-    return /^\d+$/.test(v) ? v : undefined;
-  } catch {
-    return undefined;
-  }
-}
+/** where a site's profile sits in the package (scripts/sync-profiles.mjs writes public/profiles/) */
+export const profileAsset = (site: string): string => `/profiles/${site}.json`;
 
 /**
  * The shared folder the site profile this build carries names ("shared_install" in
- * framework/profiles/<site>.json), or undefined: no such profile, no such key (a profile from
- * before framework 5 has none), or a value that is not a plain absolute folder.
+ * framework/profiles/<site>.json), or undefined: no such profile, no such key, or a value that is
+ * not a plain absolute folder.
  */
 export async function bundledSharedInstall(site: string, fetchAsset: (path: string) => Promise<Response>): Promise<string | undefined> {
   if (!/^[A-Za-z0-9_-]+$/.test(String(site ?? ''))) return undefined;
   try {
-    const res = await fetchAsset(`/framework/files/profiles/${site}.json`);
+    const res = await fetchAsset(profileAsset(site));
     if (!res.ok) return undefined;
     return sharedInstallFrom(await res.text());
   } catch {
@@ -57,12 +45,9 @@ export async function bundledSharedInstall(site: string, fetchAsset: (path: stri
   }
 }
 
-/** Is the installed tool older than the bundled one? Versions are integers; a missing or unreadable one counts as older. */
-export function frameworkOlder(installed: string | undefined, bundled: string): boolean {
-  const have = Number(String(installed ?? '').trim());
-  const want = Number(String(bundled ?? '').trim());
-  if (!Number.isFinite(want)) return false;
-  return !Number.isFinite(have) || have < want;
+/** why nothing can be set up where the site profile names no shared folder, for Details */
+export function noSharedForSite(site: string | undefined): string {
+  return `no shared copy of the tool is known for the site "${String(site ?? '').slice(0, 60)}" (the site profile name under Settings)`;
 }
 
 /**
@@ -119,37 +104,29 @@ export function hideSharedPath(text: string, dir: string | undefined): string {
     .replace(new RegExp(pathRe, 'g'), LAB_COPY);
 }
 
-/** the strip's one line for an install that failed: the refusal a running worker causes in plain words, else the exit code */
-export function installFailureWords(r: { exitCode: number; log: string }): string {
+/** the strip's one line for an install that failed for any reason but the shared copy: the refusal a running worker causes in plain words, else the exit code */
+export function installFailureWords(r: { exitCode?: number; log: string }): string {
   if (PROBE_BUSY.test(r.log)) return 'the check job on a compute node is still running from your own copy of the tool; try again once it has finished';
   if (WORKER_BUSY.test(r.log)) return 'your worker is still running from your own copy of the tool; stop it (Details), then try again';
-  return `the install command ended with exit ${r.exitCode} (see Details)`;
-}
-
-export interface FrameworkManifest {
-  v: number;
-  generated: string;
-  files: Array<{ path: string; bytes: number; sha256: string; mode: string }>;
+  return `the install command ended with exit ${r.exitCode ?? 'unknown'} (see Details)`;
 }
 
 export interface InstallOutcome {
   ok: boolean;
-  exitCode: number;
-  uploaded: number;
+  /** the install line's exit code; undefined when no line was typed (the site profile names no shared folder) */
+  exitCode?: number;
   log: string;
-  /** which copy the account runs after this: the lab's shared one, or its own */
-  mode: 'shared' | 'own';
   /** the shared folder the site profile names, when it names one */
   sharedDir?: string;
-  /** one line for Details: the shared copy could not be used, so the tool went to the student's own account */
-  note?: string;
+  /** why the lab's shared copy cannot be used, in the student's words; nothing was uploaded instead */
+  noShared?: string;
 }
 
 export interface InstallOptions {
   site: string;
   fetchAsset: (path: string) => Promise<Response>;
   onProgress?: (text: string) => void;
-  /** waits out the 15 s floor between two shell lines (the shared attempt, then the fallback's install); tests pass their own clock */
+  /** waits out the 15 s floor between two shell lines; tests pass their own clock */
   sleep?: (ms: number) => Promise<void>;
 }
 
@@ -159,81 +136,56 @@ export async function installFramework(portal: PortalApi, o: InstallOptions): Pr
   const sleep = o.sleep ?? realSleep;
   const log: string[] = [];
   const show = () => o.onProgress?.(log.join('\n'));
-  // one shell line every 15 s (audit.ts FLOORS_MS.shell): wait the clock out rather than fail on it
-  const shellFree = async () => {
-    const wait = await portal.auditWait('shell').catch(() => 0);
-    if (wait > 0) await sleep(wait + 250);
-  };
-  const home = await portal.home();
-  log.push(`home ${home}`);
   const sharedDir = await bundledSharedInstall(o.site, o.fetchAsset);
+  if (!sharedDir) {
+    const why = noSharedForSite(o.site);
+    log.push(`nothing was typed and nothing is uploaded: ${why}`);
+    show();
+    return { ok: false, log: log.join('\n'), noShared: why };
+  }
   // what the log shows of the tool's output: the lab's folder in words (the line typed is the exact command all the same)
   const hide = (text: string) => hideSharedPath(text, sharedDir);
-  let note: string | undefined;
-  if (sharedDir) {
-    const line = commands.installShared(sharedDir, o.site);
-    log.push("your lab keeps a shared copy of the tool; nothing is uploaded", `running the install of ${LAB_COPY}, one line through the portal's shell`);
-    show();
-    await shellFree();
-    const r = await portal.shell(line, { timeoutMs: 120_000 });
-    log.push(hide(r.output.trimEnd()), `exit ${r.exitCode}`);
-    show();
-    if (r.exitCode === 0) return { ok: true, exitCode: 0, uploaded: 0, log: log.join('\n'), mode: 'shared', sharedDir };
-    const why = sharedUnusable(r);
-    if (!why) return { ok: false, exitCode: r.exitCode, uploaded: 0, log: log.join('\n'), mode: 'shared', sharedDir };
-    note = `Your lab's shared copy of the tool could not be used from your account: ${hide(why)}. The tool was put in your own account instead.`;
-    log.push(note);
-    show();
-  }
-  const res = await o.fetchAsset('/framework/files.json');
-  if (!res.ok) throw new Error('this build carries no framework files (framework/files.json missing)');
-  const manifest = (await res.json()) as FrameworkManifest;
-  if (!manifest.files.length) throw new Error('this build carries no framework files: the framework/ folder was empty when the extension was built, so there is nothing to install yet');
-  const root = paths.root(home);
-  log.push(`uploading ${manifest.files.length} file(s) to ${root}`);
+  log.push(`running the install of ${LAB_COPY}, one line through the portal's shell; nothing is uploaded`);
   show();
-  const dirs = new Set<string>([root]);
-  for (const f of manifest.files) {
-    const parts = f.path.split('/');
-    for (let i = 1; i < parts.length; i++) dirs.add(`${root}/${parts.slice(0, i).join('/')}`);
-  }
-  for (const d of [...dirs].sort()) await portal.mkdir(d);
-  for (const f of manifest.files) {
-    const body = await o.fetchAsset(`/framework/files/${f.path}`).then((r) => r.text());
-    await portal.writeFile(`${root}/${f.path}`, body);
-    log.push(`  ${f.path} (${f.bytes} bytes)`);
-    show();
-  }
-  log.push(`running: ${commands.install(o.site)}`);
+  // one shell line every 15 s (audit.ts FLOORS_MS.shell): wait the clock out rather than fail on it
+  const wait = await portal.auditWait('shell').catch(() => 0);
+  if (wait > 0) await sleep(wait + 250);
+  const r = await portal.shell(commands.installShared(sharedDir, o.site), { timeoutMs: 120_000 });
+  log.push(hide(r.output.trimEnd()), `exit ${r.exitCode}`);
   show();
-  await shellFree();
-  const r = await portal.shell(commands.install(o.site), { timeoutMs: 180_000 });
-  log.push(hide(r.output), `exit ${r.exitCode}`);
-  show();
-  return { ok: r.exitCode === 0, exitCode: r.exitCode, uploaded: manifest.files.length, log: log.join('\n'), mode: 'own', ...(sharedDir ? { sharedDir } : {}), ...(note ? { note } : {}) };
+  if (r.exitCode === 0) return { ok: true, exitCode: 0, log: log.join('\n'), sharedDir };
+  const why = sharedUnusable(r);
+  return { ok: false, exitCode: r.exitCode, log: log.join('\n'), sharedDir, ...(why ? { noShared: `your lab's shared copy of the tool cannot be used from your account: ${hide(why)}` } : {}) };
 }
+
+/** Details' line for why the lab's shared copy was not used */
+const whyLine = (why: string): string => `Why: ${why}.`;
 
 /** what the strip and Details remember of an install (keys.ts INSTALL_KEY) */
 export function installNoteOf(r: InstallOutcome, at: Date): InstallNote {
   return {
     attempted_at: at.toISOString(),
     ok: r.ok,
-    detail: r.mode === 'shared' ? `exit ${r.exitCode}, ${LAB_COPY}` : `exit ${r.exitCode}, ${r.uploaded} file(s) uploaded`,
-    mode: r.mode,
+    detail: r.exitCode === undefined ? 'no install line typed' : `exit ${r.exitCode}, ${LAB_COPY}`,
     ...(r.sharedDir ? { dir: r.sharedDir } : {}),
-    ...(r.note ? { note: r.note } : {}),
+    ...(r.noShared ? { note: whyLine(r.noShared) } : {}),
   };
 }
 
 /**
  * The tool line under Details: "tool: the lab's shared copy, version N" or "tool: your own copy,
- * version N", never with a path, then, for an own copy at a site with a shared folder, either why
- * the shared copy was not used (the last install's note) or that the button moves the account to
- * it. Empty until the home was read.
+ * version N" (an account set up before 8.0.0), never with a path; then, when the lab's shared copy
+ * could not be used, why; or, for an own copy at a site with a shared folder, that the button moves
+ * the account to it. Empty until the home was read.
  */
 export function toolWords(install: Facts['install'] | undefined, note?: InstallNote): string[] {
   if (!install || install.installed === undefined) return [];
-  if (!install.installed) return [`tool: not set up yet${install.sharedRoot ? '; your lab keeps a shared copy' : ''}`];
+  if (!install.installed) {
+    const lines = [`tool: not set up yet${install.sharedRoot ? '; your lab keeps a shared copy' : ''}`];
+    if (install.noSharedCopy) lines.push(whyLine(install.noSharedCopy));
+    else if (note?.note && !note.ok) lines.push(note.note);
+    return lines;
+  }
   const s = install.shared;
   if (s) return [`tool: ${LAB_COPY}, version ${s.version ?? 'unknown'}${s.unreadable ? ` (${hideSharedPath(s.unreadable, s.dir)})` : ''}`];
   const lines = [`tool: your own copy, version ${install.version ?? 'unknown'}`];

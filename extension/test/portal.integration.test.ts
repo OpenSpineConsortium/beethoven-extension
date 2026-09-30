@@ -282,9 +282,9 @@ describe('portal client against the mock portal', () => {
       const { client: c } = client(mock);
       home = await c.home();
       user = (await c.whoAmI())!;
-      // install: one shell line; the profile names the state directory
+      // the stand-in's own-copy install (as a build before 8.0.0 set an account up; the extension no longer types it): the profile names the state directory
       clock.advance(61_000);
-      const inst = await c.shell(commands.install('mock'), { timeoutMs: 30_000 });
+      const inst = await c.shell("bash ~/.hpcworker/bin/hpcworker install --profile 'mock'", { timeoutMs: 30_000 });
       expect(inst.exitCode).toBe(0);
       expect(inst.output).toMatch(/installed hpcworker 1/);
       const profile = await c.readFileIfExists(paths.profile(home));

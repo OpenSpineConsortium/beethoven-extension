@@ -4,6 +4,10 @@ Short, from the browser-platform research note ("Which toolchain gives one codeb
 browsers, and what does Safari packaging really require?") and the report. Written for the maintainer,
 who develops on Windows today.
 
+Status (8.0.0, 2026-09-30): not pursued. Beethoven is distributed only through its private Chrome
+Web Store listing; there is no Safari, Edge or Firefox edition and none is planned. Kept as
+research.
+
 ## What the Safari edition needs
 
 - **A Mac, or Apple's packager without one.** WXT emits the Safari build (`wxt build -b safari`,

@@ -7,17 +7,32 @@
 //
 //   address:  https://openspineconsortium.com/beethoven/services.json, key "access_check" (cached 24 h)
 //   request:  POST <access_check>, Content-Type text/plain;charset=UTF-8 (no preflight), no cookies
-//             {"v":1,"access_id":"st1234","portal":"ondemand.grid.wayne.edu","product":"bridge","version":"4.0.0"}
+//             {"v":1,"access_id":"st1234","portal":"ondemand.grid.wayne.edu","product":"bridge","version":"8.0.0","install_id":"<32 hex>"}
 //   answers:  200 {"approved":true,"access_id":"st1234","checked":"<iso>","until":null|"<iso>"}
 //             200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html"}
+//             200 {"approved":false,...,"reason":"other_installation"|"other_account"|"update_required"}
 //             400 a malformed body; 429 the service's rate limit. Anything else, or nothing, is "no answer".
+//
+// One approved account, one installation (8.0.0). install_id is the random identifier
+// ext/storage.ts installId() makes the first time it is needed in this installation, from the
+// browser's random generator and nothing about the device; uninstalling removes it and a reinstall
+// makes a new one. The service binds an approved account to the first installation that asks and
+// refuses any other with reason "other_installation" until the maintainer moves the approval; an
+// installation bound to one approved account is refused for any other with "other_account"; a
+// build that sends no identifier (before 8.0.0) is refused with "update_required". v stays 1: the
+// service before 8.0.0 refuses any other v and ignores a field it does not know, so this request
+// works against the service before and after it learned about installations. This is a check in
+// the client, not a proof: it keeps an approval from being passed around, and the texts claim no
+// more than that.
 //
 // Caches and grace: an approval is good for 24 hours without asking again, and is kept up to
 // 7 days when the service does not answer; a refusal is kept 10 minutes (a click on the toolbar
 // button asks again at once, so an approval just given is seen); an attempt that got no answer is
 // not repeated for 15 minutes. Withdrawal (the service answering approved:false for an account
-// it approved before) stops every start at the next check and is said as such. The service's
-// answers are data: the only URL taken from them is a page on Licensor's own site.
+// it approved before) stops every start at the next check and is said as such; an approval moved
+// to another installation reaches this one the same way. A reason the service gives is said in its
+// own sentence, ahead of the withdrawal. The service's answers are data: the only URL taken from
+// them is a page on Licensor's own site.
 //
 // Nothing here touches the browser: storage, fetch and the clock are handed in, so the whole
 // thing runs in Node against a fake service.
@@ -46,11 +61,25 @@ export const FETCH_TIMEOUT_MS = 30_000;
 /** what a dashboard may call an account (core/portal.ts reads it with the same alphabet), lower-cased */
 export const ACCOUNT_RE = /^[a-z0-9][a-z0-9._@-]{0,63}$/;
 
+/** the installation identifier as ext/storage.ts installId() makes it: 16 random bytes as 32 hex characters */
+export const INSTALL_ID_RE = /^[0-9a-f]{32}$/;
+
 /** the account name as it is sent and compared: trimmed and lower-cased (the approved list is lower-case), or undefined when it is not a plain account name */
 export function normalizeAccount(name: unknown): string | undefined {
   const s = String(name ?? '').trim().toLowerCase();
   return ACCOUNT_RE.test(s) ? s : undefined;
 }
+
+/** why the service refused, when it said: the account is set up on another installation, this installation is set up for another account, or the request carried no installation identifier */
+export type AccessReason = 'other_installation' | 'other_account' | 'update_required';
+const REASONS: ReadonlySet<string> = new Set<AccessReason>(['other_installation', 'other_account', 'update_required']);
+
+/** the strip's sentence when the account is set up on another installation; there is nothing for the student to press */
+export const OTHER_INSTALLATION = 'This account is already set up on another computer. Ask your lab lead to move it here.';
+/** the strip's sentence when this installation is set up for another approved account; only the lab lead can release it */
+export const OTHER_ACCOUNT = `This installation of ${PRODUCT_NAME} is already set up for another account. Ask your lab lead to move it to yours.`;
+/** the strip's sentence when the service asks for the current build */
+export const UPDATE_REQUIRED = `Install the current ${PRODUCT_NAME} from the lab's private listing.`;
 
 /** services.json as last read: the addresses this build talks to, none of them compiled in but the file's own */
 export interface StoredServices {
@@ -74,6 +103,8 @@ export interface AccessRecord {
   request_page?: string;
   /** the service approved this account here once and later did not */
   withdrawn?: boolean;
+  /** why the service said no, when it gave a reason this version knows; said ahead of a withdrawal */
+  reason?: AccessReason;
   last_attempt_at: string;
   /** why the last attempt got no answer, when it did not */
   last_error?: string;
@@ -85,9 +116,11 @@ export interface AccessRequest {
   portal: string;
   product: typeof PRODUCT;
   version: string;
+  /** this installation's random identifier (ext/storage.ts installId) */
+  install_id: string;
 }
 
-export type AccessAnswer = { kind: 'approved'; checked?: string; until: string | null } | { kind: 'denied'; requestPage?: string } | { kind: 'error'; detail: string; status?: number };
+export type AccessAnswer = { kind: 'approved'; checked?: string; until: string | null } | { kind: 'denied'; requestPage?: string; reason?: AccessReason } | { kind: 'error'; detail: string; status?: number };
 
 export type AccessState =
   /** nothing on record yet for this account at this portal */
@@ -100,6 +133,12 @@ export type AccessState =
   | 'denied'
   /** approved before, refused now */
   | 'withdrawn'
+  /** the account is approved and set up on another installation; the maintainer moves it */
+  | 'other-installation'
+  /** this installation is set up for another approved account; the maintainer releases it */
+  | 'other-account'
+  /** the service asks for the current build */
+  | 'update-required'
   /** asked, no answer yet */
   | 'unreachable'
   /** the portal has not shown who is signed in */
@@ -212,6 +251,9 @@ export function accessFact(o: FactOpts): AccessFact {
     if (age < APPROVED_GRACE_MS) return fact(true, 'stale', `${head}; the service has not confirmed it since${r.last_error ? ` (${r.last_error})` : ''}; kept for seven days`, due, { checkedAt, warn: true });
     return fact(false, 'lapsed', `your approval for ${id}${where} was last confirmed ${stamp(r.checked_at)} and Licensor's access service has not answered for seven days${r.last_error ? ` (${r.last_error})` : ''}; ${PRODUCT_NAME} starts no worker until it does`, due, { checkedAt });
   }
+  if (r.reason === 'other_installation') return fact(false, 'other-installation', OTHER_INSTALLATION, due, { checkedAt });
+  if (r.reason === 'other_account') return fact(false, 'other-account', OTHER_ACCOUNT, due, { checkedAt });
+  if (r.reason === 'update_required') return fact(false, 'update-required', UPDATE_REQUIRED, due, { checkedAt });
   if (r.withdrawn) return fact(false, 'withdrawn', `Access withdrawn: ask again if you still need ${PRODUCT_NAME} (your account ${id}${where} is no longer on the approved list; checked ${stamp(r.checked_at)})`, due, { checkedAt });
   return fact(false, 'denied', `your account ${id}${where} is not on the approved list yet (checked ${stamp(r.checked_at)})`, due, { checkedAt });
 }
@@ -297,7 +339,9 @@ export async function askService(url: string, body: AccessRequest, fetchFn: type
   if (typeof j.approved !== 'boolean') return { kind: 'error', status: res.status, detail: "Licensor's access service answered in a shape this version does not know" };
   if (j.access_id !== undefined && normalizeAccount(j.access_id) !== body.access_id) return { kind: 'error', status: res.status, detail: "Licensor's access service answered for a different account" };
   if (j.approved) return { kind: 'approved', checked: typeof j.checked === 'string' ? j.checked : undefined, until: typeof j.until === 'string' ? j.until : null };
-  return { kind: 'denied', requestPage: safeSitePage(j.requestPage) };
+  // a reason this version does not know is a plain no
+  const reason = typeof j.reason === 'string' && REASONS.has(j.reason) ? (j.reason as AccessReason) : undefined;
+  return reason ? { kind: 'denied', requestPage: safeSitePage(j.requestPage), reason } : { kind: 'denied', requestPage: safeSitePage(j.requestPage) };
 }
 
 export interface CheckOpts {
@@ -309,6 +353,8 @@ export interface CheckOpts {
   portal: string;
   /** this extension's version, as the request states it */
   version: string;
+  /** this installation's random identifier (ext/storage.ts installId), sent with every check */
+  installId: string;
   fetchFn: typeof fetch;
   now?: () => Date;
   /** a person asked (toolbar click, a button): a refusal or a failed attempt is asked again at once; an approval under a day old still is not */
@@ -339,6 +385,8 @@ export async function checkAccess(o: CheckOpts): Promise<CheckOutcome> {
   if (!id) throw new Error(`"${String(o.accessId)}" is not an account name`);
   const portal = String(o.portal ?? '').trim().toLowerCase();
   if (!portal) throw new Error('no portal to ask for');
+  const install = String(o.installId ?? '').trim().toLowerCase();
+  if (!INSTALL_ID_RE.test(install)) throw new Error(`"${String(o.installId)}" is not this installation's identifier`);
   const prev = o.previous && o.previous.access_id === id && o.previous.portal === portal ? o.previous : undefined;
   if (prev && !accessDue(prev, now(), o.force)) return { record: prev, services: o.services, asked: false, fresh: false, detail: prev.approved ? 'the approval on file is less than a day old' : prev.approved === false ? 'the refusal on file is less than ten minutes old' : 'the last attempt was less than fifteen minutes ago' };
   const attemptAt = now().toISOString();
@@ -351,7 +399,7 @@ export async function checkAccess(o: CheckOpts): Promise<CheckOutcome> {
     record.last_error = `the address of Licensor's access service is not known (${svc.detail})`;
     return { record, services, asked: false, fresh: false, detail: record.last_error };
   }
-  const body: AccessRequest = { v: 1, access_id: id, portal, product: PRODUCT, version: o.version };
+  const body: AccessRequest = { v: 1, access_id: id, portal, product: PRODUCT, version: o.version, install_id: install };
   const a = await askService(url, body, o.fetchFn);
   if (a.kind === 'error') {
     record.last_error = a.detail;
@@ -363,12 +411,27 @@ export async function checkAccess(o: CheckOpts): Promise<CheckOutcome> {
     record.approved = true;
     record.until = a.until;
     delete record.withdrawn;
+    delete record.reason;
     return { record, services, asked: true, fresh: true, detail: `approved for ${id} at ${portal}${a.until ? ` until ${a.until.slice(0, 10)}` : ''}` };
   }
+  // an installation that was approved and whose approval was moved elsewhere keeps "withdrawn"
+  // beneath the reason, so it is said as a withdrawal if the reason later goes and the no stays
   const wasApproved = prev?.approved === true || prev?.withdrawn === true;
   record.approved = false;
   delete record.until;
   if (wasApproved) record.withdrawn = true;
+  if (a.reason) record.reason = a.reason;
+  else delete record.reason;
   if (a.requestPage) record.request_page = a.requestPage;
-  return { record, services, asked: true, fresh: true, detail: wasApproved ? `access withdrawn for ${id} at ${portal}` : `${id} is not on the approved list yet` };
+  const detail =
+    a.reason === 'other_installation'
+      ? `${id} is already set up on another computer`
+      : a.reason === 'other_account'
+        ? `this installation is already set up for an account other than ${id}`
+        : a.reason === 'update_required'
+          ? `the service asks for the current ${PRODUCT_NAME} from the lab's private listing`
+          : wasApproved
+            ? `access withdrawn for ${id} at ${portal}`
+            : `${id} is not on the approved list yet`;
+  return { record, services, asked: true, fresh: true, detail };
 }

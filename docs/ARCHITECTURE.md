@@ -40,7 +40,7 @@ extension 5.0.0: the lab's shared copy of the framework (2.1).
 | Framework (`framework/`, `hpcworker`) | Shell plus Python kept once per site in the lab's shared directory, or copied into the student's home where there is none (2.1): site profile, scheduler/runtime/egress adapters, job template, worker entrypoint, probe job, the sign-in sitting | `grid/worker.sbatch.tpl` and `grid/bootstrap.sbatch` (the sbatch wrapper, the Apptainer sandbox recipe on a Node 22 base, node-local temp and cache with a cleanup trap, `/dev/shm` IPC, the Slurm executable wrappers inside the container, `.part`-then-rename file writes) | Site profile schema; adapter modules (Slurm first, PBS Pro and LSF next); egress probe; Remote Control launcher in `tmux`; per-job token; `status.json` and `connection.json` writers; the `XDG_RUNTIME_DIR` fix; the plain sign-in sitting and its line contract (4.1) |
 | Worker image | A SIF built once from a Debian 12 or Ubuntu 22.04 base with the native installer pinned to a version; `DISABLE_AUTOUPDATER=1`; Claude Code's config directory (the profile's `claude_config_dir`; `~/.claude` by default, `$HOME/.beethoven/claude` on Wayne State, `$HOME/.ashley/claude` until 2026-09-30 and a link to it since) bind-mounted from persistent storage, never baked in | The sandbox recipe | SIF form for parallel-filesystem sites; `--fakeroot` rung detection |
 | Extension (`extension/`, `ood-worker`) | WXT plus TypeScript, `browser.*` with Promises, `minimum_chrome_version` 148; one codebase for Chrome, Edge, Firefox and Safari | The Ed25519 token verifier (`grid/license.js` `open()`, `ASHLEYREV1` tokens and, from 8.0.0, `BEETHOVENREV1` ones, public keys `k1` and `trial`), used for the signed kill-list only since 4.0.0 (Bridge has no licence keys); the clickwrap text and acceptance record (`core/terms.ts`, `vscode/termsPanel.ts`); the diagnostics node model (`core/diagnostics.ts`: `id`, `title`, `dependsOn`, `assumption`, `check`, `repair`, `manualFix`, `futureRisk`) | Portal-origin content script; Shell WebSocket driver (one line, and the held-open sitting); Files and Active Jobs clients; the strip, the step machine behind the icon (6.1); side panel (Chrome/Edge), `sidebar_action` (Firefox), a panel tab (Safari); the options page; on-device audit log; kill-list verifier |
-| Access service | The vendor's access service (the Cloudflare Worker behind the request page, deployed from the sibling repository of Beethoven for VS Code (`OpenSpineConsortium/beethoven-vscode`, Desktop folder `ashley`) under two names with the same code, stores and secrets: `beethoven-access.openspineconsortium.workers.dev`, which 7.0.0 uses, and the old `ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 and builds 4.0.0 to 6.0.0) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/beethoven/services.json`, body `{v, access_id, portal, product, version}`, where `product` stays `bridge`), from the same approved list the admin console manages for Beethoven for VS Code; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
+| Access service | The vendor's access service (the Cloudflare Worker behind the request page, deployed from the sibling repository of Beethoven for VS Code (`OpenSpineConsortium/beethoven-vscode`, Desktop folder `ashley`) under two names with the same code, stores and secrets: `beethoven-access.openspineconsortium.workers.dev`, which 7.0.0 uses, and the old `ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 and builds 4.0.0 to 6.0.0) answers yes or no for one account name (`POST` to the `access_check` address named in `https://openspineconsortium.com/beethoven/services.json`, body `{v, access_id, portal, product, version, install_id}`, where `product` stays `bridge` and, from 8.0.0, an approved account is bound to the first `install_id` that asks), from the same approved list the admin console manages for Beethoven for VS Code; plus a signed JSON kill-list of withdrawn versions on the website, served over HTTPS | The approved list, the admin console and the request page, merchant of record | The `access_check` route and its records; the extension's cached answer (24 h for yes, 7 days when unreachable, 10 min for no); kill-list signing key under hardware-key custody; daily fetch |
 | Partner-site package (optional) | An Open OnDemand Interactive App (`form.yml`, `submit.yml.erb`, `template/script.sh.erb`) that launches the same job template, for campuses that will install it | The job template | The `form.yml` and `view.html.erb` |
 
 Two things are deliberately absent (report, "Components and what each reuses"): any code on
@@ -120,8 +120,8 @@ student's account see them, then starts, watches and stops the worker.
 | Piece | Changes | Kept by, and where (Wayne State) | Updated by |
 |---|---|---|---|
 | The worker image, with Claude Code pinned inside | rarely | the lab, once: `image_store` `/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22`, `claude_bin` beside it | the maintainer, rebuilt inside a Slurm job (`jobs/build_image.sbatch`), never on the login node |
-| The framework (`hpcworker`) | with each framework version | the lab, once: `shared_install` `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`; at a site with no shared directory, each student's `~/.hpcworker` | the maintainer, with `tools/deploy_shared.sh`; a student's own copy by the extension, from the copy it carries, when that is newer |
-| The extension | with each extension version | the student's browser | the browser's store (nothing to build) |
+| The framework (`hpcworker`) | with each framework version | the lab, once: `shared_install` `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`; an account set up by an extension build before 8.0.0 may still have its own copy in `~/.hpcworker` | the maintainer, with `tools/deploy_shared.sh`; since 8.0.0 the extension carries no copy of the framework and updates none |
+| The extension | with each extension version | the student's browser | its private Chrome Web Store listing (nothing to build) |
 | The student's state: the profile, the consent marker, the log, the run directories, Claude Code's sign-in | as the student works | the student's account (`~/.hpcworker`, `shared_state_dir`, `claude_config_dir`) | nobody else; no install in either mode replaces it |
 
 Fetching the framework from the private GitHub repository is not possible for a student (there is no
@@ -162,8 +162,8 @@ heartbeat under three minutes old, a job submitted that has not reported yet, a 
 files only, no scheduler call), because a running job reads `lib/` again on every call into the
 container; the sentence asks the student to stop the worker first. The way back is
 `hpcworker install --own`, which copies the code into the home and moves the marker aside the same
-way. A full copy of the command in `~/.hpcworker/bin/` (an upload from the extension) wins over a
-marker left behind.
+way. A full copy of the command in `~/.hpcworker/bin/` (an upload from an extension build before
+8.0.0, or `install --own`) wins over a marker left behind.
 
 **Publishing a version** (the maintainer, after the framework tests pass): `bash tools/deploy_shared.sh`
 from the laptop (options `--site`, `--host`, `--root`, `--group`, `--dry-run`, `--replace`; `--here`
@@ -194,16 +194,20 @@ version directory: an old one is removed by hand, and only when no student's wor
 (nothing checks that yet). `--replace` is the exception: a worker started on `v<N>` reads the replaced
 files from its next call into the container on.
 
-**The student's own copy** (every site whose profile names no shared directory, framework 4 and
-earlier, and the fallback): the extension uploads the framework it carries into `~/.hpcworker`
-through the Files app and runs `bash ~/.hpcworker/bin/hpcworker install --profile <site>`, and does so
-again when `~/.hpcworker/VERSION` is older than the `VERSION` it carries. This is unchanged from
-framework 4, except that an install of an own copy moves a shared copy's marker aside.
+**The student's own copy** (framework 4 and earlier, and extension builds before 8.0.0 at a site
+with no shared directory or as their fallback): those builds uploaded the framework they carried into
+`~/.hpcworker` through the Files app and ran `bash ~/.hpcworker/bin/hpcworker install --profile
+<site>`. Since 8.0.0 the extension carries no framework code (the package holds the site profiles
+only, as data, without their free-text `notes`; `scripts/sync-profiles.mjs`, checked by
+`test/hygiene.test.ts` against the built package) and never uploads it: an account that still has its
+own copy keeps running it, the framework handles it as before, and *Details* names it with its
+version. `hpcworker install --own`, typed by hand, remains the framework's way to an own copy; an
+install of an own copy moves a shared copy's marker aside.
 
 **What the extension does** (`core/install.ts`, `core/facts.ts`, `core/steps.ts`; the `install` step
 of 6.1). It learns whether a site has a shared copy from the site profile it carries
-(`public/framework/files/profiles/<site>.json`, copied from `framework/profiles/` at build time; the
-site name comes from the portal's hostname and can be changed under *Details*). When that profile
+(`public/profiles/<site>.json`, copied from `framework/profiles/` at build time without its `notes`;
+the site name comes from the portal's hostname and can be changed under *Details*). When that profile
 names `shared_install`, the install step types one line through the portal's shell,
 `bash <dir>/bin/hpcworker install --shared <dir> --profile <site>` (each argument in single quotes;
 `commands.installShared`), and uploads nothing. The folder is used only when it is a plain absolute
@@ -211,21 +215,23 @@ path (letters, digits and `. _ + -`, no `.` or `..` segment; `sharedRootOf` in `
 nothing from a profile or a marker is ever quoted around. Whether the account can use the shared copy
 is judged by that line, run by the same account on the same login node the jobs use, not by the Files
 app: when bash cannot open the shared copy's `bin/hpcworker` (exit 126, no permission; 127, not
-there) or the tool says it cannot use the folder, the step falls back to the upload and says so in one
-line under *Details*; any other failure is reported and not worked around. After the install the facts read the marker; when it names
+there) or the tool says it cannot use the folder, nothing is uploaded instead: the strip shows one
+sentence, "Beethoven needs your lab's shared copy of the tool on the cluster, and your account cannot
+use it yet: ask your lab lead (Details says why).", with a *Try again* button, and *Details* says why
+in one line. The same sentence stands, with no line typed, where the site profile names no shared
+folder or the build carries no profile for the site. Any other failure is reported and not worked
+around. After the install the facts read the marker; when it names
 a folder they read that folder's `VERSION` through the Files app in a guarded read of its own, so a
 403 or 500 there (what a student outside the lab's group, or a Files app that does not serve the lab's
-volume, would get) does not make the portal look asleep. A shared copy is never "outdated" against the
-one the extension carries: the lab's copy is the one that counts, and *Details* says "the lab's
+volume, would get) does not make the portal look asleep. The extension compares no version: the
+lab's copy is the one that counts, and *Details* says "the lab's
 shared copy, version N" (or "your own copy, version N"); since 7.0.0 the panel's own sentences and the
 check results name neither the shared copy's cluster path nor the tool's command name. Three places
 still show them, as records: the output boxes (the tool's output as it prints it), the terminal of the
 sign-in sitting, and the audit log's endpoints (at Wayne State every look at the cluster lists the
-Files read of the shared copy's `VERSION` with its full path; run F in `extension/store-assets/e2e/`). A student's own copy at a site that has a shared one is moved to the shared
-copy, not updated, when it is older than the copy the extension carries, and *Set up the cluster
-again* moves it at any time; the strip does not try the move while it knows a worker is running, and
-when the tool refuses because a worker still runs from the own copy, the step asks the student to
-stop the worker first. Everything after the install (the probe, the sign-in sitting, the
+Files read of the shared copy's `VERSION` with its full path; run F in `extension/store-assets/e2e/`). A student's own copy is left running; at a site that has a shared
+copy, *Set up the cluster again* under *Details* moves it there, and when the tool refuses because a
+worker still runs from the own copy, the step asks the student to stop the worker first. Everything after the install (the probe, the sign-in sitting, the
 statement, start, stop, status) calls `~/.hpcworker/bin/hpcworker` as before and does not know which
 copy answers.
 
@@ -234,8 +240,8 @@ copy answers.
 all; on 2026-09-29 the group had two members (`OPEN_QUESTIONS.md`, "The lab's shared copy of the
 framework"). That held before the shared copy existed, since the image, `claude_bin` and every
 student's `shared_state_dir` sit under the same root: every student must be in `oschome` before
-their first run, in either mode, and the per-user fallback does not help a student outside the group
-there. The published tree gives the group read and execute and no write, so a member can run the
+their first run, in either mode, and a per-user copy (the fallback of extension builds before 8.0.0)
+does not help a student outside the group there. The published tree gives the group read and execute and no write, so a member can run the
 lab's code and cannot change it; the directory above it, `shared/beethoven`, stays group-writable,
 so a member could still rename `hpcworker/` itself (`OPEN_QUESTIONS.md`).
 
@@ -450,6 +456,25 @@ what stays is the `/dev/shm` scratch bound to `/tmp`, the `--signal=B:TERM@120`,
 `--open-mode=append`, the read-only bind of the host's Slurm client into the container, and the
 refusal to start when a piece is missing.
 
+**The workspace guide** (framework 8). Claude Code reads a `CLAUDE.md` in its working folder at the
+start of each session, so `hpcworker worker start` writes one into the worker's workspace
+(`<shared_state_dir>/workspaces/<name>/CLAUDE.md`) from `jobs/workspace-guide.md.tpl`, filled from
+the site profile by `lib/profile.py guide`: that this is a compute node under the site's scheduler
+and the worker a job hpcworker started; light work in the worker, heavy or long work as its own job,
+nothing on the login node, the partitions, QoS and account, `/tmp` as the job's node-local space and
+`ipc_dir` for sockets; the folders the container sees, each named for what it is from facts the
+profile already carries; results handed back as a path, as a file sent in the session when Claude
+Code has a tool for that, and to Google Drive, Docs or Sheets only through a connector the person
+turned on in Claude's settings; and what never goes in (PHI, FERPA records, IRB data without
+approval, export-controlled material, credentials, the Claude sign-in folder). It is written only
+when the workspace has none (a workspace from before framework 8 gets it at its next start), with
+bash's noclobber, so a file already there, edited or left empty on purpose, is never replaced;
+`hpcworker worker guide` prints the current text and writes nothing. The extension's texts do not
+change for it. The guide does not assume the scheduler is reachable from inside the container: this
+framework's job binds no Slurm client there (the host-client bind named just above belongs to the VS
+Code edition's job and was not carried over), so the guide says to check `command -v sbatch` and,
+when it is missing, to write the job script into the workspace for the person to submit.
+
 ### 4.3 The batch launch
 
 ```
@@ -554,7 +579,7 @@ function in the extension that appends an audit record and enforces the poll flo
 | PUN warm-up and session check | `GET /pun/sys/dashboard/` | HTTPS, follow redirects | either | `warm()` in `core/portal.ts`, run once per client before any Files, Shell or Jobs call (`ensureWarm`), and again after any 5xx. A cold per-user NGINX answers a 5xx ("Error: Server Error ... try again in 30 seconds", a 500, seen 2026-09-29) or a 302 to `/nginx/init?redir=...` (which also loses a POST body): `looksCold` is status 500 or above, or a final URL under `/nginx/init`; on it, wait and try again after 2 s, 5 s and 10 s (`WARM_DELAYS_MS`), the strip saying "Waking up your portal..."; after the third retry, "your portal did not wake up after N tries; wait a moment and try again". Then: 302 to the IdP, a VPN captive page or a connection error means "sign in to your portal (and connect the VPN) in a tab"; never automate login. The dashboard page also yields the csrf meta tag and the username |
 | Bootstrap shell: submit the job, read the id | `GET /pun/sys/shell/ssh/<host>` (scrape `csrf=` from the inline script), then `wss://<ood>/pun/sys/shell/ssh/<host>?csrf=<token>` | WebSocket, no subprotocol; send `{"input": "..."}` and `{"resize": {...}}`; receive raw PTY text frames | content script on the portal origin (a service worker is also admitted because a non-`http` Origin skips the check, but Firefox and Safari cookie behaviour makes the content script the only safe choice) | Scrape the token seconds before connecting (the secret is per Node process; Passenger kills an idle app after 300 s). Close code 3146 with reason "No clusters defined.", "Invalid Origin.", "Bad CSRF Token." or `Host "<host>" not specified in allowlist or cluster configs.`. Defaults: 5-minute idle, 1-hour maximum. Run `sbatch --parsable <script>` once, parse the id, `exit`, close. Validate every frame as JSON: a bad frame throws inside the user's only shell process. The CSRF token travels in the query string and hence into access logs. Measured 2026-09-29: `default` reaches `warrior` without a password, 1.9 s open to close |
 | The sign-in sitting | the same shell page and socket, held open (`openShell`) | the same frames; the framework's marker lines (4.1) in the PTY text; no keep-alive frames, the shell's own output is the only traffic | content script only, behind a port from the panel | One sitting at a time; one audit line in the scheduler class (the sitting allocates a job, so the 60 s floor applies) with the bytes read and typed; the framework ends it after ten minutes for the paste (and waits at most ten for a node), the panel after fifteen (`SESSION_MAX_MS`); closed at `SIGNED-IN`, `HPCW-LOGIN-FAILED`, the limit, the student's cancel or the panel closing |
-| Write request and control files | `PUT /pun/sys/dashboard/files/fs/<abs path>` (body = content; `?dir=true`; `?touch=true`) | HTTPS PUT with `X-CSRF-Token` from `<meta name="csrf-token">` | content script only (the Rails Origin check rejects `chrome-extension://`) | 422 = stale token or wrong Origin; 403 = allowlist or `EACCES`; 302 to `/nginx/init` = cold PUN, body lost (the warm-up above runs first). Gated by `upload_enabled` (only for the multipart route), `OOD_ALLOWLIST_PATH` and a 10 GB cap. Measured 2026-09-29: uploads disabled at Wayne State, `PUT` works; the framework files (only where there is no shared copy, 2.1) and the consent marker go up this way |
+| Write request and control files | `PUT /pun/sys/dashboard/files/fs/<abs path>` (body = content; `?dir=true`; `?touch=true`) | HTTPS PUT with `X-CSRF-Token` from `<meta name="csrf-token">` | content script only (the Rails Origin check rejects `chrome-extension://`) | 422 = stale token or wrong Origin; 403 = allowlist or `EACCES`; 302 to `/nginx/init` = cold PUN, body lost (the warm-up above runs first). Gated by `upload_enabled` (only for the multipart route), `OOD_ALLOWLIST_PATH` and a 10 GB cap. Measured 2026-09-29: uploads disabled at Wayne State, `PUT` works; the consent marker goes up this way (builds before 8.0.0 also put the framework files there where a site had no shared copy, 2.1) |
 | Poll worker state | `GET /pun/sys/dashboard/files/fs/<shared_state_dir>/<run>` with `Accept: application/json`, and `?download=1` for a file | HTTPS GET | either (service worker on Chrome/Edge; content script on Firefox/Safari) | Read `status.json`, `connection.json`, `rc.log` via `download_url` or `?download=1`; served `Cache-Control: no-store`; `files_upload_path` present if and only if uploads are enabled. File reads touch no scheduler, so they may run on a timer of seconds: the background's alarm reads them once a minute, and the strip, while it is open, every 10 s for the first two minutes after a start and every 60 s after that. Existence comes from the listing (the rule below), never from a download's status |
 | Upload a file to the working directory | `POST /pun/sys/dashboard/files/upload/fs` (multipart: `parent`, `name`, `file`) | HTTPS POST + CSRF | content script | 413 above `client_max_body_size`; 404 if uploads disabled (Wayne State) |
 | Job state | `GET /pun/sys/dashboard/activejobs.json?jobcluster=all&jobfilter=user` | HTTPS GET | either | `data` is an array of arrays (one inner array per 3,000-job slice); match `pbsid`; `errors` names unconfigured clusters. Reconciliation only; the primary state is `status.json`. Measured 2026-09-29: 83 jobs listed |
@@ -616,9 +641,9 @@ preferences, the acceptance record, the account name the portal's dashboard show
 about each worker's workspace (`bridge.statements`), the small notes the strip keeps so it does not
 repeat itself (`bridge.opened`: the environment links it already opened; `bridge.loginSeen`: when the
 login terminal last reported `SIGNED-IN` and what that line said; `bridge.probe`: the probe job it
-submitted by itself, time and job number; `bridge.install`: the last install or update the strip ran
-by itself or *Set up the cluster again* ran, with its time, whether it succeeded, how many files went up or which shared copy it used,
-and the one line saying why it fell back to the student's own copy when it did), the audit log, the last good kill-list, a random installation
+submitted by itself, time and job number; `bridge.install`: the last install the strip ran by
+itself or *Set up the cluster again* ran, with its time, whether it succeeded, which shared copy it
+used, and the one line saying why the lab's shared copy could not be used when it could not), the audit log, the last good kill-list, a random installation
 identifier and the ticks on the optional checklist steps; `storage.session`
 holds the run record (`bridge.run`: the run's name and state directory, job number, the last
 `status.json` and `connection.json` as read, the registration block parsed from `rc.log`, the last
@@ -666,10 +691,10 @@ the student is offered, never both. It is driven by a pure decision function (`d
 (`gatherFacts` in `core/facts.ts`, reads only). Steps come in a fixed order and the first one not
 satisfied is the step: `portal` (connected, granted, the page script answering), `warm` (the PUN
 warm-up), `terms`, `access` (the cached answer of the approval check for the account name the dashboard shows; while it is no, the one button is *Ask for access*, which opens the request page with that name filled in; while it is being asked, the strip is busy; nothing below runs until it is yes, which is how a withdrawn approval stops every start), `install` (when `profile.json` is absent by the existence rule: one
-install line pointing the account at the lab's shared copy where the bundled site profile names one,
-else the framework files by `PUT` and one install line; again when the student's own copy's
-`~/.hpcworker/VERSION` is older than the `VERSION` this build carries, and never for a shared copy;
-the tool keeps the profile; 2.1), `probe` (submitted once, in the background, when
+install line pointing the account at the lab's shared copy where the bundled site profile names one;
+otherwise, or when that line says the account cannot use the copy, one sentence naming the lab lead
+and a *Try again* button, with nothing uploaded; an own copy left by a build before 8.0.0 counts as
+installed and is never set up again by itself; the tool keeps the profile; 2.1), `probe` (submitted once, in the background, when
 `probe.json` is absent; up to fifteen minutes of patience; its verdict on the compute node), `login`
 (the sitting of 4.1, when the sign-in is not known to be good or the run says `need_login`),
 `statement` (the disclosure, the per-workspace text, the consent marker, 4.4; also when the run says
@@ -794,6 +819,18 @@ From the report's "Security controls", in the order a reviewer will look for the
   by the automatic start, and the one button is *Ask for access*. The name asked about is only the
   one the dashboard page shows (`SessionInfo.username`), never a typed one and never the
   home-directory fallback. Nothing is read from a cookie.
+- **One approved account, one installation (8.0.0).** The check also carries `install_id`, the
+  random identifier `installId()` in `ext/storage.ts` makes once per installation (nothing about the
+  device; a reinstall makes a new one). The service binds an approved account to the first
+  installation that asks and refuses any other with `"reason":"other_installation"`, which the strip
+  says as "This account is already set up on another computer. Ask your lab lead to move it here."
+  with no button, until the maintainer moves the approval; an installation already bound to another
+  approved account gets `"reason":"other_account"`, said as "This installation of Beethoven is
+  already set up for another account. Ask your lab lead to move it to yours.", also with no button;
+  a check without an identifier gets `"update_required"`. The wire stays `v:1`. The binding is
+  enforced by the extension against the service's answer, so it keeps an approval from being shared
+  casually and proves nothing against a modified copy; a move or a withdrawal reaches an
+  installation holding a fresh yes within a day (7 days offline).
 - **The lab's shared copy is read-only to students.** The extension never writes into it: it reads
   its `VERSION` and types the one install line. The launcher in the student's home is a regular file,
   so no write in the student's account reaches the shared copy, and the published tree gives the

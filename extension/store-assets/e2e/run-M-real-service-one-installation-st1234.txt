@@ -1,0 +1,34 @@
+Beethoven 8.0.0, run M (the one-installation rule on the real access service, for the reviewers' account st1234), 2026-09-30
+
+From WSL: curl to the deployed Worker beethoven-access, and tools/intake/admin.mjs for the seat (the admin token is read
+from the vendor folder by admin.mjs and never printed). st1234 is exempt from the rule (seat-rule any) so that every
+store reviewer's installation works; the rule was switched on for st1234 for this run (seat-rule one), three fresh random
+identifiers were used (IA, IB, IC), and afterwards the seat was reset (reset-seat) and the exemption put back
+(seat-rule any), so the reviewers' mock recipe keeps working. The refusal in step 3 sends the maintainer the
+second-installation e-mail (at most one a day per account). Times are UTC.
+
+14:40:29.707  START   run M against https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:30.699  ADMIN   node tools/intake/admin.mjs seat st1234 -> { "accessId": "st1234", "any_installation": true, "seat": null, "conflict": null } 
+14:40:31.867  ADMIN   node tools/intake/admin.mjs seat-rule st1234 one -> {"status":"seat-rule","accessId":"st1234","any_installation":false} 
+14:40:32.507  ADMIN   node tools/intake/admin.mjs seat st1234 -> { "accessId": "st1234", "any_installation": false, "seat": null, "conflict": null } 
+14:40:34.409  CHECK   1. a fresh installation IA (the rule on): binds
+14:40:34.413          curl -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"3b5a2fb167d73801cfd3577773aba717"}' https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:34.418          -> {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:40:34.896Z","until":null} HTTP 200
+14:40:35.672  CHECK   2. IA again: the same installation
+14:40:35.677          curl -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"3b5a2fb167d73801cfd3577773aba717"}' https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:35.681          -> {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:40:36.474Z","until":null} HTTP 200
+14:40:36.971  CHECK   3. another fresh installation IB: refused
+14:40:36.975          curl -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"c50a79f0eba3bd0a56e1179b725fe930"}' https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:36.980          -> {"approved":false,"access_id":"st1234","reason":"other_installation","requestPage":"https://openspineconsortium.com/beethoven/request.html"} HTTP 200
+14:40:37.582  ADMIN   node tools/intake/admin.mjs seat st1234 -> { "accessId": "st1234", "any_installation": false, "seat": { "install_short": "25948b12", "first_seen": "2026-09-30T14:40:34.896Z", "last_seen": "2026-09-30T14:40:36.474Z", "product": "bridge", "version": "8.0.0" }, "conflict": { "kind": "other_installation", "count": 1, "first_at": "2026-09-30T14:40:37.666Z", "last_at": "2026-09-30T14:40:37.666Z", "other_install_short": "d00c4f90" } } 
+14:40:38.885  ADMIN   node tools/intake/admin.mjs reset-seat st1234 -> {"status":"reset","accessId":"st1234","had_seat":true} 
+14:40:39.978  ADMIN   node tools/intake/admin.mjs seat-rule st1234 any -> {"status":"seat-rule","accessId":"st1234","any_installation":true} 
+14:40:40.572  ADMIN   node tools/intake/admin.mjs seat st1234 -> { "accessId": "st1234", "any_installation": true, "seat": null, "conflict": null } 
+14:40:41.578  CHECK   4. a third fresh installation IC with the exemption back: approved, binds nothing
+14:40:41.582          curl -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"0905de5af2068fb9c4f76cd56460da1e"}' https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:41.586          -> {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:40:42.624Z","until":null} HTTP 200
+14:40:42.463  CHECK   5. IB again with the exemption back: approved
+14:40:42.469          curl -X POST -H 'content-type: text/plain;charset=UTF-8' --data-binary '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"c50a79f0eba3bd0a56e1179b725fe930"}' https://beethoven-access.openspineconsortium.workers.dev/access_check
+14:40:42.474          -> {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:40:43.561Z","until":null} HTTP 200
+14:40:43.095  ADMIN   node tools/intake/admin.mjs seat st1234 -> { "accessId": "st1234", "any_installation": true, "seat": null, "conflict": null } 
+14:40:43.100  END

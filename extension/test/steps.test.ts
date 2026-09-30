@@ -4,7 +4,7 @@
 // read-only, the scheduler floor makes an automatic start wait rather than skip, and the Claude
 // link is opened once by itself and then offered on the green button.
 import { describe, expect, it } from 'vitest';
-import { CONSENT_PATIENCE_MS, decide, FRESH_RUN_MS, LOGIN_RECHECK_PATIENCE_MS, LOGIN_SEEN_FRESH_MS, PROBE_PATIENCE_MS, STEP_ORDER, type Facts, type StripView } from '../src/core/steps';
+import { CONSENT_PATIENCE_MS, decide, FRESH_RUN_MS, LOGIN_RECHECK_PATIENCE_MS, LOGIN_SEEN_FRESH_MS, NEEDS_SHARED_COPY, PROBE_PATIENCE_MS, STEP_ORDER, type Facts, type StripView } from '../src/core/steps';
 import type { AccessFact } from '../src/licensing/access';
 
 const NOW = Date.parse('2026-09-29T12:00:00Z');
@@ -92,7 +92,7 @@ describe('the step machine', () => {
     same(decide(f, NOW), { step: 'warm', primary: { action: 'open-portal' }, tone: 'fail' });
   });
 
-  it('the agreement once, then the access step: checking by itself, "Ask for access" when refused, "ask again" when withdrawn, no button at all for a withdrawn version', () => {
+  it('the agreement once, then the access step: checking by itself, "Ask for access" when refused, "ask again" when withdrawn, no button for another installation, a build too old or a withdrawn version', () => {
     const f = green();
     f.terms = false;
     same(decide(f, NOW), { step: 'terms', primary: { action: 'accept-terms' } });
@@ -116,6 +116,15 @@ describe('the step machine', () => {
     const withdrawn = decide(f, NOW);
     same(withdrawn, { step: 'access', primary: { label: 'Ask again', action: 'ask-access' }, tone: 'fail' });
     expect(withdrawn.status).toMatch(/^Access withdrawn: ask again/);
+    // one approved account, one installation: set up on another computer, only the lab lead can move it, so no button
+    f.access = access('other-installation', { needsCheck: true });
+    same(decide(f, NOW), { step: 'access', status: 'This account is already set up on another computer. Ask your lab lead to move it here.', primary: undefined, auto: undefined, input: undefined, tone: 'fail' });
+    // this installation set up for another account: the same, no button
+    f.access = access('other-account', { needsCheck: true });
+    same(decide(f, NOW), { step: 'access', status: 'This installation of Beethoven is already set up for another account. Ask your lab lead to move it to yours.', primary: undefined, auto: undefined, input: undefined, tone: 'fail' });
+    // the service asks for the current build: said plainly, no button (the listing is private)
+    f.access = access('update-required', { needsCheck: true });
+    same(decide(f, NOW), { step: 'access', status: "Install the current Beethoven from the lab's private listing.", primary: undefined, auto: undefined, tone: 'fail' });
     // the service silent for seven days, or never reached: a person may try again
     f.access = access('lapsed');
     same(decide(f, NOW), { step: 'access', primary: { label: 'Check again', action: 'retry-access' }, tone: 'fail' });
@@ -135,33 +144,33 @@ describe('the step machine', () => {
     expect(decide(f, NOW).step).toBe('open');
   });
 
-  it('installs the tool by itself, runs the probe once and waits for it, and asks only when a job fails', () => {
+  it("sets the tool up by itself from the lab's shared copy, runs the probe once and waits for it, and asks only when a job fails", () => {
     const f = green();
+    const lab = '/rs/rs_grp_oschome/shared/ashley/hpcworker/current';
     f.install = {};
     same(decide(f, NOW), { step: 'install', auto: 'poll' });
-    f.install = { installed: false };
-    same(decide(f, NOW), { step: 'install', auto: 'install', primary: undefined });
-    f.install = { installed: false, installing: true };
-    same(decide(f, NOW), { step: 'install', auto: undefined });
-    f.install = { installed: false, failed: 'exit 1' };
-    same(decide(f, NOW), { step: 'install', primary: { action: 'retry-install' } });
-    // an older tool on the cluster is set up again by itself, saying which version becomes which
-    f.install = { installed: true, outdated: { installed: '1', bundled: '2' } };
-    const up = decide(f, NOW);
-    same(up, { step: 'install', auto: 'install', primary: undefined });
-    expect(up.status).toMatch(/version 1 to 2/);
-    f.install = { installed: true, outdated: { installed: '1', bundled: '2' }, failed: 'the tool on the cluster still reports version 1 after the update to version 2 ran' };
-    same(decide(f, NOW), { step: 'install', primary: { action: 'retry-install' }, auto: undefined });
-    // where the lab keeps a shared copy, the same steps say so: the first set-up, the move, the wait
-    const lab = '/rs/rs_grp_oschome/shared/ashley/hpcworker/current';
+    // the lab's shared copy is the one way: the first set-up runs by itself and says so
     f.install = { installed: false, sharedRoot: lab };
-    same(decide(f, NOW), { step: 'install', auto: 'install', status: "Setting up the cluster with your lab's shared copy of the tool..." });
+    same(decide(f, NOW), { step: 'install', auto: 'install', primary: undefined, status: "Setting up the cluster with your lab's shared copy of the tool..." });
     f.install = { installed: false, sharedRoot: lab, installing: true };
     same(decide(f, NOW), { step: 'install', auto: undefined, status: "Setting up the cluster (pointing your account at your lab's shared copy of the tool)..." });
-    f.install = { installed: true, sharedRoot: lab, version: '4', outdated: { installed: '4', bundled: '5' } };
-    same(decide(f, NOW), { step: 'install', auto: 'install', status: "Moving your account to your lab's shared copy of the tool (your own copy is version 4)..." });
+    f.install = { installed: false, sharedRoot: lab, failed: 'exit 1' };
+    same(decide(f, NOW), { step: 'install', primary: { action: 'retry-install' } });
+    // no shared copy known for the site, or one the account cannot use: one sentence, whom to ask, a button; never an install by itself
+    for (const install of [{ installed: false }, { installed: false, noSharedCopy: 'no shared copy of the tool is known for the site "x"' }, { installed: false, sharedRoot: lab, noSharedCopy: 'it is not there' }]) {
+      f.install = install;
+      same(decide(f, NOW), { step: 'install', status: NEEDS_SHARED_COPY, primary: { label: 'Try again', action: 'retry-install' }, auto: undefined, tone: 'fail' });
+    }
+    expect(NEEDS_SHARED_COPY).toMatch(/lab's shared copy/);
+    expect(NEEDS_SHARED_COPY).toMatch(/ask your lab lead/);
+    expect(NEEDS_SHARED_COPY).not.toMatch(/\/|hpcworker|upload/);
     // on the shared copy there is nothing to do here, whatever version it is
     f.install = { installed: true, sharedRoot: lab, shared: { dir: lab, version: '5' } };
+    expect(decide(f, NOW).step).toBe('open');
+    // an own copy a build before 8.0.0 left keeps running, at a site with a shared copy or without one
+    f.install = { installed: true, sharedRoot: lab, version: '4' };
+    expect(decide(f, NOW).step).toBe('open');
+    f.install = { installed: true, version: '1' };
     expect(decide(f, NOW).step).toBe('open');
     f.install = { installed: true };
     f.probe = { present: false };

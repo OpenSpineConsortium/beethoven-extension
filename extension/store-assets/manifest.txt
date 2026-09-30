@@ -1,105 +1,125 @@
-Beethoven 7.0.0: store assets
+Beethoven 8.0.0: store assets
 
-Made 2026-09-30 between 01:52 and 01:56 UTC (2026-09-29 evening, US Eastern) for 7.0.0, the release in which the
-public name became Beethoven. Every image carried the old name before, so all twelve were made again: the nine
-screenshots in run H, the three rendered images from src/. The agreement in them is LICENSE.txt version 6 and
-PRIVACY.md version 7 (TERMS_VERSION 6), the texts 7.0.0 ships.
+Made 2026-09-30 between 14:49 and 14:53 UTC for 8.0.0, the release that is distributed only through the
+private Chrome Web Store listing, binds each approved account to one installation, and carries no copy of
+the cluster tool. All nine screenshots were made again: the setup page now says what the approval check
+sends (the installation identifier) and that an approval covers one installation, and the agreement in
+them is LICENSE.txt version 7 and PRIVACY.md version 8 (TERMS_VERSION 7), the texts 8.0.0 ships. The
+two rendered images from src/ (the tile and the marquee) name no version and no browser and are unchanged
+since 7.0.0. The Edge Add-ons logo (edge-store-logo-300x300.png and its src/ page) was removed: there is
+one store and one private listing.
 
-How the screenshots were made (run H, e2e/run-H-store-screenshots-reviewer-recipe-st1234.txt): the release build
-(extension/.output/chrome-mv3, 7.0.0, framework 6 bundled) loaded into Playwright's Chromium (Chrome for Testing 153)
-with a fresh profile, a 1280x800 viewport and the light colour scheme, driven against the mock Open OnDemand portal
-(extension/mock-ood/server.mjs) over https at localhost:8443 with a self-signed certificate, exactly as the store
-reviewer's recipe runs it: --user st1234, MOCK_LOGGED_IN=false and the mock's own home seeding (the stand-in set up as
-the account's own copy at the version the build carries, so the strip finds the tool installed and uploads nothing;
-Details reads "tool: your own copy, version 6"). There is no key: the extension read the account name the mock's
-dashboard shows and asked the real access service at beethoven-access.openspineconsortium.workers.dev, which answered
-approved:true for st1234. The site pages under https://openspineconsortium.com/beethoven/ were not published yet, so
-the harness answered the two site requests the extension makes (services.json and killlist.json) with the files the
-site build and the kill-list signer had just written into the site repository; nothing else was routed. The
-agreement was accepted on the setup page as a person does (scrolled to the end, four boxes ticked, a typed name,
-"Accept and Continue"); 01 was taken before anything was touched and 01b once the four boxes were ticked and the name
-typed, before the button was pressed (no request had gone to the vendor by then). The toolbar button was pressed on
-the portal tab with the DevTools protocol's Extensions.triggerAction (the action a click runs), and the browser's own
-permission prompt was answered with Windows UI Automation (its Allow button); no extension state was edited. Before
-that click the side panel was switched off with chrome.sidePanel.setOptions, so the background's own fallback opened
-the strip as a tab, which is what is captured at 1280x800; in Chrome and Edge a person sees the same strip in the side
-panel beside the portal. Nothing in the images was drawn by hand or composited. Each image was looked at, and the
-harness checked the text on screen in each one for a machine path, the Windows user name and the old product name:
-none appears in any of them.
+How the screenshots were made (run L, e2e/run-L-store-screenshots-reviewer-recipe-st1234.txt): the release
+build (extension/.output/chrome-mv3, 8.0.0, no framework bundled) loaded into Playwright's Chromium
+(Chrome for Testing 153) with a fresh profile, a 1280x800 viewport and the light colour scheme, driven
+against the mock Open OnDemand portal (extension/mock-ood/server.mjs) over https at localhost:8443 with a
+self-signed certificate, exactly as the store reviewer's recipe runs it (docs/store/LISTING.md): --user
+st1234, MOCK_LOGGED_IN=false and the mock's own home seeding (the account already set up on the mock's
+stand-in for the lab's shared copy, at the mock's default path /lab/shared/hpcworker/current and its
+default version 5, so the strip finds the tool and runs no install; Details reads "tool: the lab's shared
+copy, version 5"). There is no key: the extension read the account name the mock's dashboard shows and
+asked the real access service at beethoven-access.openspineconsortium.workers.dev, sending install_id with
+the check, and the service answered approved:true for st1234 (the reviewers' account is accepted from any
+installation there, so each reviewer's own installation works). services.json and killlist.json were
+answered by the harness from the files in the site repository; nothing else was routed. The agreement was
+accepted on the setup page as a person does (scrolled to the end, four boxes ticked, a typed name, "Accept
+and Continue"); 01 was taken before anything was touched and 01b once the four boxes were ticked and the
+name typed, before the button was pressed (no request had gone to the vendor by then). The toolbar button
+was pressed on the portal tab with the DevTools protocol's Extensions.triggerAction (the action a click
+runs), and the browser's own permission prompt was answered with Windows UI Automation (its Allow button);
+no extension state was edited. Before that click the side panel was switched off with
+chrome.sidePanel.setOptions, so the background's own fallback opened the strip as a tab, which is what is
+captured at 1280x800; in Chrome a person sees the same strip in the side panel beside the portal. Nothing
+in the images was drawn by hand or composited. Each image was looked at, and the harness checked the text on
+screen in each one for a machine path, the Windows user name and the old product name: none appears in any
+of them.
 
-Screenshots (1280x800 PNG), in the order suggested for the stores:
-  04-worker-online-open-in-claude.png  step 11 of 11: "Your worker is online: node01-amber-lantern."; the green Open
-      in Claude button, Copy link, Stop; the output box shows the probe submission with its path in the mock's home
-  03-sign-in-to-claude.png  step 7 of 11: the sign-in sitting is open on the cluster (the portal's shell in the strip,
-      the mock's authorize link), one box for the code, "Open the sign-in page again"
-  02-checks.png  Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip reopened
-      afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-30 01:52 UTC); kill-list of
-      2026-09-30"; check 6 ends "the tool is set up (your own copy)"
-  01-agreement-signing-dialog.png  the setup page ("Beethoven: setup") as it opens on install: the signing dialog at
-      its top, headed "Beethoven Trial Edition License Agreement (version 6) and Privacy Statement", the summary ("In
-      short") and the top edge of the full-text box
-  05-setup-page.png  the setup page after setup, from the top: "Accepted version 6 ... by "A. Student" (Chromium
-      153)" with the SHA-256 prefixes of the agreement (b03b5d26238b5188..., LICENSE.txt version 6) and of the privacy
-      statement (c224280e1a0c3549..., PRIVACY.md version 7) as this build ships them; "2. Your access" (Access
-      approved for st1234 at localhost, checked 2026-09-30 01:52 UTC, "Check my access now"; nothing to enter, no key);
-      "3. Your portal" (localhost, site profile "localhost")
+Screenshots (1280x800 PNG), in the order suggested for the store (it takes five):
+  04-worker-online-open-in-claude.png  step 11 of 11: "Your worker is online: node01-amber-lantern."; the green
+      Open in Claude button, Copy link, Stop; the output box shows the probe submission with its path in the
+      mock's home
+  03-sign-in-to-claude.png  step 7 of 11: the sign-in sitting is open on the cluster (the portal's shell in the
+      strip, the mock's authorize link), one box for the code, "Open the sign-in page again"
+  02-checks.png  Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip
+      reopened afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-30 14:49
+      UTC); kill-list of 2026-09-30"; check 6 ends "the tool is set up (the lab's shared copy)"
+  01-agreement-signing-dialog.png  the setup page ("Beethoven: setup") as it opens on install: the signing
+      dialog at its top, headed "Beethoven Trial Edition License Agreement (version 7) and Privacy
+      Statement", and the summary ("In short"), whose second point says an approval is for one installation
+      on one computer and that the check sends the random identifier the installation made for itself
+  05-setup-page.png  the setup page after setup, from the top: "Accepted version 7 ... by "A. Student"
+      (Chromium 153)" with the SHA-256 prefixes of the agreement (49d4ef3f5e82a34d..., LICENSE.txt version 7)
+      and of the privacy statement (712ce3a8756cfa1d..., PRIVACY.md version 8) as this build ships them;
+      "2. Your access" (what is sent, including this installation's identifier, "a random number Beethoven
+      made when you accepted its agreement, not taken from your computer"; one installation per approval;
+      "Access approved for st1234 at localhost, checked 2026-09-30 14:49 UTC"; "Check my access now"; nothing
+      to enter, no key); "3. Your portal" (localhost, site profile "localhost")
 
-Extra screenshots (1280x800 PNG), optional for the stores:
-  01b-agreement-statements.png  the same dialog scrolled to the four statements, all four ticked (the first reads
-      "... I agree to the Beethoven Trial Edition License Agreement (version 6, 2026-09-29) and the Privacy Statement,
-      which I have read."), the name "A. Student" typed, "Accept and Continue" enabled and not yet pressed, and "2. Your
-      access" before any portal is connected
-  03b-where-your-work-goes.png  step 8 of 11: where the work goes, the worker name, the workspace on the cluster, and
-      the statement about the workspace
-  04b-details-worker-card.png  Details > Your worker in a settled state (the strip reopened): worker "worker", job
-      100002 on node01, online; the claude.ai/code link and the session name; the Claude sign-in and Remote Control
-      answer as the job reports them; the successor job; the line "tool: your own copy, version 6" above the buttons;
-      the top of the checks below
-  05b-setup-page-settings.png  the setup page scrolled to "5. Settings" (shell host, site profile name, permission
-      mode, the two on-by-default settings) and the top of "6. Audit log"
+Extra screenshots (1280x800 PNG), optional:
+  01b-agreement-statements.png  the same dialog scrolled to the four statements, all four ticked (the first
+      reads "... I agree to the Beethoven Trial Edition License Agreement (version 7, 2026-09-30) and the
+      Privacy Statement, which I have read."), the name "A. Student" typed, "Accept and Continue" enabled and
+      not yet pressed, and "2. Your access" before any portal is connected
+  03b-where-your-work-goes.png  step 8 of 11: where the work goes, the worker name, the workspace on the
+      cluster, and the statement about the workspace
+  04b-details-worker-card.png  Details > Your worker in a settled state (the strip reopened): worker "worker",
+      job 100002 on node01, online; the claude.ai/code link and the session name; the Claude sign-in and
+      Remote Control answer as the job reports them; the successor job; the line "tool: the lab's shared copy,
+      version 5" above the buttons; the top of the checks below
+  05b-setup-page-settings.png  the setup page scrolled to "5. Settings" (shell host, site profile name,
+      permission mode, the two on-by-default settings) and the top of "6. Audit log"
 
-Rendered images (Edge headless, --headless=new --screenshot at the stated window size, from the HTML in src/, which
-now names Beethoven; the logo and the line under the name are unchanged):
-  promo-tile-440x280.png  (440x280)  Chrome Web Store small promo tile and Edge small promotional tile
-  marquee-1400x560.png  (1400x560)  Chrome Web Store marquee and Edge large promotional tile
-  edge-store-logo-300x300.png  (300x300)  Edge Add-ons store logo (Partner Center requires 300x300); it carries no text,
-      so the new rendering is byte-identical to the old one
-  src/tile-440x280.html, src/marquee-1400x560.html, src/edge-store-logo-300x300.html  the pages they were rendered from
+Rendered images (unchanged since 7.0.0; Edge headless, --headless=new --screenshot at the stated window size,
+from the HTML in src/):
+  promo-tile-440x280.png  (440x280)  Chrome Web Store small promotional tile
+  marquee-1400x560.png  (1400x560)  Chrome Web Store marquee
+  src/tile-440x280.html, src/marquee-1400x560.html  the pages they were rendered from
 
-The request logs in e2e/ (each lists every request the browser made, who made it, the vendor requests with their
-bodies and answers, and every line typed into the portal's shell and what it printed):
-  run-H-store-screenshots-reviewer-recipe-st1234.txt  7.0.0, the reviewer recipe (own copy at localhost): the source of
-      all nine screenshots; the access check went to beethoven-access.openspineconsortium.workers.dev with product
-      "bridge" and version "7.0.0"; no request to any old address; online; seventeen checks OK.
-  run-F-shared-copy-st1234.txt  7.0.0, the lab's shared copy: the mock reached at https://ondemand.wayne.localhost:8443
-      (Chromium resolves *.localhost to this machine, and the hostname makes the site "wayne", as
-      ondemand.grid.wayne.edu does) with --shared-install at the path profiles/wayne.json names and --shared-version 6:
-      one install line, no framework file uploaded, Details "tool: the lab's shared copy, version 6", check 6 "(the
-      lab's shared copy)", online, seventeen checks OK, the access check on the new host. Evidence only, no store image:
-      the audit log rows there show the Files requests for the shared copy's VERSION with its full cluster path, which
-      carries the cluster folder's old name (the log's NAME-SCAN lines count them); nothing else on screen did.
-  run-G-not-approved-zz9999.txt  7.0.0, an account not on the approved list: the access check on the new host answered
-      approved:false; the strip's one button reads "Ask for access" and opened
-      https://openspineconsortium.com/beethoven/request.html?access_id=zz9999 (the page is not published yet, so only
-      the address was checked); nothing was submitted to the scheduler in the 75 s that followed.
-  run-A to run-E  the 4.0.0 and 5.0.0 runs under the product's former name, kept as they were written: they are the
-      record of those builds, and rewriting them would falsify them.
+The request logs in e2e/ for 8.0.0 (each lists every request the browser made, who made it, the vendor
+requests with their bodies and answers, and every line typed into the portal's shell and what it printed):
+  run-I-approved-bound-st1234.txt  approved and bound, on the lab's shared copy: the mock reached at
+      https://ondemand.wayne.localhost:8443 (the hostname makes the site "wayne") with --shared-install at the
+      path profiles/wayne.json names and --shared-version 8, and services.json pointed at the mock's access
+      stub (one installation per approved account). The check carried install_id; one install line, no
+      framework file uploaded; Details "tool: the lab's shared copy, version 8"; online; seventeen checks OK.
+      Afterwards the stub, asked directly, approved the same identifier, refused another with
+      "other_installation" and refused a check without one with "update_required".
+  run-J-second-installation-st1234.txt  a second installation: a fresh browser profile, the same mock user, the
+      stub started with st1234 already bound to run I's identifier. The service answered "other_installation";
+      the strip said "This account is already set up on another computer. Ask your lab lead to move it here."
+      with no button (run-J-strip-other-installation.png is that strip, as evidence, not a store image);
+      in the 75 s watched afterwards nothing was typed into the portal's shell and no job was submitted; the
+      stub still approved run I's installation.
+  run-K-no-install-id-update-required-st1234.txt  a client that sends no installation identifier (a build
+      before 8.0.0), played with curl against the stub: "update_required"; with --install-optional (what the
+      deployed service does while REQUIRE_INSTALL_ID is "0") it is approved, and a second identifier is still
+      refused.
+  run-L-store-screenshots-reviewer-recipe-st1234.txt  the store reviewer's recipe against the real access
+      service: the source of all nine screenshots; the check went to beethoven-access with product "bridge",
+      version "8.0.0" and install_id; online; seventeen checks OK.
+  run-M-real-service-one-installation-st1234.txt  the rule on the real service, with curl and admin.mjs: the
+      reviewers' exemption on st1234 was switched off for the run, a fresh identifier was approved and bound,
+      a second one was refused with "other_installation" (the maintainer's second-installation e-mail follows
+      from that, at most once a day), and then the seat was reset (admin.mjs reset-seat st1234) and the
+      exemption put back (admin.mjs seat-rule st1234 any), so the reviewers' recipe keeps working; two more
+      fresh identifiers were then approved without binding.
+  run-A to run-H  the 4.0.0 to 7.0.0 runs, kept as they were written: they are the record of those builds.
 
 Caveats
 - The strip is captured as a tab, not in the side panel (see above); the content is the same page.
-- The agreement text inside the dialog names the licensor (the copyright line and the parties clause of LICENSE.txt,
-  the first lines of PRIVACY.md); none of it is inside the visible part of 01 or 01b (01 shows only the top edge of
-  the full-text box, 01b none of it). The harness's text record for 01 lists that text because the box's top edge is
-  in view; the image shows none of it.
-- 02, 04b: "Connected - phone - HEAD" and "student@example.edu" are the mock's stand-in Remote Control and Claude
-  sign-in values, not the reviewer's or anyone's account.
-- 03, 04: the claude.ai tabs the extension opened during the run (the mock's sign-in URL with a mock client id, and
-  the mock's environment link) are not in any image; the e2e log says which of their requests were stubbed.
+- The mock's stand-in for the lab's shared copy reports version 5 (the mock's default, which the reviewer's
+  recipe uses); the real shared copy at Wayne State is framework 8. Run I used --shared-version 8.
+- The agreement text inside the dialog names the licensor (the copyright line and the parties clause of
+  LICENSE.txt, the first lines of PRIVACY.md); none of it is inside the visible part of 01 or 01b.
+- 02, 04b: "Connected - phone - HEAD" and "student@example.edu" are the mock's stand-in Remote Control and
+  Claude sign-in values, not the reviewer's or anyone's account.
+- 03, 04: the claude.ai tabs the extension opened during the run are not in any image; the e2e log says which
+  of their requests were stubbed.
 - 03, 03b, 04: the output box and the terminal show the tool's command name and paths in the mock's home
   (/home/st1234/.hpcworker/...), as the tool prints them; the extension shows raw command output as it is.
-- The time stamps in 02, 04b, 05 and 05b are this machine's local time (US Eastern) as the extension shows them; the
-  "checked ... UTC" in check 1 and the access card, and the audit log's times, are UTC.
+- The time stamps in 02, 04b, 05 and 05b are this machine's local time (US Eastern) as the extension shows
+  them; the "checked ... UTC" in check 1 and the access card, and the audit log's times, are UTC.
 
-Not here: the 128x128 store icon is extension/public/icon/128.png (also inside every package).
-This folder is outside the build (wxt publicDir is public/) and excluded from the AMO sources zip
+Not here: the 128x128 store icon is extension/public/icon/128.png (also inside the package).
+This folder is outside the build (wxt publicDir is public/) and excluded from the sources zip
 (zip.excludeSources in wxt.config.ts), e2e/ included.

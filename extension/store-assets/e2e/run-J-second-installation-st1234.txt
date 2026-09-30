@@ -1,0 +1,132 @@
+Beethoven 8.0.0 end to end, run J (a second installation of the same approved account: a fresh browser profile, the mock's access stub with st1234 already bound to run I's installation), 2026-09-30
+
+Setup: the release build extension/.output/chrome-mv3 (8.0.0, no framework bundled) in Playwright Chromium (Chrome for
+Testing 153.0.8010.12), headless=false, a fresh persistent profile with the extension pinned; the mock portal
+(extension/mock-ood/server.mjs) over https, reached at https://ondemand.wayne.localhost:8443 (Chromium resolves *.localhost to this machine; the hostname makes the site "wayne", as ondemand.grid.wayne.edu does),
+with --user st1234 --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current --shared-version 8 --seat st1234=16c70cd16774f3e7d8806896d98bb533 and MOCK_LOGGED_IN=false.
+The site pages are not published yet: https://openspineconsortium.com/beethoven/services.json and /beethoven/killlist.json were
+answered by the harness (route.fulfill) with the files the site build and the signer wrote into the site repository
+(openspineconsortium.github.io/beethoven/), with access_check pointed at the mock's stub https://ondemand.wayne.localhost:8443/beethoven/access_check.
+The toolbar button was pressed on the portal tab with CDP Extensions.triggerAction (the action a click runs); the side panel
+was disabled first, so the background's own fallback opened the strip as a tab; the browser's permission prompt was
+answered with Windows UI Automation (Allow). claude.ai / claude.com / anthropic.com requests the harness could intercept were
+answered locally (STUB lines); a tab the extension opens with tabs.create is attached after its first request, so that one
+request is not intercepted. Times are UTC; "+s" is seconds since the harness started. Headers are not logged; the WebSocket
+token is redacted; lines typed into the portal's shell (SHELL-IN) and what it printed (SHELL-OUT) come from the WebSocket frames,
+with the pasted sign-in code redacted; the extension's own file loads (chrome-extension://) are counted, not listed.
+
+Summary
+  acceptance record written:                   2026-09-30 14:38:12.289  +  20.2 s; vendor requests before it: 0
+  agreement accepted:                          version 7; affirmation 1: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 7, 2026-09-30) and the Privacy Statement, which I have read.
+  first vendor request:                        2026-09-30 14:38:12.311  GET https://openspineconsortium.com/beethoven/killlist.json
+  access check:                                POST https://ondemand.wayne.localhost:8443/beethoven/access_check (content-type text/plain;charset=UTF-8; cookie header none) body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"} -> 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+  access check:                                POST https://ondemand.wayne.localhost:8443/beethoven/access_check (content-type text/plain;charset=UTF-8; cookie header none) body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"} -> 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+  every access check went to the stub:  yes (2 POST(s))
+  every access check carried install_id:      yes
+  requests to an old address (/ashley/*, ashley-service): 0
+  site profile name the extension used:        wayne (from the hostname ondemand.wayne.localhost)
+  the strip at the access step:                This account is already set up on another computer. Ask your lab lead to move it here.
+  primary buttons on that step:                0; visible buttons in the strip: []
+  after 75 s: jobs submitted 0; lines typed into the shell 0; the strip still says: This account is already set up on another computer. Ask your lab lead to move it here.
+  access record in storage:                    {"access_id":"st1234","approved":false,"checked_at":"2026-09-30T14:38:16.316Z","last_attempt_at":"2026-09-30T14:38:16.316Z","portal":"ondemand.wayne.localhost","reason":"other_installation","request_page":"https://openspineconsortium.com/beethoven/request.html","v":1}
+  the stub asked directly, run I's installation: install_id 16c70cd16774f3e7d8806896d98bb533 -> 200 {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:39:33.134Z","until":null}
+  the stub asked directly, this (run J's) installation: install_id fc8597c3fb7b302dcc30c8786374c8ec -> 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+  the old name in page text (whole pages, not only what is on screen):
+      strip: 0
+
+Events and requests, in order
+14:37:52.648 +   0.6 s  SETUP        mock portal: node mock-ood/server.mjs --port 8443 --host localhost --user st1234 --home <path on this machine> --cert <path on this machine> --key <path on this machine> --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current --shared-version 8 --seat st1234=16c70cd16774f3e7d8806896d98bb533; MOCK_LOGGED_IN=false
+14:37:52.650 +   0.6 s  SETUP        mock says: home dir:  <path on disk>  (shown to the extension as /home/st1234; the seeded tool prints it as /home/st1234)
+14:37:52.650 +   0.6 s  SETUP        mock says: shared:    <path on disk> (the lab's shared copy of the stand-in tool, shown as /rs/rs_grp_oschome/shared/beethoven/hpcworker/current)
+14:37:52.650 +   0.6 s  SETUP        mock says: tool:      not set up (the strip runs the shared install when the site's bundled profile names /rs/rs_grp_oschome/shared/beethoven/hpcworker/current: open the mock at https://ondemand.wayne.localhost:8443 for wayne with --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current, or set the site profile name in Details; otherwise it says the lab's shared copy is needed)
+14:37:52.650 +   0.6 s  SETUP        mock says: access:    https://localhost:8443/beethoven/access_check (tests only; approves st1234, one installation each; already bound: st1234)
+14:37:52.651 +   0.6 s  SETUP        the mock home before the run: []
+14:37:54.355 +   2.3 s  SETUP        Chromium 153.0.8010.12 with .output/chrome-mv3 (8.0.0, no framework bundled), fresh profile
+14:37:54.645 +   2.6 s  SETUP        extension id ljkjllefjpjebnnghebkppmdfmnakjoo
+14:38:10.874 +  18.8 s  SETUP-PAGE   page title "Beethoven: setup"
+14:38:10.874 +  18.8 s  CHECK        vendor requests before the agreement was accepted: 0
+14:38:11.304 +  19.2 s  DIALOG       heading: Beethoven Trial Edition License Agreement (version 7) and Privacy Statement
+14:38:11.317 +  19.2 s  DIALOG       first lines of the full text: BEETHOVEN TRIAL EDITION LICENSE AGREEMENT / Version 7, 2026-09-30. Applies to the Trial Edition of Beethoven 8.0.0 and later versions that ship / this text, as distributed through its private listing on the Chrome Web Store, which only the Google
+14:38:12.256 +  20.2 s  DIALOG       tick label 1: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 7, 2026-09-30) and the Privacy Statement, which I have read.
+14:38:12.261 +  20.2 s  DIALOG       boxes ticked 4/4; name "A. Student"; "Accept and Continue" enabled: true
+14:38:12.262 +  20.2 s  CHECK        vendor requests before the agreement was accepted (just before the button): 0
+14:38:12.262 +  20.2 s  ACCEPT       pressed "Accept and Continue"
+14:38:12.311 +  20.2 s  REQUEST      GET https://openspineconsortium.com/beethoven/killlist.json  [extension background (service worker); fetch] -> 200 answer { "v": 1, "kid": "k1", "issued": 1790735333, "revoked_versions": [], "revoked_lids": [], "message": "Beethoven is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDczNTMzMywicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJCZWV0aG92ZW4gaXMgY3VycmVudC4ifQ.AeGob
+14:38:12.314 +  20.2 s  ROUTE        GET https://openspineconsortium.com/beethoven/killlist.json answered from the site repository's beethoven/killlist.json (392 bytes)
+14:38:12.320 +  20.2 s  VENDOR-REQ   GET https://openspineconsortium.com/beethoven/killlist.json from extension background (service worker); cookie header none
+14:38:12.331 +  20.3 s  VENDOR-RES   200 https://openspineconsortium.com/beethoven/killlist.json answer { "v": 1, "kid": "k1", "issued": 1790735333, "revoked_versions": [], "revoked_lids": [], "message": "Beethoven is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDczNTMzMywicmV2b2tlZF92ZXJzaW9ucyI6W10sInJldm9rZWRfbGlkcyI6W10sIm1lc3NhZ2UiOiJCZWV0aG92ZW4gaXMgY3VycmVudC4ifQ.AeGob
+14:38:12.442 +  20.4 s  ACCEPT       acceptance record in storage: terms_version 7, accepted_at 2026-09-30T14:38:12.289Z, license_sha256 49d4ef3f5e82a34d5bbd5361f6eabb0ad061d23752cb56d7294a539628ca692b, privacy_sha256 712ce3a8756cfa1dfbea6166c244a579c2a398cf60adbd116203871de762753d, button "Accept and Continue"
+14:38:12.443 +  20.4 s  ACCEPT       affirmation 1 as recorded: By ticking this box and choosing "Accept and Continue" below, I agree to the Beethoven Trial Edition License Agreement (version 7, 2026-09-30) and the Privacy Statement, which I have read. (checked true)
+14:38:12.574 +  20.5 s  REQUEST      GET https://ondemand.wayne.localhost:8443/login?go=1&redirect=%2Fpun%2Fsys%2Fdashboard%2F  [tab navigation; document] -> 302
+14:38:12.606 +  20.5 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [tab navigation; document] -> 200
+14:38:12.794 +  20.7 s  PORTAL       signed in; the dashboard says "Logged in as st1234"
+14:38:12.805 +  20.7 s  HARNESS      side panel disabled (so the strip opens as a tab through the background fallback)
+14:38:13.328 +  21.3 s  CLICK        toolbar action on the portal tab (Extensions.triggerAction, tab target ED328D3F...)
+14:38:16.042 +  24.0 s  PROMPT       pressed 'Allow' (invoke) in window 'Beethoven - Google Chrome for Testing' (pid 3472)
+14:38:16.045 +  24.0 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+14:38:16.046 +  24.0 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+14:38:16.063 +  24.0 s  GRANT        origin https://ondemand.wayne.localhost:8443 granted: true; strip tab opened: true
+14:38:16.072 +  24.0 s  REQUEST      GET https://openspineconsortium.com/beethoven/services.json  [extension background (service worker); fetch] -> 200 answer { "access_check": "https://ondemand.wayne.localhost:8443/beethoven/access_check", "request": "https://beethoven-access.openspineconsortium.workers.dev/request", "revocation": "https://beethoven-access.openspineconsortium.workers.dev/revoked", "allowlist": "https://beethoven-access.openspineconsortiu
+14:38:16.073 +  24.0 s  ROUTE        GET https://openspineconsortium.com/beethoven/services.json answered from the site repository's beethoven/services.json (653 bytes)
+14:38:16.077 +  24.0 s  VENDOR-REQ   GET https://openspineconsortium.com/beethoven/services.json from extension background (service worker); cookie header none
+14:38:16.080 +  24.0 s  STRIP        page title "Beethoven"
+14:38:16.086 +  24.0 s  REQUEST      POST https://ondemand.wayne.localhost:8443/beethoven/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"} answer {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+14:38:16.088 +  24.0 s  VENDOR-REQ   POST https://ondemand.wayne.localhost:8443/beethoven/access_check from extension background (service worker) body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"}; cookie header none
+14:38:16.089 +  24.0 s  VENDOR-RES   200 https://openspineconsortium.com/beethoven/services.json answer { "access_check": "https://ondemand.wayne.localhost:8443/beethoven/access_check", "request": "https://beethoven-access.openspineconsortium.workers.dev/request", "revocation": "https://beethoven-access.openspineconsortium.workers.dev/revoked", "allowlist": "https://beethoven-access.openspineconsortiu
+14:38:16.090 +  24.0 s  SETTINGS     portal settings on file: {"connected_at":"2026-09-30T14:38:15.954Z","hostname":"ondemand.wayne.localhost","origin":"https://ondemand.wayne.localhost:8443","shell_host":"default","site":"wayne"}
+14:38:16.114 +  24.0 s  VENDOR-RES   200 https://ondemand.wayne.localhost:8443/beethoven/access_check answer {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+14:38:16.131 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+14:38:16.136 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+14:38:16.141 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files  [page script on the portal tab; fetch] -> 302
+14:38:16.143 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+14:38:16.156 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+14:38:16.158 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+14:38:16.159 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234  [page script on the portal tab; fetch] -> 200
+14:38:16.199 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.203 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.208 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.214 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.218 +  24.1 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.262 +  24.2 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.274 +  24.2 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.288 +  24.2 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+14:38:16.319 +  24.2 s  REQUEST      POST https://ondemand.wayne.localhost:8443/beethoven/access_check  [extension background (service worker); fetch] -> 200 body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"} answer {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+14:38:16.321 +  24.3 s  VENDOR-REQ   POST https://ondemand.wayne.localhost:8443/beethoven/access_check from extension background (service worker) body {"v":1,"access_id":"st1234","portal":"ondemand.wayne.localhost","product":"bridge","version":"8.0.0","install_id":"fc8597c3fb7b302dcc30c8786374c8ec"}; cookie header none
+14:38:16.330 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.341 +  24.3 s  VENDOR-RES   200 https://ondemand.wayne.localhost:8443/beethoven/access_check answer {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+14:38:16.347 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.356 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.392 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.398 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/  [page script on the portal tab; fetch] -> 200
+14:38:16.413 +  24.3 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.435 +  24.4 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.445 +  24.4 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.506 +  24.4 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.513 +  24.4 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:16.518 +  24.4 s  REQUEST      GET https://ondemand.wayne.localhost:8443/pun/sys/dashboard/files/fs/home/st1234/.hpcworker  [page script on the portal tab; fetch] -> 404
+14:38:17.113 +  25.0 s  ACCESS       record: {"access_id":"st1234","approved":false,"checked_at":"2026-09-30T14:38:16.316Z","last_attempt_at":"2026-09-30T14:38:16.316Z","portal":"ondemand.wayne.localhost","reason":"other_installation","request_page":"https://openspineconsortium.com/beethoven/request.html","v":1}
+14:38:17.117 +  25.0 s  ACCESS       services on file: {"access_check":"https://ondemand.wayne.localhost:8443/beethoven/access_check","fetched_at":"2026-09-30T14:38:16.080Z","request_page":"https://openspineconsortium.com/beethoven/request.html"}
+14:38:17.158 +  25.1 s  STRIP        [access step] This account is already set up on another computer. Ask your lab lead to move it here.
+14:38:17.201 +  25.1 s  STRIP        status "This account is already set up on another computer. Ask your lab lead to move it here."; primary buttons: 0; visible buttons in the strip: []
+14:38:17.201 +  25.1 s  INSTALL-ID   this installation's identifier fc8597c3fb7b302dcc30c8786374c8ec; run I's (on the seat) 16c70cd16774f3e7d8806896d98bb533
+14:38:18.059 +  26.0 s  SHOT         evidence J-strip-other-installation.png viewport 1280x800; "Beethoven" on screen 1x; on-screen text clean
+14:38:18.068 +  26.0 s  NAME-SCAN    the strip at the access step: 0 occurrence(s) of the old name in the page text
+14:38:18.068 +  26.0 s  WAIT         waits 75 s (one poll alarm, where "start my worker when I open my portal" runs) before reading the job list
+14:39:33.072 + 101.0 s  JOBS         the mock's job list (no jobs.json: nothing was ever submitted): []
+14:39:33.079 + 101.0 s  STRIP        still: This account is already set up on another computer. Ask your lab lead to move it here.
+14:39:33.079 + 101.0 s  SHELL        lines typed into the portal's shell: 0
+14:39:33.083 + 101.0 s  ACCESS       record after the wait: {"access_id":"st1234","approved":false,"checked_at":"2026-09-30T14:38:16.316Z","last_attempt_at":"2026-09-30T14:38:16.316Z","portal":"ondemand.wayne.localhost","reason":"other_installation","request_page":"https://openspineconsortium.com/beethoven/request.html","v":1}
+14:39:33.143 + 101.1 s  STUB-CHECK   run I's installation: install_id 16c70cd16774f3e7d8806896d98bb533 -> 200 {"approved":true,"access_id":"st1234","checked":"2026-09-30T14:39:33.134Z","until":null}
+14:39:33.148 + 101.1 s  STUB-CHECK   this (run J's) installation: install_id fc8597c3fb7b302dcc30c8786374c8ec -> 200 {"approved":false,"access_id":"st1234","requestPage":"https://openspineconsortium.com/beethoven/request.html","reason":"other_installation"}
+14:39:33.148 + 101.1 s  HOME         the mock home after the run: []
+14:39:33.148 + 101.1 s  HOME         .hpcworker/shared: absent
+14:39:33.149 + 101.1 s  HOME         .hpcworker/VERSION: absent
+
+Extension file loads (chrome-extension://, not listed): 10
+Requests by initiator and host:
+     2  extension background (service worker) -> ondemand.wayne.localhost:8443
+     2  extension background (service worker) -> openspineconsortium.com
+    28  page script on the portal tab -> ondemand.wayne.localhost:8443
+     2  tab navigation -> ondemand.wayne.localhost:8443
+
+Store screenshots taken in this run: none (evidence images kept outside the repository); on-screen leaks (machine path, user name, old name): []

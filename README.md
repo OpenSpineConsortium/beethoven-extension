@@ -1,13 +1,13 @@
 # Beethoven
 
-The public name is **Beethoven** (decided 2026-09-29): the extension, its store listings, its pages at
-`https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a reviewer sees
-say Beethoven, and it is not an Anthropic product. The repository is `OpenSpineConsortium/beethoven`
-(it was called ashley-bridge until 2026-09-30), and a few internal names stay because changing them would
-break something installed or show nothing:
-the kill-list's format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster
-(never shown to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the
-extension sends to the access service. The name lives in one constant per place: `PRODUCT_NAME` in
+The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
+pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
+reviewer sees say Beethoven, and it is not an Anthropic product. The repository is
+`OpenSpineConsortium/beethoven` (it was called ashley-bridge until 2026-09-30), and a few internal
+names stay because changing them would break something installed or show nothing: the kill-list's
+format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster (never shown
+to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the extension sends to
+the access service. The name lives in one constant per place: `PRODUCT_NAME` in
 `extension/src/core/terms.ts` and the site map in the site repository's `tools/build_site.py`.
 
 Beethoven puts a student's own Claude Code session, running as an ordinary batch job on their
@@ -60,10 +60,13 @@ Beethoven extension     ──▶ https://ondemand.<university>.edu ──▶ lo
                               └────────── shared storage <state_dir>/<run>/ ◀──────────────────────────┘
 ```
 
-What a student does, in order, after installing the extension from the browser's store and accepting
-the agreement once on its setup page (there is no key and nothing to paste: their own sign-in to the
-portal identifies them, and the extension confirms with the vendor's access service that the account
-the portal shows is approved; if it is not, the panel's one button is *Ask for access*):
+What a student does, in order, after installing the extension from its private listing on the Chrome
+Web Store (open only to the Google accounts of students the maintainer approved; there is no
+download and no other store) and accepting the agreement once on its setup page (there is no key and
+nothing to paste: their own sign-in to the portal identifies them, and the extension confirms with
+the vendor's access service that the account the portal shows is approved on this installation, one
+installation per approved account; if it is not approved, the panel's one button is *Ask for
+access*):
 
 1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
    university requires it) and keep the tab open.
@@ -142,11 +145,13 @@ From the report's "deliberately absent" list and its security controls:
 - No durable secret in extension storage. Connection state lives in `storage.session`; the audit log
   of every portal request stays on the device and is never transmitted.
 - No transmission of command text, file paths, prompts, job output, portal cookies or tokens to the
-  vendor. The only thing sent to the vendor about the student is the approval check (the account name
-  the portal's dashboard shows, the portal hostname, the product and the version), answered yes or no
-  by the access service; the only other requests to the vendor's site are the daily downloads of the
-  service address (`services.json`) and the signed withdrawn-versions list. All of them are made only
-  after the agreement is accepted. There is no licence key: see `docs/TESTERS.md` for the flow.
+  vendor. The only thing sent to the vendor about the student is the approval check (the account
+  name the portal's dashboard shows, the portal hostname, the product, the version and the random
+  identifier the extension made for its installation), answered yes or no by the access service,
+  which binds an approved account to the first installation that asks and refuses any other; the
+  only other requests to the vendor's site are the daily downloads of the service address
+  (`services.json`) and the signed withdrawn-versions list. All of them are made only after the
+  agreement is accepted. There is no licence key: see `docs/TESTERS.md` for the flow.
 
 ## Status
 
@@ -170,12 +175,16 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 7.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 8.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
-Beethoven, with new public addresses and nothing new about data); the framework's `VERSION` file is 6, and the lab's shared copy at Wayne State is v6;
-the agreement `LICENSE.txt` is version 6 and the extension's `TERMS_VERSION`
-(`extension/src/core/terms.ts`) is 6 to match; `PRIVACY.md` is version 7. All integers; a changed text
-moves its version with it.
+Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
+all, sets an account up only from the lab's shared copy, sends its installation's random identifier
+with the approval check (one installation per approved account) and is offered only through a
+private Chrome Web Store listing); the framework's `VERSION` file is 8, and the lab's shared copy at
+Wayne State is the version `tools/deploy_shared.sh` last published (the panel shows it under
+*Details*); the agreement `LICENSE.txt` is version 7 and the extension's `TERMS_VERSION`
+(`extension/src/core/terms.ts`) is 7 to match; `PRIVACY.md` is version 8. All integers; a changed
+text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -199,15 +208,18 @@ cd extension
 npm ci                 # pinned versions from package-lock.json
 npm run typecheck      # tsc --noEmit
 npm test               # vitest: 130+ tests, starts the mock portal itself
-npm run build          # -> .output/chrome-mv3 (Chrome, Edge) and .output/firefox-mv2 (Firefox)
-npm run zip:all        # -> .output/beethoven-<version>-{chrome,firefox,edge,safari}.zip + -sources.zip
+npm run build          # -> .output/chrome-mv3 (Chrome: what ships) and .output/firefox-mv2 (built, not shipped)
+npm run zip:all        # -> .output/beethoven-<version>-{chrome,firefox,edge,safari}.zip + -sources.zip; only the chrome zip is uploaded
 ```
 
-`npm run build` first runs `scripts/sync-framework.mjs`, which copies `../framework/`, `../LICENSE.txt`
-and `../PRIVACY.md` into `public/` and stops if the agreement's "Version N" line disagrees with
-`TERMS_VERSION` in `src/core/terms.ts`. Load `.output/chrome-mv3` unpacked in Chrome or Edge, or
-`.output/firefox-mv2/manifest.json` as a temporary add-on in Firefox, to try a build by hand
-(`docs/store/TEST_BEFORE_UPLOAD.md`).
+`npm run build` first runs `scripts/sync-profiles.mjs`, which copies the site profiles
+(`../framework/profiles/*.json`, without their free-text `notes`), `../LICENSE.txt` and
+`../PRIVACY.md` into `public/` and stops if the agreement's "Version N" line disagrees with
+`TERMS_VERSION` in `src/core/terms.ts`. No other framework file enters the package (8.0.0); `npm
+test` after a build checks that, and that the package's JavaScript is minified with no comment or
+source map. Load `.output/chrome-mv3` unpacked in Chrome to try a build by hand
+(`docs/store/TEST_BEFORE_UPLOAD.md`); students never load a build by hand: they install from the
+private listing.
 
 **Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about
 seven minutes under Git Bash on the Windows laptop, measured 2026-09-29; a few tests skip without a
@@ -230,10 +242,12 @@ two ways (`docs/ARCHITECTURE.md` 2.1):
   own copy already there is moved aside into `~/.hpcworker/replaced/`, never deleted.
   `hpcworker version` then says "7 (shared copy at ...)" (the shared copy's version; 7 since
   2026-09-30). The extension never replaces or updates a shared copy.
-- *The student's own copy*, at every other site and as the fallback when the account cannot use the
-  shared copy: copy `framework/` to the cluster and run
-  `bash framework/bin/hpcworker install --profile <site>`; the extension does the same through the
-  portal's Files app, and again when its bundled `framework/VERSION` is newer than the installed one.
+- *The student's own copy*: copy `framework/` to the cluster and run
+  `bash framework/bin/hpcworker install --profile <site>` by hand. Extension builds before 8.0.0 did
+  this through the portal's Files app at sites with no shared copy; 8.0.0 carries no framework and
+  uploads nothing. Where the site profile names no shared copy, or the account cannot use it, the
+  panel says the lab's shared copy is needed and to ask the lab lead; an account that already has its
+  own copy keeps running it.
 
 Either way the install adds `~/.hpcworker/bin` to PATH through a managed block in `~/.bashrc`, so a
 new terminal finds `hpcworker`; a terminal opened before the install needs
@@ -251,7 +265,11 @@ repository of Beethoven for VS Code (`OpenSpineConsortium/beethoven-vscode`, the
 there, not from here, under two names with the same code, stores and secrets:
 `beethoven-access.openspineconsortium.workers.dev` for 7.0.0 and later, and the old
 `ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 (the VS Code edition
-before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0.0 to 6.0.0.
+before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0.0 to 6.0.0. It
+answers yes or no for one account on one installation: an approved account is bound to the first
+installation that asks, any other is refused until the maintainer moves the approval, and a build
+that sends no installation identifier (before 8.0.0) is refused once the service's
+`REQUIRE_INSTALL_ID` is on (`docs/store/SUBMISSION.md`, section 2).
 
 **Releasing a version.**
 
@@ -259,18 +277,19 @@ before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0
    move to the next whole number; a changed agreement or privacy statement moves its own "Version N"
    line and, for the agreement, `TERMS_VERSION`/`TERMS_DATE` in `src/core/terms.ts`; a changed framework
    moves `framework/VERSION` and the `VERSION=` line at the top of `framework/bin/hpcworker`.
-2. `npm run typecheck && npm test && npm run build && npm run zip:all` in `extension/`, and the framework
-   tests. A changed framework is then published to each site's shared copy with
+2. `npm run typecheck && npm run build && npm run zip && npm test` in `extension/` (the test run
+   after the zips also checks the packages themselves), and the framework tests. A changed framework is then published to each site's shared copy with
    `bash tools/deploy_shared.sh`, before the extension that needs it reaches students: the extension
    runs whatever the lab's copy is.
-3. Copy the zips into `release/<version>/`, write `SHA256SUMS.txt` (`sha256sum *.zip > SHA256SUMS.txt`)
-   and a short `README.md` there (see `release/6.0.0/`), commit, tag `v<version>`, push both remotes:
+3. Copy the Chrome zip (the only package from 8.0.0) into `release/<version>/`, write `SHA256SUMS.txt`
+   (`sha256sum *.zip > SHA256SUMS.txt`) and a short `README.md` there (see `release/8.0.0/`), commit, tag `v<version>`, push both remotes:
    `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
    (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
-   maintainer's machine that is WSL). Attach the zips and `SHA256SUMS.txt` to a GitHub release named
-   `v<version>` on the organisation's copy, which is the download page developers and testers are given.
-4. Test by hand (`docs/store/TEST_BEFORE_UPLOAD.md`), then upload store by store
-   (`docs/store/SUBMISSION.md`, texts in `docs/store/LISTING.md`), then rebuild and push the site pages if
+   maintainer's machine that is WSL). Attach the zip and `SHA256SUMS.txt` to a GitHub release named
+   `v<version>` on the organisation's private copy, for the record; it is not a download page for
+   students, who install only from the private listing.
+4. Test by hand (`docs/store/TEST_BEFORE_UPLOAD.md`), then upload the chrome zip to the private
+   Chrome Web Store item (`docs/store/SUBMISSION.md`, texts in `docs/store/LISTING.md`), then rebuild and push the site pages if
    a text changed.
 
 ## Documents
@@ -285,18 +304,18 @@ before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0
   framework's cluster-side checks.
 - `docs/OPEN_QUESTIONS.md`: the 12 ranked open questions, their first tests and results, and the
   live-portal findings of 2026-09-29.
-- `docs/STORE_LISTING.md`: single-purpose statement, permission justifications, privacy answers per
-  store, reviewer access, the 13-item checklist.
-- `docs/store/`: the texts to paste into each store (`LISTING.md`), the submission steps
-  (`SUBMISSION.md`) and the hand test before upload (`TEST_BEFORE_UPLOAD.md`).
+- `docs/STORE_LISTING.md`: single-purpose statement, permission justifications, privacy answers,
+  reviewer access and the checklist for the one private Chrome Web Store listing.
+- `docs/store/`: the texts to paste into the Chrome Web Store dashboard (`LISTING.md`), the
+  submission steps (`SUBMISSION.md`) and the hand test before upload (`TEST_BEFORE_UPLOAD.md`).
 - `docs/PUBLISHING_SITE.md`: the public pages, the services file and the kill-list, how they are built,
   signed and checked, and what stays at the old addresses.
 - `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
-- `docs/MAC_AND_SAFARI.md`: what the Safari edition needs.
+- `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; nothing to paste.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 6; the extension's
-  `TERMS_VERSION` is 6) and the privacy statement (version 7).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 7; the extension's
+  `TERMS_VERSION` is 7) and the privacy statement (version 8).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

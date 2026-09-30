@@ -7,14 +7,14 @@ export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {
 export const REVOKED_KEY = 'bridge.revoked'; //  {revoked, message}: what the chokepoint consults before a command
 export const ACCESS_KEY = 'bridge.access'; //    the access service's last word on this account at this portal (licensing/access.ts AccessRecord)
 export const SERVICES_KEY = 'bridge.services'; // services.json as last read, {fetched_at, access_check, request_page}
-export const INSTALL_ID_KEY = 'bridge.install_id';
+export const INSTALL_ID_KEY = 'bridge.install_id'; // 32 random hex characters, made once per installation (ext/storage.ts installId); sent in the approval check
 export const IDENTITY_KEY = 'bridge.identity'; // {username, seen_at}: the account name the portal's dashboard last showed for the signed-in session (never typed)
 export const CHECKLIST_KEY = 'bridge.checklist'; // {drive_connected_at}: the student's own "done" ticks for steps outside this extension
 export const STATEMENTS_KEY = 'bridge.statements'; // {[workspaces/<name>]: Acknowledgement}: the data statement, per workspace, with the text version it was made on
 export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment links this browser profile already opened by itself
 export const LOGIN_SEEN_KEY = 'bridge.loginSeen'; // {at, detail}: when the login terminal in this browser last reported SIGNED-IN
 export const PROBE_KEY = 'bridge.probe'; //      {submitted_at, job}: the probe job the strip submitted by itself, so it is not submitted again while it runs
-export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail, mode, dir, note}: the last install, so a failing one is not retried in a loop and Details can say which copy it set up
+export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail, dir, note}: the last install, so Details can say which copy it set up, or why the lab's could not be used
 // TERMS_KEY ('bridge.terms') is in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
@@ -76,11 +76,9 @@ export interface InstallNote {
   attempted_at: string;
   ok: boolean;
   detail: string;
-  /** which copy the install set up: the lab's shared copy, or the student's own (uploaded) */
-  mode?: 'shared' | 'own';
   /** the shared folder the site profile names, when it names one */
   dir?: string;
-  /** one line for Details when the shared copy could not be used and the tool went to the student's own account instead */
+  /** one line for Details when the lab's shared copy could not be used (builds up to 7.0.0 wrote it when they put the tool in the student's own account instead) */
   note?: string;
 }
 

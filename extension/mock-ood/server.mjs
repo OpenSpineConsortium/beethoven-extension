@@ -20,9 +20,15 @@
 // contract the extension codes to (src/licensing/access.ts). No build points at it: the extension
 // reads the address from services.json on Licensor's site, and a test hands it this one instead.
 //   GET  /beethoven/services.json              {"access_check": "<origin>/beethoven/access_check", ...}, CORS open
-//   POST /beethoven/access_check               text/plain JSON {v, access_id, portal, product, version} ->
-//                                              200 {"approved":true,...} for the ids in --approve (default st1234),
-//                                              200 {"approved":false,...} otherwise; 400 malformed; 429 past --access-limit
+//   POST /beethoven/access_check               text/plain JSON {v, access_id, portal, product, version, install_id} ->
+//                                              for the ids in --approve (default st1234), one installation each:
+//                                              the first install_id asking binds the account (--seat id=install
+//                                              binds one beforehand), and it gets 200 {"approved":true,...};
+//                                              another gets 200 {"approved":false,...,"reason":"other_installation"};
+//                                              an installation bound to another approved account gets
+//                                              "reason":"other_account" (one installation, one account);
+//                                              none gets "reason":"update_required" (unless --install-optional);
+//                                              200 {"approved":false,...} for any other id; 400 malformed; 429 past --access-limit
 //
 // Two behaviours measured on the live portal (ondemand.grid.wayne.edu, 2026-09-29) are reproduced:
 // the first /pun/ request after a while answers 500 "Error: Server Error ... try again in 30 seconds"
@@ -37,25 +43,29 @@
 // and records that virtual home in place of the directory's real path (MOCK_DISPLAY_HOME), so
 // what the extension shows of the tool's output reads like a cluster wherever the mock runs.
 //
-// The lab's shared copy of the tool (framework 5), for the shared-install tests: with
-// --shared-install [PATH] (option sharedInstall) a second directory on disk, seeded with the stand-in
-// tool, a VERSION (--shared-version, default 5) and profiles/mock.json naming PATH, is served
-// read-only by the Files routes at the virtual PATH (default /lab/shared/hpcworker/current), and a
-// typed line that names PATH runs against that directory. --shared-unreadable (sharedReadable:
-// false) plays a student outside the lab's group: the Files routes answer 403 there and bash cannot
-// open the launcher (No such file or directory, exit 127). MOCK_SHARED_INSTALL=PATH in the server's
-// environment does what --shared-install PATH does. Without either nothing changes.
+// The lab's shared copy of the tool (framework 5), the only way Beethoven 8.0.0 sets an account up
+// (the package carries no copy of the tool): with option sharedInstall (the CLI: always) a second
+// directory on disk, seeded with the stand-in tool, a VERSION (--shared-version, default 5) and
+// profiles/mock.json naming the shared path, is served read-only by the Files routes at that
+// virtual path, and a typed line that names the path runs against that directory. The path is
+// --shared-install PATH, else MOCK_SHARED_INSTALL=PATH in the server's environment, else
+// /lab/shared/hpcworker/current. --shared-unreadable (sharedReadable: false) plays a student
+// outside the lab's group: the Files routes answer 403 there and bash cannot open the launcher (No
+// such file or directory, exit 127).
 //
-// The CLI (the store reviewer's recipe) starts the home with the stand-in set up as the account's own
-// copy of the tool: ~/.hpcworker/profile.json and ~/.hpcworker/VERSION at the version the build carries
-// (public/framework/files/VERSION), so the strip finds the tool installed and current and uploads
-// nothing (option seedInstalled). Without it the strip would upload the real framework and run its
-// install, which has no profile for a mock site and refuses, and whose jobs the stand-in scheduler never
-// runs. --fresh-home starts with the stand-in command only (the upload path, up to that refusal);
-// --shared-install never seeds an own copy, so the shared install runs.
+// The CLI (the store reviewer's recipe) starts the home already set up on that shared copy (option
+// seedShared): the stand-in's own `install --shared` runs once at start, so the account has the
+// launcher, the marker and the profile, and the strip finds "the lab's shared copy, version 5" and
+// runs no install. The recipe needs this because the strip takes the shared path from the site
+// profile the build carries, and no build carries one for a mock site such as localhost. Other
+// homes: --shared-install [PATH] leaves the account not set up, so the strip runs the shared
+// install when the site's profile names PATH (open the mock as ondemand.wayne.localhost with
+// --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current); --fresh-home leaves it
+// not set up with the default path; --own-copy gives it the stand-in as its own copy, as a build
+// before 8.0.0 left it (option seedInstalled); --shared-unreadable leaves it not set up.
 //
 // The only dependency is `ws`. Node 22.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -81,19 +91,6 @@ function findBash() {
   return 'bash';
 }
 
-/** the framework VERSION the extension build carries (sync-framework's copy), else the checkout's, else 1 */
-function carriedFrameworkVersion() {
-  for (const f of [path.join(here, '..', 'public', 'framework', 'files', 'VERSION'), path.join(here, '..', '..', 'framework', 'VERSION')]) {
-    try {
-      const v = fs.readFileSync(f, 'utf8').trim();
-      if (/^\d+$/.test(v)) return v;
-    } catch {
-      /* not there */
-    }
-  }
-  return '1';
-}
-
 const html = (title, body) => `<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body>${body}</body></html>\n`;
 
 export async function createMockPortal(opts = {}) {
@@ -112,8 +109,10 @@ export async function createMockPortal(opts = {}) {
     jobComposer: false,
     shellHosts: ['default', 'login1', 'login2'],
     seedTool: true,
-    /** with seedTool: set the stand-in up as the account's own copy (profile.json, and VERSION at the version the build carries), so the strip uploads nothing */
+    /** with seedTool: set the stand-in up as the account's own copy (profile.json and VERSION), as a build before 8.0.0 left an account */
     seedInstalled: false,
+    /** with sharedInstall (and a readable copy): the account already set up on the lab's shared copy, by the stand-in's own install --shared; seedTool is then ignored */
+    seedShared: false,
     /** the virtual path of the lab's shared copy of the tool (framework 5 shared_install); undefined = the site keeps none */
     sharedInstall: undefined,
     /** false plays an account outside the lab's group: the Files routes answer 403 and bash cannot open the launcher */
@@ -126,6 +125,10 @@ export async function createMockPortal(opts = {}) {
     approved: ['st1234'],
     /** answers past this many access checks are 429 (0 = no limit) */
     accessLimit: 0,
+    /** installations already bound, {access_id: install_id}; the stand-in binds the rest as they first ask */
+    seats: {},
+    /** false plays the service with REQUIRE_INSTALL_ID "0": an approved account asking without an installation identifier is approved and bound to nothing */
+    requireInstallId: true,
     tls: undefined,
     log: () => {},
     ...opts,
@@ -134,23 +137,25 @@ export async function createMockPortal(opts = {}) {
   fs.mkdirSync(realHome, { recursive: true });
   const virtualHome = `/home/${o.user}`;
   const displayHome = o.displayHome ?? process.env.MOCK_DISPLAY_HOME ?? virtualHome;
-  if (o.seedTool) {
-    const dir = path.join(realHome, '.hpcworker', 'bin');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.copyFileSync(path.join(BIN, 'hpcworker'), path.join(dir, 'hpcworker'));
-    if (o.seedInstalled) {
-      // the account's own copy, installed and current: the stand-in's own default profile, and the VERSION the build carries
-      const hw = path.join(realHome, '.hpcworker');
-      const profile = path.join(hw, 'profile.json');
-      if (!fs.existsSync(profile)) fs.writeFileSync(profile, `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', claude_config_dir: '$HOME/.claude', login_node_rules: { max_processes: 20, poll_floor_seconds: 60 }, worker_defaults: { cpus: 2, mem: '8G', hours: 8, permission_mode: 'default', capacity: 4 } })}\n`);
-      const version = path.join(hw, 'VERSION');
-      if (!fs.existsSync(version)) fs.writeFileSync(version, `${carriedFrameworkVersion()}\n`);
-    }
-  }
   // the lab's shared copy: a directory on disk beside the home, seeded with the stand-in tool
   // the option, else MOCK_SHARED_INSTALL in the server's environment (as MOCK_DISPLAY_HOME is read)
   const sharedOpt = o.sharedInstall ?? process.env.MOCK_SHARED_INSTALL;
   const sharedVirtual = sharedOpt ? String(sharedOpt).replace(/\/+$/, '') : undefined;
+  // an outsider was never set up on the shared copy, so there is nothing to seed for one
+  const seedShared = !!(o.seedShared && sharedVirtual && o.sharedReadable);
+  if (o.seedTool && !seedShared) {
+    const dir = path.join(realHome, '.hpcworker', 'bin');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(path.join(BIN, 'hpcworker'), path.join(dir, 'hpcworker'));
+    if (o.seedInstalled) {
+      // the account's own copy, as a build before 8.0.0 left it: the stand-in's own default profile, and the version the stand-in says it is
+      const hw = path.join(realHome, '.hpcworker');
+      const profile = path.join(hw, 'profile.json');
+      if (!fs.existsSync(profile)) fs.writeFileSync(profile, `${JSON.stringify({ schema_version: 1, site: 'mock', scheduler: 'slurm', partition_cpu: 'secp', qos_cpu: 'secondary', shared_state_dir: '$HOME/.hpcworker/state', claude_config_dir: '$HOME/.claude', login_node_rules: { max_processes: 20, poll_floor_seconds: 60 }, worker_defaults: { cpus: 2, mem: '8G', hours: 8, permission_mode: 'default', capacity: 4 } })}\n`);
+      const version = path.join(hw, 'VERSION');
+      if (!fs.existsSync(version)) fs.writeFileSync(version, '1\n');
+    }
+  }
   let sharedReal;
   if (sharedVirtual) {
     sharedReal = fs.mkdtempSync(path.join(os.tmpdir(), 'mock-ood-shared-'));
@@ -163,12 +168,25 @@ export async function createMockPortal(opts = {}) {
   /** what bash is handed for the shared path: the directory, or, for an outsider, a path that is not there */
   const sharedForShell = sharedReal ? posix(o.sharedReadable ? sharedReal : `${sharedReal}.unreadable`) : undefined;
   const bash = findBash();
+  if (seedShared) {
+    // the account already set up on the lab's copy: the stand-in's own install --shared, run once, so
+    // the launcher, the marker and the profile are exactly what the install the strip types would write
+    const r = spawnSync(bash, ['-c', 'bash "$MOCK_SHARED_REAL/bin/hpcworker" install --shared "$MOCK_SHARED_REAL" --profile mock'], {
+      env: { ...process.env, HOME: posix(realHome), USER: o.user, MOCK_DISPLAY_HOME: displayHome, MOCK_SHARED_INSTALL: sharedVirtual, MOCK_SHARED_REAL: sharedForShell },
+      cwd: realHome,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 60_000,
+    });
+    if (r.status !== 0) throw new Error(`mock-ood: setting the home up on the shared copy failed (exit ${r.status}): ${(r.stderr || r.stdout || r.error?.message || '').trim()}`);
+  }
   const railsToken = crypto.randomBytes(32).toString('base64');
   const shellSecret = crypto.randomBytes(24).toString('base64url');
-  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0, coldHits: 0, punWarmUntil: 0, accessChecks: 0, accessBodies: [], accessHeaders: [] };
+  const seats = Object.fromEntries(Object.entries(o.seats ?? {}).map(([k, v]) => [String(k).toLowerCase(), String(v).toLowerCase()]));
+  const state = { coldDone: !o.cold, shells: 0, frames: 0, fatal: 0, coldHits: 0, punWarmUntil: 0, accessChecks: 0, accessBodies: [], accessHeaders: [], seats, conflicts: {} };
   const log = o.log;
 
-  // the access-service stand-in: the D3 contract, byte for byte, so the extension's client is tested against it
+  // the access-service stand-in: the D3 contract, byte for byte, with the one-installation rule of 8.0.0, so the extension's client is tested against it
   const accessHeaders = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };
   const accessJson = (res, status, body) => {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...accessHeaders });
@@ -190,10 +208,24 @@ export async function createMockPortal(opts = {}) {
       return accessJson(res, 400, { error: 'not JSON' });
     }
     if (!j || typeof j !== 'object' || j.v !== 1 || typeof j.access_id !== 'string' || typeof j.portal !== 'string' || j.product !== 'bridge' || typeof j.version !== 'string') return accessJson(res, 400, { error: 'the body needs v, access_id, portal, product and version' });
+    if (j.install_id !== undefined && (typeof j.install_id !== 'string' || !/^[0-9a-f]{32}$/i.test(j.install_id))) return accessJson(res, 400, { error: 'install_id is the 32 hexadecimal characters the extension made when it was installed' });
     state.accessBodies.push(j);
     const id = j.access_id.toLowerCase();
-    if (o.approved.includes(id)) return accessJson(res, 200, { approved: true, access_id: id, checked: new Date().toISOString(), until: null });
-    return accessJson(res, 200, { approved: false, access_id: id, requestPage: 'https://openspineconsortium.com/beethoven/request.html' });
+    const no = (extra = {}) => accessJson(res, 200, { approved: false, access_id: id, requestPage: 'https://openspineconsortium.com/beethoven/request.html', ...extra });
+    if (!o.approved.includes(id)) return no();
+    // one approved account, one installation: the first to ask is bound; another is refused and counted, the seat unchanged;
+    // and one installation, one account: an installation another account's seat names is refused for this one
+    const install = typeof j.install_id === 'string' ? j.install_id.toLowerCase() : '';
+    if (install) {
+      if (!state.seats[id]) {
+        if (Object.entries(state.seats).some(([other, bound]) => other !== id && bound === install)) return no({ reason: 'other_account' });
+        state.seats[id] = install;
+      } else if (state.seats[id] !== install) {
+        state.conflicts[id] = (state.conflicts[id] ?? 0) + 1;
+        return no({ reason: 'other_installation' });
+      }
+    } else if (o.requireInstallId) return no({ reason: 'update_required' });
+    return accessJson(res, 200, { approved: true, access_id: id, checked: new Date().toISOString(), until: null });
   };
 
   // the shell app's tokens: salt-hash, verified against a per-process secret (the csrf module's shape)
@@ -558,14 +590,22 @@ export async function createMockPortal(opts = {}) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--approve a,b] [--access-limit N] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--shared-install [PATH]] [--shared-version N] [--shared-unreadable] [--fresh-home] [--cert F --key F]
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const a = process.argv.slice(2);
+/** where the CLI keeps the lab's shared copy when neither --shared-install PATH nor MOCK_SHARED_INSTALL names one */
+export const DEFAULT_SHARED_INSTALL = '/lab/shared/hpcworker/current';
+
+/**
+ * The options the CLI starts the mock with, from its arguments and environment. Exported so the
+ * test of the store reviewer's recipe starts exactly what the recipe's command line starts.
+ * The lab's shared copy is always there; the home is set up on it unless another home is asked for.
+ */
+export function cliOptions(a, env = process.env) {
   const val = (k, d) => (a.includes(k) ? a[a.indexOf(k) + 1] : d);
   // --shared-install takes an optional path: the next argument unless it is another flag
   const sharedArg = a.includes('--shared-install') ? (val('--shared-install', '') ?? '') : undefined;
-  const sharedInstall = sharedArg === undefined ? undefined : sharedArg && !sharedArg.startsWith('--') ? sharedArg : '/lab/shared/hpcworker/current';
-  const portal = await createMockPortal({
+  const sharedInstall = sharedArg && !sharedArg.startsWith('--') ? sharedArg : env.MOCK_SHARED_INSTALL || DEFAULT_SHARED_INSTALL;
+  const ownCopy = a.includes('--own-copy');
+  const sharedReadable = !a.includes('--shared-unreadable');
+  return {
     port: Number(val('--port', 8080)),
     host: val('--host', '127.0.0.1'),
     home: val('--home', undefined),
@@ -573,6 +613,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     user: val('--user', 'student'),
     approved: String(val('--approve', 'st1234')).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     accessLimit: Number(val('--access-limit', 0)) || 0,
+    // --seat st1234=<32 hex>[,id=install]: an installation already bound, so the next one to ask is refused
+    seats: Object.fromEntries(String(val('--seat', '')).split(',').map((s) => s.trim().toLowerCase().split('=')).filter((kv) => kv.length === 2 && kv[0] && kv[1])),
+    requireInstallId: !a.includes('--install-optional'),
     rnode: val('--rnode', 'disabled'),
     noClusters: a.includes('--no-clusters'),
     cold: a.includes('--cold'),
@@ -580,20 +623,34 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     requireCookie: !a.includes('--no-cookie'),
     jobComposer: a.includes('--job-composer'),
     sharedInstall,
-    sharedReadable: !a.includes('--shared-unreadable'),
+    sharedReadable,
     sharedVersion: val('--shared-version', '5'),
-    // the reviewer's recipe: the stand-in set up as the account's own copy, unless a fresh home or a shared copy is asked for
-    seedInstalled: !a.includes('--fresh-home') && !sharedInstall,
+    // the reviewer's recipe: the home already set up on the shared copy, unless another home is asked for
+    seedShared: sharedArg === undefined && !a.includes('--fresh-home') && !ownCopy && sharedReadable,
+    // the stand-in in the account only as its own copy (--own-copy); every other home starts empty or on the shared copy
+    seedTool: ownCopy,
+    seedInstalled: ownCopy,
     tls: a.includes('--cert') ? { cert: val('--cert'), key: val('--key') } : undefined,
-    log: (s) => console.log(`  ${s}`),
-  });
+  };
+}
+
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--approve a,b] [--access-limit N] [--seat id=install] [--install-optional] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--shared-install [PATH]] [--shared-version N] [--shared-unreadable] [--fresh-home] [--own-copy] [--cert F --key F]
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const a = process.argv.slice(2);
+  const opts = cliOptions(a);
+  const portal = await createMockPortal({ ...opts, log: (s) => console.log(`  ${s}`) });
+  const home = opts.seedShared
+    ? "set up on the lab's shared copy (launcher, marker, profile), as after the install the strip types; the strip runs no install"
+    : opts.seedInstalled
+      ? "the stand-in as the account's own copy, as a build before 8.0.0 left it"
+      : `not set up (the strip runs the shared install when the site's bundled profile names ${portal.sharedInstall}: open the mock at https://ondemand.wayne.localhost:${portal.port} for wayne with --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current, or set the site profile name in Details; otherwise it says the lab's shared copy is needed)`;
   console.log(`mock Open OnDemand portal at ${portal.origin}`);
   console.log(`  sign in:   ${portal.origin}/login   (then the dashboard is ${portal.origin}/pun/sys/dashboard/)`);
   console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome}; the seeded tool prints it as ${portal.displayHome})`);
-  if (portal.sharedInstall) console.log(`  shared:    ${portal.sharedDir} (the lab's shared copy, shown as ${portal.sharedInstall}${a.includes('--shared-unreadable') ? '; this account cannot read it' : ''}; the strip uses it when the site is one whose bundled profile names that path: open the mock at https://ondemand.wayne.localhost:${portal.port} for wayne, or set the site profile name in Details)`);
-  else console.log(`  tool:      ${a.includes('--fresh-home') ? 'the stand-in command only (not set up: the strip uploads the real framework, whose install refuses a mock site)' : "the stand-in, set up as the account's own copy at the version the build carries"}`);
+  console.log(`  shared:    ${portal.sharedDir} (the lab's shared copy of the stand-in tool, shown as ${portal.sharedInstall}${opts.sharedReadable ? '' : '; this account cannot read it'})`);
+  console.log(`  tool:      ${home}`);
   console.log(`  user:      ${portal.user}`);
   console.log(`  shell:     ${portal.origin}/pun/sys/shell/ssh/default`);
-  console.log(`  access:    ${portal.origin}/beethoven/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'})`);
+  console.log(`  access:    ${portal.origin}/beethoven/access_check (tests only; approves ${portal.approved.join(', ') || 'nobody'}, one installation each${Object.keys(portal.state.seats).length ? `; already bound: ${Object.keys(portal.state.seats).join(', ')}` : ''}${opts.requireInstallId ? '' : '; a check without an installation identifier is approved'})`);
   console.log('  Ctrl-C to stop');
 }

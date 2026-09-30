@@ -71,6 +71,24 @@ name and identifier carry no university name.
   model); a confirmed approval is kept 24 h (7 days when the service is unreachable), a refusal 10
   minutes. The sibling Beethoven for VS Code (Ashley for VS Code until 3.0.0) keeps its own key flow
   and the same approved list serves both.
+- **One approved account, one installation (decided 2026-09-30, 8.0.0).** The approval check also
+  sends `install_id`, the random identifier `ext/storage.ts` `installId()` makes once per
+  installation (16 random bytes, nothing about the device; a reinstall makes a new one). The service
+  binds an approved account to the first installation that asks; another gets
+  `"reason":"other_installation"` and the strip says "This account is already set up on another
+  computer. Ask your lab lead to move it here." with no button; an installation already bound to
+  another approved account gets `"reason":"other_account"` and "This installation of Beethoven is
+  already set up for another account. Ask your lab lead to move it to yours.", also with no button;
+  a request with no identifier gets `"update_required"`. The wire stays `v:1` (the service before
+  8.0.0 refuses any other `v` and ignores unknown fields). Never a hardware address, serial or other
+  device identifier, no fingerprinting, no obfuscation (Chrome forbids it; Vite's minification
+  only): everything the check sends and the service keeps is written in `LICENSE.txt` section 3(e)
+  and 10 and in `PRIVACY.md`. It is a check in the client, not a proof, and no text may claim more.
+- **One store, one private listing (decided 2026-09-30, 8.0.0).** Beethoven is offered only as a
+  Private item on the Chrome Web Store whose trusted testers are the maintainer's Google Group of
+  approved students (`docs/store/SUBMISSION.md`). No Edge, Firefox or Safari listing, no signed
+  file, no download on the website or for students anywhere else. The Firefox build script stays
+  because the code builds for it; nothing submits it.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
   action; no container command on the login node and nothing of ours under its `/tmp`; container
   temp and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne
@@ -100,15 +118,19 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-09-29 and extension 7.0.0 `LICENSE.txt` is version 6 and `PRIVACY.md` version
-  7, which rename the product and give the new addresses and say nothing new about data; both
-  describe the software as built (no keys; the approval check against the access service with the
-  account name the portal shows; the daily fetch of `services.json` and the withdrawn-versions list;
-  no activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 6 to match, with `TERMS_DATE` 2026-09-29, and the framework's
-  `VERSION` file is 7). The copies the extension ships in `extension/public/` must be byte-identical
-  to them at build time. Change a text and its version together (integer). Never pre-tick a box; the
-  button label is part of the record; a changed agreement is shown again and accepted again.
+  Edition; since 2026-09-30 and extension 8.0.0 `LICENSE.txt` is version 7 and `PRIVACY.md` version
+  8, which add the shared copy as the only install, one installation per approved account with the
+  installation identifier in the approval check, the request page's Google account, purpose,
+  optional CV (deleted twelve months after the decision) and mailbox confirmation, and the private
+  Chrome Web Store listing as the only channel; both describe the software as built (no keys; the
+  approval check against the access service with the account name the portal shows and the
+  installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
+  activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
+  `extension/src/core/terms.ts` is 7 to match, with `TERMS_DATE` 2026-09-30; the framework's
+  `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
+  byte-identical to them at build time. Change a text and its version together (integer). Never
+  pre-tick a box; the button label is part of the record; a changed agreement is shown again and
+  accepted again.
 - Never use the p-word (the one that starts "prov" and ends "enance") for the history of a file or a
   piece of data; say origin, source or record. Versions are integers (1.0.0, 2.0.0), never
   fractional.
@@ -131,14 +153,17 @@ name and identifier carry no university name.
   own copy in `~/.hpcworker` (every other site, and the fallback). The student's state (profile,
   consent marker, log, run directories) is theirs in both; a shared copy is never replaced by the
   extension and never called outdated by it.
-- `extension/`: WXT 0.21 plus TypeScript, `browser.*` with Promises, no polyfill; `wxt.config.ts` holds
-  the manifest exactly as the report's permission table specifies it; `src/core/` (audit chokepoint,
-  net, redact, shell driver), `src/licensing/` (kill-list verification; no licence keys since 4.0.0), `src/entrypoints/`
-  (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock portal), `scripts/sync-framework.mjs`
-  (copies `../framework/**` into `public/framework/` with a hashed manifest before every build and zip).
+- `extension/`: WXT 0.21 plus TypeScript, `browser.*` with Promises, no polyfill; `wxt.config.ts`
+  holds the manifest exactly as the report's permission table specifies it; `src/core/` (audit
+  chokepoint, net, redact, shell driver), `src/licensing/` (kill-list verification; no licence keys
+  since 4.0.0), `src/entrypoints/` (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock
+  portal, with a stand-in for the access service that binds one installation per approved account),
+  `scripts/sync-profiles.mjs` (copies `../framework/profiles/*.json` as data, and the two agreement
+  texts, into `public/` before every build and zip; since 8.0.0 no framework code enters the
+  package).
 - `docs/`: the report, the design documents, the pilot plan, open questions and measurements.
 - `tools/`: `push_via_grid.sh` and `push_org.sh` (the two remotes), (the site pages are generated by the site repository's
-  `tools/build_site.py`, which reads `LICENSE.txt`, `PRIVACY.md` and `release/` from here),
+  `tools/build_site.py`, which reads `LICENSE.txt` and `PRIVACY.md` from here; it hosts no package),
   `deploy_shared.sh` (publishes the framework to a site's shared copy over ssh, from the laptop; on
   the login node only tar, chmod, setfacl and one link; older versions are kept).
 
@@ -151,9 +176,9 @@ eat backslashes, so write scripts with the Write tool and run them by path; line
 export PATH=/c/Users/grego/tools/node22:$PATH
 cd extension && npm ci                   # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0
 npm run typecheck && npm test            # tsc --noEmit; vitest (the mock portal starts itself on an ephemeral port)
-npm run build                            # wxt build -b chrome && wxt build -b firefox --mv2 (sync-framework runs first)
-npm run zip                              # store zips; wxt zip -b firefox also yields the AMO source zip
-npm run build:safari                     # then xcrun safari-web-extension-packager on a Mac
+npm run build                            # wxt build -b chrome && wxt build -b firefox --mv2 (sync-profiles runs first; only Chrome ships)
+npm run zip                              # the Chrome zip is the one uploaded (docs/store); the Firefox and sources zips are not submitted
+npm run build:safari                     # builds; no Safari edition is offered
 npm run build:dev                        # the Chrome build that can connect http://localhost, for the mock
 npm run mock                             # node mock-ood/server.mjs, port 8080 by default (--port N); flags in extension/README.md
 ```
@@ -219,11 +244,12 @@ sentence and a local *done* tick.
 
 Decided 2026-09-29 (evening), in the maintainer's words: "Claude Code is like gas, the Ashley code
 base is the car." The container image with Claude Code in it and the framework are the lab's shared
-things, kept once on the lab's CephFS volume; the extension is the student's thin client, which makes
-the student's account see them (`hpcworker install --shared`, typed through the portal's shell) and
-then starts, watches and stops the worker. The per-user upload stays as the fallback for sites with no
-shared directory. The extension updates itself through the browser's store. Fetching the framework
-from the private GitHub repository is not possible for a student (no token) and is not designed.
+things, kept once on the lab's CephFS volume; the extension is the student's thin client, which
+makes the student's account see them (`hpcworker install --shared`, typed through the portal's
+shell) and then starts, watches and stops the worker. Since 8.0.0 the extension carries no framework
+and uploads nothing; a site with no shared directory is told to ask its lab lead. The extension
+updates itself through its private Chrome Web Store listing. Fetching the framework from the private
+GitHub repository is not possible for a student (no token) and is not designed.
 
 ## How to be useful here
 

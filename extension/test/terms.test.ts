@@ -18,7 +18,7 @@ describe('the terms version', () => {
     expect(head![2]).toBe(TERMS_DATE);
   });
 
-  it('ships the root texts byte for byte (scripts/sync-framework.mjs copies them before every build)', () => {
+  it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {
     expect(read('../public/LICENSE.txt')).toBe(read('../../LICENSE.txt'));
     expect(read('../public/PRIVACY.md')).toBe(read('../../PRIVACY.md'));
   });

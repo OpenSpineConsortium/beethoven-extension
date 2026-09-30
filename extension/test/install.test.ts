@@ -1,33 +1,28 @@
-// Setting up the cluster in its two modes, against a fake portal that records what is sent: the
-// lab's shared copy (one line through the bootstrap shell, nothing uploaded, the exact command the
-// page script types), the fallback to the student's own copy when bash cannot open the shared
-// launcher or the tool refuses the folder (with the one-line note Details shows, and the 15 s shell
-// clock waited out between the two lines), a failure of any other kind reported rather than worked
-// around, and a site profile with no shared folder keeping the upload exactly as before.
+// Setting up the cluster, against a fake portal that records what is sent: the lab's shared copy is
+// the one way (one line through the bootstrap shell, nothing uploaded, the exact command the page
+// script types, the 15 s shell clock waited out first); a site profile with no shared folder types
+// nothing and uploads nothing, and says why; a shared copy the account cannot use (bash cannot open
+// the launcher, or the tool refuses the folder) uploads nothing either, with the reason in the
+// student's words; any other failure is reported as it is.
 import { describe, expect, it } from 'vitest';
 import { classifyCommand } from '../src/core/audit';
 import { commands, paths, sharedInstallFrom, sharedRootOf } from '../src/core/contract';
-import { bundledSharedInstall, hideSharedPath, installFailureWords, installFramework, installNoteOf, LAB_COPY, sharedUnusable, toolWords } from '../src/core/install';
+import { bundledSharedInstall, hideSharedPath, installFailureWords, installFramework, installNoteOf, LAB_COPY, noSharedForSite, profileAsset, sharedUnusable, toolWords } from '../src/core/install';
 import type { PortalApi } from '../src/core/portal';
 
 const HOME = '/wsu/home/ab/ab12/ab1234';
 const WAYNE_SHARED = '/rs/rs_grp_oschome/shared/ashley/hpcworker/current';
 const EXACT = "bash '/rs/rs_grp_oschome/shared/ashley/hpcworker/current/bin/hpcworker' install --shared '/rs/rs_grp_oschome/shared/ashley/hpcworker/current' --profile 'wayne'";
 
-/** the extension's own files as a build carries them; `shared` goes into profiles/wayne.json when given */
-function assets(shared?: string | null, extra: Record<string, string> = {}) {
+/** the extension's own files as a build carries them: the site profiles only; `shared` goes into profiles/wayne.json when given */
+function assets(shared?: string | null) {
   const files: Record<string, string> = {
-    'bin/hpcworker': '#!/bin/bash\necho tool\n',
-    VERSION: '5\n',
-    'profiles/wayne.json': JSON.stringify({ schema_version: 1, site: 'wayne', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker', ...(shared ? { shared_install: shared } : {}) }),
-    ...extra,
+    '/profiles/wayne.json': JSON.stringify({ schema_version: 1, site: 'wayne', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker', ...(shared ? { shared_install: shared } : {}) }),
   };
   const asked: string[] = [];
   const fetchAsset = async (p: string): Promise<Response> => {
     asked.push(p);
-    if (p === '/framework/files.json') return Response.json({ v: 1, generated: 'test', files: Object.entries(files).map(([path, body]) => ({ path, bytes: body.length, sha256: '', mode: path.startsWith('bin/') ? '0755' : '0644' })) });
-    const rel = p.replace(/^\/framework\/files\//, '');
-    return rel in files ? new Response(files[rel]) : new Response('not found', { status: 404 });
+    return p in files ? new Response(files[p]) : new Response('not found', { status: 404 });
   };
   return { fetchAsset, asked };
 }
@@ -58,12 +53,13 @@ describe('the shared folder a site profile names', () => {
     expect(sharedRootOf(' /opt/lab/hpcworker/v5 ')).toBe('/opt/lab/hpcworker/v5');
     for (const bad of ['', 'rs/relative', '/rs/$USER/x', '/rs/a b', "/rs/it's", '/rs/a;rm', '/rs/../etc', '/rs/./x', '~/x', '/', 5, undefined, null]) expect(sharedRootOf(bad), String(bad)).toBeUndefined();
     expect(sharedInstallFrom(JSON.stringify({ site: 'wayne', shared_install: WAYNE_SHARED }))).toBe(WAYNE_SHARED);
-    // a profile from before framework 5 has no such key: the tool is uploaded as before
+    // a profile from before framework 5 has no such key: the site keeps no shared copy
     expect(sharedInstallFrom(JSON.stringify({ site: 'wayne' }))).toBeUndefined();
     expect(sharedInstallFrom('not json')).toBeUndefined();
   });
 
-  it('is read from the bundled profile of the site, and only for a plain site name', async () => {
+  it('is read from the bundled profile of the site, at /profiles/<site>.json, and only for a plain site name', async () => {
+    expect(profileAsset('wayne')).toBe('/profiles/wayne.json');
     expect(await bundledSharedInstall('wayne', assets(WAYNE_SHARED).fetchAsset)).toBe(WAYNE_SHARED);
     expect(await bundledSharedInstall('wayne', assets(null).fetchAsset)).toBeUndefined();
     expect(await bundledSharedInstall('osc', assets(WAYNE_SHARED).fetchAsset)).toBeUndefined();
@@ -80,6 +76,8 @@ describe('the shared folder a site profile names', () => {
     expect(classifyCommand(EXACT)).toBe('shell');
     expect(paths.sharedMarker(HOME)).toBe(`${HOME}/.hpcworker/shared`);
     expect(paths.sharedVersion(WAYNE_SHARED)).toBe(`${WAYNE_SHARED}/VERSION`);
+    // the own-copy install and its upload are gone: the extension types no other install
+    expect(Object.keys(commands)).not.toContain('install');
   });
 });
 
@@ -112,81 +110,92 @@ describe('when the shared copy cannot be used', () => {
 
 describe('installing', () => {
   it("at a site with a shared folder: one line, nothing uploaded, the lab's copy", async () => {
-    const { p, shells, writes, dirs } = fakePortal([{ exitCode: 0, output: `installed: this account uses the shared copy of hpcworker 5 at ${WAYNE_SHARED} (nothing copied)` }]);
-    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
+    const slept: number[] = [];
+    const { p, shells, writes, dirs } = fakePortal([{ exitCode: 0, output: `installed: this account uses the shared copy of hpcworker 5 at ${WAYNE_SHARED} (nothing copied)` }], [9_000]);
+    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset, sleep: async (ms) => void slept.push(ms) });
     expect(shells).toEqual([EXACT]);
     expect(writes).toEqual([]);
     expect(dirs).toEqual([]);
-    expect(r).toMatchObject({ ok: true, exitCode: 0, uploaded: 0, mode: 'shared', sharedDir: WAYNE_SHARED });
-    expect(r.note).toBeUndefined();
+    // the shell clock is waited out, not failed on
+    expect(slept).toEqual([9_250]);
+    expect(r).toMatchObject({ ok: true, exitCode: 0, sharedDir: WAYNE_SHARED });
+    expect(r.noShared).toBeUndefined();
     // the line typed is the exact command; what the log shows names the folder in words, never by its path
-    expect(r.log).toContain("running the install of the lab's shared copy, one line through the portal's shell");
+    expect(r.log).toContain("running the install of the lab's shared copy, one line through the portal's shell; nothing is uploaded");
     expect(r.log).toContain('installed: this account uses the shared copy of hpcworker 5 (nothing copied)');
     expect(r.log).not.toContain('/rs/rs_grp_oschome/shared');
-    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toEqual({ attempted_at: '2026-09-29T20:00:00.000Z', ok: true, detail: "exit 0, the lab's shared copy", mode: 'shared', dir: WAYNE_SHARED });
+    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toEqual({ attempted_at: '2026-09-29T20:00:00.000Z', ok: true, detail: "exit 0, the lab's shared copy", dir: WAYNE_SHARED });
   });
 
-  it("falls back to the student's own copy when bash cannot open the shared launcher, waiting out the shell clock between the two lines", async () => {
-    const slept: number[] = [];
-    const { p, shells, writes } = fakePortal([{ exitCode: 126, output: `bash: ${WAYNE_SHARED}/bin/hpcworker: Permission denied` }, { exitCode: 0, output: 'installed hpcworker 5 at ~/.hpcworker' }], [0, 9_000]);
-    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset, sleep: async (ms) => void slept.push(ms) });
-    expect(shells).toEqual([EXACT, commands.install('wayne')]);
-    expect(writes).toEqual([`${HOME}/.hpcworker/bin/hpcworker`, `${HOME}/.hpcworker/VERSION`, `${HOME}/.hpcworker/profiles/wayne.json`]);
-    expect(slept).toEqual([9_250]);
-    expect(r).toMatchObject({ ok: true, mode: 'own', uploaded: 3, sharedDir: WAYNE_SHARED });
-    expect(r.note).toBe("Your lab's shared copy of the tool could not be used from your account: your account may not read it. The tool was put in your own account instead.");
+  it('at a site with no shared folder: nothing typed, nothing uploaded, and why', async () => {
+    const { p, shells, writes, dirs } = fakePortal([]);
+    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(null).fetchAsset });
+    expect(shells).toEqual([]);
+    expect(writes).toEqual([]);
+    expect(dirs).toEqual([]);
+    expect(r).toMatchObject({ ok: false, noShared: noSharedForSite('wayne') });
+    expect(r.exitCode).toBeUndefined();
+    expect(r.noShared).toBe('no shared copy of the tool is known for the site "wayne" (the site profile name under Settings)');
+    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toEqual({ attempted_at: '2026-09-29T20:00:00.000Z', ok: false, detail: 'no install line typed', note: `Why: ${r.noShared}.` });
+    // a site this build carries no profile for at all reads the same way
+    const none = await installFramework(fakePortal([]).p, { site: 'localhost', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
+    expect(none.noShared).toBe(noSharedForSite('localhost'));
+  });
+
+  it('when the account cannot use the shared copy: nothing uploaded instead, the reason in the student\'s words', async () => {
+    const { p, shells, writes } = fakePortal([{ exitCode: 126, output: `bash: ${WAYNE_SHARED}/bin/hpcworker: Permission denied` }]);
+    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
+    expect(shells).toEqual([EXACT]);
+    expect(writes).toEqual([]);
+    expect(r).toMatchObject({ ok: false, exitCode: 126, sharedDir: WAYNE_SHARED });
+    expect(r.noShared).toBe("your lab's shared copy of the tool cannot be used from your account: your account may not read it");
     expect(r.log).toContain(`bash: ${LAB_COPY}: Permission denied`);
-    const note = installNoteOf(r, new Date('2026-09-29T20:00:00Z'));
-    expect(note).toMatchObject({ ok: true, mode: 'own', dir: WAYNE_SHARED, note: r.note, detail: 'exit 0, 3 file(s) uploaded' });
-    // the same when the tool itself refused the folder (exit 3), with its reason in the note
-    const refused = fakePortal([{ exitCode: 3, output: `hpcworker: the shared copy at ${WAYNE_SHARED} cannot be used from this account: it has no readable VERSION file. Nothing was changed.` }, { exitCode: 0, output: '' }]);
+    expect(installNoteOf(r, new Date('2026-09-29T20:00:00Z'))).toMatchObject({ ok: false, dir: WAYNE_SHARED, detail: "exit 126, the lab's shared copy", note: `Why: ${r.noShared}.` });
+    // the same when the tool itself refused the folder (exit 3), with its reason
+    const refused = fakePortal([{ exitCode: 3, output: `hpcworker: the shared copy at ${WAYNE_SHARED} cannot be used from this account: it has no readable VERSION file. Nothing was changed.` }]);
     const r2 = await installFramework(refused.p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
-    expect(r2).toMatchObject({ ok: true, mode: 'own' });
-    expect(r2.note).toBe("Your lab's shared copy of the tool could not be used from your account: it has no readable VERSION file. The tool was put in your own account instead.");
+    expect(r2).toMatchObject({ ok: false, exitCode: 3 });
+    expect(r2.noShared).toBe("your lab's shared copy of the tool cannot be used from your account: it has no readable VERSION file");
     expect(r2.log).toContain('hpcworker: the shared copy cannot be used from this account: it has no readable VERSION file.');
     expect(r2.log).not.toContain('/rs/rs_grp_oschome/shared');
-    expect(refused.shells).toHaveLength(2);
+    expect(refused.shells).toHaveLength(1);
+    expect(refused.writes).toEqual([]);
   });
 
-  it('reports any other failure of the shared line as it is, uploading nothing (a worker still running from the own copy)', async () => {
+  it('reports any other failure of the shared line as it is (a worker still running from an own copy)', async () => {
     const { p, shells, writes } = fakePortal([{ exitCode: 1, output: `hpcworker: your worker worker (job 123, online) still runs from the copy in ${HOME}/.hpcworker. Stop it first (hpcworker worker stop), then run this again. Nothing was changed.` }]);
     const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(WAYNE_SHARED).fetchAsset });
     expect(shells).toEqual([EXACT]);
     expect(writes).toEqual([]);
-    expect(r).toMatchObject({ ok: false, exitCode: 1, uploaded: 0, mode: 'shared' });
+    expect(r).toMatchObject({ ok: false, exitCode: 1 });
+    expect(r.noShared).toBeUndefined();
     expect(installFailureWords(r)).toMatch(/^your worker is still running from your own copy/);
-  });
-
-  it('at a site with no shared folder: the upload and one install line, as before', async () => {
-    const { p, shells, writes } = fakePortal([{ exitCode: 0, output: 'installed hpcworker 5' }]);
-    const r = await installFramework(p, { site: 'wayne', fetchAsset: assets(null).fetchAsset });
-    expect(shells).toEqual([commands.install('wayne')]);
-    expect(writes).toHaveLength(3);
-    expect(r).toMatchObject({ ok: true, mode: 'own', uploaded: 3 });
-    expect(r.sharedDir).toBeUndefined();
-    expect(r.note).toBeUndefined();
   });
 });
 
 describe('the tool line under Details', () => {
-  it('says which copy runs, and for an own copy at a site with a shared one, why or how to move', () => {
+  it('says which copy runs, why the lab\'s could not be used, and for an own copy at a site with a shared one, how to move', () => {
     expect(toolWords(undefined)).toEqual([]);
     expect(toolWords({})).toEqual([]);
     expect(toolWords({ installed: false, sharedRoot: WAYNE_SHARED })).toEqual(['tool: not set up yet; your lab keeps a shared copy']);
+    // no usable shared copy: the reason the strip points to
+    expect(toolWords({ installed: false, noSharedCopy: noSharedForSite('localhost') })).toEqual(['tool: not set up yet', 'Why: no shared copy of the tool is known for the site "localhost" (the site profile name under Settings).']);
+    const failed = { attempted_at: 'x', ok: false, detail: 'exit 127', dir: WAYNE_SHARED, note: "Why: your lab's shared copy of the tool cannot be used from your account: it is not there, or your account cannot reach it." };
+    expect(toolWords({ installed: false, sharedRoot: WAYNE_SHARED }, failed)).toEqual(['tool: not set up yet; your lab keeps a shared copy', failed.note]);
     expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '6' } })).toEqual(["tool: the lab's shared copy, version 6"]);
     expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, unreadable: "the portal's Files app could not read its VERSION file (403)" } })[0]).toBe("tool: the lab's shared copy, version unknown (the portal's Files app could not read its VERSION file (403))");
     // the Files app's own error names the file it could not read; the line names the folder in words
     expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, unreadable: `the portal's Files app could not read its VERSION file (could not read ${WAYNE_SHARED}/VERSION (403))` } })[0]).toBe("tool: the lab's shared copy, version unknown (the portal's Files app could not read its VERSION file (could not read the lab's shared copy (403)))");
+    // an own copy, as a build before 8.0.0 left it
     expect(toolWords({ installed: true, version: '5' })).toEqual(['tool: your own copy, version 5']);
     expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED })).toEqual(['tool: your own copy, version 5', 'Your lab keeps a shared copy; "Set up the cluster again" moves your account to it.']);
-    const note = { attempted_at: 'x', ok: true, detail: 'exit 0', mode: 'own' as const, dir: WAYNE_SHARED, note: 'could not be used' };
-    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED }, note)).toEqual(['tool: your own copy, version 5', 'could not be used']);
+    expect(toolWords({ installed: true, version: '5', sharedRoot: WAYNE_SHARED }, failed)).toEqual(['tool: your own copy, version 5', failed.note]);
     // no line names a path
     for (const i of [{ installed: false, sharedRoot: WAYNE_SHARED }, { installed: true, shared: { dir: WAYNE_SHARED, version: '6' } }, { installed: true, version: '5', sharedRoot: WAYNE_SHARED }]) {
       for (const line of toolWords(i)) expect(line).not.toMatch(/\/rs\/|\/shared\//);
     }
-    // once the account runs the shared copy, an old fallback note is history and is not shown
-    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '5' } }, note)).toHaveLength(1);
+    // once the account runs the shared copy, an old note is history and is not shown
+    expect(toolWords({ installed: true, shared: { dir: WAYNE_SHARED, version: '5' } }, failed)).toHaveLength(1);
   });
 });
 
