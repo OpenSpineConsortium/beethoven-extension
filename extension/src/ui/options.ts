@@ -5,7 +5,7 @@
 // notice, un-prechecked boxes whose sentence names the exact button, a typed name, never
 // install-equals-accept; and the text stays exportable and printable.
 import { browser } from 'wxt/browser';
-import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, PRODUCT_NAME, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, type Affirmation, type TermsRecord } from '../core/terms';
+import { acceptanceComplete, AFFIRMATIONS, AGREE_BUTTON, measureReading, NOT_READ, openedInTab, PRODUCT_NAME, readingHint, readingRecord, sha256, SUMMARY, TERMS_KEY, TERMS_TITLE, TERMS_VERSION, textRead, type Affirmation, type BoxGeometry, type ReadingState, type TermsRecord } from '../core/terms';
 import { browserName, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 import { AUTO_START_KEY, type AutoStartNote } from '../core/keys';
 import { auditSection, settingsSection } from './details';
@@ -79,44 +79,60 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
   const t = await texts();
   const licenseHash = await sha256(t.license);
   const privacyHash = await sha256(t.privacy);
-  let scrolled = false;
+  // the reading gate (core/terms.ts measureReading): scrolled to the end, opened in a tab, or the
+  // text fits its box once the box is on the page and laid out
+  let reading: ReadingState = NOT_READ;
   const doc = el('div', { class: 'doc', id: 'doc', tabindex: '0', role: 'region', 'aria-label': 'License agreement and privacy statement, scrollable' });
   doc.textContent = `${t.license}${SEPARATOR}${t.privacy}`;
-  const hint = el('p', { class: 'muted small', id: 'scrollhint', text: 'Scroll the text above to its end to continue.' });
+  const hint = el('p', { class: 'muted small', id: 'scrollhint', 'aria-live': 'polite', text: readingHint(reading) });
   const boxes = AFFIRMATIONS.map((a) => ({ a, input: el('input', { type: 'checkbox', id: `aff-${a.id}`, 'data-id': a.id }) }));
   const name = el('input', { type: 'text', id: 'name', autocomplete: 'name', 'aria-describedby': 'namehint' });
   const agree = el('button', { class: 'primary', type: 'button', disabled: true, text: AGREE_BUTTON });
   const status = el('div', { class: 'status', role: 'status', 'aria-live': 'polite' });
   const check = () => {
+    const read = textRead(reading);
     const all = boxes.every((b) => b.input.checked);
     const n = name.value.trim();
-    const ok = scrolled && all && n.length >= 2;
+    const ok = read && all && n.length >= 2;
     agree.disabled = !ok;
     const missing: string[] = [];
-    if (!scrolled) missing.push('read the full text to its end');
+    if (!read) missing.push('read the full text (scroll it to its end, or open it in tabs)');
     if (!all) missing.push('tick every statement that is true (all are needed to continue)');
     if (n.length < 2) missing.push('type your name');
     status.textContent = ok ? '' : `To continue: ${missing.join('; ')}.`;
   };
-  doc.addEventListener('scroll', () => {
-    if (doc.scrollTop + doc.clientHeight >= doc.scrollHeight - 8) {
-      scrolled = true;
-      hint.textContent = 'You have reached the end of the text.';
-      check();
-    }
-  });
-  setTimeout(() => {
-    if (doc.scrollHeight <= doc.clientHeight + 8) {
-      scrolled = true;
-      hint.textContent = '';
-      check();
-    }
-  }, 0);
+  const moveTo = (next: ReadingState) => {
+    reading = next;
+    const words = readingHint(reading);
+    if (hint.textContent !== words) hint.textContent = words;
+    check();
+  };
+  const geometry = (): BoxGeometry => ({ scrollTop: doc.scrollTop, clientHeight: doc.clientHeight, scrollHeight: doc.scrollHeight });
+  doc.addEventListener('scroll', () => moveTo(measureReading(reading, geometry())));
+  // Measured when the box is actually laid out on the page, and again whenever its size changes
+  // (the observer reports the box once it has a size). Until then it has no height, and a box with
+  // no height proves nothing (laidOut); without the observer the gate opens only by scrolling or
+  // by opening the text in a tab.
+  if (typeof ResizeObserver === 'function') {
+    let seen = false;
+    const observer = new ResizeObserver(() => {
+      if (!doc.isConnected) {
+        // the page was drawn again without this box: stop watching it
+        if (seen) observer.disconnect();
+        return;
+      }
+      seen = true;
+      // the print layout unrolls the box to the whole text; that is not this screen's box fitting it
+      if (window.matchMedia?.('print').matches) return;
+      moveTo(measureReading(reading, geometry()));
+    });
+    observer.observe(doc);
+  }
   for (const b of boxes) b.input.addEventListener('input', check);
   name.addEventListener('input', check);
   agree.addEventListener('click', async () => {
     const affirmations: Affirmation[] = boxes.map((b) => ({ id: b.a.id, label: b.a.label, checked: b.input.checked }));
-    const complete = acceptanceComplete(affirmations, name.value, scrolled);
+    const complete = acceptanceComplete(affirmations, name.value, textRead(reading));
     if (!complete.ok) return check();
     const record: TermsRecord = {
       v: 1,
@@ -129,7 +145,8 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
       button_label: AGREE_BUTTON,
       affirmations,
       signed_name: name.value.trim(),
-      scrolled_to_end: true,
+      // what happened: the end reached by scrolling (or the text fitted its box), and separately whether it was opened in a tab
+      ...readingRecord(reading),
       product_version: version(),
       host: browserName(),
       install_id: await installId(),
@@ -141,7 +158,7 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
   const card = el('div', { class: 'card' });
   add(card,
     el('h3', { text: `${TERMS_TITLE} (version ${TERMS_VERSION}) and Privacy Statement` }),
-    el('p', {}, `Read the summary, then the full text (scroll to its end), tick each statement, type your name, and choose `, el('strong', { text: AGREE_BUTTON }), `. Choosing that button forms the agreement between you and the licensor; opening the text in a tab also counts as reading it. You can export or print the text at any time.`),
+    el('p', {}, `Read the summary, then the full text (scroll to its end), tick each statement, type your name, and choose `, el('strong', { text: AGREE_BUTTON }), `. Choosing that button forms the agreement between you and the licensor; opening the agreement and the privacy statement in tabs (the first button under the text) also counts as reading them. You can export or print the text at any time.`),
     el('h3', { text: 'In short' }),
     el('ul', {}, ...SUMMARY.map((s) => el('li', { text: s }))),
     el('h3', { text: 'The full text' }),
@@ -150,12 +167,12 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
     el('div', { class: 'row noprint' },
       el('button', {
         type: 'button',
-        text: 'Open in a tab (plain text, printable)',
+        text: 'Open in tabs (plain text, printable)',
         onClick: () => {
-          void browser.tabs.create({ url: browser.runtime.getURL('/LICENSE.txt') });
-          scrolled = true;
-          hint.textContent = 'The full text is open in a tab.';
-          check();
+          // the box holds both texts, so both open; it counts as reading once both tabs exist
+          void Promise.all([browser.tabs.create({ url: browser.runtime.getURL('/LICENSE.txt') }), browser.tabs.create({ url: browser.runtime.getURL('/PRIVACY.md') })])
+            .then(() => moveTo(openedInTab(reading)))
+            .catch((e) => notify('fail', `The texts could not be opened in tabs (${(e as Error).message}); scroll the text above to its end instead.`));
         },
       }),
       el('button', { type: 'button', text: 'Export a copy', onClick: () => downloadText(`${PRODUCT_NAME.replace(/\s+/g, '-')}-agreement-v${TERMS_VERSION}.txt`, `${t.license}${SEPARATOR}${t.privacy}`) }),
@@ -165,11 +182,12 @@ async function signingDialog(notify: Notify, done: () => Promise<void>): Promise
     el('h3', { text: 'Your statements' }),
     el('fieldset', {}, el('legend', { text: 'Tick each box only if it is true. None is ticked for you.' }), ...boxes.map((b) => el('div', { class: 'box' }, b.input, el('label', { for: `aff-${b.a.id}`, text: b.a.label })))),
     el('div', { class: 'row' }, el('label', { for: 'name', text: 'Type your full name as your signature:' }), name),
-    el('p', { class: 'muted small', id: 'namehint', text: 'Your typed name, the boxes you tick, the time, the browser, and the version and hash of this text are recorded in this browser to prove the agreement. Nothing else is recorded here, and nothing is sent anywhere.' }),
+    el('p', { class: 'muted small', id: 'namehint', text: `Your typed name, the boxes you tick, the time, the browser, the version of ${PRODUCT_NAME}, this installation's random identifier, whether you reached the end of the text in the box above (by scrolling, or because it all fitted with nothing to scroll) or opened it in tabs, and the version and hash of this text are recorded in this browser to prove the agreement. This record stays in this browser; only the installation identifier goes with each approval check (see 2. Your access).` }),
     el('div', { class: 'row noprint' }, agree, el('button', { type: 'button', text: 'Decline', onClick: () => { notify('info', `Declined. Do not use ${PRODUCT_NAME}; you can remove it from your browser's extensions page.`); window.close(); } })),
     status,
   );
-  setTimeout(check, 0);
+  // the status line needs no layout; the reading gate waits for the observer above
+  check();
   return card;
 }
 

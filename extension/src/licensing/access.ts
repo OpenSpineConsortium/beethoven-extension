@@ -81,6 +81,37 @@ export const OTHER_ACCOUNT = `This installation of ${PRODUCT_NAME} is already se
 /** the strip's sentence when the service asks for the current build */
 export const UPDATE_REQUIRED = `Install the current ${PRODUCT_NAME} from the lab's private listing.`;
 
+// Why the background did not ask the service, as bare reasons like checkAccess's own details; the
+// page that shows one puts the label in front (accessOutcomeWords), so the label is said once.
+/** the background's reason when no agreement is accepted */
+export const NOT_ASKED_TERMS = 'the agreement has not been accepted yet';
+/** the background's reason when no portal is connected */
+export const NOT_ASKED_NO_PORTAL = 'no portal connected yet';
+/** the background's reason when the dashboard has shown no account name */
+export const NOT_ASKED_NO_ACCOUNT = 'your portal has not shown who is signed in yet: open it in a tab and sign in there, then try again';
+
+/**
+ * What a press of "Check my access now" came to, in one line. The label ("Checked", "Not asked") is
+ * said here and nowhere else; the detail is the bare reason the background or checkAccess gave.
+ * 9.0.0 had the label on both sides and showed "Not asked: not asked: ...".
+ */
+export function accessOutcomeWords(o: { asked: boolean; approved?: boolean; detail: string }): { kind: 'ok' | 'warn' | 'info'; text: string } {
+  const detail = String(o.detail ?? '').trim().replace(/^(?:not asked|checked)\s*:\s*/i, '').replace(/[.\s]+$/, '');
+  return { kind: o.asked ? (o.approved ? 'ok' : 'warn') : 'info', text: `${o.asked ? 'Checked' : 'Not asked'}: ${detail}.` };
+}
+
+/**
+ * A bare reason as a sentence of its own, for the strip's status line where no label goes in front:
+ * "your portal has not shown who is signed in yet: ..." -> "Your portal has not shown who is signed in
+ * yet: ....". A leading "not asked:" or "checked:" label is dropped, as in accessOutcomeWords.
+ */
+export function reasonSentence(detail: string): string {
+  const d = String(detail ?? '').trim().replace(/^(?:not asked|checked)\s*:\s*/i, '').trim();
+  if (!d) return d;
+  const s = d.charAt(0).toUpperCase() + d.slice(1);
+  return /[.!?]$/.test(s) ? s : `${s}.`;
+}
+
 /** services.json as last read: the addresses this build talks to, none of them compiled in but the file's own */
 export interface StoredServices {
   fetched_at: string;

@@ -62,8 +62,8 @@ Beethoven extension     ──▶ https://ondemand.<university>.edu ──▶ lo
 
 What a student does, in order, after installing the extension from its private listing on the Chrome
 Web Store (open only to the Google accounts of students the maintainer approved; there is no
-download and no other store) and accepting the agreement once on its setup page (there is no key and
-nothing to paste: their own sign-in to the portal identifies them, and the extension confirms with
+download and no other store) and accepting the agreement once on its setup page (there is no licence
+key to enter: their own sign-in to the portal identifies them, and the extension confirms with
 the vendor's access service that the account the portal shows is approved on this installation, one
 installation per approved account; if it is not approved, the panel's one button is *Ask for
 access*):
@@ -175,12 +175,16 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 8.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 10.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
 with the approval check (one installation per approved account) and is offered only through a
-private Chrome Web Store listing); the framework's `VERSION` file is 8, and the lab's shared copy at
+private Chrome Web Store listing; 9.0.0 wears the site's theme with its typefaces bundled and was
+never submitted for review; 10.0.0 refuses an address on claude.ai, claude.com or anthropic.com
+before asking the browser for anything, removes a grant an earlier build obtained on one, and keeps
+the agreement's button grey until the text has been read; `release/10.0.0/README.md` lists the
+changes); the framework's `VERSION` file is 8, and the lab's shared copy at
 Wayne State is the version `tools/deploy_shared.sh` last published (the panel shows it under
 *Details*); the agreement `LICENSE.txt` is version 7 and the extension's `TERMS_VERSION`
 (`extension/src/core/terms.ts`) is 7 to match; `PRIVACY.md` is version 8. All integers; a changed
@@ -282,7 +286,7 @@ that sends no installation identifier (before 8.0.0) is refused once the service
    `bash tools/deploy_shared.sh`, before the extension that needs it reaches students: the extension
    runs whatever the lab's copy is.
 3. Copy the Chrome zip (the only package from 8.0.0) into `release/<version>/`, write `SHA256SUMS.txt`
-   (`sha256sum *.zip > SHA256SUMS.txt`) and a short `README.md` there (see `release/8.0.0/`), commit, tag `v<version>`, push both remotes:
+   (`sha256sum *.zip > SHA256SUMS.txt`) and a short `README.md` there (see `release/10.0.0/`, which also holds the store kit and the reviewers' mock-portal zip), commit, tag `v<version>`, push both remotes:
    `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
    (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
    maintainer's machine that is WSL). Attach the zip and `SHA256SUMS.txt` to a GitHub release named
@@ -313,7 +317,7 @@ that sends no installation identifier (before 8.0.0) is refused once the service
 - `docs/WAYNE_STATE_PILOT.md`: the pilot plan for the first campus, with the three-step script.
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
-- `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; nothing to paste.
+- `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
 - `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 7; the extension's
   `TERMS_VERSION` is 7) and the privacy statement (version 8).
 - `SECURITY.md`: threat model, controls, how to report a problem.

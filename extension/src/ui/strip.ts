@@ -9,6 +9,7 @@
 // talks to Licensor: the background does, and only the record it leaves is read here.
 import { browser } from 'wxt/browser';
 import type { RunState } from '../entrypoints/background';
+import { normaliseOrigin } from '../core/connect';
 import { commands, parseJobId } from '../core/contract';
 import { gatherFacts, type Transient } from '../core/facts';
 import { bundledSharedInstall, installFailureWords, installFramework, installNoteOf } from '../core/install';
@@ -22,6 +23,7 @@ import { checkAccessNow, connectPortal, currentRun, markStopped, openEnvironment
 import { statementSection } from './sections';
 import { openTerminal, type Terminal } from './terminal';
 import { PRODUCT_NAME } from '../core/terms';
+import { reasonSentence } from '../licensing/access';
 
 /** the run's files are read this often while the panel is open */
 const FAST_POLL_MS = 10_000;
@@ -132,10 +134,33 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     }
   };
 
-  /** the connect button: the permission request is the first call inside the click, as Firefox requires */
-  const connectFromClick = (click: ClickNote) => {
-    const granting = requestOrigin(click.origin);
-    connectPortal(click.origin, click.tabId, granting)
+  /**
+   * What the connect button connects: the connected portal itself when its grant was taken away
+   * ("Allow the portal again"; the clicked tab is loaded only when it is that portal), else the tab
+   * the toolbar button was clicked from when it looks like Open OnDemand. Never the last clicked
+   * tab's origin in place of the portal's, and never an Anthropic tab (facts.ts offers none).
+   */
+  const connectTarget = (snap: Snapshot): { origin: string; tabId?: number } | undefined => {
+    if (snap.settings) return { origin: snap.settings.origin, tabId: snap.click?.origin === snap.settings.origin ? snap.click.tabId : undefined };
+    return snap.click?.looksLikeOod ? { origin: snap.click.origin, tabId: snap.click.tabId } : undefined;
+  };
+
+  /**
+   * The connect button: the address is checked, then the permission requested, both synchronously
+   * and first inside the click, as Firefox and Chrome require. An address normaliseOrigin refuses
+   * (an Anthropic one above all) is said in words and the browser is asked for nothing.
+   */
+  const connectFromClick = (target: { origin: string; tabId?: number } | undefined) => {
+    if (!target) return;
+    let origin: string;
+    try {
+      origin = normaliseOrigin(target.origin);
+    } catch (e) {
+      notify('fail', (e as Error).message);
+      return;
+    }
+    const granting = requestOrigin(origin);
+    connectPortal(origin, target.tabId, granting)
       .then((out) => notify(out.answered ? 'ok' : 'warn', out.answered ? `Connected ${out.settings.hostname}.` : `Connected ${out.settings.hostname}; the portal tab has not answered yet. Reload it if this does not change in a moment.`))
       .catch((e) => notify('fail', (e as Error).message))
       .finally(() => void tick());
@@ -164,7 +189,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
           await tick();
           try {
             const r = await checkAccessNow(a === 'retry-access');
-            if (!r.asked && r.approved === undefined) transient.accessFailed = r.detail;
+            if (!r.asked && r.approved === undefined) transient.accessFailed = reasonSentence(r.detail);
           } catch (e) {
             transient.accessFailed = (e as Error).message;
           } finally {
@@ -273,7 +298,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
           await openEnvironment().catch(() => undefined);
           break;
         case 'connect':
-          if (snap.click) connectFromClick(snap.click);
+          connectFromClick(connectTarget(snap));
           break;
         case 'open-setup':
         case 'accept-terms':
@@ -296,7 +321,7 @@ export async function mountStrip(root: HTMLElement): Promise<void> {
     const p = snap.view.primary;
     if (!p) return null;
     // "connect" needs the permission call inside the click itself; everything else goes through perform
-    const onClick = p.action === 'connect' && snap.click ? () => connectFromClick(snap.click!) : () => void perform(p.action, snap);
+    const onClick = p.action === 'connect' ? () => connectFromClick(connectTarget(snap)) : () => void perform(p.action, snap);
     return el('div', { class: 'row' }, el('button', { class: 'primary', text: p.label, onClick }));
   };
 

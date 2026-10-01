@@ -6,6 +6,7 @@
 // left is read here. The transient part (what the panel is doing right now) is handed in by the
 // caller, so the same function serves the panel and the background's automatic start.
 import type { KV } from './audit';
+import { isAnthropicAddress } from './connect';
 import { isEnvironmentUrl, LAUNCHER_TAG, paths, probeVerdict, profileRestricts, sharedRootOf, stateDirFrom, type ProbeFile, type StatusFile, type ConnectionFile, type Registration } from './contract';
 import { ackSubject, statementFor, type Statements } from './disclosure';
 import { noSharedForSite } from './install';
@@ -97,6 +98,15 @@ export interface Gathered {
   consentWritten?: boolean;
 }
 
+/** an origin's hostname, or the origin itself when it does not parse */
+function hostnameOf(origin: string): string {
+  try {
+    return new URL(origin).hostname;
+  } catch {
+    return origin;
+  }
+}
+
 /** the environment link of a run, only when it is Claude's own Code page for an environment */
 export function environmentLinkOf(run: RunLike | undefined): string | undefined {
   if (!run) return undefined;
@@ -116,7 +126,11 @@ export async function gatherFacts(env: FactsEnv): Promise<Gathered> {
   f.portal.hostname = s?.hostname;
   f.portal.granted = s ? await env.granted(s.origin) : false;
   f.portal.alive = s && f.portal.granted ? await env.alive() : false;
-  if (!s && env.click?.looksLikeOod) f.portal.candidate = { origin: env.click.origin, hostname: new URL(env.click.origin).hostname, tabId: env.click.tabId };
+  // a tab on an Anthropic host is never offered as a portal, whatever its path or an older note says
+  if (!s && env.click) {
+    if (isAnthropicAddress(env.click.origin)) f.portal.refusedTab = hostnameOf(env.click.origin);
+    else if (env.click.looksLikeOod) f.portal.candidate = { origin: env.click.origin, hostname: new URL(env.click.origin).hostname, tabId: env.click.tabId };
+  }
 
   // the browser-side facts, whatever the portal says
   f.terms = recordInForce(await env.local.get(TERMS_KEY));

@@ -11,7 +11,7 @@
 // itself: the page script on the portal origin is the only network client there.
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
-import { lookAtTab } from '../core/connect';
+import { acceptedSettings, isAnthropicAddress, lookAtTab, mayRequestOrigin } from '../core/connect';
 import { isEnvironmentUrl, parseRegistration, paths, type ConnectionFile, type StatusFile } from '../core/contract';
 import { statementFor, type Statements } from '../core/disclosure';
 import { environmentLinkOf, gatherFacts, type Transient } from '../core/facts';
@@ -22,10 +22,10 @@ import { PORTAL_OPS, type PortalApi, type PortalOp, type SessionInfo } from '../
 import { decide } from '../core/steps';
 import { recordInForce, TERMS_KEY } from '../core/terms';
 import { startWorker } from '../core/worker';
-import { ACCESS_PERIOD_MINUTES, checkAccess, type AccessRecord, type StoredServices } from '../licensing/access';
+import { ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
-import { connectApi, connectPortal, requestOrigin } from '../ext/connectApi';
+import { connectApi, connectPortal, dropAnthropicLeftovers, requestOrigin } from '../ext/connectApi';
 import { assetUrl, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
 
 const POLL_ALARM = 'bridge.poll';
@@ -94,14 +94,20 @@ let startInFlight: Promise<StartResult> | undefined;
 let accessInFlight: Promise<AccessOutcome> | undefined;
 /** serialises the once-only opening of the Claude link */
 let openChain: Promise<unknown> = Promise.resolve();
+/** the clean-up of anything an earlier build left on an Anthropic address, once per start of this background */
+let leftovers: Promise<unknown> | undefined;
+const dropLeftoversOnce = (): Promise<unknown> => (leftovers ??= dropAnthropicLeftovers().catch(() => undefined));
 
 export default defineBackground({
   // Firefox MV2: a persistent background keeps the alarm and message listeners simple; ignored on MV3
   persistent: true,
   main() {
+    // install, update and browser start all start this background: a grant on an Anthropic address
+    // that 9.0.0 obtained (it asked before it refused) is removed here, before anything else uses grants
+    void dropLeftoversOnce();
     void portalSettings().then((s) => (settingsCache = s));
     browser.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes['bridge.portal']) settingsCache = changes['bridge.portal']?.newValue as PortalSettings | undefined;
+      if (area === 'local' && changes['bridge.portal']) settingsCache = acceptedSettings(changes['bridge.portal']?.newValue as PortalSettings | undefined);
       // the first request to Licensor's site follows the acceptance of the agreement, never precedes it
       if (area === 'local' && changes[TERMS_KEY] && recordInForce(changes[TERMS_KEY]?.newValue)) {
         void refreshKillListNow();
@@ -112,10 +118,12 @@ export default defineBackground({
     browser.runtime.onInstalled.addListener(async (details) => {
       if (details.reason === 'install') await browser.runtime.openOptionsPage();
       await ensureAlarms();
+      await dropLeftoversOnce();
       await reRegisterPortalScript();
     });
     browser.runtime.onStartup?.addListener(async () => {
       await ensureAlarms();
+      await dropLeftoversOnce();
       await reRegisterPortalScript();
     });
     void ensureAlarms();
@@ -153,16 +161,23 @@ interface ClickedTab {
  * opens, and when the tab looks like Open OnDemand (a /pun/ page, or the portal already connected)
  * the browser is asked for that origin. The rest (registering and loading the page script,
  * remembering the hostname, then the access check with the account the dashboard shows) follows
- * the grant. The click is the one moment a refusal is asked about again at once.
+ * the grant. The click is the one moment a refusal is asked about again at once. A tab on
+ * claude.ai, claude.com or anthropic.com is never an Open OnDemand page, whatever its path
+ * (lookAtTab), and an origin normaliseOrigin refuses is never asked for: both are decided
+ * synchronously, before the request, so a click there asks the browser for nothing.
  */
 function onActionClicked(tab: ClickedTab): void {
   openPanelFor(tab);
   const look = lookAtTab(tab.url, settingsCache?.hostname);
   const note: ClickNote | undefined = look && tab.id !== undefined ? { tabId: tab.id, origin: look.origin, path: look.path, looksLikeOod: look.ood, granted: false, at: new Date().toISOString() } : undefined;
-  if (look && tab.id !== undefined && look.ood) {
+  if (look && tab.id !== undefined && look.ood && !look.anthropic && mayRequestOrigin(look.origin)) {
     const tabId = tab.id;
     const granting = requestOrigin(look.origin);
     void (async () => {
+      // the panel describes this tab while the browser's prompt is open, not the tab clicked before it
+      // (the request above is already made; nothing here waits before it)
+      if (note) await session.set(CLICK_KEY, note);
+      await tellPages();
       try {
         const out = await connectPortal(look.origin, tabId, granting);
         settingsCache = out.settings;
@@ -221,7 +236,7 @@ async function handle(msg: Request, sender: { tab?: { id?: number }; url?: strin
       // only a page script on the granted origin may register as the portal tab
       const settings = await portalSettings();
       const from = sender.url ? new URL(sender.url).origin : '';
-      if (!settings || from !== settings.origin || from !== msg.origin || sender.tab?.id === undefined) return fail(new Error('hello from an unexpected origin'));
+      if (!settings || isAnthropicAddress(from) || from !== settings.origin || from !== msg.origin || sender.tab?.id === undefined) return fail(new Error('hello from an unexpected origin'));
       await session.set(PORTAL_TAB_KEY, { tabId: sender.tab.id, origin: from } satisfies PortalTab);
       await tellPages();
       // the portal tab just connected: the access check reads the dashboard's account name from it
@@ -293,7 +308,7 @@ async function portalTabId(): Promise<number | undefined> {
       if (tab.id === undefined) continue;
       // a tab that was open before the grant has no page script yet: load it now, as the click would have
       if (!(await connectApi.ping(tab.id).catch(() => false))) {
-        await connectApi.inject(tab.id).catch(() => undefined);
+        await connectApi.inject(tab.id, settings.origin).catch(() => undefined);
         let ok = false;
         for (let i = 0; i < 8 && !ok; i++) {
           await connectApi.sleep(250);
@@ -530,11 +545,12 @@ function checkAccessNow(trigger: AccessTrigger): Promise<AccessOutcome> {
   if (accessInFlight) return accessInFlight;
   accessInFlight = (async (): Promise<AccessOutcome> => {
     // PRIVACY.md and LICENSE.txt: no request to Licensor before the agreement is accepted
-    if (!recordInForce(await local.get(TERMS_KEY))) return { asked: false, detail: 'not asked: the agreement has not been accepted yet' };
+    // the detail is the bare reason; the page that shows it says "Not asked" or "Checked" (licensing/access.ts accessOutcomeWords)
+    if (!recordInForce(await local.get(TERMS_KEY))) return { asked: false, detail: NOT_ASKED_TERMS };
     const settings = await portalSettings();
-    if (!settings) return { asked: false, detail: 'not asked: no portal connected yet' };
+    if (!settings) return { asked: false, detail: NOT_ASKED_NO_PORTAL };
     const account = await dashboardAccount();
-    if (!account) return { asked: false, detail: 'Your portal has not shown who is signed in yet: open it in a tab and sign in there, then try again.' };
+    if (!account) return { asked: false, detail: NOT_ASKED_NO_ACCOUNT };
     const previous = await local.get<AccessRecord>(ACCESS_KEY);
     const services = await local.get<StoredServices>(SERVICES_KEY);
     let out;

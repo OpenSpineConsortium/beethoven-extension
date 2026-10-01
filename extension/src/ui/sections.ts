@@ -3,11 +3,12 @@
 // access/agreement status card.
 import { browser } from 'wxt/browser';
 import { ackSubject, makeAcknowledgement, PLAN_CLASS_DISCLOSURE, STATEMENT_TEXT, statementFor, STATEMENTS_KEY, type Acknowledgement, type Statements } from '../core/disclosure';
+import { normaliseOrigin } from '../core/connect';
 import { paths, profileRestricts, RESTRICTED_MARKER, stateDirFrom } from '../core/contract';
 import { ACCESS_KEY, CHECKLIST_KEY, IDENTITY_KEY, KILLLIST_KEY, PREFS_KEY, SERVICES_KEY, type Checklist, type IdentityNote, type PortalSettings, type Prefs } from '../core/keys';
 import { PRODUCT_NAME, recordInForce, TERMS_KEY, type TermsRecord } from '../core/terms';
 import { writeConsentFile } from '../core/worker';
-import { accessFact, type AccessFact, type AccessRecord, type StoredServices } from '../licensing/access';
+import { accessFact, accessOutcomeWords, type AccessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import { installId, local, portalSettings, prefs as loadPrefs, version } from '../ext/storage';
 import { add, clear, el, fmtTime } from './dom';
@@ -49,12 +50,14 @@ export function connectSection(settings: PortalSettings | undefined, onChange: (
     el('div', { class: 'row' }, input, el('button', {
       text: 'Connect',
       onClick: () => {
-        // no await before the permission request: the prompt must come straight from the click
+        // no await before the permission request: the prompt must come straight from the click. The
+        // address is checked first, synchronously: an Anthropic one (or one that is not https) is
+        // refused in words here and the browser is asked for nothing.
         let origin: string;
         try {
-          origin = new URL(/^https?:\/\//i.test(input.value.trim()) ? input.value.trim() : `https://${input.value.trim()}`).origin;
-        } catch {
-          status.textContent = 'type your portal address first';
+          origin = normaliseOrigin(input.value);
+        } catch (e) {
+          status.textContent = (e as Error).message;
           return;
         }
         const granting = requestOrigin(origin);
@@ -128,7 +131,7 @@ export async function statementSection(onChange: () => void, opts: { compact?: b
   const prefs = await loadPrefs();
   const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
   const box = el('div', { class: opts.compact ? 'statement' : 'card' });
-  const name = el('input', { type: 'text', value: prefs.worker_name, placeholder: 'worker', 'aria-label': 'Worker name', pattern: '[A-Za-z0-9_-]{1,32}' });
+  const name = el('input', { type: 'text', value: prefs.worker_name, placeholder: 'worker', 'aria-label': 'Worker name', pattern: '[A-Za-z0-9_\\-]{1,32}' });
   const where = el('div', { class: 'muted small mono' });
   const restrictedLine = el('div', { class: 'small' });
   const markButton = el('button', { class: 'small', text: 'Mark this workspace restricted', hidden: true });
@@ -260,8 +263,8 @@ export function accessButtons(a: AccessFact, notify: Notify, onChange: () => voi
       title: "Asks Licensor's access service about the account your portal shows",
       onClick: async () => {
         try {
-          const r = await checkAccessNow(true);
-          notify(r.asked ? (r.approved ? 'ok' : 'warn') : 'info', r.asked ? `Checked: ${r.detail}.` : `Not asked: ${r.detail}`);
+          const words = accessOutcomeWords(await checkAccessNow(true));
+          notify(words.kind, words.text);
         } catch (e) {
           notify('fail', (e as Error).message);
         }

@@ -1,0 +1,3 @@
+d0cfe80960122ea2dbe597b6f1208661a687305fe744739262cd75600896a8ea *beethoven-10.0.0-chrome.zip
+d1ef35ed752ce0c2c0fa869ad34e410a6ff014dbcf90afe697547704a3f2e310 *store-kit-10.0.0.zip
+1b6ce820dc829620d094ccea58cc9f6066fc29e3f6a74ee0fcc0cd853c1f07d5 *reviewer/beethoven-mock-portal.zip

@@ -3,6 +3,7 @@
 // ext/connectApi.ts (the one place a permission is asked for).
 import { browser } from 'wxt/browser';
 import type { AccessOutcome, RunState, StartResult } from '../entrypoints/background';
+import { isAnthropicHost } from '../core/connect';
 import { unwrap, type Answer, type Request } from '../core/messages';
 import type { PortalApi, PortalOp } from '../core/portal';
 import { portalSettings } from '../ext/storage';
@@ -43,13 +44,13 @@ export async function openOptions(): Promise<void> {
   await browser.runtime.openOptionsPage();
 }
 
-/** the active tab's origin, when the browser lets us see it (activeTab after a toolbar click) */
+/** the active tab's origin, when the browser lets us see it (activeTab after a toolbar click); never an Anthropic one */
 export async function activeTabOrigin(): Promise<{ origin: string; tabId: number; path: string } | undefined> {
   const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
   if (!tab?.url || tab.id === undefined) return undefined;
   try {
     const u = new URL(tab.url);
-    if (!/^https?:$/.test(u.protocol)) return undefined;
+    if (!/^https?:$/.test(u.protocol) || isAnthropicHost(u.hostname)) return undefined;
     return { origin: u.origin, tabId: tab.id, path: u.pathname };
   } catch {
     return undefined;

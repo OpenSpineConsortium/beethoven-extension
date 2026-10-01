@@ -1,0 +1,28 @@
+WHAT IT IS
+Beethoven starts, watches and stops a Claude Code worker (a batch job) in the user's own account on a university cluster, through its Open OnDemand portal, and hands the user the claude.ai link the worker prints. It is not an Anthropic product ("Claude" and "Claude Code" are Anthropic's marks) and not provided by or on behalf of any university.
+
+WHY THERE IS NO TEST ACCOUNT
+It has no account, password or licence key of its own; the portal sign-in identifies the user. A worker needs a Wayne State AccessID on its Open OnDemand portal (VPN, second factor), the user's own Claude Pro or Max, and our approval of that account. We cannot issue or lend accounts: one person per account is a term of the portal and of Anthropic's service.
+
+WITHOUT A PORTAL
+1. On https://example.com, click the Beethoven toolbar button: the side panel says "Beethoven step 1 of 11: Your portal". No permission prompt.
+2. In the panel, "Details" > "Run the checks": "2 thing(s) to fix" (FAIL on "1. Access and agreement" and "2. Portal connected"), 15 BLOCKED; worker buttons disabled. Expected with no portal, accepted or not.
+3. The setup page opens on install (or press "Setup page" in the panel). Scroll the agreement to its end (or "Open in tabs"; until then the button is grey), tick the four statements (one consents to class-action and jury-trial waivers), type your name as the signature, press "Accept and Continue". Accepting sends one GET: https://openspineconsortium.com/beethoven/killlist.json.
+4. Under "3. Your portal" type example.com, press "Connect": Chrome asks to allow that one site. The button on example.com then shows "step 2 of 11: Waking up your portal" (the site answers 404). No approval check is sent. "Disconnect" removes the site permission and the page script. claude.ai there: refused, no prompt.
+
+FULL FLOW ON A LOCAL MOCK PORTAL
+The attached beethoven-mock-portal.zip holds a Node stand-in for the portal, scheduler and cluster tool, plus ws; no extension code. Needs Node 22, bash and openssl; tested end to end only on Windows (Git for Windows).
+1. Make a localhost certificate in the unzipped folder (Git Bash: prefix MSYS_NO_PATHCONV=1):
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30 -addext subjectAltName=DNS:localhost
+2. In bash (use no other --user):
+MOCK_LOGGED_IN=false node server.mjs --port 8443 --host localhost --user st1234 --cert cert.pem --key key.pem
+3. Disconnect example.com first. Open https://localhost:8443/login, choose Advanced, "Proceed to localhost (unsafe)" (your own certificate), then "Sign in as st1234". No password. Our access service approves st1234 from any installation only when the portal is localhost.
+4. With the agreement accepted, click the Beethoven button on that tab and Allow Chrome's prompt. The panel then works by itself (two waits of up to a minute).
+5. A sign-in tab opens at the stand-in's dummy Anthropic link (client_id=mock-client); close it. Type ABC123 (any six letters or digits) in "Paste the code from that page here", press Enter.
+6. Tick the data statement, press "I have read this and the statement is true". A second claude.ai tab opens by itself at a made-up environment (no real session; close it); the panel says "Your worker is online", green "Open in Claude". Run the checks: 17 OK.
+
+WHAT IT NEVER DOES
+No host permission at install. It asks Chrome for one site at a time, only from a click: its button on a page whose path starts /pun/ or /nginx/ (Open OnDemand pages) or on the connected portal, a Connect or Allow button in its panel, or the setup page's "Connect". An Anthropic address (claude.ai, claude.com, anthropic.com or subdomains) is refused before any permission request. It runs no script on, reads nothing from and sends nothing to those sites; it only opens Anthropic pages (sign-in, session link, connectors) in a new tab. It never reads the portal's cookie or signs in for the user: the user signs in on Anthropic's page and pastes the one-time code into the panel, which types it once into Claude Code's sign-in in the user's own cluster job and forgets it (not stored, logged or sent to us); it never sees the credential made from it. No remote code, analytics, error reports or usage data.
+
+WHAT IT SENDS US
+Nothing before acceptance. Then, without cookies: a daily GET of killlist.json (signed list of withdrawn versions); and, once a connected portal's dashboard shows a signed-in account name, services.json (at most daily) and the approval check to https://beethoven-access.openspineconsortium.workers.dev/access_check with that name, the portal hostname, the product ("bridge"), the version and a random installation id made at acceptance. The answer is yes or no. Per account the service keeps the last check (time, portal, version, answer, a salted hash of the network address, never the address) and a count, and binds an approved account to the first installation that asks.

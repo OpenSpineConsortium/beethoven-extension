@@ -6,7 +6,8 @@
 // "Could not establish connection. Receiving end does not exist." until the tab was reloaded).
 // The injected script needs a moment to attach its listener, so the tab is pinged a few times
 // before the connection is called unanswered. The browser API is passed in, so the sequence is
-// tested against a fake.
+// tested against a fake. An Anthropic address is refused here, and by every caller before it asks
+// the browser for anything.
 import { siteFromHostname, type PortalSettings } from './keys';
 import { PRODUCT_NAME } from './terms';
 
@@ -18,7 +19,8 @@ export interface ConnectApi {
   scriptRegisteredFor(): Promise<string | undefined>;
   registerScript(origin: string): Promise<void>;
   unregisterScript(): Promise<void>;
-  inject(tabId: number): Promise<void>;
+  /** load the page script into the tab, only while the tab is on that origin (it throws otherwise) */
+  inject(tabId: number, origin: string): Promise<void>;
   ping(tabId: number): Promise<boolean>;
   loadSettings(): Promise<PortalSettings | undefined>;
   saveSettings(s: PortalSettings): Promise<void>;
@@ -27,12 +29,71 @@ export interface ConnectApi {
   sleep(ms: number): Promise<void>;
 }
 
+// Never an Anthropic site: Beethoven has, asks for and uses no access to claude.ai, claude.com or
+// anthropic.com, nor to any name under them. This one predicate is the rule; normaliseOrigin, the
+// tab reading, the permission request (ext/connectApi.ts requestOrigin), the stored settings, the
+// page script and the clean-up of grants an earlier build obtained all ask it. 9.0.0 refused such an
+// address only after it had asked the browser for it, so the browser's Allow/Deny prompt came first.
+const ANTHROPIC_HOST = /(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/;
+
+/** the end of the refusal sentence, for the places that say it in their own words */
+export const ANTHROPIC_NEVER = `${PRODUCT_NAME} never connects to claude.ai, claude.com or anthropic.com`;
+/** the refusal sentence wherever an Anthropic address is typed or clicked from */
+export const ANTHROPIC_REFUSAL = `that is an Anthropic address, not a portal: ${ANTHROPIC_NEVER}`;
+
+/** "claude.ai", "www.claude.ai", "api.anthropic.com", "CLAUDE.COM." -> true; "claude.ai.example.edu", "notclaude.ai" -> false */
+export function isAnthropicHost(hostname: string | undefined | null): boolean {
+  // a fully qualified name may end in a dot ("claude.ai." is claude.ai)
+  const h = String(hostname ?? '').trim().toLowerCase().replace(/\.+$/, '');
+  return ANTHROPIC_HOST.test(h);
+}
+
+// A typed address names its scheme when it starts with one and a colon, unless what follows the colon
+// is a port ("localhost:8443", "portal.example.edu:443/pun/", or "localhost:" with nothing after it).
+// "https:/claude.ai" and "https:claude.ai" are https addresses on claude.ai (the URL standard reads
+// them so), and "ftp://claude.ai", "wss://claude.ai" and "ftp:/claude.ai" name claude.ai under another
+// scheme; 10.0.0's first build put https:// in front of all of these and asked the browser for the
+// hosts "https", "ftp" and "wss" instead.
+const EXPLICIT_SCHEME = /^[a-z][a-z0-9+.-]*:(?!\d+(?:[/?#]|$)|$)/i;
+
+/** a typed address, an origin or a URL, read as the URL standard reads it, https:// put in front when it names no scheme; undefined when it is no address */
+function parseAddress(input: string): URL | undefined {
+  const s = String(input ?? '').trim();
+  if (!s) return undefined;
+  try {
+    return new URL(/^https?:/i.test(s) || EXPLICIT_SCHEME.test(s) ? s : `https://${s}`);
+  } catch {
+    return undefined;
+  }
+}
+
+/** the host an address names, with or without its scheme ("claude.ai/code" -> "claude.ai", "ftp://claude.ai" -> "claude.ai"); undefined when it names none */
+function hostOf(input: string): string | undefined {
+  return parseAddress(input)?.hostname || undefined;
+}
+
+/** an origin, a URL or a typed address on an Anthropic host */
+export function isAnthropicAddress(input: string | undefined | null): boolean {
+  return isAnthropicHost(hostOf(String(input ?? '')));
+}
+
+/** a host permission pattern ("https://claude.ai/*", "*://*.anthropic.com/*") on an Anthropic host; the all-hosts patterns are not */
+export function isAnthropicPattern(pattern: string): boolean {
+  const m = /^[a-z*]+:\/\/([^/]*)\//i.exec(String(pattern ?? ''));
+  if (!m) return false;
+  const host = (m[1] ?? '').replace(/:(\d+|\*)$/, '').replace(/^\*\./, '');
+  return host !== '*' && isAnthropicHost(host);
+}
+
 export interface TabLook {
   origin: string;
   hostname: string;
+  /** the page's path; empty for an Anthropic tab, whose address is never kept */
   path: string;
-  /** the page is an Open OnDemand page (a /pun/ path), or the tab is on the portal already connected */
+  /** the page is an Open OnDemand page (a /pun/ path), or the tab is on the portal already connected; never on an Anthropic host */
   ood: boolean;
+  /** the tab is on claude.ai, claude.com or anthropic.com (or under them): never a portal, whatever its path */
+  anthropic: boolean;
 }
 
 /** what a tab's address says: usable at all (http/https), and does it look like Open OnDemand */
@@ -41,8 +102,9 @@ export function lookAtTab(url: string | undefined, storedHostname?: string): Tab
   try {
     const u = new URL(url);
     if (!/^https?:$/.test(u.protocol)) return undefined;
+    if (isAnthropicHost(u.hostname)) return { origin: u.origin, hostname: u.hostname, path: '', ood: false, anthropic: true };
     const ood = /^\/pun\//.test(u.pathname) || /^\/nginx\//.test(u.pathname) || (!!storedHostname && u.hostname === storedHostname);
-    return { origin: u.origin, hostname: u.hostname, path: u.pathname, ood };
+    return { origin: u.origin, hostname: u.hostname, path: u.pathname, ood, anthropic: false };
   } catch {
     return undefined;
   }
@@ -50,14 +112,56 @@ export function lookAtTab(url: string | undefined, storedHostname?: string): Tab
 
 /** "ondemand.grid.wayne.edu", "https://ondemand.grid.wayne.edu/pun/sys/dashboard" -> "https://ondemand.grid.wayne.edu" */
 export function normaliseOrigin(input: string): string {
-  let s = String(input ?? '').trim();
-  if (!s) throw new Error('type your portal address first');
-  if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
-  const u = new URL(s);
-  // never an Anthropic site: the extension has no business on claude.ai, claude.com or anthropic.com (STORE_LISTING.md)
-  if (/(^|\.)(claude\.ai|claude\.com|anthropic\.com)$/i.test(u.hostname)) throw new Error(`that is an Anthropic address, not a portal: ${PRODUCT_NAME} never connects to claude.ai, claude.com or anthropic.com`);
+  if (!String(input ?? '').trim()) throw new Error('type your portal address first');
+  const u = parseAddress(input);
+  if (!u) throw new Error('type your portal address first');
+  // the Anthropic refusal comes first, whatever the scheme: "ftp://claude.ai" is refused as claude.ai
+  if (isAnthropicHost(u.hostname)) throw new Error(ANTHROPIC_REFUSAL);
   if (u.protocol !== 'https:' && !(u.protocol === 'http:' && /^(localhost|127\.0\.0\.1)$/.test(u.hostname))) throw new Error('the portal must be an https address');
   return u.origin;
+}
+
+/**
+ * May the browser be asked for this origin? Only an origin exactly as normaliseOrigin makes it (so
+ * never an Anthropic one, and https or the local mock only). Synchronous, so a click handler can ask
+ * it before the permission request without losing the gesture.
+ */
+export function mayRequestOrigin(origin: string): boolean {
+  try {
+    return typeof origin === 'string' && normaliseOrigin(origin) === origin;
+  } catch {
+    return false;
+  }
+}
+
+/** The permission request behind its check: a refused origin never reaches the browser, and its answer is "not granted". */
+export function guardedRequest(request: (patterns: string[]) => Promise<boolean>): (origin: string) => Promise<boolean> {
+  return (origin) => (mayRequestOrigin(origin) ? request([`${origin}/*`]) : Promise.resolve(false));
+}
+
+/** settings read back from storage, unless they name an Anthropic address (an earlier build or a hand edit cannot make one a portal) */
+export function acceptedSettings(s: PortalSettings | undefined | null): PortalSettings | undefined {
+  if (!s || typeof s !== 'object') return undefined;
+  if (isAnthropicAddress(s.origin) || isAnthropicHost(s.hostname)) return undefined;
+  return s;
+}
+
+/** the browser's grants, as the clean-up below needs them */
+export interface GrantApi {
+  heldOrigins(): Promise<string[]>;
+  removeOrigins(patterns: string[]): Promise<void>;
+}
+
+/**
+ * Remove every host grant on an Anthropic name. 9.0.0 asked for an address before refusing it, so a
+ * tester who pressed Allow there holds a grant this extension never used; it goes on install, update
+ * and browser start. With nothing held, nothing is removed and the browser is not asked to remove
+ * anything. Returns the patterns it removed.
+ */
+export async function dropAnthropicGrants(api: GrantApi): Promise<string[]> {
+  const held = (await api.heldOrigins().catch(() => [] as string[])).filter(isAnthropicPattern);
+  if (held.length) await api.removeOrigins(held).catch(() => undefined);
+  return held;
 }
 
 export interface ConnectOutcome {
@@ -106,7 +210,7 @@ export async function connectSequence(api: ConnectApi, input: ConnectInput): Pro
     answered = await api.ping(input.tabId).catch(() => false);
     if (!answered) {
       try {
-        await api.inject(input.tabId);
+        await api.inject(input.tabId, origin);
         injected = true;
       } catch {
         /* the tab may be mid-navigation; the registration covers its next load */

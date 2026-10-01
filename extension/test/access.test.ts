@@ -7,9 +7,11 @@
 // too old) are said in their own sentences, and the pure decision turns each record into the one
 // state the strip and check 1 show. The last block runs the same client against the mock portal's
 // stand-in for the service, which binds an approved account to the first installation that asks.
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { cliOptions, createMockPortal } from '../mock-ood/server.mjs';
-import { accessDue, accessFact, APPROVED_GRACE_MS, APPROVED_TTL_MS, askService, checkAccess, DENIED_TTL_MS, fetchServices, INSTALL_ID_RE, normalizeAccount, OTHER_ACCOUNT, OTHER_INSTALLATION, PRODUCT, REQUEST_PAGE_URL, requestUrl, RETRY_MS, safeSitePage, SERVICES_TTL_MS, SERVICES_URL, UPDATE_REQUIRED, type AccessRecord, type StoredServices } from '../src/licensing/access';
+import { accessDue, accessFact, accessOutcomeWords, reasonSentence, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, APPROVED_GRACE_MS, APPROVED_TTL_MS, askService, checkAccess, DENIED_TTL_MS, fetchServices, INSTALL_ID_RE, normalizeAccount, OTHER_ACCOUNT, OTHER_INSTALLATION, PRODUCT, REQUEST_PAGE_URL, requestUrl, RETRY_MS, safeSitePage, SERVICES_TTL_MS, SERVICES_URL, UPDATE_REQUIRED, type AccessRecord, type StoredServices } from '../src/licensing/access';
 
 const T0 = Date.parse('2026-09-29T12:00:00Z');
 const at = (ms: number) => new Date(ms);
@@ -50,6 +52,49 @@ function fakeService(o: { approved?: string[]; status?: number; body?: unknown; 
 
 const approvedRecord = (checkedAgoMs: number, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', approved: true, checked_at: iso(T0 - checkedAgoMs), until: null, last_attempt_at: iso(T0 - checkedAgoMs), ...extra });
 const deniedRecord = (checkedAgoMs: number, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', approved: false, checked_at: iso(T0 - checkedAgoMs), request_page: REQUEST_PAGE_URL, last_attempt_at: iso(T0 - checkedAgoMs), ...extra });
+
+// "Check my access now": the label is said once, on the page's side; the background and the client
+// give bare reasons. 9.0.0 showed "Not asked: not asked: the agreement has not been accepted yet".
+describe('the strip\'s status line when the background did not ask', () => {
+  // the strip shows the bare reason with no label in front, so it is made a sentence of its own
+  // (9.0.0's background gave this one as a sentence; 10.0.0's first build showed it lower-case)
+  it('starts with a capital and ends with one full stop, with no label', () => {
+    expect(reasonSentence(NOT_ASKED_NO_ACCOUNT)).toBe('Your portal has not shown who is signed in yet: open it in a tab and sign in there, then try again.');
+    expect(reasonSentence(NOT_ASKED_NO_PORTAL)).toBe('No portal connected yet.');
+    expect(reasonSentence(NOT_ASKED_TERMS)).toBe('The agreement has not been accepted yet.');
+    expect(reasonSentence('not asked: no portal connected yet')).toBe('No portal connected yet.');
+    expect(reasonSentence("Licensor's access service answered 502")).toBe("Licensor's access service answered 502.");
+    expect(reasonSentence('Done.')).toBe('Done.');
+    expect(reasonSentence('')).toBe('');
+  });
+});
+
+describe('what a press of "Check my access now" says', () => {
+  it('says "Not asked" once, before the bare reason, and ends with one full stop', () => {
+    expect(accessOutcomeWords({ asked: false, detail: NOT_ASKED_TERMS })).toEqual({ kind: 'info', text: 'Not asked: the agreement has not been accepted yet.' });
+    expect(accessOutcomeWords({ asked: false, detail: NOT_ASKED_NO_PORTAL }).text).toBe('Not asked: no portal connected yet.');
+    expect(accessOutcomeWords({ asked: false, detail: NOT_ASKED_NO_ACCOUNT }).text).toBe('Not asked: your portal has not shown who is signed in yet: open it in a tab and sign in there, then try again.');
+    expect(accessOutcomeWords({ asked: false, approved: true, detail: 'the approval on file is less than a day old' }).text).toBe('Not asked: the approval on file is less than a day old.');
+    // a reason that still carries a label (as 9.0.0's did) is not labelled twice, and a full stop is not doubled
+    expect(accessOutcomeWords({ asked: false, detail: 'not asked: no portal connected yet' }).text).toBe('Not asked: no portal connected yet.');
+    expect(accessOutcomeWords({ asked: false, detail: 'the address is not known.' }).text).toBe('Not asked: the address is not known.');
+    for (const d of [NOT_ASKED_TERMS, NOT_ASKED_NO_PORTAL, NOT_ASKED_NO_ACCOUNT]) {
+      expect(d).not.toMatch(/^(not asked|checked)\b/i);
+      expect(accessOutcomeWords({ asked: false, detail: d }).text).not.toMatch(/not asked:\s*not asked/i);
+    }
+  });
+
+  it('says "Checked" for an answer, in the class of the answer', () => {
+    expect(accessOutcomeWords({ asked: true, approved: true, detail: 'approved for st1234 at localhost' })).toEqual({ kind: 'ok', text: 'Checked: approved for st1234 at localhost.' });
+    expect(accessOutcomeWords({ asked: true, approved: false, detail: 'st1234 is not on the approved list yet' })).toEqual({ kind: 'warn', text: 'Checked: st1234 is not on the approved list yet.' });
+  });
+
+  it('the background gives bare reasons, never its own "not asked:" label', () => {
+    const background = readFileSync(fileURLToPath(new URL('../src/entrypoints/background.ts', import.meta.url)), 'utf8');
+    expect(background).not.toMatch(/detail:\s*['"`]not asked/i);
+    for (const name of ['NOT_ASKED_TERMS', 'NOT_ASKED_NO_PORTAL', 'NOT_ASKED_NO_ACCOUNT']) expect(background).toContain(`detail: ${name}`);
+  });
+});
 
 describe('the wire request', () => {
   it('is one POST with a text/plain JSON body of exactly {v, access_id, portal, product, version, install_id}, without cookies', async () => {

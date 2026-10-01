@@ -6,9 +6,15 @@ reasons behind them; this file says what to do around the paste, in what order. 
 for 4.0.0 (the first version without licence keys), brought up to date for 6.0.0 and 7.0.0 the same
 night, rewritten on 2026-09-30 for 8.0.0, and brought up to date for 9.0.0 the same evening (the
 extension's pages in the site's theme with the typefaces bundled, a new icon, new store images and a
-short description; no change to permissions, requests, stored data or the agreement texts). Beethoven
-is offered in one place only: a **Private** item on the Chrome Web Store, visible to the trusted
-testers the maintainer names, a Google Group he keeps with his personal Google account and to which
+short description; no change to permissions, requests, stored data or the agreement texts), and
+brought up to date for 10.0.0 on 2026-10-01. 9.0.0 was built on 2026-09-30 and replaced before any
+review because of two defects: it asked Chrome for a site permission on an Anthropic address before
+refusing that address as a portal, and its agreement's *Accept and Continue* button did not wait for
+the text to be scrolled to its end; 10.0.0 refuses an Anthropic address before any permission
+request and enables the button only once the text in its box has been scrolled to its end (or fits
+the box with nothing to scroll), or the agreement and the privacy statement have been opened in tabs,
+with the agreement texts at the same versions. Beethoven is offered in one place only: a
+**Private** item on the Chrome Web Store, visible to the trusted testers the maintainer names, a Google Group he keeps with his personal Google account and to which
 he adds each student he approves for Beethoven. No other store, no signed file, no download from the
 website: the website shows no install link at all, and the item's link goes to approved students
 only. Store dashboards move their fields around from time to time; the field names below are the
@@ -26,11 +32,16 @@ being shared casually, and the agreement makes sharing a breach.
 Have these in hand, and check each once:
 
 1. The package, built from a clean tree with Node 22 in `extension/`:
-   `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The file to upload is
-   `.output/beethoven-9.0.0-chrome.zip` (the same command also writes a Firefox zip and a sources
-   zip; neither is uploaded, and the sources zip is what a reviewer gets if they ask for the mock
-   portal, section 4). Confirm it is a release build: `unzip -p .output/beethoven-9.0.0-chrome.zip
-   manifest.json` must show `"name":"Beethoven"`, `"version":"9.0.0"`, the 128-character
+   `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The build writes
+   `.output/beethoven-10.0.0-chrome.zip`; the file to upload is its copy in the release folder,
+   `release/10.0.0/beethoven-10.0.0-chrome.zip`, whose SHA-256 must match
+   `release/10.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`). The same command also writes a
+   Firefox zip and a sources zip; neither is uploaded or sent to anyone: the sources zip holds the
+   extension's full source. A reviewer who asks for the mock portal gets
+   `release/10.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no extension code
+   (section 4). Confirm it is a release build: `unzip -p
+   release/10.0.0/beethoven-10.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
+   `"version":"10.0.0"`, the 128-character
    `description` in `LISTING.md` ("Starts, watches and stops ..."),
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
    `"optional_host_permissions":["https://*/*"]` and no `localhost`,
@@ -64,7 +75,7 @@ Have these in hand, and check each once:
    installation**: every reviewer's installation is a new one, and a second installation of any
    other account is refused. From WSL (Windows sockets flake), two checks with two different
    installation identifiers:
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"9.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
+   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"10.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
    and the same with `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
    `access-control-allow-origin: *`. If the second answers `"reason":"other_installation"`, the
    service does not exempt the reviewer account yet, and a reviewer would see "This account is
@@ -75,10 +86,30 @@ Have these in hand, and check each once:
    seat and no conflict. Never run this check with a real student's
    AccessID: the first identifier that asks binds that account. If it answers `approved:false`
    without a reason, add the account in the admin console (or `node tools/intake/admin.mjs add
-   st1234 "Store reviewer (mock portal)" st1234@wayne.edu "store-reviewer mock username"` in the
-   sibling repository of Beethoven for VS Code, Desktop folder `ashley`; token from the vendor
-   folder, never on the command line). The `product` field stays `bridge`, the extension's name on
-   the wire since 4.0.0.
+   st1234 "Store reviewer (mock portal)" <the maintainer's own e-mail> "store-reviewer mock
+   username"` in the sibling repository of Beethoven for VS Code, Desktop folder `ashley`; token from
+   the vendor folder, never on the command line; never `st1234@wayne.edu`, a mailbox a real person may
+   own), and then run `node tools/intake/admin.mjs seat-rule st1234 any`: without that rule `st1234`
+   is an ordinary approval, valid at any portal and bound to the first installation that asks. The
+   `product` field stays `bridge`, the extension's name on the wire since 4.0.0.
+
+   **Deploy the access service of 2026-10-01 before submitting.** `tools/intake/worker.js` in that
+   repository approves `st1234` only when the portal is `localhost` (or a name under `.localhost`) and
+   answers it as an unknown account from any other portal, and its public `GET /allowlist` names
+   nobody (until then it gave every approved AccessID to anyone, which `PRIVACY.md` version 8 does not
+   allow: "The service answers yes or no, and nothing else about you or anyone else"). Until that
+   Worker is live, the live service approves `st1234` at any portal and binds the first installation
+   there, so the reviewer text "only when the portal is localhost" is not yet true: do not send the
+   fuller text in `PASTE.md` before it. In this order: (1) `node tools/intake/admin.mjs list`:
+   `st1234` must be the only record with `any_installation`; `admin.mjs seat st1234` must show no
+   seat (clear one with `reset-seat st1234`). (2) Publish the site with `/beethoven/services.json` and
+   `/ashley/services.json` without their `allowlist` key (the site repository's working tree has both;
+   its `tools/build_site.py` fails if either key comes back). (3) No sooner than an hour later (the VS
+   Code builds cache the services file for an hour; a day is safer), deploy the Worker under both
+   names (`bash tools/intake/deploy.sh`, then `WORKER_NAME=ashley-service bash tools/intake/deploy.sh`;
+   `deploy.sh` no longer writes an `allowlist` key). (4) The two checks above again: both still
+   `approved:true`, and `https://beethoven-access.openspineconsortium.workers.dev/allowlist` answers
+   `"accessIds":[]`.
 6. The Google Group of testers, made once at `https://groups.google.com` with the personal Google
    account that owns the developer account: *Create group*; the name "Beethoven-users" and an
    address such as `beethoven-users@googlegroups.com` (whatever is free); who can search for
@@ -114,13 +145,13 @@ Registration (once, about ten minutes):
 
 The item (about thirty minutes):
 
-4. Dashboard, **Items**, **New item**. Drag `beethoven-9.0.0-chrome.zip` in. The item ID appears
+4. Dashboard, **Items**, **New item**. Drag `beethoven-10.0.0-chrome.zip` in. The item ID appears
    in the URL and in the item header at once; note it: it is the link approved students get
    (section 5), and it goes nowhere public. A draft left from the extension's earlier name can be
    archived (it is hidden from the list and can be shown again; nobody ever saw it), or kept and
-   turned into Beethoven by uploading the 9.0.0 zip under its **Package** tab; either ends in the
+   turned into Beethoven by uploading the 10.0.0 zip under its **Package** tab; either ends in the
    same place.
-5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,049 characters);
+5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,203 characters);
    Category Developer Tools; Language English (United States); the store icon; the promo video's
    YouTube link (upload the file as Unlisted first, or leave the field empty); the small promo tile;
    the five screenshots in the order given; the marquee; Official URL (empty until the site is
@@ -143,8 +174,15 @@ The item (about thirty minutes):
    the developer account, not this one only. The dashboard itself was not opened while this was
    written, so the exact field names may differ. Never choose Unlisted or Public: either would let
    anyone with the link install.
-8. **Submit for review** (top right). A Private item is reviewed like a public one.
-9. Expected review time: most items are reviewed within a few days; a wildcard optional host
+8. **Test instructions** tab (under **Access** in the left menu), from `PASTE.md`: the username
+   sentence (Beethoven has no account of its own), the password box left empty, and the Additional
+   instructions (490 characters, within the box's 500). Save changes. Before pasting, see on the
+   10.0.0 build the two things these texts say it does differently from 9.0.0: the agreement's
+   button waits for the end of the text, and claude.ai typed into the setup page's *Connect* is
+   refused with no prompt (`TEST_BEFORE_UPLOAD.md`, steps 2 and 15). The fuller text below them in
+   `PASTE.md` is not pasted: it goes into a reply if a reviewer asks (section 4).
+9. **Submit for review** (top right). A Private item is reviewed like a public one.
+10. Expected review time: most items are reviewed within a few days; a wildcard optional host
    permission (`https://*/*`) puts the item into in-depth review, and a new developer account with a
    first item adds to that, so allow up to a few weeks. The decision comes by e-mail; a rejection
    names the policy and can be appealed from the dashboard with a written explanation (section 4).
@@ -196,21 +234,28 @@ plainly and offer the next best thing. Reply with this:
 Thank you for reviewing Beethoven. The extension works only against a university's Open OnDemand portal, which requires a university account, a VPN and a second factor. We cannot issue such an account to a reviewer, and we cannot lend ours: one person, one account is a term of the portal and of Anthropic's Claude service the worker uses.
 
 What we can offer:
-1. A mock portal (mock-ood/server.mjs in the extension's project, which we attach as a zip) that serves the same routes the extension uses, with a stand-in scheduler and a stand-in cluster tool, and a recipe to run it in ten minutes on any machine with Node 22 (below). The mock's username is approved on our access service and accepted from any installation, so the extension works against it with nothing to paste; there is no key.
+1. A mock portal, attached as beethoven-mock-portal.zip: a small Node 22 server that serves the same routes the extension uses, with a stand-in scheduler and a stand-in cluster tool; it contains no extension code. The recipe below runs it with the item you installed from the store; it needs Node 22, bash and openssl, and we have run it end to end only on Windows, with Git for Windows. The mock's username, st1234, is approved on our access service for a portal at localhost and accepted from any installation, so the extension works against it with no licence key.
 2. [Only if recorded by then: a walk-through of the same flow against the mock, and one against a live university portal with the hostname and the pasted code blurred, so you see exactly what a student sees. Delete this item if there is no recording.]
 3. A live screen-share at a time of your choosing, during which you may direct every click.
 
-What the extension does not do, which may be what you need to confirm: it has no host permission, content script or code on claude.ai, anthropic.com or claude.com and only opens those pages in a new tab; it never reads a Claude credential (the user signs in on Anthropic's page and pastes a one-time code that is relayed once to the user's own cluster shell and kept nowhere); it runs no remote code (its daily update check fetches one signed JSON list); it holds no install-time host permission and asks for one origin at the click; the one thing it sends us is the approval check (the account name the portal shows, the portal hostname, the product, the version and a random identifier the extension made for this installation), answered yes or no; no analytics, no error reports, no activation.
+What the extension does not do, which may be what you need to confirm: it has no host permission, content script or code on claude.ai, anthropic.com or claude.com and only opens those pages in a new tab; it never reads a Claude credential (the user signs in on Anthropic's page and pastes a one-time code that is relayed once to the user's own cluster shell and kept nowhere); it runs no remote code (its daily update check fetches one signed JSON list); it holds no install-time host permission, asks for one origin at a time and only from a click, and refuses an address on claude.ai, anthropic.com or claude.com before any permission request; the one thing it sends us is the approval check (the account name the portal shows, the portal hostname, the product, the version and a random identifier the extension made for this installation), answered yes or no; no analytics, no error reports, no activation.
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher.
 ```
 
-Then paste the reviewer recipe from `LISTING.md` under it, and attach
-`.output/beethoven-9.0.0-sources.zip`. The two recordings named in `../STORE_LISTING.md` ("Reviewer
-access", item 2) have not been made as of 2026-09-30; record them (under five minutes each, the mock
-one from the recipe in `LISTING.md`, the live one with the portal hostname and the pasted code
-blurred) if you want item 2 in the reply; otherwise leave item 2 out, as the draft says. The mock is
-not hosted publicly; the recipe runs it locally.
+Then paste under it the fuller text from `PASTE.md` (section "Test instructions tab", the block
+after "The fuller text, for a reply to a reviewer"), which carries the recipe for a reviewer who has
+the item installed from the store, and attach `release/10.0.0/reviewer/beethoven-mock-portal.zip`:
+the mock, its stand-in scheduler and cluster tool and its one dependency (`ws`), and no extension
+code. Never attach `.output/beethoven-<version>-sources.zip`: it holds the extension's full source,
+which is not handed out. The recipe in `LISTING.md` is the same flow at more length, for a follow-up
+question. The mock flow was run end to end only on Windows, with Git for Windows (on the 9.0.0
+package and again on the 10.0.0 build in `release/10.0.0/`, 2026-10-01, from the repository's
+`extension/mock-ood`; the zip's own copy was started and answered `/login`); say so if a reviewer names another system. The two recordings named in
+`../STORE_LISTING.md` ("Reviewer access", item 2) have not been made as of 2026-09-30; record them
+(under five minutes each, the mock one from the recipe in `LISTING.md`, the live one with the portal
+hostname and the pasted code blurred) if you want item 2 in the reply; otherwise leave item 2 out, as
+the draft says. The mock is not hosted publicly; the recipe runs it locally.
 
 ## 5. After publication: how students install
 

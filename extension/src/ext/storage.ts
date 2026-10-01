@@ -5,6 +5,7 @@
 // opened, the last sign-in it saw, the probe it submitted); storage.session holds connection state.
 import { browser } from 'wxt/browser';
 import type { KV } from '../core/audit';
+import { acceptedSettings } from '../core/connect';
 import { DEFAULT_PREFS, INSTALL_ID_KEY, PORTAL_KEY, PREFS_KEY, type PortalSettings, type Prefs } from '../core/keys';
 
 function area(a: { get(keys: string): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void>; remove(keys: string): Promise<void> }): KV & { remove(key: string): Promise<void> } {
@@ -25,8 +26,9 @@ function area(a: { get(keys: string): Promise<Record<string, unknown>>; set(item
 export const local = area(browser.storage.local);
 export const session = area(browser.storage.session);
 
+/** the connected portal; never one on an Anthropic address, whatever storage holds (core/connect.ts acceptedSettings) */
 export async function portalSettings(): Promise<PortalSettings | undefined> {
-  return local.get<PortalSettings>(PORTAL_KEY);
+  return acceptedSettings(await local.get<PortalSettings>(PORTAL_KEY));
 }
 
 export async function prefs(): Promise<Prefs> {

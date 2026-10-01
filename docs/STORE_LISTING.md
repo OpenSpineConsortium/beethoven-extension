@@ -26,8 +26,8 @@ are in the history of this file (7.0.0 and before).
 
 It must read as one narrow browser function, not two products. Every permission below maps to a
 sentence of it. The listing description also says, in plain words: the extension talks only to the
-Open OnDemand portal address you connect; it has no access to claude.ai; it never sees your Claude
-sign-in; it runs no code it did not ship with.
+Open OnDemand portal address you connect; it holds no site permission on claude.ai and never asks
+for one; it never sees your Claude sign-in; it runs no code it did not ship with.
 
 ## What a click on the icon does (listing text and reviewer notes)
 
@@ -54,7 +54,7 @@ product: the person's own sign-in to their portal identifies them, and the exten
 the vendor's access service that the account is approved and that this installation is the one the
 approval is bound to (one approved account, one installation).
 
-## Per-permission justifications (one sentence each, as entered in the dashboard)
+## Per-permission justifications (one sentence each; the texts entered in the dashboard are in `store/PASTE.md`)
 
 | Manifest key | Value | Justification |
 |---|---|---|
@@ -63,7 +63,7 @@ approval is bound to (one approved account, one installation).
 | | `scripting` | Loads the extension's page script on your university portal, and only there, after you connect it, including into the tab you clicked from. |
 | | `activeTab` | Lets a click on the icon read the address of the portal tab you clicked from, so it can connect that one site; no install warning. |
 | | `sidePanel` | Opens the job monitor beside your portal tab when you click the icon. |
-| `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab; access is requested at that click for that one origin only, and the extension refuses to work until it is granted. |
+| `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab, from the panel or by typing its address on the setup page; access is requested at that click for that one origin only, an Anthropic address is refused before any request, and the extension refuses to work until the portal is granted. |
 | `host_permissions` | none | |
 | `action` (no `default_popup`) | | A click on the icon runs the steps above and opens the panel; there is no popup. |
 | `options_ui` | the setup page | The agreement, your portal (connect by address or disconnect), the statement about where your work goes, the settings (shell host, site profile, worker permission mode, "start my worker when I open my portal" and "open claude.ai when my worker connects", both on by default in the current build and each explained where it is switched), the audit log with its export, and the optional Google Drive step. It opens on install. |
@@ -90,7 +90,7 @@ No payment gates any function of the Trial Edition, so the "payment required" di
 used. The listing says instead:
 
 > Free. Approval of your institutional account by the maintainer is required (ask on the request
-> page; there is no key and nothing to paste); no payment is taken, nothing converts into a paid
+> page; there is no licence key); no payment is taken, nothing converts into a paid
 > licence, and no charge follows the end of the evaluation period (agreement, section 3(c)). A paid
 > Full Edition, if ever offered, would be a separate agreement.
 
@@ -183,43 +183,48 @@ relies on:
    app does), and `GET /pun/sys/dashboard/activejobs.json`. It runs no scheduler and reaches no
    cluster; it exists so a reviewer can click the icon on the mock's tab, grant the one origin,
    watch the steps run and see a fake job go from starting to online. The mock's username `st1234`
-   is on the approved list of the live access service and must be accepted from any installation
-   (every reviewer's is a new one), so the approval check answers yes for it and the reviewer has
-   nothing to paste; the check is in `store/SUBMISSION.md`, section 0, item 5. The mock is not
+   has an approval on the live access service that counts only on a portal at localhost, from any
+   installation (every reviewer's is a new one), so the approval check answers yes for it and the
+   reviewer needs no key; the check is in `store/SUBMISSION.md`, section 0, item 5. The mock is not
    hosted publicly.
 2. A recorded walk-through (under five minutes) of the same flow against the mock portal, and a
    second recording against a real portal with the hostname blurred, so the reviewer sees what a
    student sees, including the sign-in step with the pasted code blurred. Not recorded as of
    2026-09-30.
-3. Reviewer notes stating the negatives: no claude.ai access, no credential handling (the pasted
+3. Reviewer notes stating the negatives: no site permission on claude.ai, never asked for, no credential handling (the pasted
    code is relayed once and not kept), no remote code, the two kinds of external page it opens and
    that it runs nothing on them, and the exact host and permission list a security office can pin
    with `ExtensionSettings.runtime_allowed_hosts`.
 
-## Negative statements (listing text, privacy policy and reviewer notes, verbatim)
+## Negative statements (word for word as on the public reviewers page; the listing and the privacy
+policy say the same in their own words)
 
-- Beethoven has no access to claude.ai or any Anthropic page. It does not run on those sites, does
-  not read them and does not change them. It opens an Anthropic page in a new tab in two cases (the
-  sign-in page Claude Code printed during a sitting you started; your session's claude.ai/code link
-  when your worker connects) and the connectors settings page for the optional Google Drive step, as
-  a bookmark would; nothing of the extension runs there.
+- Beethoven has no site permission on claude.ai or any Anthropic page and never asks for one. It
+  does not run on those sites, does not read them and does not change them; a click on its button on
+  such a tab reads only the tab's address, to refuse it. It opens an Anthropic page in a new tab in
+  two cases (the sign-in page Claude Code printed during a sitting you started; your session's
+  claude.ai/code link when your worker connects) and the connectors settings page for the optional
+  Google Drive step, as a bookmark would; nothing of the extension runs there.
 - Beethoven never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own
   page; the one-time code you paste into the extension's box is typed once into your own job's
   terminal on your cluster and is not stored, not logged and not sent anywhere else; the extension
   reads only whether Claude Code says it is signed in.
-- Beethoven runs no code it did not ship with. Its daily update check downloads a signed list, not
-  a program.
-- Beethoven works with one website: the Open OnDemand portal you connect. It requests access to
-  that site when you click its icon on that site's tab, and to nothing else. Its only other requests
-  go to the maintainer: the approval check, which sends the account name your portal shows for you,
-  your portal's address, the product name and its version, and the random identifier of this
-  installation, so the maintainer's access service can answer whether that account is approved and
-  whether this is the installation it is approved on; and a daily download, from the maintainer's
-  website, of that service's address and the signed list of withdrawn versions, which carries
-  nothing about you.
-- Beethoven does not read your portal cookie and does not sign in for you. When your portal asks
-  for a sign-in, the extension asks you to sign in in a tab. There is no key and nothing to paste:
-  your institution's own sign-in identifies you.
+- Beethoven runs no code it did not ship with. Its daily update check fetches a signed list, not a
+  program.
+- Beethoven works with one website: the Open OnDemand portal you connect. It requests access to that
+  site, and to nothing else, only from a click: its icon on that site's tab, a Connect or Allow
+  button in its panel, or Connect on its setup page, where you can type the site's address. It
+  refuses an address on claude.ai, claude.com or anthropic.com before asking the browser for
+  anything. Its only other requests go to the maintainer: the approval check, which sends the
+  account name your portal shows for you, your portal's address, the product name and its version,
+  and the installation identifier (a random number the extension makes when its agreement is
+  accepted, not derived from the device), so the maintainer's access service can answer whether that
+  account is approved on this installation; and a daily fetch, from the maintainer's website, of
+  that service's address and the signed list of withdrawn versions, which carries nothing about you.
+- Beethoven does not read your portal cookie and does not sign in for you. When your portal asks for
+  a sign-in, the extension asks you to sign in in a tab. There is no licence key: your institution's
+  own sign-in identifies you, and the only thing you paste is the one-time code Claude Code's own
+  sign-in gives you, which goes to your own job.
 - Beethoven sends its maintainer no usage data, no error reports and no activation request; the
   approval check is the only thing it sends about you. Its audit log of what it asked your portal
   never contains what you typed to sign in and is never transmitted.

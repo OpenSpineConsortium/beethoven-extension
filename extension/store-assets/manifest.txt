@@ -1,5 +1,7 @@
 Beethoven 9.0.0: store assets
 
+These images were made on the 9.0.0 build and are unchanged for 10.0.0.
+
 Made 2026-10-01 between 01:46 and 02:03 UTC for 9.0.0 and rebuilt once at 02:38 to 02:40 UTC (the stills
 came out byte-identical; the video changed as described under promo/beethoven-promo.mp4), the release whose
 pages wear the site's theme (the cream ground, ink type, the teal accent, Newsreader and IBM Plex), from

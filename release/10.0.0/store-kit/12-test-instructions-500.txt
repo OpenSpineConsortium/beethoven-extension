@@ -1,0 +1,5 @@
+Beethoven runs Claude Code in a Wayne State grid account via Open OnDemand. Needs the user's own AccessID, VPN, 2FA, Claude Pro/Max and our approval; we cannot lend accounts.
+1. Toolbar icon on example.com: panel at step 1 of 11, no prompt.
+2. Details > Run the checks: 2 FAIL, 15 BLOCKED (no portal).
+3. Setup page: scroll to end, tick 4, sign, Accept and Continue. At 3. Your portal type example.com, Connect: Chrome asks for that site only. Disconnect removes it.
+Mock portal on request.

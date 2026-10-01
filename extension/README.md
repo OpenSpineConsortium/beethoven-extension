@@ -341,7 +341,7 @@ for the signed-in session ("Logged in as ...", read by `PortalClient.session()`)
 cookie, and never the home directory's owner (that fallback names paths only). Whether they may use
 Beethoven is the maintainer's approved list, asked by the background alone: it reads `access_check` from
 `https://openspineconsortium.com/beethoven/services.json` (cached a day) and POSTs
-`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"8.0.0","install_id":"<32 hex>"}` as
+`{"v":1,"access_id":"<account>","portal":"<hostname>","product":"bridge","version":"10.0.0","install_id":"<32 hex>"}` as
 `text/plain;charset=UTF-8` without cookies when the portal tab connects, about once a day, and on a toolbar click
 after a no or a failed attempt or once the last yes is a day old; never before the acceptance record is in
 storage (the same gate as the kill-list). A yes is kept 24 hours (up to 7 days while the service cannot be

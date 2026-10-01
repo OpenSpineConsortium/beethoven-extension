@@ -45,8 +45,14 @@ export interface TermsRecord {
   affirmations: Affirmation[];
   /** the name the person typed as their signature */
   signed_name: string;
-  /** whether the person scrolled the full text to its end (or opened it in a tab) before the button became available */
+  /**
+   * Since 10.0.0: true only when the person scrolled the full text to its end, or the whole text was
+   * in view in its box without scrolling. Builds before 10.0.0 wrote true whatever happened (their
+   * gate measured the box before it was on the page), so in an older record it says nothing.
+   */
   scrolled_to_end: boolean;
+  /** since 10.0.0: the person opened the agreement and the privacy statement in tabs ("Open in tabs"), which the page counts as reading them; absent from older records */
+  opened_in_tab?: boolean;
   product_version: string;
   /** browser name and version */
   host: string;
@@ -88,13 +94,76 @@ export async function sha256(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** True when every affirmation is ticked, a name is typed and the text was read to its end. */
-export function acceptanceComplete(affirmations: Affirmation[], signedName: string, scrolledToEnd: boolean): { ok: boolean; missing: string[] } {
+/** True when every affirmation is ticked, a name is typed and the text was read (textRead below). */
+export function acceptanceComplete(affirmations: Affirmation[], signedName: string, read: boolean): { ok: boolean; missing: string[] } {
   const missing: string[] = [];
   for (const a of AFFIRMATIONS) if (!affirmations.find((x) => x.id === a.id && x.checked)) missing.push(a.id);
   if (!signedName || signedName.trim().length < 2) missing.push('signed_name');
-  if (!scrolledToEnd) missing.push('scrolled_to_end');
+  if (!read) missing.push('text_read');
   return { ok: missing.length === 0, missing };
+}
+
+// The reading gate of the signing dialog, as pure functions so the rule is tested without a browser.
+// The button waits until the person has scrolled the full text to its end, or opened it in tabs
+// (the page says that counts), or the text, laid out in its box on the page, fits with nothing to
+// scroll. A box that is not on the page yet has no height and proves nothing: 9.0.0 measured it
+// then, found scrollHeight 0, called the text read and opened the gate at once.
+
+/** how near the bottom counts as the end (a zoomed page stops a pixel or two short) */
+export const END_SLACK_PX = 8;
+
+/** one reading of the text box: element.scrollTop, clientHeight and scrollHeight */
+export interface BoxGeometry {
+  scrollTop: number;
+  clientHeight: number;
+  scrollHeight: number;
+}
+
+/** what the person has done with the text so far; each part, once true, stays true */
+export interface ReadingState {
+  /** the box was scrolled to the end of the text */
+  scrolledToEnd: boolean;
+  /** the box, laid out on the page, showed the whole text with nothing to scroll */
+  fits: boolean;
+  /** the agreement and the privacy statement were opened in tabs (both opened, not only asked for) */
+  openedInTab: boolean;
+}
+
+export const NOT_READ: ReadingState = { scrolledToEnd: false, fits: false, openedInTab: false };
+
+/** a box with no height is not laid out (not on the page yet, or hidden) and proves nothing */
+export function laidOut(g: BoxGeometry): boolean {
+  return g.clientHeight > 0 && g.scrollHeight > 0;
+}
+
+/** the state after a scroll of the box, its first layout or a change of its size */
+export function measureReading(s: ReadingState, g: BoxGeometry): ReadingState {
+  if (!laidOut(g)) return s;
+  if (g.scrollTop + g.clientHeight < g.scrollHeight - END_SLACK_PX) return s;
+  // the end is in view: by scrolling to it, or because there was nothing to scroll
+  return g.scrollTop > 0 ? { ...s, scrolledToEnd: true } : { ...s, fits: true };
+}
+
+export function openedInTab(s: ReadingState): ReadingState {
+  return { ...s, openedInTab: true };
+}
+
+/** the gate: may the agreement button be offered as far as reading goes */
+export function textRead(s: ReadingState): boolean {
+  return s.scrolledToEnd || s.fits || s.openedInTab;
+}
+
+/** the line under the box, true at every moment (each sentence says what has happened, and that stays true) */
+export function readingHint(s: ReadingState): string {
+  if (s.scrolledToEnd) return 'You have reached the end of the text.';
+  if (s.fits) return 'The whole text was in view in the box above, with nothing to scroll.';
+  if (s.openedInTab) return 'You opened the agreement and the privacy statement in tabs, which counts as reading them.';
+  return 'Scroll the text above to its end to continue, or open it in tabs.';
+}
+
+/** what the acceptance record says about the reading */
+export function readingRecord(s: ReadingState): { scrolled_to_end: boolean; opened_in_tab: boolean } {
+  return { scrolled_to_end: s.scrolledToEnd || s.fits, opened_in_tab: s.openedInTab };
 }
 
 /** A record counts only if it is for the terms in force. */

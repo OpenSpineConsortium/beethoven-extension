@@ -7,6 +7,7 @@
 // Order: portal tab open -> portal awake and signed in -> terms accepted -> access approved ->
 // tool installed -> probe run -> signed in to Claude on the cluster -> data statement -> worker
 // started -> worker online -> open in Claude.
+import { ANTHROPIC_NEVER, isAnthropicHost } from './connect';
 import type { WorkerState } from './contract';
 import { OTHER_ACCOUNT, OTHER_INSTALLATION, UPDATE_REQUIRED, type AccessFact } from '../licensing/access';
 import { PRODUCT_NAME } from './terms';
@@ -39,8 +40,10 @@ export interface Facts {
     granted: boolean;
     alive: boolean;
     hostname?: string;
-    /** the tab the toolbar button was clicked from, when it looks like Open OnDemand and is not connected */
+    /** the tab the toolbar button was clicked from, when it looks like Open OnDemand and is not connected (never an Anthropic tab) */
     candidate?: { origin: string; hostname: string; tabId: number };
+    /** the toolbar button was clicked from a tab on claude.ai, claude.com or anthropic.com (its hostname): never a portal, nothing is asked */
+    refusedTab?: string;
   };
   warm: {
     state: 'unknown' | 'warming' | 'warm' | 'cold' | 'unreachable' | 'signed-out';
@@ -165,7 +168,8 @@ function view(step: StepId, rest: Omit<StripView, 'step' | 'index' | 'total' | '
 export function decide(f: Facts, now = Date.now()): StripView {
   // 1. the portal tab
   if (!f.portal.connected) {
-    if (f.portal.candidate) return view('portal', { status: `This tab is ${f.portal.candidate.hostname}. Connect it as your portal; the browser will ask you to allow that one site.`, primary: { label: 'Connect this portal', action: 'connect' }, tone: 'info' });
+    if (f.portal.candidate && !isAnthropicHost(f.portal.candidate.hostname)) return view('portal', { status: `This tab is ${f.portal.candidate.hostname}. Connect it as your portal; the browser will ask you to allow that one site.`, primary: { label: 'Connect this portal', action: 'connect' }, tone: 'info' });
+    if (f.portal.refusedTab) return view('portal', { status: `This tab is ${f.portal.refusedTab}, an Anthropic address, not a portal: ${ANTHROPIC_NEVER}, and asks for nothing here. Open your Open OnDemand portal in a tab and click the ${PRODUCT_NAME} button there.`, primary: { label: 'Setup page', action: 'open-setup' }, tone: 'info' });
     return view('portal', { status: `Open your Open OnDemand portal in a tab and click the ${PRODUCT_NAME} button there.`, primary: { label: 'Setup page', action: 'open-setup' }, tone: 'info' });
   }
   if (!f.portal.granted) return view('portal', { status: `Access to ${f.portal.hostname ?? 'your portal'} was taken away in the browser. Allow it again.`, primary: { label: 'Allow the portal again', action: 'connect' }, tone: 'fail' });

@@ -17,6 +17,7 @@
 import { browser } from 'wxt/browser';
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { Audit } from '../core/audit';
+import { isAnthropicHost } from '../core/connect';
 import { commands } from '../core/contract';
 import { REVOKED_KEY } from '../core/keys';
 import { LoginWatcher } from '../core/login';
@@ -34,6 +35,8 @@ export default defineContentScript({
   matches: [],
   runAt: 'document_idle',
   main() {
+    // never on an Anthropic site, whatever loaded it: nothing of the extension runs there (core/connect.ts isAnthropicHost)
+    if (isAnthropicHost(location.hostname)) return;
     // One copy per tab. The background loads this script into an already-open tab with
     // executeScript, and the runtime registration loads it at document_idle; a tab still loading
     // when the grant lands gets both. Two copies would each answer every relayed call (one typed
