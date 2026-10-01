@@ -1,0 +1,142 @@
+/* The home page diagram's rules, copied verbatim by build_assets.mjs --sync-site from the site's
+   assets/css/hero.css (the diagram, the tablet rule for its labels, reduced motion). Do not edit. */
+
+/* ---------- home: the diagram ----------
+   Two shape-only SVGs (wide, tall) share one set of HTML labels. Each label carries its
+   position and size in SVG units (--x --y --fs wide, --px --py --pfs tall); the stage has
+   the SVG's aspect ratio, so percentages and container-width font sizes keep the labels
+   on their shapes at every width. */
+.flow {
+  container-type: inline-size;
+  margin: 36px auto 0;
+  max-width: 1140px;
+}
+.flow__stage {
+  --vw: 1200; --vh: 560;
+  position: relative;
+  aspect-ratio: 1200 / 560;
+}
+.flow__art { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.flow__art--tall { display: none; }
+
+.flow__t {
+  position: absolute;
+  left: calc(var(--x) / var(--vw) * 100%);
+  top: calc(var(--y) / var(--vh) * 100%);
+  font-size: max(10.5px, calc(var(--fs) / var(--vw) * 100cqw));   /* stays legible on tablets */
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  line-height: 1.2;
+  margin: 0;
+  text-align: left;
+}
+.flow__t.t-s { transform: translate(0, -50%); }
+.flow__t.t-e { transform: translate(-100%, -50%); }
+.flow__t .ph { display: none; }
+
+.t-node { font-family: var(--font-display); font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
+.t-arrow { font-family: var(--font-mono); color: var(--ink-soft); letter-spacing: 0.01em; }
+.t-arrow.t-o { color: var(--ochre); }
+.t-me { font-family: var(--font-mono); color: var(--teal); }
+.t-url { font-family: var(--font-mono); color: var(--ink-soft); }
+.t-ask {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--paper-deep);
+  border-radius: 1.15em;
+  padding: 0.55em 0.95em;
+}
+
+/* browser window */
+.b-win { fill: var(--paper-card); stroke: var(--line); stroke-width: 1; }
+.b-bar { fill: var(--paper-deep); }
+.b-rule, .b-railrule { stroke: var(--line-soft); stroke-width: 1; }
+.b-dot { fill: rgba(26, 28, 24, 0.16); }
+.b-url { fill: var(--paper-card); stroke: var(--line-soft); }
+.b-lock rect { fill: var(--ink-faint); }
+.b-lock path { fill: none; stroke: var(--ink-faint); stroke-width: 1.4; }
+.b-rail { fill: var(--paper); }
+.b-ico { fill: none; stroke: var(--line); stroke-width: 1.3; }
+.b-ico-l { stroke: var(--ink-faint); stroke-width: 1.5; stroke-linecap: round; }
+.b-bars { fill: var(--line); }
+.b-av { fill: var(--teal); }
+.b-sk { fill: rgba(26, 28, 24, 0.07); }
+.b-card { fill: var(--paper); stroke: var(--line-soft); }
+.b-ax { stroke: var(--line); stroke-width: 1; }
+.b-box { fill: var(--paper-card); stroke: var(--ink); stroke-width: 1; }
+.b-wh { stroke: var(--ink); stroke-width: 0.9; }
+.b-med { stroke: var(--ochre); stroke-width: 1.7; }
+.b-jit { fill: var(--teal); opacity: 0.32; }
+.b-comp { fill: var(--paper-card); stroke: var(--line); stroke-width: 1; }
+.b-caret { stroke: var(--teal); stroke-width: 1.6; animation: bh-caret 1.1s steps(1) infinite; }
+.b-send { fill: var(--ink); }
+.b-send-a { fill: none; stroke: var(--paper-card); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* nodes */
+.n-cloud { fill: var(--paper-card); stroke: var(--ink); stroke-width: 1.4; }
+.n-rack { fill: var(--paper-card); stroke: var(--ink); stroke-width: 1.4; }
+.n-foot { fill: var(--ink); }
+.n-unit { fill: var(--paper); stroke: var(--line); stroke-width: 1; }
+.n-unit--me { fill: rgba(14, 95, 88, 0.09); stroke: var(--teal); stroke-width: 1.3; }
+.n-led { fill: var(--ink-faint); opacity: 0.55; }
+.n-led--on { fill: var(--teal); opacity: 1; animation: bh-led 1.8s ease-in-out infinite; }
+.n-led--blink { animation: bh-blink 2.6s steps(1) infinite; }
+.n-prompt { fill: none; stroke: var(--teal); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.n-vent { stroke: var(--line); stroke-width: 1.2; stroke-linecap: round; }
+.n-board { fill: var(--paper-card); stroke: var(--ink); stroke-width: 1.4; }
+.n-brk { fill: var(--paper-deep); stroke: var(--ink); stroke-width: 1.2; }
+.n-gold { fill: var(--ochre); opacity: 0.85; }
+.n-fan { fill: var(--paper); stroke: var(--ink); stroke-width: 1.1; }
+.n-blade { fill: none; stroke: var(--ink-soft); stroke-width: 1.2; stroke-linecap: round; }
+.n-hub { fill: var(--ink); }
+.n-spin { transform-box: fill-box; transform-origin: center; animation: bh-spin 2.4s linear infinite; }
+
+/* arrows and the dots that run along them */
+.fl-a { fill: none; stroke: var(--teal); stroke-width: 1.5; opacity: 0.5; }
+.fl-a--o { stroke: var(--ochre); opacity: 0.6; }
+.fl-h { fill: none; stroke: var(--teal); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fl-h--o { stroke: var(--ochre); }
+.fl-port { fill: var(--paper-card); stroke: var(--teal); stroke-width: 1.6; }
+.fl-d {
+  fill: none;
+  stroke: var(--teal);
+  stroke-width: 8.5;
+  stroke-linecap: round;
+  stroke-dasharray: 0 200;   /* pathLength 100: one dot per run */
+  animation: bh-flow 3.2s cubic-bezier(0.45, 0, 0.55, 1) infinite both;
+}
+.fl-d--o { stroke: var(--ochre); }
+.fl-d--late { animation-delay: 1.6s; }
+
+@keyframes bh-flow {
+  0%   { stroke-dashoffset: 0;    opacity: 0; }
+  10%  { opacity: 1; }
+  84%  { opacity: 1; }
+  100% { stroke-dashoffset: -100; opacity: 0; }
+}
+@keyframes bh-caret { 50% { opacity: 0; } }
+@keyframes bh-led { 50% { opacity: 0.35; } }
+@keyframes bh-blink { 0%, 60% { opacity: 0.55; } 61%, 70% { fill: var(--teal); opacity: 0.9; } 71% { opacity: 0.55; } }
+@keyframes bh-spin { to { transform: rotate(360deg); } }
+
+/* ---------- home: tablets ----------
+   Where the labels' minimum size takes over (a diagram narrower than about 1000px), "the heavy
+   lifting" in one line is wider than the gap between the GPU and the rack, so it touched the
+   rack; there it goes on two short lines, centred in the gap just under its arrow. */
+@media (min-width: 721px) {
+  @container (max-width: 1000px) {
+    .flow__t.t-lift {
+      white-space: normal;
+      width: 6.4em;
+      text-align: center;
+      top: calc(436 / var(--vh) * 100%);
+    }
+  }
+}
+
+/* ---------- reduced motion: everything holds still ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .fl-d { animation: none; stroke-dashoffset: -58; opacity: 1; }
+  .n-spin, .n-led--on, .n-led--blink, .b-caret { animation: none; }
+  .bh-sec .browser, .bh-sec .browser:hover { transition: none; transform: none; }
+}

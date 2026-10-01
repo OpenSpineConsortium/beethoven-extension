@@ -1,8 +1,12 @@
 # Submitting Beethoven to the Chrome Web Store, click by click
 
-For the maintainer. `LISTING.md` beside this file holds every text to paste; this file says where it
-goes and in what order. Written 2026-09-29 for 4.0.0 (the first version without licence keys),
-brought up to date for 6.0.0 and 7.0.0 the same night, and rewritten on 2026-09-30 for 8.0.0, which
+For the maintainer. `PASTE.md` beside this file is the paste sheet: every dashboard field in the
+dashboard's order, with the text to paste or the file to upload. `LISTING.md` holds the texts and the
+reasons behind them; this file says what to do around the paste, in what order. Written 2026-09-29
+for 4.0.0 (the first version without licence keys), brought up to date for 6.0.0 and 7.0.0 the same
+night, rewritten on 2026-09-30 for 8.0.0, and brought up to date for 9.0.0 the same evening (the
+extension's pages in the site's theme with the typefaces bundled, a new icon, new store images and a
+short description; no change to permissions, requests, stored data or the agreement texts). Beethoven
 is offered in one place only: a **Private** item on the Chrome Web Store, visible to the trusted
 testers the maintainer names, a Google Group he keeps with his personal Google account and to which
 he adds each student he approves for Beethoven. No other store, no signed file, no download from the
@@ -23,19 +27,23 @@ Have these in hand, and check each once:
 
 1. The package, built from a clean tree with Node 22 in `extension/`:
    `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The file to upload is
-   `.output/beethoven-8.0.0-chrome.zip` (the same command also writes a Firefox zip and a sources
+   `.output/beethoven-9.0.0-chrome.zip` (the same command also writes a Firefox zip and a sources
    zip; neither is uploaded, and the sources zip is what a reviewer gets if they ask for the mock
-   portal, section 4). Confirm it is a release build: `unzip -p .output/beethoven-8.0.0-chrome.zip
-   manifest.json` must show `"name":"Beethoven"`, `"version":"8.0.0"`, the 128-character
+   portal, section 4). Confirm it is a release build: `unzip -p .output/beethoven-9.0.0-chrome.zip
+   manifest.json` must show `"name":"Beethoven"`, `"version":"9.0.0"`, the 128-character
    `description` in `LISTING.md` ("Starts, watches and stops ..."),
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
    `"optional_host_permissions":["https://*/*"]` and no `localhost`,
    `"permissions":["storage","alarms","scripting","activeTab","sidePanel"]`, and no
    `host_permissions` key. No page of the built extension may show the product's old name (`grep
    -ril` over the unpacked zip; the kill-list's format tag inside the bundle is the one allowed
-   exception).
-2. The images in `extension/store-assets/` (see its `manifest.txt`): screenshots 1280x800, the
-   440x280 tile, the 1400x560 marquee; the 128x128 icon is `extension/public/icon/128.png`.
+   exception). From 9.0.0 the zip also holds `fonts/`: five IBM Plex and two Newsreader `.woff2`
+   files and the two SIL Open Font License texts (`unzip -l` shows them), and nothing else new.
+2. The images named in `PASTE.md` (all under `extension/store-assets/`; its `manifest.txt` says how
+   each was made): the 128x128 store icon, five screenshots 1280x800, the 440x280 tile and the
+   1400x560 marquee, each PNG without alpha or JPEG at the exact size (`PASTE.md` has a one-line
+   check), and the promo video file, which goes to YouTube, not to the dashboard. Look at each one
+   before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
    `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 8), `.../beethoven/terms.html`
    (the text of `LICENSE.txt` version 7), `.../beethoven/support.html` and
@@ -56,7 +64,7 @@ Have these in hand, and check each once:
    installation**: every reviewer's installation is a new one, and a second installation of any
    other account is refused. From WSL (Windows sockets flake), two checks with two different
    installation identifiers:
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"8.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
+   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"9.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
    and the same with `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
    `access-control-allow-origin: *`. If the second answers `"reason":"other_installation"`, the
    service does not exempt the reviewer account yet, and a reviewer would see "This account is
@@ -72,8 +80,8 @@ Have these in hand, and check each once:
    folder, never on the command line). The `product` field stays `bridge`, the extension's name on
    the wire since 4.0.0.
 6. The Google Group of testers, made once at `https://groups.google.com` with the personal Google
-   account that owns the developer account: *Create group*; a name such as "Beethoven testers" and
-   an address such as `beethoven-testers@googlegroups.com` (whatever is free); who can search for
+   account that owns the developer account: *Create group*; the name "Beethoven-users" and an
+   address such as `beethoven-users@googlegroups.com` (whatever is free); who can search for
    the group: only members; who can join: only invited users; who can view members and who can post:
    group managers (nobody writes to it). Add each student approved for Beethoven by the Google
    account they gave on the request form (*Members*, *Add members*; if the page offers only
@@ -99,28 +107,34 @@ Registration (once, about ten minutes):
 3. In the dashboard, open **Account**: set the publisher display name (Gregory Schwing, trading as
    OpenSpineConsortium, or the LLC once it exists), verify the contact e-mail, and answer the trader
    / non-trader question (asked of everyone for the EU Digital Services Act; the item is offered in
-   the United States only, but the field must be answered). To show the homepage as the "official"
-   URL, verify `openspineconsortium.com` in Google Search Console with the same account.
+   the United States only, but the field must be answered). The **Official URL** field lists only
+   sites verified in Google Search Console with the same Google account; `PASTE.md`, field 9, gives
+   the four steps (a URL-prefix property for `https://openspineconsortium.com/` with an HTML file at
+   the site root). The field can stay empty until then.
 
 The item (about thirty minutes):
 
-4. Dashboard, **Items**, **New item**. Drag `beethoven-8.0.0-chrome.zip` in. The item ID appears
+4. Dashboard, **Items**, **New item**. Drag `beethoven-9.0.0-chrome.zip` in. The item ID appears
    in the URL and in the item header at once; note it: it is the link approved students get
-   (section 5), and it goes nowhere public.
-5. **Store listing** tab, from `LISTING.md`: the detailed description; Category Developer Tools;
-   Language English (United States); store icon (`icon/128.png`); the five screenshots; the small
-   promo tile and the marquee; Official URL / Homepage `https://openspineconsortium.com/beethoven/`;
-   Support URL `https://openspineconsortium.com/beethoven/support.html`; Mature content No. Save
-   draft.
-6. **Privacy practices** tab: the single-purpose statement; one justification per permission
+   (section 5), and it goes nowhere public. A draft left from the extension's earlier name can be
+   archived (it is hidden from the list and can be shown again; nobody ever saw it), or kept and
+   turned into Beethoven by uploading the 9.0.0 zip under its **Package** tab; either ends in the
+   same place.
+5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,049 characters);
+   Category Developer Tools; Language English (United States); the store icon; the promo video's
+   YouTube link (upload the file as Unlisted first, or leave the field empty); the small promo tile;
+   the five screenshots in the order given; the marquee; Official URL (empty until the site is
+   verified); Homepage URL `https://openspineconsortium.com/beethoven/`; Support URL
+   `https://openspineconsortium.com/beethoven/support.html`; Mature content No. Save draft.
+6. **Privacy practices** tab, from `PASTE.md`: the single-purpose statement; one justification per permission
    (`storage`, `alarms`, `scripting`, `activeTab`, `sidePanel`) and the host-permission
    justification for `https://*/*`; "Are you using remote code?" No; Data usage: tick "Personally
    identifiable information" only, with the sentence from `LISTING.md` (the institutional account
    name the portal shows and the random installation identifier, sent in the approval check), and
    leave every other category unticked; tick the three certifications; Privacy policy URL
    `https://openspineconsortium.com/beethoven/privacy.html`. Save draft.
-7. **Distribution** tab: Payments Free; Visibility **Private**, and add the group's address from
-   section 0, item 6. Regions: United States only. Save draft. Chrome's documentation
+7. **Distribution** tab: Payments Free; Visibility **Private**, and add the address of the
+   Beethoven-users group from section 0, item 6. Regions: United States only. Save draft. Chrome's documentation
    (`https://developer.chrome.com/docs/webstore/cws-dashboard-distribution`, read 2026-09-30) says
    that Private lets trusted testers install the item, that besides them "you can also include any
    Google Groups that you own or manage", and that the members of those groups can install it; the
@@ -143,7 +157,7 @@ it through Chrome's own update mechanism within hours of publication, and nobody
 Builds before 8.0.0 send no installation identifier, and the service refuses a check without one
 (`"reason":"update_required"`) unless its `REQUIRE_INSTALL_ID` variable is `"0"`. Keep it at `"0"`
 while any student, you included, still uses 7.0.0 or an older build, and turn it on (remove it, or
-set it to `"1"`, and deploy both service names) once 8.0.0 is live on the private listing and
+set it to `"1"`, and deploy both service names) once 8.0.0 or later is live on the private listing and
 installed by everyone who needs it. Until then an old build keeps working and is not bound to an
 installation.
 
@@ -192,7 +206,7 @@ Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude
 ```
 
 Then paste the reviewer recipe from `LISTING.md` under it, and attach
-`.output/beethoven-8.0.0-sources.zip`. The two recordings named in `../STORE_LISTING.md` ("Reviewer
+`.output/beethoven-9.0.0-sources.zip`. The two recordings named in `../STORE_LISTING.md` ("Reviewer
 access", item 2) have not been made as of 2026-09-30; record them (under five minutes each, the mock
 one from the recipe in `LISTING.md`, the live one with the portal hostname and the pasted code
 blurred) if you want item 2 in the reply; otherwise leave item 2 out, as the draft says. The mock is

@@ -1,0 +1,78 @@
+capture run 2026-10-01T01:31:55.139Z
+01:31:57.944 SETUP       mock says: home dir:  <path on disk>  (shown to the extension as /home/st1234; the seeded tool prints it as /home/st1234)
+01:31:57.946 SETUP       mock says: shared:    <path on disk> (the lab's shared copy of the stand-in tool, shown as /lab/shared/hpcworker/current)
+01:31:57.946 SETUP       mock says: tool:      set up on the lab's shared copy (launcher, marker, profile), as after the install the strip types; the strip runs no install
+01:31:57.946 SETUP       mock says: access:    https://localhost:8443/beethoven/access_check (tests only; approves st1234, one installation each)
+01:31:59.759 SETUP       Chromium 153.0.8010.12 with .output/chrome-mv3 (9.0.0), fresh profile, 1280x800 at device scale 2, light scheme
+01:32:15.611 FONTS       loaded on the setup page: Newsreader 400, Newsreader 500, IBM Plex Sans 400, IBM Plex Sans 500, IBM Plex Sans 600, IBM Plex Mono 400
+01:32:16.561 SHOT        01-signing-dialog.png (1280x800): on-screen text clean
+01:32:18.158 SHOT        01-signing-dialog-crop.png 875x619 css: on-screen text clean
+01:32:18.971 DIALOG      boxes ticked 4/4; name "A. Student"; "Accept and Continue" enabled
+01:32:19.895 SHOT        02-statements-ticked.png (1280x800): on-screen text clean
+01:32:21.430 SHOT        02-statements-ticked-crop.png 875x534 css: on-screen text clean
+01:32:21.505 VENDOR-REQ  GET https://openspineconsortium.com/beethoven/killlist.json
+01:32:21.522 VENDOR-RES  200 https://openspineconsortium.com/beethoven/killlist.json { "v": 1, "kid": "k1", "issued": 1790735333, "revoked_versions": [], "revoked_lids": [], "message": "Beethoven is current.", "sig": "ASHLEYREV1.eyJ2IjoxLCJraWQiOiJrMSIsImlzc3VlZCI6MTc5MDczNTMzMywicmV2
+01:32:21.620 ACCEPT      pressed "Accept and Continue"; the acceptance card shows
+01:32:21.945 PORTAL      signed in to the mock as st1234
+01:32:25.194 PROMPT      pressed 'Allow' (invoke) in window 'Beethoven - Google Chrome for Testing' (pid 3416)
+01:32:25.235 VENDOR-REQ  GET https://openspineconsortium.com/beethoven/services.json
+01:32:25.254 VENDOR-REQ  POST https://localhost:8443/beethoven/access_check body {"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"9.0.0","install_id":"d66848de457f4eee3905a72a1d63261c"}
+01:32:25.255 HOLD        approval check #1 held until the strip at "Checking your access..." is captured (20 s at most)
+01:32:25.256 VENDOR-RES  200 https://openspineconsortium.com/beethoven/services.json { "access_check": "https://localhost:8443/beethoven/access_check", "request": "https://beethoven-access.openspineconsortium.workers.dev/request", "revocation": "https://beethoven-access.openspineconso
+01:32:25.270 STRIP       [access step] Waking up your portal...
+01:32:25.775 STRIP       [access step] Checking your access...
+01:32:26.695 SHOT        03-checking-access.png (1280x800): on-screen text clean
+01:32:30.033 SHOT        03-checking-access-panel.png 336x121 css: on-screen text clean
+01:32:31.820 SHOT        03-checking-access-strip.png 1256x121 css: on-screen text clean
+01:32:31.820 HOLD        approval check #1 sent on to the mock's stub
+01:32:31.848 VENDOR-RES  200 https://localhost:8443/beethoven/access_check {"approved":true,"access_id":"st1234","checked":"2026-10-01T01:32:31.839Z","until":null}
+01:32:32.348 ACCESS      record: {"access_id":"st1234","approved":true,"checked_at":"2026-10-01T01:32:25.228Z","last_attempt_at":"2026-10-01T01:32:25.228Z","portal":"localhost","request_page":"https://openspineconsortium.com/beethoven/request.html","until":null,"v":1}
+01:32:32.356 STRIP       [sign-in step] Checking your access...
+01:32:32.873 STRIP       [sign-in step] Asking for a compute node to check (a short job (ten minutes at most))...
+01:32:36.474 STRIP       [sign-in step] Signing in to Claude on the cluster in 57 s (the scheduler is asked at most once a minute)...
+01:33:33.892 STRIP       [sign-in step] Signing in to Claude on the cluster: a compute node is asked for, then Anthropic's sign-in page opens...
+01:33:34.406 STRIP       [sign-in step] Sign in to Claude in the tab that opened, then paste the code it shows below.
+01:33:38.903 SHOT        04-sign-in.png (1280x800): on-screen text clean
+01:33:42.371 SHOT        04-sign-in-panel.png 336x777 css: on-screen text clean
+01:33:44.364 SHOT        04-sign-in-strip.png 1256x514 css: on-screen text clean
+01:33:44.411 STRIP       [statement step] Sign in to Claude in the tab that opened, then paste the code it shows below.
+01:33:45.933 STRIP       [statement step] Read where your work goes and make the statement about worker "worker".
+01:33:46.037 STRIP       [online] Read where your work goes and make the statement about worker "worker".
+01:33:47.068 STRIP       [online] Starting your worker in 48 s (the scheduler is asked at most once a minute)...
+01:34:00.986 STRIP       [online] Starting your worker in 34 s (the scheduler is asked at most once a minute)...
+01:34:01.999 STRIP       [online] Starting your worker in 33 s (the scheduler is asked at most once a minute)...
+01:34:35.475 STRIP       [online] Starting your worker...
+01:34:35.997 STRIP       [online] Starting your worker (one job on the cluster)...
+01:34:45.439 STRIP       [online] Your worker is online: node01-amber-lantern.
+01:34:47.560 SHOT        05-online.png (1280x800): on-screen text clean
+01:34:50.950 SHOT        05-online-panel.png 336x506 css: on-screen text clean
+01:34:52.874 SHOT        05-online-strip.png 1256x289 css: on-screen text clean
+01:35:29.657 CHECKS      run 1: 17 tags: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+01:35:30.034 STRIP       [online (reopened)] Waking up your portal...
+01:35:31.072 STRIP       [online (reopened)] Your worker is online: node01-amber-lantern.
+01:35:33.219 CHECKS      on the reopened strip: 17 tags: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+01:35:34.697 SHOT        06-details-checks.png (1280x800): on-screen text clean
+01:35:37.540 SHOT        06-details-checks-card.png 1256x849 css: on-screen text clean
+01:35:41.261 SHOT        06-details-checks-panel.png 336x2029 css: on-screen text clean
+01:35:42.775 SETUP-PAGE  access card: There is nothing to enter. Your university's sign-in identifies you: once you are signed in to your portal, its dashboard shows your account name, and Beethoven asks Licensor's access service whether that account is approved (when you connect, and about once a day). What is sent: that account name, your portal's address, the product and its version, and this installation's identifier (a random number Beethoven made when you accepted its agreement, not taken from your computer). An approval is for one installation: a second computer, another browser profile or a reinstall is refused until your lab lead moves the approval to it. Not approved yet? Ask for access; the maintainer approves it, and the next click on the Beethoven button checks again. Access approved for st1234 at localhost (checked 2026-10-01 01:32 UTC) account st1234 at localhost; the service last answered 9/30/2026, 9:32:25 PM Check my access now
+01:35:43.721 SHOT        07-setup-access.png (1280x800): on-screen text clean
+01:35:45.117 SHOT        07-setup-access-card.png 909x323 css: on-screen text clean
+
+The checks (last run):
+  OK 1. Access and agreement Access approved for st1234 at localhost (checked 2026-10-01 01:32 UTC); kill-list of 2026-09-30
+  OK 2. Portal connected localhost (granted 2026-10-01)
+  OK 3. Portal tab open the page script answers from your portal tab
+  OK 4. Portal reachable and signed in signed in as st1234
+  OK 5. Shell app admits a connection shell opened, one command ran (exit 0, 1448 ms) and the shell closed
+  OK 6. Files app lists your home your home folder: 2 entries, uploads allowed; the tool is set up (the lab's shared copy)
+  OK 7. Active Jobs lists your clusters 2 job(s) of yours on mock
+  OK 8. Optional submit routes (informational) Job Composer JSON absent (404); Projects present
+  OK 9. Reverse proxy (informational) the reverse proxy is off or does not admit this host (mailbox mode); asked for the login node the shell reached (login1)
+  OK 10. Scheduler and container runtime found login node login1; scheduler slurm; runtime apptainer/1.2.2 singularity/3.5.2; 2 partition(s); CentOS Linux 7 (Core)
+  OK 11. Probe job has run on a compute node probe of 2026-10-01T01:32 on node01: node temp 210 GB free, /dev/shm 64 GB free, user namespaces yes, container runs, egress direct (api.anthropic.com 404, platform.claude.com 200, claude.ai 403); statsig.anthropic.com has no DNS record here
+  OK 12. Claude Code runs on the compute node claude 2.1.283 (Claude Code) (node v22.12.0, first exec 3 s)
+  OK 13. Signed in to Claude on the cluster signed in from this browser on 2026-10-01 01:33 (student@example.edu max (Remote Control answer on record)); the next probe will confirm it
+  OK 14. Remote Control consent recorded your answer is recorded by Claude Code itself; remote-control flags: --name --capacity --permission-mode --continue
+  OK 15. Runtime directory writable on the node the runtime directory in /dev/shm works on the node and inside the image
+  OK 16. Data classification acknowledged statement made for worker "worker" on 2026-10-01; the consent marker is written on the cluster; the workspace is not marked restricted
+  OK 17. Portal session age signed in 0 min ago

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="-16 -16 128 128">
+<defs><filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="3.5" flood-color="#0A423D" flood-opacity=".18"/></filter></defs>
+<rect x="0.5" y="0.5" width="95" height="95" rx="17.5" fill="#FBFAF4" stroke="#1A1C18" stroke-opacity="0.16" stroke-width="1" filter="url(#sh)"/>
+<rect x="24" y="14" width="48" height="64" rx="5" fill="#FBFAF4" stroke="#1A1C18" stroke-width="2.6"/>
+<rect x="29" y="78" width="6" height="4" rx="1.2" fill="#1A1C18"/>
+<rect x="61" y="78" width="6" height="4" rx="1.2" fill="#1A1C18"/>
+<rect x="30" y="21" width="36" height="14" rx="3" fill="#F1EEE3" fill-opacity="1" stroke="#1A1C18" stroke-opacity="0.18" stroke-width="1.2"/>
+<circle cx="35" cy="28" r="1.9" fill="#8C8E82" fill-opacity="0.6"/>
+<line x1="62" y1="25" x2="62" y2="31" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="57.5" y1="25" x2="57.5" y2="31" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="53" y1="25" x2="53" y2="31" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<rect x="30" y="39" width="36" height="14" rx="3" fill="#0E5F58" fill-opacity=".1" stroke="#0E5F58" stroke-opacity="1" stroke-width="2"/>
+<circle cx="35" cy="46" r="1.9" fill="#0E5F58" fill-opacity="1"/>
+<path d="M41,42.8 l3.2,3.2 l-3.2,3.2 M47,49.2 h5" fill="none" stroke="#0E5F58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="62" y1="43" x2="62" y2="49" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="57.5" y1="43" x2="57.5" y2="49" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="53" y1="43" x2="53" y2="49" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<rect x="30" y="57" width="36" height="14" rx="3" fill="#F1EEE3" fill-opacity="1" stroke="#1A1C18" stroke-opacity="0.18" stroke-width="1.2"/>
+<circle cx="35" cy="64" r="1.9" fill="#8C8E82" fill-opacity="0.6"/>
+<line x1="62" y1="61" x2="62" y2="67" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="57.5" y1="61" x2="57.5" y2="67" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+<line x1="53" y1="61" x2="53" y2="67" stroke="#1A1C18" stroke-opacity=".2" stroke-width="1.3" stroke-linecap="round"/>
+</svg>

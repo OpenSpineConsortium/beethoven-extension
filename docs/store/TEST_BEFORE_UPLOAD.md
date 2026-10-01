@@ -1,8 +1,11 @@
-# Testing Beethoven 8.0.0 by hand before the store upload
+# Testing Beethoven 9.0.0 by hand before the store upload
 
 One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in from 8.0.0 (a
 private listing on the Chrome Web Store; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up
-to date for 6.0.0 and 7.0.0 the same night, and for 8.0.0 on 2026-09-30. The build is in
+to date for 6.0.0 and 7.0.0 the same night, for 8.0.0 on 2026-09-30, and for 9.0.0 the same evening
+(the pages in the site's theme with its typefaces bundled, and a new icon; nothing else in the code
+changed: same permissions, same requests, same agreement version 7 and privacy statement version 8).
+The build is in
 `extension/.output/chrome-mv3/`; the zip beside it is what the store gets. To rebuild: Node 22, `npm
 ci`, `npm run build`, `npm run zip` in `extension/` (the Firefox build those commands also write is
 not tested here and not submitted).
@@ -11,23 +14,23 @@ not tested here and not submitted).
 
 - Your AccessID is approved for Beethoven (`node tools/intake/admin.mjs list` in the repository of
   Beethoven for VS Code, Desktop folder `ashley`, shows it).
-- One approved account, one installation. The first installation of 8.0.0 that checks your AccessID
+- One approved account, one installation. The first installation of 8.0.0 or later that checks your AccessID
   binds it, and this afternoon's unpacked build is an installation. Before you test, clear your seat
   (`node tools/intake/admin.mjs reset-seat <your AccessID>`) so the unpacked build binds; after the
   test, clear it again before you install from the private listing, or use *Move the approval* in
   the e-mail the listing's installation triggers. Never run a `curl` check with your own AccessID:
   the first identifier that asks binds the account.
 - The service's `REQUIRE_INSTALL_ID` is `"0"` while 7.0.0 builds are still in use (`SUBMISSION.md`,
-  section 2); with it at `"0"` an old build is approved and binds nothing, and 8.0.0 binds as
-  described.
+  section 2); with it at `"0"` an old build is approved and binds nothing, and 8.0.0 and 9.0.0
+  bind as described.
 - Your Claude sign-in on the grid is current: `hpcworker claude status` over ssh says the sign-in
   folder is present and consent is recorded.
 - Know the state of the worker chain: `hpcworker worker status --name worker`. If a worker is
   online, the extension will find it and say so ("found running"); to test a cold start, stop it
   first (`hpcworker worker stop --name worker`, or the panel's Stop later).
-- If an older build (7.0.0 or earlier, including one under the old name) is loaded in the browser,
-  remove it first: its storage carries an older agreement record, and two builds would both answer
-  the icon on the portal tab.
+- If an older build (8.0.0 or earlier, including one under the old name) is loaded in the browser,
+  remove it first: the pass below starts from a fresh install (an older build's storage may carry an
+  older agreement record), and two builds would both answer the icon on the portal tab.
 - The lab's shared copy is published: over ssh, `bash -lc 'hpcworker version'` prints the version of
   the shared copy at `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`.
 - Have the phone with the Claude app signed in to the same Claude account.
@@ -39,7 +42,8 @@ not tested here and not submitted).
    loading is for this test only; students install from the private listing.)
 2. **Setup page.** Scroll the agreement to its end (the button stays grey until then), tick the four
    statements, type your name, *Accept and Continue*. The agreement is version 7 and the privacy
-   statement version 8. The Access card says it has not checked yet, and says what is sent, the
+   statement version 8. The page wears the site's theme: the cream ground, ink text, headings in
+   Newsreader, body text in IBM Plex Sans, the teal accent. The Access card says it has not checked yet, and says what is sent, the
    installation's identifier included; there is no key box and no username box anywhere.
 3. **Pin the icon**: puzzle-piece icon, pin *Beethoven*.
 4. **Portal.** Open `https://ondemand.grid.wayne.edu` (VPN first off campus), sign in, wait for the
@@ -74,7 +78,15 @@ not tested here and not submitted).
     privacy statement (version 8) and the audit export (its file name and its header line). In the
     browser's developer tools, the page script's marker on the portal tab reads
     `beethovenPortalScriptLoaded`.
-12. **A second installation.** Make a second Chrome profile (*Add* in the profile menu), load the
+12. **The theme, the fonts and the icon (new in 9.0.0).** The setup page, the panel, *Details* and
+    the options page all show the cream ground, Newsreader headings, IBM Plex text and the teal
+    *Open in Claude* button; nothing falls back to a system font (Times or Arial where Newsreader or
+    Plex should be is a defect). In the developer tools of the setup page and of the panel, *Network*,
+    filter *Font*, reload: every font comes from `chrome-extension://<id>/fonts/`, and nothing goes to
+    `fonts.googleapis.com`, `fonts.gstatic.com` or any other address. The toolbar icon is the rack
+    with one teal unit; look at it at 16 px on a light and on a dark toolbar (*Customize Chrome*, a
+    dark colour) and write down if it turns to a grey smudge.
+13. **A second installation.** Make a second Chrome profile (*Add* in the profile menu), load the
     same unpacked build there, accept the agreement, open the portal, click the icon. The strip must
     stop at the access step with exactly "This account is already set up on another computer. Ask
     your lab lead to move it here." and no button; *Details* shows the same sentence. Within a
@@ -83,7 +95,7 @@ not tested here and not submitted).
     again: it goes on to approved. The first profile keeps its approval until its day is up (an
     approval under a day old is not asked again), then shows the same sentence. Move it back, or
     `reset-seat`, before you go on. Remove the second profile afterwards.
-13. **Not approved (optional).** Your own account is approved, so this path needs either a colleague
+14. **Not approved (optional).** Your own account is approved, so this path needs either a colleague
     who is not on the list (one click: the strip must read *Ask for access* and open the request
     page with their AccessID filled in) or the mock recipe in `LISTING.md` run with `--user zz9999`.
 
@@ -98,9 +110,10 @@ starts empty (the agreement is accepted once more) and is a new installation for
 
 ## Just before uploading
 
-- `unzip -p extension/.output/beethoven-8.0.0-chrome.zip manifest.json` shows version 8.0.0, the
+- `unzip -p extension/.output/beethoven-9.0.0-chrome.zip manifest.json` shows version 9.0.0, the
   name Beethoven, the 128-character `description` in `LISTING.md` and the permissions `storage,
-  alarms, scripting, activeTab, sidePanel`, optional host `https://*/*`, nothing else.
+  alarms, scripting, activeTab, sidePanel`, optional host `https://*/*`, nothing else. `unzip -l` on
+  the same zip lists `fonts/` with seven `.woff2` files and the two `-OFL.txt` licence texts.
 - The five public pages open: `https://openspineconsortium.com/beethoven/`, `privacy.html`,
   `terms.html`, `support.html` and `request.html` beside it; none offers a download or names another
   browser; `https://openspineconsortium.com/beethoven/services.json` carries `access_check` on
@@ -114,5 +127,10 @@ starts empty (the agreement is accepted once more) and is a new installation for
   sentence; read it once in each before pasting.
 - The access service saw your checks: `node tools/intake/admin.mjs list` (the `checks` array, and
   your seat).
-- Look at each PNG in `extension/store-assets/` once yourself.
+- Look at each file `PASTE.md` names, once yourself, and run the one-line check at the top of
+  `PASTE.md`: every image the exact size its field asks for and `RGB` (no alpha). Every product
+  screen in them is a real capture of this build, and every image or video frame that names Claude
+  or claude.ai carries, small, "Not an Anthropic product." Watch the promo video to its end before
+  it goes to YouTube.
+- The description in `PASTE.md` is 1,049 characters; paste it whole.
 - Then follow `SUBMISSION.md`.

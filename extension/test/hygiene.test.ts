@@ -69,6 +69,29 @@ describe('what the source must not contain', () => {
     expect(existsSync(path.join(ROOT, 'scripts', 'sync-framework.mjs'))).toBe(false);
   });
 
+  // 9.0.0 wears the site's typefaces; they are files in the package, never fetched (no remote code, and no
+  // request a reader of the privacy statement would not expect)
+  it('loads its fonts from the package only, each family with its licence', () => {
+    const css = SRC.filter((p) => p.endsWith('.css'));
+    const fontsDir = path.join(ROOT, 'public', 'fonts');
+    const bundled = readdirSync(fontsDir);
+    for (const p of css) {
+      const text = read(p);
+      expect(/@import|https?:\/\/|\/\/fonts\.|googleapis|gstatic/i.test(text.replace(/\/\*[\s\S]*?\*\//g, '')), rel(p)).toBe(false);
+      for (const m of text.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/g)) {
+        const ref = m[1] ?? '';
+        expect(ref, rel(p)).toMatch(/^\/fonts\/[A-Za-z0-9-]+\.woff2$/);
+        expect(bundled, rel(p)).toContain(ref.slice('/fonts/'.length));
+      }
+    }
+    for (const family of ['Newsreader', 'IBMPlex']) {
+      expect(bundled.some((n) => n.startsWith(family) && n.endsWith('.woff2')), family).toBe(true);
+      expect(read(path.join(fontsDir, `${family}-OFL.txt`))).toMatch(/SIL Open Font License, Version 1\.1/);
+    }
+    const bytes = bundled.reduce((s, n) => s + statSync(path.join(fontsDir, n)).size, 0);
+    expect(bytes).toBeLessThan(400 * 1024);
+  });
+
   it('never uses the banned word', () => {
     const banned = new RegExp(['prov', 'enance'].join(''), 'i');
     const files = [...SRC, ...walk(path.join(ROOT, 'test'), ['.ts']), ...walk(path.join(ROOT, 'mock-ood'), ['.mjs', '.mts']), path.join(ROOT, 'wxt.config.ts')];
@@ -223,9 +246,17 @@ describe('the built package', () => {
         expect(`profiles/${String(p.site)}.json`, label).toBe(e.name);
       }
       if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
-      // nothing beside the manifest, the pages, the scripts, the styles, the icons, the profiles and the two texts
-      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|icon\/\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js)$/.test(n));
+      // nothing beside the manifest, the pages, the scripts, the styles, the icons, the profiles, the two texts, and
+      // the bundled fonts with their licences (9.0.0)
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt)$/.test(n));
       expect(other, label).toEqual([]);
+      // every font the pages use is in the package, beside the licence of its family
+      const fonts = names.filter((n) => n.endsWith('.woff2'));
+      expect(fonts.length, label).toBeGreaterThan(0);
+      for (const family of ['Newsreader', 'IBMPlex']) {
+        expect(fonts.some((n) => n.startsWith(`fonts/${family}`)), `${label} ${family}`).toBe(true);
+        expect(names, label).toContain(`fonts/${family}-OFL.txt`);
+      }
     }
   });
 

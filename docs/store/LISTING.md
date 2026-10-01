@@ -1,18 +1,25 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 8.0.0, and the answers to
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 9.0.0, and the answers to
 its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 and 7.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven and its addresses under
-`/beethoven/`), and for 8.0.0 on 2026-09-30: Beethoven is offered in one place only, a **Private**
+`/beethoven/`), for 8.0.0 on 2026-09-30 (Beethoven is offered in one place only, a **Private**
 item on the Chrome Web Store whose trusted testers are the Google Group of approved students; the
 extension carries no cluster-side code and works only with the lab's shared copy; an approval covers
-one installation, and the approval check carries the installation's random identifier (`PRIVACY.md`
-version 8, `LICENSE.txt` version 7). There is no other store, no signed file and no download.
-Before anything is pasted, read the built extension (`extension/.output/chrome-mv3`) once more for
-every `fetch`, `WebSocket` and `tabs.create` and confirm the facts below. `SUBMISSION.md` beside
-this file says where each text goes, click by click. `../STORE_LISTING.md` is the longer compliance
-document these texts come from.
+one installation, and the approval check carries the installation's random identifier), and for
+9.0.0 the same evening: the extension's pages wear the theme of openspineconsortium.com, with its
+three typefaces bundled in the package as files beside their licences (nothing is fetched for them),
+and a new icon. 9.0.0 changes no permission, no request, no stored item and no agreement text
+(`PRIVACY.md` version 8, `LICENSE.txt` version 7, as in 8.0.0). There is no other store, no signed
+file and no download.
+
+**`PASTE.md` beside this file is the paste sheet**: every dashboard field in the dashboard's order,
+with the text to paste or the file to upload. This file holds the texts and the reasons behind them;
+`SUBMISSION.md` says what to do around the paste (registration, the group, the review). Before
+anything is pasted, read the built extension (`extension/.output/chrome-mv3`) once more for every
+`fetch`, `WebSocket` and `tabs.create` and confirm the facts below. `../STORE_LISTING.md` is the
+longer compliance document these texts come from.
 
 Facts every text below rests on:
 
@@ -55,8 +62,11 @@ Facts every text below rests on:
   `https://openspineconsortium.com/beethoven/support.html`, request page
   `https://openspineconsortium.com/beethoven/request.html`. None of them links the listing: it is
   private, and its link goes only to approved students.
-- The package is `extension/.output/beethoven-8.0.0-chrome.zip` (`npm run zip`; the Firefox zip the
-  same command writes is not submitted anywhere).
+- The package is `extension/.output/beethoven-9.0.0-chrome.zip` (`npm run zip`; the Firefox zip the
+  same command writes is not submitted anywhere). Its pages load their fonts (Newsreader, IBM Plex
+  Sans, IBM Plex Mono) from `fonts/` inside the package, each family beside its SIL Open Font
+  License 1.1 text; no stylesheet names a remote address (`extension/test/hygiene.test.ts` fails if
+  one does).
 - Beethoven runs Claude Code and is not an Anthropic product. The name carries no Anthropic mark;
   "Claude" and "Claude Code" appear in the texts only to say what it runs.
 - Publisher, until the LLC exists: Gregory Schwing, trading as OpenSpineConsortium. The product
@@ -74,11 +84,52 @@ Beethoven
 Starts, watches and stops a Claude Code worker on your university's Open OnDemand cluster and hands you its Remote Control link.
 ```
 
-This is what the 8.0.0 package carries (`extension/wxt.config.ts` and `extension/package.json`;
+This is what the 9.0.0 package carries, unchanged since 8.0.0 (`extension/wxt.config.ts` and `extension/package.json`;
 `extension/test/hygiene.test.ts` fails above 132). It is the sentence decided on 2026-09-29 without
 its leading name, which the store shows beside the description anyway.
 
-## Detailed description (plain text; 5,286 characters; under Chrome's limit of 16,000)
+## Detailed description (the one to paste; plain text; 1,049 characters; under Chrome's limit of 16,000)
+
+Written 2026-09-30 for 9.0.0 in the voice of the site's home page, for a student who reads it in
+twenty seconds: what it does in two sentences, three steps, what you need, how to get it, what is
+sent, and the marks. Counted with Python as Unicode characters without a trailing newline: 1,049
+(1,067 if the dashboard counts each of its 18 line breaks as two characters). ASCII only, so it
+pastes the same everywhere. Every sentence rests on the facts above: the data sentence names what
+the approval check carries about the person (the account name and the installation identifier),
+says that the portal's address and the version go with them, and "nothing else about you" is true of
+the product field (a constant) and of the two daily GETs (they carry no data). The site's
+"on an H200 when it needs one" is left out: the GPU a worker may use depends on the student's grid
+account, which the extension does not know.
+
+```
+Your grid. From claude.ai.
+
+Beethoven starts a Claude Code worker in your own account on the Wayne State grid and opens it in claude.ai. Ask there or in the Claude app, and your worker does the work.
+
+HOW IT WORKS
+1. Sign in to ondemand.grid.wayne.edu and click Beethoven. The first time, allow that one site and accept the agreement.
+2. When asked, sign in to Claude once, on Anthropic's own page.
+3. Click Open in Claude. Your worker runs until you press Stop.
+
+YOU NEED
+A Wayne State AccessID, a grid account, the GlobalProtect VPN, and Claude Pro or Max.
+
+By approval only: ask at https://openspineconsortium.com/
+One approval covers one installation: one Chrome profile on one computer.
+
+YOUR DATA
+To check your approval, Beethoven sends our access service the account name your portal shows and a random installation identifier, with your portal's address and the version. The extension sends nothing else about you. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
+
+Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.
+```
+
+## Reviewed description (reviewer-facing; plain text; 5,286 characters; not pasted into the dashboard)
+
+The description the 8.0.0 listing was written with, reviewed line by line against the code. It is
+kept as the reviewer-facing text: if a reviewer asks what the extension does, never does or keeps,
+reply with it (with the reviewer recipe below and `SUBMISSION.md`, section 4). Everything in it is
+still true of 9.0.0. The detailed description above is condensed from it and narrowed to Wayne State
+(the only site profile with a shared copy), and makes no claim this one does not support.
 
 ```
 Beethoven starts, watches and stops a Claude Code worker in your own account on your university's cluster, through the Open OnDemand portal you already use, and hands you the link that shows that worker at claude.ai/code and in the Claude app (Anthropic's Remote Control feature).
@@ -125,12 +176,16 @@ Start, monitor and stop a Claude Code worker on your university's Open OnDemand 
 
 | Permission | Justification |
 |---|---|
-| `storage` | Remembers the portal address you connected, your preferences, your acceptance of the agreement, the account name your portal shows with the last approval answer, and your statement about each worker's workspace, all on your device. |
+| `storage` | Remembers the portal address you connected, your preferences, your acceptance of the agreement, the account name your portal shows with the last approval answer, this installation's random identifier, your statement about each worker's workspace and the audit log of requests made to your portal, all on your device. |
 | `alarms` | Reads your running job's status files no more than once a minute, renews the approval check and fetches the signed withdrawn-versions list once a day, and keeps doing so after the browser suspends the extension. |
 | `scripting` | Loads the extension's page script on your university portal, and only there, after you connect it, including into the portal tab that is already open. |
 | `activeTab` | Lets a click on the toolbar button read the address of the portal tab you clicked from, so the extension can ask you to allow that one site; nothing is read from any other tab. |
 | `sidePanel` | Opens the extension's panel beside your portal tab when you click the toolbar button; there is no popup. |
 | Optional host permission `https://*/*` (requested at runtime for one origin) | Your university's Open OnDemand portal has an address the extension cannot know in advance; when you click the button on that portal's tab, the extension asks the browser for that one origin only, and it refuses to work until that one site is granted. It never requests a claude.ai, anthropic.com or claude.com origin. |
+
+For 9.0.0 the `storage` sentence also names the installation identifier and the audit log, which
+the extension already kept (the privacy statement lists both); nothing new is stored. The remote-code
+answer gains one sentence on the bundled fonts.
 
 Never requested: `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
 `nativeMessaging`, `debugger`, `identity`, `clipboardRead`; any install-time host permission.
@@ -140,7 +195,7 @@ Never requested: `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declara
 Answer: **No.** Justification if a field asks for one:
 
 ```
-No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints during the sign-in are parsed as text and never executed. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; the extension runs it in the user's own cluster account through the portal's shell and carries no copy of it; nothing from the cluster is ever executed in the browser.
+No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints during the sign-in are parsed as text and never executed. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; the extension runs it in the user's own cluster account through the portal's shell and carries no copy of it; nothing from the cluster is ever executed in the browser. Fonts are files inside the package; nothing is fetched to display a page.
 ```
 
 ## Privacy practices
@@ -167,52 +222,38 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 
 | Field | Value |
 |---|---|
-| Homepage / website | `https://openspineconsortium.com/beethoven/` |
+| Official URL | `https://openspineconsortium.com/` once that site is verified in Google Search Console under the developer account's Google account (`PASTE.md` says how); empty until then |
+| Homepage URL | `https://openspineconsortium.com/beethoven/` (the manifest's `homepage_url` and the page's canonical address; the site root shows the same page) |
+| Support URL | `https://openspineconsortium.com/beethoven/support.html` |
 | Privacy policy | `https://openspineconsortium.com/beethoven/privacy.html` |
-| Terms (in the description) | `https://openspineconsortium.com/beethoven/terms.html` |
-| Support | `https://openspineconsortium.com/beethoven/support.html` |
+| Ask for access (in the description) | `https://openspineconsortium.com/` (the form is on the home page, under "Ask for access"; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
+| Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
-## Images (all in `extension/store-assets/`, listed in its `manifest.txt`)
+The six site addresses above answered 200 on 2026-09-30 at about 21:45 US Eastern (curl from WSL),
+and the live home page's headline read "Your grid. From claude.ai." with the lede "Ask in claude.ai.
+Your worker on the grid does the work."
 
-| Image | File |
-|---|---|
-| Store icon 128x128 | `extension/public/icon/128.png` (inside the package too) |
-| Screenshots 1280x800 (up to 5) | `01-agreement-signing-dialog.png`, `02-checks.png`, `03-sign-in-to-claude.png`, `04-worker-online-open-in-claude.png`, `05-setup-page.png` and the `b` variants |
-| Small promotional tile 440x280 (optional) | `promo-tile-440x280.png` |
-| Marquee 1400x560 (optional) | `marquee-1400x560.png` |
+## Images and the promo video
 
-Suggested order for the five slots: 04 (online, green button), 03 (sign-in step), 02 (checks), 01
-(agreement), 05 (setup page). The screenshots were taken from the 8.0.0 release build against the
-mock portal and the live access service (run L in `store-assets/e2e/`, 2026-09-30).
+For 9.0.0 the images are made again in the site's theme, to these rules: the store icon is the
+package icon (the rack from the home page diagram, its one teal unit lit;
+`extension/store-assets/src/icon/README.md`) flattened on the site's cream; every product screen is
+a real capture of the 9.0.0 release build (the raw captures are in `extension/store-assets/raw-9/`,
+and its `LIST.txt` says how they were taken), framed, never a drawn screen; the diagram may be
+drawn, as it is on the site; every image or video frame that names Claude or claude.ai also carries,
+small, "Not an Anthropic product."; PNG 24-bit without alpha, or JPEG, at the exact sizes.
+`PASTE.md` names the file for each field, in the dashboard's order, and
+`extension/store-assets/manifest.txt` says how each was made. The promo video is not a file field:
+the dashboard takes a YouTube address (`PASTE.md` says how to get one).
 
 ## The dashboard, field by field
 
-| Field | Text |
-|---|---|
-| Category | Developer Tools |
-| Language | English (United States) |
-| Title, Summary | from the package (name and `description` above) |
-| Description | the detailed description above |
-| Store icon | `extension/public/icon/128.png` |
-| Screenshots (1280x800) | the five named above |
-| Small promo tile (440x280), Marquee (1400x560) | `promo-tile-440x280.png`, `marquee-1400x560.png` (optional fields) |
-| Official URL / Homepage URL | `https://openspineconsortium.com/beethoven/` (the "official" flag needs the domain verified in Google Search Console under the same Google account) |
-| Support URL | `https://openspineconsortium.com/beethoven/support.html` |
-| Mature content | No |
-| Single purpose | the single-purpose statement above |
-| Permission justification: storage, alarms, scripting, activeTab, sidePanel | the sentences above, one per field |
-| Host permission justification | the `https://*/*` sentence above |
-| Are you using remote code? | No (with the justification above if the field is shown) |
-| Data usage: personally identifiable information | ticked (the institutional account name the portal shows and the random installation identifier, sent in the approval check; the sentence from the privacy-practices table above) |
-| Data usage: every other category | unticked (nothing else is collected or transmitted to the developer) |
-| Certifications | the three, ticked |
-| Privacy policy URL | `https://openspineconsortium.com/beethoven/privacy.html` |
-| Visibility (Distribution) | **Private**, trusted testers: the Google Group of approved students (section 1 of `SUBMISSION.md`); never Unlisted or Public |
-| Regions | United States only (the terms say "offered in the United States"; this also keeps the EU trader declaration out of the picture) |
-| Payments | Free (no in-store payment; the maintainer approves institutional accounts, and the description says so) |
+`PASTE.md` beside this file: the Store listing tab in the order of the dashboard's fields, then the
+Privacy practices tab and the Distribution tab, each with the text in a block to copy or the file to
+upload. Chrome has no reviewer-notes field on the item.
 
-Chrome has no reviewer-notes field on the item. If the review asks for test access, answer with the
-text in `SUBMISSION.md`, section 4, and the recipe below.
+If the review asks for test access, answer with the text in `SUBMISSION.md`, section 4, and the
+recipe below.
 
 ## Reviewer recipe (for a reply to the review)
 

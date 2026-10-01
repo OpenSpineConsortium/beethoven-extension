@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Screenshot 1: Your grid. From claude.ai.</title>
+<link rel="stylesheet" href="store.css">
+<link rel="stylesheet" href="diagram.css">
+<style>
+  .canvas { --w: 1280px; --h: 800px; --mask-y: 62%; }
+  .top { top: 58px; }
+  .h { font-size: 66px; }
+  .lede { font-size: 23px; margin-top: 14px; }
+  .fig { position: absolute; left: 90px; top: 214px; width: 1100px; }
+  .fig .flow { margin: 0; max-width: none; }
+  .fine { left: 0; right: 0; bottom: 30px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="center top">
+    <h1 class="h">Your grid. <em>From claude.ai.</em></h1>
+    <p class="lede">Ask in claude.ai. Your worker on the grid does the work.</p>
+  </div>
+  <div class="fig" data-flow></div>
+  <p class="fine">Not an Anthropic product.</p>
+</div>
+<script src="diagram.js"></script>
+<script src="common.js"></script>
+</body>
+</html>

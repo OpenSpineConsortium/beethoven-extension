@@ -1,0 +1,84 @@
+Beethoven 9.0.0: raw screens for the store images (the site theme), captured 2026-10-01 01:31 UTC
+
+Real captures of the release build (extension/.output/chrome-mv3) in Playwright Chromium
+153.0.8010.12, light colour scheme, against the mock portal of the store reviewer's recipe (https://localhost:8443,
+--user st1234, MOCK_LOGGED_IN=false, the mock's default shared copy and display home /home/st1234). The approval check went to
+the mock's access stub, not the live service; the harness held that one request until the strip at "Checking your access..."
+was captured, then sent it on. Nothing is drawn or composited. The full screens are 1280x800 PNGs (CSS pixels); the crops are
+the elements themselves at device scale 2 (the strip's "-panel" crops with the page narrowed to the side panel's 360 px). The
+strip was opened as a tab (the side panel was disabled for the run), so no browser chrome is in any image.
+
+01-signing-dialog.png
+    1280x800
+    the setup page as it opens on install: "Beethoven: setup", the signing dialog at its top (the heading, "In short")
+01-signing-dialog-crop.png
+    1750x1238 (875x619 CSS px at 2x)
+    the signing dialog: its heading, the sentence on how to sign, and the summary ("In short")
+02-statements-ticked.png
+    1280x800
+    the four statements ticked, the name "A. Student" typed, "Accept and Continue" enabled and not yet pressed
+02-statements-ticked-crop.png
+    1750x1068 (875x534 CSS px at 2x)
+    the statements, the typed name and the two buttons
+03-checking-access.png
+    1280x800
+    the strip while the approval check is out: "Checking your access..." (the dot pulses)
+03-checking-access-panel.png
+    672x242 (336x121 CSS px at 2x)
+    the strip at "Checking your access..." (the page at the side panel's width, 360 px)
+03-checking-access-strip.png
+    2512x242 (1256x121 CSS px at 2x)
+    the strip at "Checking your access...", at 1280 px
+04-sign-in.png
+    1280x800
+    the sign-in step: the sitting open on the cluster (the shell in the strip), the box for the code
+04-sign-in-panel.png
+    672x1554 (336x777 CSS px at 2x)
+    the strip at the sign-in step (the page at the side panel's width, 360 px)
+04-sign-in-strip.png
+    2512x1028 (1256x514 CSS px at 2x)
+    the strip at the sign-in step, at 1280 px
+05-online.png
+    1280x800
+    the worker online: the status line with the session name, the green "Open in Claude" button, "Copy link", "Stop"
+05-online-panel.png
+    672x1012 (336x506 CSS px at 2x)
+    the strip, worker online, with the green button (the page at the side panel's width, 360 px)
+05-online-strip.png
+    2512x578 (1256x289 CSS px at 2x)
+    the strip, worker online, at 1280 px
+06-details-checks.png
+    1280x800
+    Details > Checks: 17 of 17 OK
+06-details-checks-card.png
+    2512x1698 (1256x849 CSS px at 2x)
+    Details > Checks: the heading and the card with the seventeen checks, at 1280 px
+06-details-checks-panel.png
+    672x4058 (336x2029 CSS px at 2x)
+    Details > Checks: the heading and the card with the seventeen checks (the page at the side panel's width, 360 px)
+07-setup-access.png
+    1280x800
+    the setup page at "2. Your access": what is sent, one installation per approval, "Access approved for st1234 at localhost", "Check my access now"
+07-setup-access-card.png
+    1818x646 (909x323 CSS px at 2x)
+    the setup page's Access card with its heading
+
+Checks shown in 06: OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK OK
+On-screen text checked for a machine path, the Windows user name, a personal name and the old product name: none found in any image.
+
+Notes
+- 01-signing-dialog-crop.png ends at the summary ("In short"): the first lines of the full text below it carry the
+  licensor's copyright line, a personal name, so the crop leaves them out. 01-signing-dialog.png does not reach them.
+- 02: the name box shows its focus ring (the name was just typed into it). 04: the code box has focus, as the strip
+  gives it when the sign-in page has opened.
+- 03: the dot before "Beethoven" pulses while a step is busy; each image catches it at one point of the pulse.
+- 04, 05: the box at the bottom of the strip is the output of the last command the strip ran (the check job), with
+  paths in the mock's home (/home/st1234/...) as the tool prints them.
+- 04: the authorize link in the terminal is the mock's (client_id=mock-client); 06 check 13 shows the mock's
+  stand-in sign-in, "student@example.edu max". Neither is anyone's account.
+- Times: "last run" and "the service last answered" are this machine's local time (US Eastern), as the extension
+  shows them; "checked ... UTC" is UTC.
+- The "-panel" crops are the same page rendered 360 px wide; in Chrome the side panel can be dragged wider or
+  narrower. At 320 px nothing on these pages runs off the side (measured in a second run of the same recipe).
+- The green button is the site's teal (#0E5F58), the colour of the site's selected pill.
+

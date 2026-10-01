@@ -67,7 +67,7 @@ src/licensing/
   killlist.ts               the signed kill-list: shape, verification, fail-safe refresh; withdraws versions only
 src/ext/                    storage.ts (browser.storage as the KV the core expects), connectApi.ts (the browser behind core/connect.ts)
 src/ui/                     strip.ts, terminal.ts, details.ts, options.ts, sections.ts, dom.ts, rpc.ts, style.css
-public/                     LICENSE.txt and PRIVACY.md (copied from the repository root by scripts/sync-profiles.mjs at build time), profiles/ (the same), icons
+public/                     LICENSE.txt and PRIVACY.md (copied from the repository root by scripts/sync-profiles.mjs at build time), profiles/ (the same), icons, fonts/ (the site's typefaces with their licences)
 scripts/sync-profiles.mjs   copies ../framework/profiles/*.json into public/profiles/ (data only, without their notes; no framework code) and the agreement texts before every build and zip
 mock-ood/                   a mock Open OnDemand portal (server.mjs, only dependency: ws) with fake scheduler commands and a seeded hpcworker
 test/                       vitest: the step machine, connecting, the plain-login reader, the statement, access, kill-list, audit, shell, diagnostics, worker, source hygiene, integration against the mock
@@ -90,6 +90,13 @@ profiles as data. Its JavaScript is Vite's minified output (Chrome's rules allow
 obfuscation), with no source map. `test/hygiene.test.ts` checks both against every build folder in `.output` of
 this version and the store zips of this version (the sources zip is only checked for the absence of the framework);
 it skips those checks, and says so, when there is no build of this version yet.
+
+The pages wear the theme of openspineconsortium.com (9.0.0): its tokens in `src/ui/style.css`, and its three
+typefaces as files in `public/fonts/`, each family beside its SIL Open Font License 1.1 text: Newsreader 16pt
+Regular and Medium (productiontype/Newsreader at cfcb4f7, `fonts/static/woff2`) and IBM Plex Sans (Regular,
+Medium, SemiBold) and IBM Plex Mono (Regular, Medium) in IBM's own Latin1 cuts (IBM/plex at 763c36e,
+`packages/plex-*/fonts/split/woff2`), unmodified, about 205 KB in all. Nothing is fetched: `test/hygiene.test.ts`
+fails on a stylesheet that names a remote address or a font that is not in `public/fonts/`.
 
 `npm run build:safari` emits `.output/safari-mv3` for `xcrun safari-web-extension-packager` (untested: needs a Mac; a manifest hook strips the Chrome-only side-panel keys from that build).
 `npm run build:dev` is the Chrome build with `http://localhost/*` added to the optional host permissions so the

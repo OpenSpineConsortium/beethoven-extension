@@ -1,0 +1,128 @@
+/* ============================================================
+   store.css: the Chrome Web Store images and the promo video.
+   Tokens, type and shadows are the site's own
+   (openspineconsortium.github.io/assets/css/style.css, hero.css);
+   the fonts are local copies in fonts/ (SIL OFL 1.1), so the pages
+   render the same with no network.
+   ============================================================ */
+
+@font-face { font-family: "Newsreader"; src: url("fonts/Newsreader-Variable.ttf") format("truetype"); font-weight: 200 800; font-style: normal; }
+@font-face { font-family: "Newsreader"; src: url("fonts/Newsreader-Italic-Variable.ttf") format("truetype"); font-weight: 200 800; font-style: italic; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular-Latin1.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Medium-Latin1.woff2") format("woff2"); font-weight: 500; font-style: normal; }
+@font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-SemiBold-Latin1.woff2") format("woff2"); font-weight: 600; font-style: normal; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Regular-Latin1.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Medium-Latin1.woff2") format("woff2"); font-weight: 500; font-style: normal; }
+
+:root {
+  --paper:        #F1EEE3;
+  --paper-card:   #FBFAF4;
+  --paper-deep:   #E7E2D2;
+  --ink:          #1A1C18;
+  --ink-soft:     #585B50;
+  --ink-faint:    #8C8E82;
+  --teal:         #0E5F58;
+  --teal-deep:    #0A423D;
+  --teal-bright:  #157A70;
+  --ochre:        #BC6B26;
+  --line:         rgba(26, 28, 24, 0.14);
+  --line-soft:    rgba(26, 28, 24, 0.08);
+
+  --font-display: "Newsreader", Georgia, serif;
+  --font-body:    "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono:    "IBM Plex Mono", ui-monospace, monospace;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* the hero window's shadow (hero SVG: feDropShadow dy 22, stdDeviation 20, #0A423D at .16) */
+  --shadow-window: 0 22px 40px rgba(10, 66, 61, 0.16);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* one canvas per image, exactly the store's size */
+.canvas {
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  overflow: hidden;
+  background: var(--paper);
+  isolation: isolate;
+}
+
+/* the site's faint drafting grid (hero.css .bh::before), centred on the picture */
+.canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--line-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: var(--grid-x, 0) var(--grid-y, 0);
+  -webkit-mask-image: radial-gradient(ellipse var(--mask-w, 60%) var(--mask-h, 55%) at var(--mask-x, 50%) var(--mask-y, 58%), #000 0%, transparent 78%);
+          mask-image: radial-gradient(ellipse var(--mask-w, 60%) var(--mask-h, 55%) at var(--mask-x, 50%) var(--mask-y, 58%), #000 0%, transparent 78%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* ---------- type (hero.css .bh__title, .bh__lede, .bh__fine) ---------- */
+.h {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.h em { color: var(--teal); font-style: italic; }
+.h .l { display: block; }
+
+.lede {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.fine {
+  position: absolute;
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.brand img { display: block; }
+
+/* ---------- a real capture, framed like the site's window ----------
+   The capture's own card is cut out of the screen it was taken from (data-box, in the capture's
+   pixels) and shown at data-scale; its corners are the card's own radius and the shadow is the
+   hero window's. Nothing inside the card is drawn here. */
+.shot {
+  position: absolute;
+  overflow: hidden;
+  box-shadow: var(--shadow-window);
+  background: var(--paper-card);
+}
+.shot img { position: absolute; display: block; max-width: none; }
+
+/* ---------- layouts ---------- */
+.center { position: absolute; left: 0; right: 0; text-align: center; }
+.side { position: absolute; }

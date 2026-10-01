@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Beethoven promo (1280x720)</title>
+<link rel="stylesheet" href="store.css">
+<link rel="stylesheet" href="diagram.css">
+<!--
+  The promo video, 28 s, as one page. Opened in a browser it plays once from the start. The build script
+  opens it with ?record, which pauses every animation on the page, and then calls __seek(t) for each frame:
+  every animation (the site's own CSS animations of the diagram: the dots, the fans, the LEDs, the caret;
+  and the scene's, made below with the Web Animations API) is set to time t, so each frame is exact.
+
+  0.0  the headline, then the diagram draws itself: the claude.ai window, the two arrows from its port,
+       the Claude servers and the rack, the arrow up to the model, the GPU and the arrow to it; then the
+       dots run along the arrows as on the site (its CSS, its timing, started later)
+  9.9  Click once.               the toolbar button (the package icon), then the strip at "Checking your
+                                 access..." (raw-9/03-checking-access-panel.png)
+  14.6 Sign in to Claude, once.  the strip at the sign-in step (raw-9/04-sign-in-panel.png)
+  19.3 Ask from claude.ai.       the strip with the worker online (raw-9/05-online-panel.png)
+  24.0 Beethoven, openspineconsortium.com, held to the end (28 s)
+-->
+<style>
+  .canvas { --w: 1280px; --h: 720px; --mask-y: 60%; }
+  .scene { position: absolute; inset: 0; }
+
+  /* scene 1: the home page */
+  .s1-top { position: absolute; left: 0; right: 0; top: 42px; text-align: center; }
+  .s1-top .h { font-size: 60px; }
+  .s1-top .lede { font-size: 21px; margin-top: 12px; }
+  .s1-top .part { display: inline-block; }
+  .s1-fig { position: absolute; left: 140px; top: 178px; width: 1000px; }
+  .s1-fig .flow { margin: 0; max-width: none; }
+  /* the site's dots, started once the arrows are drawn (the site's 1.6 s between the two runs is kept) */
+  .fl-d { animation-delay: 4s; }
+  .fl-d.fl-d--late { animation-delay: 5.6s; }
+  .pv-in { transform-box: fill-box; transform-origin: center; }
+
+  /* the three beats: words left, the strip right */
+  .text { position: absolute; left: 96px; top: 50%; transform: translateY(-50%); width: 500px; }
+  .text .h { font-size: 60px; text-wrap: balance; }
+  .text .lede { font-size: 22px; margin-top: 18px; max-width: 420px; }
+  .tap { position: absolute; left: 832px; top: 196px; width: 112px; height: 112px; }
+  .drift { position: absolute; inset: 0; }
+
+  /* the end card */
+  .end { display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 40px; }
+  .end img { width: 132px; height: 132px; display: block; }
+  .end .name { font-family: var(--font-display); font-weight: 500; font-size: 92px; line-height: 1; letter-spacing: -0.035em; margin-top: 6px; }
+  .end .url { font-family: var(--font-mono); font-size: 22px; color: var(--teal); margin-top: 22px; letter-spacing: 0.01em; }
+
+  .fine { left: 96px; bottom: 22px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <section class="scene" id="s1">
+    <div class="s1-top">
+      <h1 class="h"><span class="part" id="h1a">Your grid.</span> <em class="part" id="h1b">From claude.ai.</em></h1>
+      <p class="lede" id="s1-lede">Ask in claude.ai. Your worker on the grid does the work.</p>
+    </div>
+    <div class="s1-fig" data-flow></div>
+  </section>
+
+  <section class="scene" id="b1">
+    <div class="text"><h2 class="h">Click <em>once.</em></h2><p class="lede">Click Beethoven on your portal tab.</p></div>
+    <img class="tap" id="b1-tap" src="icon/icon.svg" alt="">
+    <div class="shot" id="b1-shot" style="left: 642px; top: 330px" data-src="../raw-9/03-checking-access-panel.png" data-box="8,8,656,225" data-scale="0.75" data-radius="4 14 14 4"></div>
+  </section>
+
+  <section class="scene" id="b2">
+    <div class="text"><h2 class="h"><span class="l">Sign in to Claude,</span> <em>once.</em></h2><p class="lede">On Anthropic's own page.</p></div>
+    <div class="drift" id="b2-drift"><div class="shot" id="b2-shot" style="left: 688px; top: 84px" data-src="../raw-9/04-sign-in-panel.png" data-box="8,8,656,1536" data-scale="0.62" data-radius="4 14 14 4"></div></div>
+  </section>
+
+  <section class="scene" id="b3">
+    <div class="text"><h2 class="h">Ask from <em>claude.ai.</em></h2><p class="lede">Open in Claude. Your worker runs until you press Stop.</p></div>
+    <div class="shot" id="b3-shot" style="left: 652px; top: 284px" data-src="../raw-9/05-online-panel.png" data-box="8,8,656,996" data-scale="0.84" data-radius="4 14 14 4"></div>
+  </section>
+
+  <section class="scene end" id="s5">
+    <img id="end-icon" src="icon/icon.svg" alt="">
+    <div class="name" id="end-name">Beethoven</div>
+    <div class="url" id="end-url">openspineconsortium.com</div>
+  </section>
+
+  <p class="fine">Not an Anthropic product.</p>
+</div>
+<script src="diagram.js"></script>
+<script src="common.js"></script>
+<script>
+(function () {
+  'use strict';
+  var DURATION = 28;
+  var EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';   /* the site's --ease */
+  var $ = function (s) { return document.querySelector(s); };
+  var ms = function (s) { return s * 1000; };
+
+  function anim(el, frames, t0, dur, easing, fill) {
+    return el.animate(frames, { delay: ms(t0), duration: ms(dur), easing: easing || EASE, fill: fill || 'both' });
+  }
+  function rise(el, t0, dur, dy) {
+    // the individual `translate` property, so an element's own transform (the labels' centring) is kept
+    return anim(el, [{ opacity: 0, translate: '0 ' + (dy == null ? 16 : dy) + 'px' }, { opacity: 1, translate: '0 0' }], t0, dur || 0.8);
+  }
+  function fade(el, t0, dur) { return anim(el, [{ opacity: 0 }, { opacity: 1 }], t0, dur || 0.5, 'ease-out'); }
+  // a scene is shown between t0 and t1 (its wrapper only fades; what is inside comes in on its own)
+  function scene(el, t0, t1) {
+    anim(el, [{ opacity: 0 }, { opacity: 1 }], t0, 0.01, 'linear', 'both');
+    anim(el, [{ opacity: 1 }, { opacity: 0 }], t1, 0.45, 'ease-in', 'forwards');
+  }
+  // draws a stroke from its start: the element's own length, normalised to 1
+  function draw(el, t0, dur) {
+    el.setAttribute('pathLength', '1');
+    el.style.strokeDasharray = '1 1';
+    return anim(el, [{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], t0, dur, 'cubic-bezier(0.45, 0, 0.55, 1)');
+  }
+  // wraps a run of sibling SVG elements, first..last, in a <g>
+  function wrap(first, last, id) {
+    var g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.id = id; g.setAttribute('class', 'pv-in');
+    first.parentNode.insertBefore(g, first);
+    var n = first;
+    while (n) { var next = n.nextSibling; g.appendChild(n); if (n === last) break; n = next; }
+    return g;
+  }
+  function label(text) {
+    return Array.prototype.find.call(document.querySelectorAll('.flow__t'), function (e) { return e.textContent.replace(/\s+/g, ' ').trim() === text; });
+  }
+
+  // ---------- scene 1: the home page, drawn ----------
+  var svg = $('.flow__art--wide');
+  var win = wrap(svg.querySelector('.b-win'), svg.querySelector('.b-send-a'), 'pv-win');
+  var cloudG = svg.querySelector('.n-cloud').parentNode;
+  var cloudWrap = wrap(cloudG, cloudG, 'pv-cloud');
+  var rack = svg.querySelector('.n-rack');
+  var rackIn = wrap(rack.nextElementSibling, svg.querySelector('.n-brk').previousElementSibling, 'pv-rack-in');
+  var brk = svg.querySelector('.n-brk'), board = svg.querySelector('.n-board');
+  var gpuIn = wrap(board.nextElementSibling, svg.querySelector('.fl-a').previousElementSibling, 'pv-gpu-in');
+  var arrows = svg.querySelectorAll('.fl-a');            // chat, code session, the model, the heavy lifting
+  var port = svg.querySelector('.fl-port');
+
+  // each arrow gets its own copy of its arrowhead, shown when the arrow arrives
+  var heads = [];
+  Array.prototype.forEach.call(arrows, function (a, i) {
+    var id = a.getAttribute('marker-end').match(/#([^)]+)/)[1];
+    var m = document.getElementById(id).cloneNode(true);
+    m.id = 'pv-head-' + i;
+    document.getElementById(id).parentNode.appendChild(m);
+    a.setAttribute('marker-end', 'url(#pv-head-' + i + ')');
+    heads.push(m.firstElementChild);
+  });
+
+  scene($('#s1'), 0, 9.3);
+  rise($('#h1a'), 0.2, 0.9, 14);
+  rise($('#h1b'), 0.65, 0.9, 14);
+  rise($('#s1-lede'), 1.1, 0.9, 10);
+
+  rise(win, 1.5, 1.0, 18);
+  fade(label('claude.ai'), 1.8, 0.6);
+  rise(label('Is the female pelvis relatively wider?'), 2.1, 0.7, 8);
+
+  anim(port, [{ opacity: 0 }, { opacity: 1 }], 2.45, 0.25, 'ease-out');
+  draw(arrows[0], 2.55, 1.0); draw(arrows[1], 2.55, 1.0);
+  fade(heads[0], 3.5, 0.15); fade(heads[1], 3.5, 0.15);
+  fade(label('a chat'), 2.95, 0.5); fade(label('a Code session'), 3.05, 0.5);
+
+  draw(svg.querySelector('.n-cloud'), 3.2, 0.9);
+  anim(svg.querySelector('.n-cloud'), [{ fillOpacity: 0 }, { fillOpacity: 1 }], 3.7, 0.4, 'ease-out');
+  rise(label('Claude servers'), 3.75, 0.6, 6);
+
+  draw(rack, 3.35, 0.85);
+  anim(rack, [{ fillOpacity: 0 }, { fillOpacity: 1 }], 3.8, 0.35, 'ease-out');
+  fade(rackIn, 3.95, 0.5);
+  rise(label('Wayne State grid'), 4.1, 0.6, 6);
+  fade(label('your Claude Code worker'), 4.3, 0.5);
+
+  draw(arrows[2], 4.35, 0.55); fade(heads[2], 4.85, 0.15);
+  fade(label('the model'), 4.6, 0.45);
+
+  draw(brk, 4.55, 0.6); draw(board, 4.6, 0.8);
+  anim(brk, [{ fillOpacity: 0 }, { fillOpacity: 1 }], 4.9, 0.3, 'ease-out');
+  anim(board, [{ fillOpacity: 0 }, { fillOpacity: 1 }], 5.0, 0.35, 'ease-out');
+  fade(gpuIn, 5.05, 0.5);
+  rise(label('H200 GPU'), 5.15, 0.6, 6);
+
+  draw(arrows[3], 4.95, 0.65); fade(heads[3], 5.55, 0.15);
+  fade(label('the heavy lifting'), 5.25, 0.45);
+
+  // ---------- the three beats ----------
+  // each scene has gone (0.45 s fade) before the next one comes in
+  scene($('#b1'), 9.85, 14.0);
+  rise($('#b1 .text'), 9.9, 0.9, 16);
+  rise($('#b1-tap'), 10.15, 0.7, 10);
+  anim($('#b1-tap'), [{ transform: 'scale(1)' }, { transform: 'scale(0.9)', offset: 0.4 }, { transform: 'scale(1)' }], 10.95, 0.35, 'ease-in-out');
+  rise($('#b1-shot'), 11.25, 0.8, 18);
+
+  scene($('#b2'), 14.55, 18.7);
+  rise($('#b2 .text'), 14.6, 0.9, 16);
+  rise($('#b2-shot'), 14.8, 0.9, 18);
+  // the sign-in strip moves up a little while it is on screen; 22 px, so the next box of the capture (the
+  // output of the probe, capture row 1077: 84 - 22 + 1069 x 0.62 = 724.8 px) stays below the frame's edge
+  anim($('#b2-drift'), [{ translate: '0 0' }, { translate: '0 -22px' }], 15.4, 3.3, 'cubic-bezier(0.45, 0, 0.55, 1)');
+
+  scene($('#b3'), 19.25, 23.4);
+  rise($('#b3 .text'), 19.3, 0.9, 16);
+  rise($('#b3-shot'), 19.5, 0.9, 18);
+
+  // ---------- the end card ----------
+  scene($('#s5'), 23.95, 99);
+  rise($('#end-icon'), 24.0, 0.9, 12);
+  rise($('#end-name'), 24.25, 0.9, 12);
+  rise($('#end-url'), 24.65, 0.8, 8);
+
+  window.__duration = DURATION;
+  window.__poster = 8.2;
+  window.__seek = function (t) {
+    document.getAnimations().forEach(function (a) { a.pause(); a.currentTime = ms(t); });
+  };
+
+  window.__ready = window.__ready.then(function (info) {
+    if (/[?&]record\b/.test(location.search)) window.__seek(0);
+    return info;
+  });
+})();
+</script>
+</body>
+</html>

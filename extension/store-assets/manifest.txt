@@ -1,82 +1,143 @@
-Beethoven 8.0.0: store assets
+Beethoven 9.0.0: store assets
 
-Made 2026-09-30 between 14:49 and 14:53 UTC for 8.0.0, the release that is distributed only through the
-private Chrome Web Store listing, binds each approved account to one installation, and carries no copy of
-the cluster tool. All nine screenshots were made again: the setup page now says what the approval check
-sends (the installation identifier) and that an approval covers one installation, and the agreement in
-them is LICENSE.txt version 7 and PRIVACY.md version 8 (TERMS_VERSION 7), the texts 8.0.0 ships. The
-two rendered images from src/ (the tile and the marquee) name no version and no browser and are unchanged
-since 7.0.0. The Edge Add-ons logo (edge-store-logo-300x300.png and its src/ page) was removed: there is
-one store and one private listing.
+Made 2026-10-01 between 01:46 and 02:03 UTC for 9.0.0 and rebuilt once at 02:38 to 02:40 UTC (the stills
+came out byte-identical; the video changed as described under promo/beethoven-promo.mp4), the release whose
+pages wear the site's theme (the cream ground, ink type, the teal accent, Newsreader and IBM Plex), from
+the real screens of the 9.0.0 release build in raw-9/ and the home page diagram of openspineconsortium.com.
+Every image is in the site's style: one idea each, a Newsreader headline whose last words are the site's
+teal italic, one quiet line, and either the site's diagram or one real screen. The 8.0.0 screenshots
+(01-agreement-signing-dialog.png to 05b-setup-page-settings.png) were removed from this folder; they are in
+git at commit c05f595.
 
-How the screenshots were made (run L, e2e/run-L-store-screenshots-reviewer-recipe-st1234.txt): the release
-build (extension/.output/chrome-mv3, 8.0.0, no framework bundled) loaded into Playwright's Chromium
-(Chrome for Testing 153) with a fresh profile, a 1280x800 viewport and the light colour scheme, driven
-against the mock Open OnDemand portal (extension/mock-ood/server.mjs) over https at localhost:8443 with a
-self-signed certificate, exactly as the store reviewer's recipe runs it (docs/store/LISTING.md): --user
-st1234, MOCK_LOGGED_IN=false and the mock's own home seeding (the account already set up on the mock's
-stand-in for the lab's shared copy, at the mock's default path /lab/shared/hpcworker/current and its
-default version 5, so the strip finds the tool and runs no install; Details reads "tool: the lab's shared
-copy, version 5"). There is no key: the extension read the account name the mock's dashboard shows and
-asked the real access service at beethoven-access.openspineconsortium.workers.dev, sending install_id with
-the check, and the service answered approved:true for st1234 (the reviewers' account is accepted from any
-installation there, so each reviewer's own installation works). services.json and killlist.json were
-answered by the harness from the files in the site repository; nothing else was routed. The agreement was
-accepted on the setup page as a person does (scrolled to the end, four boxes ticked, a typed name, "Accept
-and Continue"); 01 was taken before anything was touched and 01b once the four boxes were ticked and the
-name typed, before the button was pressed (no request had gone to the vendor by then). The toolbar button
-was pressed on the portal tab with the DevTools protocol's Extensions.triggerAction (the action a click
-runs), and the browser's own permission prompt was answered with Windows UI Automation (its Allow button);
-no extension state was edited. Before that click the side panel was switched off with
-chrome.sidePanel.setOptions, so the background's own fallback opened the strip as a tab, which is what is
-captured at 1280x800; in Chrome a person sees the same strip in the side panel beside the portal. Nothing
-in the images was drawn by hand or composited. Each image was looked at, and the harness checked the text on
-screen in each one for a machine path, the Windows user name and the old product name: none appears in any
-of them.
+WHAT GOES IN WHICH DASHBOARD FIELD (Chrome Web Store, Store listing tab)
 
-Screenshots (1280x800 PNG), in the order suggested for the store (it takes five):
-  04-worker-online-open-in-claude.png  step 11 of 11: "Your worker is online: node01-amber-lantern."; the green
-      Open in Claude button, Copy link, Stop; the output box shows the probe submission with its path in the
-      mock's home
-  03-sign-in-to-claude.png  step 7 of 11: the sign-in sitting is open on the cluster (the portal's shell in the
-      strip, the mock's authorize link), one box for the code, "Open the sign-in page again"
-  02-checks.png  Details > Checks: all seventeen OK (the report of "Run the checks", shown on the strip
-      reopened afterwards); check 1 reads "Access approved for st1234 at localhost (checked 2026-09-30 14:49
-      UTC); kill-list of 2026-09-30"; check 6 ends "the tool is set up (the lab's shared copy)"
-  01-agreement-signing-dialog.png  the setup page ("Beethoven: setup") as it opens on install: the signing
-      dialog at its top, headed "Beethoven Trial Edition License Agreement (version 7) and Privacy
-      Statement", and the summary ("In short"), whose second point says an approval is for one installation
-      on one computer and that the check sends the random identifier the installation made for itself
-  05-setup-page.png  the setup page after setup, from the top: "Accepted version 7 ... by "A. Student"
-      (Chromium 153)" with the SHA-256 prefixes of the agreement (49d4ef3f5e82a34d..., LICENSE.txt version 7)
-      and of the privacy statement (712ce3a8756cfa1d..., PRIVACY.md version 8) as this build ships them;
-      "2. Your access" (what is sent, including this installation's identifier, "a random number Beethoven
-      made when you accepted its agreement, not taken from your computer"; one installation per approval;
-      "Access approved for st1234 at localhost, checked 2026-09-30 14:49 UTC"; "Check my access now"; nothing
-      to enter, no key); "3. Your portal" (localhost, site profile "localhost")
+  Store icon (128x128)          store-icon-128.png
+  Screenshots (up to 5)         screenshot-01-your-grid.png, then 02, 03, 04, 05, in that order
+  Small promo tile (440x280)    promo-tile-440x280.png
+  Marquee promo tile (1400x560) marquee-1400x560.png
+  Global promo video            a YouTube link: upload promo/beethoven-promo.mp4 to YouTube first and paste
+                                the video's address here (the dashboard takes a link, not a file)
 
-Extra screenshots (1280x800 PNG), optional:
-  01b-agreement-statements.png  the same dialog scrolled to the four statements, all four ticked (the first
-      reads "... I agree to the Beethoven Trial Edition License Agreement (version 7, 2026-09-30) and the
-      Privacy Statement, which I have read."), the name "A. Student" typed, "Accept and Continue" enabled and
-      not yet pressed, and "2. Your access" before any portal is connected
-  03b-where-your-work-goes.png  step 8 of 11: where the work goes, the worker name, the workspace on the
-      cluster, and the statement about the workspace
-  04b-details-worker-card.png  Details > Your worker in a settled state (the strip reopened): worker "worker",
-      job 100002 on node01, online; the claude.ai/code link and the session name; the Claude sign-in and
-      Remote Control answer as the job reports them; the successor job; the line "tool: the lab's shared copy,
-      version 5" above the buttons; the top of the checks below
-  05b-setup-page-settings.png  the setup page scrolled to "5. Settings" (shell host, site profile name,
-      permission mode, the two on-by-default settings) and the top of "6. Audit log"
+The screenshots and the two tiles are exactly the store's sizes, 8-bit RGB with no alpha channel and no
+transparency chunk (checked by build_assets.mjs on every build, and again with PIL). The store icon is
+128x128 RGBA: its padding is transparent.
 
-Rendered images (unchanged since 7.0.0; Edge headless, --headless=new --screenshot at the stated window size,
-from the HTML in src/):
-  promo-tile-440x280.png  (440x280)  Chrome Web Store small promotional tile
-  marquee-1400x560.png  (1400x560)  Chrome Web Store marquee
-  src/tile-440x280.html, src/marquee-1400x560.html  the pages they were rendered from
+THE FILES
 
-The request logs in e2e/ for 8.0.0 (each lists every request the browser made, who made it, the vendor
-requests with their bodies and answers, and every line typed into the portal's shell and what it printed):
+store-icon-128.png  (128x128 PNG, RGBA)
+    The icon stream's mark (the worker rack from the home page diagram, its own unit in solid teal) on its
+    cream card: 96 px of artwork inside 16 px of transparent padding, Chrome's convention for a store icon.
+    A copy of src/icon/icon.png, which is also the package's icon/128.png; see src/icon/README.md for how
+    the mark was chosen. (Until 2026-09-30 this file was flattened on the cream, which showed as a second
+    frame on the store's white page.)
+
+screenshot-01-your-grid.png  (1280x800)
+    "Your grid. From claude.ai." / "Ask in claude.ai. Your worker on the grid does the work." over the home
+    page diagram: the claude.ai window, the arrows to Claude servers and to the Wayne State grid, the arrow
+    up to the model and the one left to the H200 GPU. The diagram is the site's own SVG and CSS, copied
+    verbatim (src/diagram.js, src/diagram.css), shown as the site shows it to a visitor who has asked for
+    reduced motion: the dots held at the same point of each arrow.
+screenshot-02-click-once.png  (1280x800)
+    "Click once." / "One click on Beethoven starts your worker on the grid. Then open it in Claude." Beside
+    it the strip at step 11 of 11: "Your worker is online: node01-amber-lantern.", the teal "Open in
+    Claude", "Copy link", "Stop". From raw-9/05-online-panel.png (the side panel's width); the card runs on
+    below the bottom edge, where the output box of the last command is.
+screenshot-03-sign-in-once.png  (1280x800)
+    "Sign in to Claude, once." / "On Anthropic's own page. Then paste the code it shows." Beside it the strip
+    at step 7 of 11: the instruction, the portal's shell with the sign-in sitting, the box for the code and
+    "Open the sign-in page again". From raw-9/04-sign-in-panel.png; the card runs on below the bottom edge.
+screenshot-04-seventeen-checks.png  (1280x800)
+    "Seventeen checks. All OK." / "Your access, the portal, the scheduler, the node and your sign-in, in one
+    click." Beside it Details > Checks: "Run the checks", "last run ...: everything works" and the seventeen
+    rows, each tagged OK. From raw-9/06-details-checks-card.png (the page at 1280 px); the card runs on past
+    the right edge, which cuts the end of the longer rows. The headline says what the tags say (it read
+    "All green." until 2026-09-30; at listing size the pale tags do not read as green).
+screenshot-05-by-approval-only.png  (1280x800)
+    "By approval only." / "Ask for access. One approval, one installation." Below it the setup page's
+    Access card: what the approval check sends, one installation per approval, "Access approved for st1234 at
+    localhost (checked 2026-10-01 01:32 UTC)", "Check my access now". From raw-9/07-setup-access-card.png,
+    the whole card.
+promo-tile-440x280.png  (440x280)
+    The icon, "Beethoven" in Newsreader and "Your grid. From claude.ai."
+marquee-1400x560.png  (1400x560)
+    The icon and the name, "Your grid. From claude.ai." and the site's line on the left; the home page
+    diagram on the right (at this width the site sets "the heavy lifting" on two lines, and so does this).
+promo/beethoven-promo.mp4  (1280x720, 28.0 s, 30 fps, 840 frames, H.264 High, yuv420p, BT.709, no audio)
+    0 s    the headline, then the diagram draws itself: the window, the two arrows from its port, the
+           Claude servers and the rack, the arrow up to the model, the GPU and the arrow to it; then the
+           dots run along the arrows, with the site's own CSS animation and timing, started once the
+           arrows are there
+    9.9 s  "Click once." / "Click Beethoven on your portal tab.": the toolbar button (the package icon)
+           presses, then the strip at "Checking your access..." (raw-9/03-checking-access-panel.png)
+    14.6 s "Sign in to Claude, once." / "On Anthropic's own page.": the strip at the sign-in step, moving
+           up 22 px (raw-9/04-sign-in-panel.png)
+    19.3 s "Ask from claude.ai." / "Open in Claude. Your worker runs until you press Stop.": the strip with
+           the worker online (raw-9/05-online-panel.png)
+    24.0 s the end card, held: the icon, "Beethoven", openspineconsortium.com
+    "Not an Anthropic product." stays at the bottom left throughout.
+    The sign-in and online strips run on below the bottom edge through plain card: the next box of each
+    capture (the output of the last command) starts below the frame in every frame (sign-in: at 724.8 px
+    at the end of its 22 px move; online: at 728.4 px), checked on all 840 decoded frames.
+promo/beethoven-promo-poster.png  (1280x720, RGB)
+    The frame at 8.2 s (the diagram drawn, the dots on their way). For the YouTube thumbnail if wanted.
+
+Every image that names Claude or claude.ai carries, small, "Not an Anthropic product." (all five
+screenshots, both tiles, every frame of the video and the poster). "Claude" and "claude.ai" appear only to
+say what Beethoven works with, as on the site.
+
+HOW THEY ARE MADE (src/)
+
+  node src/build_assets.mjs --pw <dir of an installed playwright package> [--only shots|tiles|icon|video]
+                            [--sync-site <the site repository>] [--webm]
+
+build_assets.mjs opens each page in src/ in Playwright's Chromium at the image's exact size and device
+scale 1 and takes a screenshot of it; it fails if a page makes any request that is not a local file, if a
+font is not loaded, if the page is not exactly the image's size, or if a PNG is not 24-bit RGB without alpha.
+The pages:
+  store.css           the site's tokens (style.css), its headline, line and fine-print styles (hero.css), the
+                      hero window's shadow, and the drafting grid behind the hero
+  split.css           screenshots 2 to 4: the words left, the screen right
+  shot-01..05.html, tile-440x280.html, marquee-1400x560.html, promo.html
+  common.js           puts the diagram in, cuts each screen's card out of its capture (data-box, in the
+                      capture's pixels), and waits for the fonts and images
+  diagram.js, diagram.css
+                      the home page diagram and its rules, copied verbatim from the site repository
+                      (tools/pages/index/body.html between flow:start and flow:end; assets/css/hero.css);
+                      --sync-site copies them again
+  fonts/              Newsreader (the variable roman and italic, byte-identical to google/fonts main,
+                      ofl/newsreader) and IBM Plex Sans and Mono (the Latin1 cuts the extension bundles), each
+                      with its SIL Open Font License text. Nothing is fetched.
+  icon/               the icon stream's work (its README says how to regenerate it)
+
+The screens are the captures in raw-9/ (raw-9/LIST.txt and raw-9/capture-log.txt say how they were taken:
+the 9.0.0 release build in Playwright Chromium against the mock portal of the store reviewer's recipe). Each
+image shows one card exactly as captured: cut out of the capture along the card's own border, scaled, given
+the card's own corner radii and the hero window's shadow. Nothing inside a card is drawn, edited or
+composited. The video is drawn frame by frame: promo.html exposes __seek(t), which sets every animation on
+the page to time t; each frame is a screenshot, and ffmpeg (found on PATH, else inside WSL) encodes them.
+Without ffmpeg (or with --webm) the script records the page in real time with Playwright's recorder and
+keeps a .webm instead (VP8, about 28.9 s with the page's loading at the start); YouTube takes either.
+
+CAVEATS
+
+- The strip is captured as a tab at the side panel's width (360 px), with the side panel switched off for
+  the run; in Chrome a person sees the same page in the side panel beside the portal.
+- The account and machine names in the screens are the mock portal's stand-ins (st1234, localhost,
+  node01-amber-lantern, student@example.edu), not anyone's account.
+- Google's image guidance suggests promo tiles with little text and without light backgrounds. These tiles
+  follow the site's cream and carry the name and one line, as the brief asked.
+- Google's image page says a store icon may have transparency (96x96 artwork in 16 px of transparent
+  padding) and that one without an alpha channel is placed in a frame with rounded corners.
+  store-icon-128.png has no alpha, as the brief asked; ../public/icon/128.png is the same mark with
+  transparent padding, if the frame looks wrong on the listing.
+- The motion in the video that is neither a capture nor the site's own animation: the diagram drawing
+  itself, the scenes coming in and going, the button's press and the sign-in strip moving up.
+
+THE REQUEST LOGS IN e2e/
+
+Each lists every request the browser made, who made it, the vendor requests with their bodies and
+answers, and every line typed into the portal's shell and what it printed. They are the record of the
+8.0.0 and earlier runs; the 9.0.0 captures are described in raw-9/.
   run-I-approved-bound-st1234.txt  approved and bound, on the lab's shared copy: the mock reached at
       https://ondemand.wayne.localhost:8443 (the hostname makes the site "wayne") with --shared-install at the
       path profiles/wayne.json names and --shared-version 8, and services.json pointed at the mock's access
@@ -95,8 +156,8 @@ requests with their bodies and answers, and every line typed into the portal's s
       deployed service does while REQUIRE_INSTALL_ID is "0") it is approved, and a second identifier is still
       refused.
   run-L-store-screenshots-reviewer-recipe-st1234.txt  the store reviewer's recipe against the real access
-      service: the source of all nine screenshots; the check went to beethoven-access with product "bridge",
-      version "8.0.0" and install_id; online; seventeen checks OK.
+      service: the source of the nine 8.0.0 screenshots; the check went to beethoven-access with product
+      "bridge", version "8.0.0" and install_id; online; seventeen checks OK.
   run-M-real-service-one-installation-st1234.txt  the rule on the real service, with curl and admin.mjs: the
       reviewers' exemption on st1234 was switched off for the run, a fresh identifier was approved and bound,
       a second one was refused with "other_installation" (the maintainer's second-installation e-mail follows
@@ -105,21 +166,5 @@ requests with their bodies and answers, and every line typed into the portal's s
       fresh identifiers were then approved without binding.
   run-A to run-H  the 4.0.0 to 7.0.0 runs, kept as they were written: they are the record of those builds.
 
-Caveats
-- The strip is captured as a tab, not in the side panel (see above); the content is the same page.
-- The mock's stand-in for the lab's shared copy reports version 5 (the mock's default, which the reviewer's
-  recipe uses); the real shared copy at Wayne State is framework 8. Run I used --shared-version 8.
-- The agreement text inside the dialog names the licensor (the copyright line and the parties clause of
-  LICENSE.txt, the first lines of PRIVACY.md); none of it is inside the visible part of 01 or 01b.
-- 02, 04b: "Connected - phone - HEAD" and "student@example.edu" are the mock's stand-in Remote Control and
-  Claude sign-in values, not the reviewer's or anyone's account.
-- 03, 04: the claude.ai tabs the extension opened during the run are not in any image; the e2e log says which
-  of their requests were stubbed.
-- 03, 03b, 04: the output box and the terminal show the tool's command name and paths in the mock's home
-  (/home/st1234/.hpcworker/...), as the tool prints them; the extension shows raw command output as it is.
-- The time stamps in 02, 04b, 05 and 05b are this machine's local time (US Eastern) as the extension shows
-  them; the "checked ... UTC" in check 1 and the access card, and the audit log's times, are UTC.
-
-Not here: the 128x128 store icon is extension/public/icon/128.png (also inside the package).
 This folder is outside the build (wxt publicDir is public/) and excluded from the sources zip
-(zip.excludeSources in wxt.config.ts), e2e/ included.
+(zip.excludeSources in wxt.config.ts), e2e/, raw-9/, src/ and promo/ included.

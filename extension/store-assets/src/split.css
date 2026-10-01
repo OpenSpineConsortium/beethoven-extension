@@ -1,0 +1,12 @@
+/* Screenshots 2 to 5: the words on the left, one real screen on the right. */
+.canvas { --w: 1280px; --h: 800px; --mask-x: 72%; --mask-y: 50%; --mask-w: 52%; --mask-h: 70%; }
+.text {
+  position: absolute;
+  left: 96px;
+  top: 50%;
+  width: var(--text-w, 470px);
+  transform: translateY(-50%);
+}
+.h { font-size: 64px; text-wrap: balance; }
+.lede { font-size: 23px; margin-top: 22px; max-width: 410px; text-wrap: pretty; }
+.fine { left: 96px; bottom: 36px; }

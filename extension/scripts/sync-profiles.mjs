@@ -47,7 +47,7 @@ console.log(`sync-profiles: ${names.length} site profile(s) copied from ${source
 // The agreement texts the extension ships must be byte-identical to the canonical ones at the
 // repository root (CLAUDE.md, "Terms"); copy them at the same moment, so a build can never carry
 // a stale or foreign text. The signing dialog hashes what it shows, so the copy is what is recorded.
-for (const name of ['LICENSE.txt', 'PRIVACY.md']) {
+for (const name of ['LICENSE.txt', 'PRIVACY.md', 'THIRD_PARTY_NOTICES.md']) {
   const from = path.resolve(root, '..', name);
   try {
     const text = await fs.readFile(from);
