@@ -1,27 +1,89 @@
-// The acceptance record for the licence terms: what was shown, what was ticked, who signed, when.
-// Ported from the vendor's VS Code extension (its core/terms.ts); the mechanism is the same, the
-// surface is a browser extension page and the record lives in storage.local.
+// The acceptance record for the licence terms: what was shown, what was ticked, when, and from which
+// installation. Ported from the vendor's VS Code extension (its core/terms.ts); the mechanism is the
+// same, the surface is a browser extension page and the record lives in storage.local.
 //
 // Why so much detail: the cases that enforce click-through terms turn on what the screen said and
 // what the click meant (Berman, Chabolla, Sellers, Kauders, In re StockX). The vendor bears that
-// proof, so every acceptance stores the terms version and the SHA-256 of the exact text shown, the
-// state of each checkbox with its exact label, the typed name, the surface, the browser and the
-// time. The text stays retrievable: the onboarding page exports the agreement beside the record
-// (Michigan UETA, MCL 450.838(3): a record the recipient cannot store or print is not enforceable
-// against them).
+// proof, so every acceptance stores the terms version and the SHA-256 of the exact texts bundled and
+// offered under "Show terms", the summary and the sentence shown with their exact words, the state of
+// each box, the button's label, whether the full text was opened, the time, the browser and the
+// installation identifier. The text stays retrievable: the welcome and settings pages let the person
+// open, save and print it (Michigan UETA, MCL 450.838(3): a record the recipient cannot store or print
+// is not enforceable against them).
+//
+// 11.0.0 (TermsRecord v2): one tick and one button, "Agree and continue", on the welcome page; no typed
+// name and no scrolling gate. Opening the full text is the person's choice and enables nothing; the
+// record says truthfully whether it was opened and whether its end was reached. The identity the record
+// lacks at the moment of acceptance (no account is known before the first grid sign-in) is added once,
+// afterwards, as bound_account, and the record says it came after. A two-tick variant for counsel
+// (Decision 1: a second, separate box for the dispute terms and the known risks) is one constant,
+// TWO_TICKS, switched off. Version 1 records (the signing dialog of 8.0.0 to 10.0.0) are kept where they
+// are and are out of force: everyone accepts once more.
 
 /**
- * The version and date on the first line of the LICENSE.txt this build ships ("Version N, date");
+ * The version and date on the first line of the LICENSE.txt this build ships ("Version N, date.");
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 7;
-export const TERMS_DATE = '2026-09-30';
+export const TERMS_VERSION = 8;
+export const TERMS_DATE = '2026-10-01';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
-export const AGREE_BUTTON = 'Accept and Continue';
+export const AGREE_BUTTON = 'Agree and continue';
 export const EDITION = 'trial';
 export const TERMS_KEY = 'bridge.terms';
+/**
+ * The acceptance records made before this one (8.0.0 to 10.0.0's v1 records, and a v2 record of an
+ * earlier text), kept out of force when a new acceptance replaces them under TERMS_KEY: the agreement
+ * history a dispute may need. At most TERMS_HISTORY_MAX, oldest dropped.
+ */
+export const TERMS_HISTORY_KEY = 'bridge.termsHistory';
+export const TERMS_HISTORY_MAX = 10;
+
+/**
+ * Decision 1 (Greg: one tick). true shows the counsel variant: the agree box without its second line,
+ * and a second, separate, unticked box for the dispute terms and the known risks. A change here is a
+ * change to the agreement's formation and goes with a new TERMS_VERSION.
+ */
+export const TWO_TICKS = false;
+
+/** the four lines of "The agreement, in short", verbatim; recorded with their hash */
+export const SUMMARY: readonly string[] = [
+  "Free while you're approved. Licensed to you, not sold.",
+  'To check your approval, it sends the lab your AccessID and an ID for this browser.',
+  'The grid, Anthropic or the browser store can stop it working at any time. You accept that risk.',
+  'Disputes: written notice first, then one person at a time in Michigan courts, with no jury.',
+];
+
+/** one box as the welcome page draws it: a bold first line and, in the shipping variant, a soft second line, both inside one label */
+export interface TickWords {
+  id: 'agree' | 'specific';
+  bold: string;
+  soft?: string;
+}
+
+const AGREE_BOLD = `I've read and agree to the ${PRODUCT_NAME} terms and privacy statement, and I'm 18 or older.`;
+const AGREE_SOFT = 'That includes giving up a jury trial and class actions, and accepting the risks above.';
+const SPECIFIC = 'I specifically accept the dispute terms (no jury trial, no class actions) and the known risks (sections 8, 19 and 20).';
+
+/** the shipping tick (Decision 1): one box, unticked, its sentence naming the waivers and the risks */
+export const AFFIRMATION: TickWords = { id: 'agree', bold: AGREE_BOLD, soft: AGREE_SOFT };
+
+/** the counsel variant: the agree box alone, and a second, separate box */
+export const AFFIRMATIONS_TWO: readonly TickWords[] = [
+  { id: 'agree', bold: AGREE_BOLD },
+  { id: 'specific', bold: SPECIFIC },
+];
+
+/** the boxes this build shows, in order */
+export function ticks(): readonly TickWords[] {
+  return TWO_TICKS ? AFFIRMATIONS_TWO : [AFFIRMATION];
+}
+
+/** the exact label recorded for a box: its lines as one sentence pair, verbatim */
+export function tickLabel(t: TickWords): string {
+  return t.soft ? `${t.bold} ${t.soft}` : t.bold;
+}
 
 export interface Affirmation {
   id: string;
@@ -30,63 +92,61 @@ export interface Affirmation {
   checked: boolean;
 }
 
+/** TermsRecord v2 (11.0.0): storage.local, exportable */
 export interface TermsRecord {
-  v: 1;
+  v: 2;
   terms_version: number;
+  terms_date: string;
   edition: 'trial';
-  /** SHA-256 of the agreement as shown */
+  /** SHA-256 of the LICENSE.txt bundled and offered under "Show terms" */
   license_sha256: string;
-  /** SHA-256 of PRIVACY.md as shown */
+  /** SHA-256 of the PRIVACY.md bundled and offered under "Show terms" */
   privacy_sha256: string;
-  accepted_at: string;
-  surface: 'extension';
+  /** the four summary lines, verbatim, and their hash */
+  summary_lines: string[];
+  summary_sha256: string;
+  /** each box with its exact label and state */
+  affirmations: Affirmation[];
   /** the label of the control that formed the agreement, exactly as shown */
   button_label: string;
-  affirmations: Affirmation[];
-  /** the name the person typed as their signature */
-  signed_name: string;
-  /**
-   * Since 10.0.0: true only when the person scrolled the full text to its end, or the whole text was
-   * in view in its box without scrolling. Builds before 10.0.0 wrote true whatever happened (their
-   * gate measured the box before it was on the page), so in an older record it says nothing.
-   */
-  scrolled_to_end: boolean;
-  /** since 10.0.0: the person opened the agreement and the privacy statement in tabs ("Open in tabs"), which the page counts as reading them; absent from older records */
-  opened_in_tab?: boolean;
+  surface: 'welcome';
+  /** "Show terms" was expanded before the press */
+  terms_opened: boolean;
+  terms_opened_at?: string;
+  /** the expanded text was scrolled to its end before the press */
+  terms_end_reached: boolean;
+  opened_in_tab: boolean;
+  saved_copy: boolean;
+  printed: boolean;
+  accepted_at: string;
   product_version: string;
   /** browser name and version */
   host: string;
-  /** this installation's random identifier (ext/storage.ts installId; not taken from the device; the approval check sends it too) */
+  /** this installation's random identifier (ext/storage.ts installId; the approval check sends it too) */
   install_id: string;
+  /** the AccessID the grid's dashboard first showed after acceptance, added once (the identity the record lacked when it was made) */
+  bound_account?: string;
+  bound_account_seen_at?: string;
 }
 
-const RIGHTS =
-  'I specifically consent to the terms that change how a dispute is handled and what I can recover: written notice and 60 days to resolve it before any lawsuit, individual claims only with a class-action waiver, Michigan courts with small claims allowed where I live (section 19), the WAIVER OF JURY TRIAL (section 20), the one-year limit on contract and warranty claims, and the warranty disclaimer, exclusive remedy and liability limits (sections 12 and 13).';
-const RISKS =
-  `Known risks: ${PRODUCT_NAME} depends on my university's cluster, its Open OnDemand portal and network, and on Anthropic (Claude and Claude Code Remote Control); any of them can stop it working, including Anthropic changing or enforcing who may use Remote Control, my university disabling or reconfiguring the portal's shell, files or reverse proxy, and a browser store removing or disabling the extension; the Trial Edition is free, can be withdrawn or ended, and nothing is refunded because nothing is paid; nothing releases the licensor from its own gross negligence, wilful misconduct or fraud; and ${PRODUCT_NAME} is a research tool, never for clinical use. I accept these risks (section 8).`;
-const AGE = `I am 18 or older (or a parent or guardian accepting for me), and each account ${PRODUCT_NAME} touches (my university cluster and portal, my Claude account) is my own.`;
-
-/** The affirmations the signing dialog shows, in order. The wording is part of the record. */
-export const AFFIRMATIONS: Array<{ id: string; label: string }> = [
-  {
-    id: 'read_agree',
-    label: `By ticking this box and choosing "${AGREE_BUTTON}" below, I agree to the ${TERMS_TITLE} (version ${TERMS_VERSION}, ${TERMS_DATE}) and the Privacy Statement, which I have read.`,
-  },
-  { id: 'rights', label: RIGHTS },
-  { id: 'risks', label: RISKS },
-  { id: 'age_authority', label: AGE },
-];
-
-/** The plain-words summary shown above the full text. */
-export const SUMMARY: string[] = [
-  `This is the free Trial Edition. It is licensed, not sold: you receive a licence to use ${PRODUCT_NAME}, not the software itself. Nothing is paid, nothing converts into a paid licence, and no charge ever follows.`,
-  `${PRODUCT_NAME} works only for an institutional account the licensor has approved, and your own sign-in to your university's Open OnDemand portal, which you connect yourself, is what identifies you; there is no key. An approval is for one installation on one computer: another installation is refused until the licensor moves the approval, and sharing a copy or an account is a breach (section 3). It works with that one website; its only other requests go to the licensor: the approval check, which sends the account name your portal shows, the portal's address, the product and its version, and the random identifier this installation made for itself, and a daily download of the service's address and the signed list of withdrawn versions, which carries nothing about you (section 10). It runs nothing on claude.ai and never reads, stores or copies a Claude credential: you sign in to Claude Code yourself, once, on a compute node of your cluster.`,
-  `Your Claude Code worker runs as a batch job on your cluster and is shown to you through Anthropic's Remote Control at claude.ai/code and in the Claude app. Files the worker reads and every command's output go to Anthropic; while you are connected the transcript is stored on Anthropic's servers under your own plan's terms.`,
-  `${PRODUCT_NAME} depends on your university's cluster and portal and on Anthropic. Any of them can stop it working; because nothing is paid, nothing is refunded (sections 7 to 9).`,
-  'Disputes: a signed written notice and 60 days to resolve it before any lawsuit; individual claims only (class-action waiver); Michigan courts, or small claims where you live; a jury waiver; one year to bring contract and warranty claims (sections 19 and 20). No arbitration in this version.',
-  'Electronic records: you receive the agreement and notices electronically, can save and print them ("Export a copy", "Print"), can ask for a paper copy, and can withdraw this consent by stopping use. You need a web browser to read them.',
-  `No warranty; liability is limited (sections 12 and 13). ${PRODUCT_NAME} is a research tool and never for clinical use.`,
-];
+/** the record 8.0.0 to 10.0.0 wrote (signing dialog, typed name); kept in storage, never in force under these terms */
+export interface TermsRecordV1 {
+  v: 1;
+  terms_version: number;
+  edition: 'trial';
+  license_sha256: string;
+  privacy_sha256: string;
+  accepted_at: string;
+  surface: 'extension';
+  button_label: string;
+  affirmations: Affirmation[];
+  signed_name: string;
+  scrolled_to_end: boolean;
+  opened_in_tab?: boolean;
+  product_version: string;
+  host: string;
+  install_id: string;
+}
 
 export async function sha256(text: string): Promise<string> {
   const data = new TextEncoder().encode(text.replace(/\r\n/g, '\n'));
@@ -94,83 +154,136 @@ export async function sha256(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** True when every affirmation is ticked, a name is typed and the text was read (textRead below). */
-export function acceptanceComplete(affirmations: Affirmation[], signedName: string, read: boolean): { ok: boolean; missing: string[] } {
-  const missing: string[] = [];
-  for (const a of AFFIRMATIONS) if (!affirmations.find((x) => x.id === a.id && x.checked)) missing.push(a.id);
-  if (!signedName || signedName.trim().length < 2) missing.push('signed_name');
-  if (!read) missing.push('text_read');
+/** every box this build shows is ticked; nothing else is asked (no name, no reading gate) */
+export function acceptanceComplete(affirmations: Array<{ id: string; checked: boolean }>): { ok: boolean; missing: string[] } {
+  const missing = ticks()
+    .filter((t) => !affirmations.find((a) => a.id === t.id && a.checked))
+    .map((t) => t.id);
   return { ok: missing.length === 0, missing };
 }
 
-// The reading gate of the signing dialog, as pure functions so the rule is tested without a browser.
-// The button waits until the person has scrolled the full text to its end, or opened it in tabs
-// (the page says that counts), or the text, laid out in its box on the page, fits with nothing to
-// scroll. A box that is not on the page yet has no height and proves nothing: 9.0.0 measured it
-// then, found scrollHeight 0, called the text read and opened the gate at once.
-
-/** how near the bottom counts as the end (a zoomed page stops a pixel or two short) */
+/** how near the bottom of the expanded text counts as its end (a zoomed page stops a pixel or two short) */
 export const END_SLACK_PX = 8;
 
-/** one reading of the text box: element.scrollTop, clientHeight and scrollHeight */
+/** one reading of the expanded text's box: element.scrollTop, clientHeight and scrollHeight */
 export interface BoxGeometry {
   scrollTop: number;
   clientHeight: number;
   scrollHeight: number;
 }
 
-/** what the person has done with the text so far; each part, once true, stays true */
-export interface ReadingState {
-  /** the box was scrolled to the end of the text */
-  scrolledToEnd: boolean;
-  /** the box, laid out on the page, showed the whole text with nothing to scroll */
-  fits: boolean;
-  /** the agreement and the privacy statement were opened in tabs (both opened, not only asked for) */
-  openedInTab: boolean;
-}
-
-export const NOT_READ: ReadingState = { scrolledToEnd: false, fits: false, openedInTab: false };
-
-/** a box with no height is not laid out (not on the page yet, or hidden) and proves nothing */
+/** a box with no height is not laid out (not on the page yet, or folded) and proves nothing */
 export function laidOut(g: BoxGeometry): boolean {
   return g.clientHeight > 0 && g.scrollHeight > 0;
 }
 
-/** the state after a scroll of the box, its first layout or a change of its size */
-export function measureReading(s: ReadingState, g: BoxGeometry): ReadingState {
-  if (!laidOut(g)) return s;
-  if (g.scrollTop + g.clientHeight < g.scrollHeight - END_SLACK_PX) return s;
-  // the end is in view: by scrolling to it, or because there was nothing to scroll
-  return g.scrollTop > 0 ? { ...s, scrolledToEnd: true } : { ...s, fits: true };
+/**
+ * The one measure that remains of 10.0.0's reading gate: does this reading of the expanded text show
+ * its end? It only sets terms_end_reached in the record; it never enables or disables anything.
+ */
+export function endReached(g: BoxGeometry): boolean {
+  if (!laidOut(g)) return false;
+  return g.scrollTop + g.clientHeight >= g.scrollHeight - END_SLACK_PX;
 }
 
-export function openedInTab(s: ReadingState): ReadingState {
-  return { ...s, openedInTab: true };
+/** what the page knows at the press, for buildTermsRecord */
+export interface AcceptanceInput {
+  license: string;
+  privacy: string;
+  /** the boxes as they stood at the press */
+  checked: Partial<Record<'agree' | 'specific', boolean>>;
+  termsOpenedAt?: string;
+  termsEndReached: boolean;
+  openedInTab: boolean;
+  savedCopy: boolean;
+  printed: boolean;
+  productVersion: string;
+  host: string;
+  installId: string;
+  at?: string;
 }
 
-/** the gate: may the agreement button be offered as far as reading goes */
-export function textRead(s: ReadingState): boolean {
-  return s.scrolledToEnd || s.fits || s.openedInTab;
+/** TermsRecord v2 from what the welcome page showed and what the person did */
+export async function buildTermsRecord(i: AcceptanceInput): Promise<TermsRecord> {
+  const summary = [...SUMMARY];
+  return {
+    v: 2,
+    terms_version: TERMS_VERSION,
+    terms_date: TERMS_DATE,
+    edition: EDITION,
+    license_sha256: await sha256(i.license),
+    privacy_sha256: await sha256(i.privacy),
+    summary_lines: summary,
+    summary_sha256: await sha256(summary.join('\n')),
+    affirmations: ticks().map((t) => ({ id: t.id, label: tickLabel(t), checked: !!i.checked[t.id] })),
+    button_label: AGREE_BUTTON,
+    surface: 'welcome',
+    terms_opened: !!i.termsOpenedAt,
+    ...(i.termsOpenedAt ? { terms_opened_at: i.termsOpenedAt } : {}),
+    terms_end_reached: i.termsEndReached,
+    opened_in_tab: i.openedInTab,
+    saved_copy: i.savedCopy,
+    printed: i.printed,
+    accepted_at: i.at ?? new Date().toISOString(),
+    product_version: i.productVersion,
+    host: i.host,
+    install_id: i.installId,
+  };
 }
 
-/** the line under the box, true at every moment (each sentence says what has happened, and that stays true) */
-export function readingHint(s: ReadingState): string {
-  if (s.scrolledToEnd) return 'You have reached the end of the text.';
-  if (s.fits) return 'The whole text was in view in the box above, with nothing to scroll.';
-  if (s.openedInTab) return 'You opened the agreement and the privacy statement in tabs, which counts as reading them.';
-  return 'Scroll the text above to its end to continue, or open it in tabs.';
+/**
+ * The account the grid's dashboard showed, added once to a record in force; a record that already
+ * names one is returned unchanged (the first account it saw is the one it keeps).
+ */
+export function bindAccount(r: TermsRecord, account: string, at = new Date().toISOString()): TermsRecord {
+  if (r.bound_account || !account) return r;
+  return { ...r, bound_account: account, bound_account_seen_at: at };
 }
 
-/** what the acceptance record says about the reading */
-export function readingRecord(s: ReadingState): { scrolled_to_end: boolean; opened_in_tab: boolean } {
-  return { scrolled_to_end: s.scrolledToEnd || s.fits, opened_in_tab: s.openedInTab };
-}
-
-/** A record counts only if it is for the terms in force. */
+/** A record counts only if it is v2 for the terms in force, with every box this build shows ticked. */
 export function recordInForce(r: unknown): r is TermsRecord {
   const x = r as TermsRecord | undefined;
-  return !!x && x.v === 1 && x.terms_version === TERMS_VERSION && x.edition === EDITION && typeof x.signed_name === 'string';
+  if (!x || typeof x !== 'object' || x.v !== 2 || x.terms_version !== TERMS_VERSION || x.edition !== EDITION) return false;
+  if (typeof x.accepted_at !== 'string' || !Array.isArray(x.affirmations)) return false;
+  return acceptanceComplete(x.affirmations).ok;
+}
+
+/** the export's sentence about the full text, from the record itself */
+export function openedSentence(r: Pick<TermsRecord, 'terms_opened'>): string {
+  return r.terms_opened ? 'The full text was opened before Agree.' : 'The full text was not opened before Agree.';
+}
+
+/** the history with a record that is about to be replaced; one already in it, or none, leaves it as it is */
+export function withHistory(history: unknown, previous: unknown): unknown[] {
+  const h = Array.isArray(history) ? history : [];
+  if (!previous || typeof previous !== 'object') return h;
+  const key = JSON.stringify(previous);
+  if (h.some((x) => JSON.stringify(x) === key)) return h;
+  return [...h, previous].slice(-TERMS_HISTORY_MAX);
+}
+
+/** the acceptance record as a person reads and keeps it (Settings: "Save your acceptance record"); the full record follows as JSON */
+export function recordText(r: TermsRecord): string {
+  const yes = (b: boolean) => (b ? 'yes' : 'no');
+  const lines = [
+    `${TERMS_TITLE}, version ${r.terms_version} (${r.terms_date})`,
+    `Accepted on ${r.accepted_at} in ${r.host}, ${PRODUCT_NAME} ${r.product_version}, on the ${r.surface} page`,
+    `Installation ID: ${r.install_id}`,
+    r.bound_account ? `Account: ${r.bound_account} (shown by your portal at ${r.bound_account_seen_at ?? 'a later time'}, after the acceptance)` : 'Account: not seen yet (added once your portal shows it)',
+    ...r.affirmations.map((a) => `Ticked: ${yes(a.checked)}: "${a.label}"`),
+    `Button: "${r.button_label}"`,
+    openedSentence(r),
+    `The end of the full text was reached: ${yes(r.terms_end_reached)}. Opened in a tab: ${yes(r.opened_in_tab)}. Saved a copy: ${yes(r.saved_copy)}. Printed: ${yes(r.printed)}.`,
+    `LICENSE.txt SHA-256: ${r.license_sha256}`,
+    `PRIVACY.md SHA-256: ${r.privacy_sha256}`,
+    'The agreement in short, as shown:',
+    ...r.summary_lines.map((l) => `  ${l}`),
+    '',
+    'The full record:',
+    JSON.stringify(r, null, 1),
+  ];
+  return `${lines.join('\n')}\n`;
 }
 
 /** The one-line refusal shown wherever the terms have not been accepted. */
-export const TERMS_REFUSAL = `The ${PRODUCT_NAME} licence terms have not been accepted in this browser yet: open the setup page (the terms are shown there).`;
+export const TERMS_REFUSAL = `The ${PRODUCT_NAME} terms haven't been accepted in this browser yet. Open ${PRODUCT_NAME}'s welcome page to accept them.`;

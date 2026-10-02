@@ -22,6 +22,15 @@
 # DIR/bin/hpcworker, the marker ~/.hpcworker/shared naming the folder, the profile, log/. An own
 # copy found in ~/.hpcworker is moved aside, never deleted; a plain `install` moves the marker
 # aside in turn, so the account runs its own copy again. `version` says which copy runs.
+#
+# Framework 10 (Beethoven 11.0.0, docs/V11_CONTRACT.md): `connect`, `worker status [--json]`,
+# `worker stop`, `worker restrict`, `claude consent --record ID` and `login-setup [--remove]` are
+# answered by lib/tool.mjs (Node, which reads the pasted code from standard input with the keepalive
+# around it). `worker start` is framework 10's too (the queued status.json, the job in line, the job
+# simulator of the mock portal taking it to online) whenever MOCK_SIM=1, MOCK_QUEUE_S or MOCK_START_S
+# is set, and always under `connect`; otherwise it keeps the 10.0.0 stand-in's instant start, which
+# the 10.0.0 tests and its reviewer recipe rely on (the status is online at once). The state folder
+# of a profile under /rs/rs_grp_oschome/$USER (Wayne State's) lives on disk where MOCK_ROOTS_SH says.
 set -u
 HPCW_HOME="${HPCW_HOME:-$HOME/.hpcworker}"
 PROFILE="$HPCW_HOME/profile.json"
@@ -32,10 +41,23 @@ PROFILE="$HPCW_HOME/profile.json"
 # themselves stay where they are. The shared copy's folder on disk is shown as its portal path too.
 DISPLAY_HOME="${MOCK_DISPLAY_HOME:-$HOME}"
 show() {
-  local s="${1//"$HOME"/$DISPLAY_HOME}"
+  local s="$1" pair v r
+  # the extra roots first (they may sit inside the home's folder on disk), then the home, then the shared copy
+  if [ -n "${MOCK_ROOTS_SH:-}" ]; then
+    while IFS= read -r -d ';' pair; do v="${pair%%=*}"; r="${pair#*=}"; [ -n "$r" ] && s="${s//"$r"/$v}"; done <<< "${MOCK_ROOTS_SH%;};"
+  fi
+  s="${s//"$HOME"/$DISPLAY_HOME}"
   [ -n "${MOCK_SHARED_REAL:-}" ] && s="${s//"$MOCK_SHARED_REAL"/${MOCK_SHARED_INSTALL:-$MOCK_SHARED_REAL}}"
   printf '%s' "$s"
 }
+map_root() { # a path as the portal shows it under an extra root (/rs/rs_grp_oschome/<user>) -> where it is on disk
+  local p="$1" pair v r
+  if [ -n "${MOCK_ROOTS_SH:-}" ]; then
+    while IFS= read -r -d ';' pair; do v="${pair%%=*}"; r="${pair#*=}"; case "$p" in "$v"|"$v"/*) p="$r${p#"$v"}";; esac; done <<< "${MOCK_ROOTS_SH%;};"
+  fi
+  printf '%s' "$p"
+}
+tool() { exec node "$MOCK_LIB/tool.mjs" "$@"; }
 LAUNCHER_TAG='# hpcworker launcher for a shared copy (managed: "hpcworker install" rewrites this file)'
 default_profile() { # $1 = site name: what the stand-in writes when no profile of that name is at hand
   printf '{"schema_version":1,"site":"%s","scheduler":"slurm","partition_cpu":"secp","qos_cpu":"secondary","shared_state_dir":"$HOME/.hpcworker/state","claude_config_dir":"$HOME/.claude","login_node_rules":{"max_processes":20,"poll_floor_seconds":60},"worker_defaults":{"cpus":2,"mem":"8G","hours":8,"permission_mode":"default","capacity":4}}\n' "$1" > "$PROFILE"
@@ -46,7 +68,7 @@ state_dir() { # the profile's shared_state_dir with $HOME and $USER expanded, as
   local raw; raw=$(tr -d '\n' < "$PROFILE" 2>/dev/null | grep -o '"shared_state_dir": *"[^"]*"' | head -1 | cut -d'"' -f4)
   raw="${raw:-\$HOME/.hpcworker}"
   raw="${raw//\$HOME/$HOME}"; raw="${raw//\$USER/${USER:-student}}"
-  printf '%s' "$raw"
+  map_root "$raw"
 }
 site() { tr -d '\n' < "$PROFILE" 2>/dev/null | grep -o '"site": *"[^"]*"' | head -1 | cut -d'"' -f4; }
 # the environment id is stable per machine (Claude Code keys it to remoteControlMachineId); here per mock home
@@ -74,6 +96,8 @@ Or ask Claude to work in this folder from your projects on claude.ai
 EOT
 }
 case "${1:-}" in
+  connect) shift; tool connect "$@" ;;
+  login-setup) shift; tool login-setup "$@" ;;
   install)
     name=""; shared=""
     while [ $# -gt 1 ]; do
@@ -165,41 +189,36 @@ EOF
   worker)
     [ -s "$PROFILE" ] || die "no profile at $(show "$PROFILE"): run 'hpcworker install --profile wayne' (or 'hpcworker install --discover')"
     sub="${2:-list}"; shift 2 2>/dev/null || shift $#
+    args=("$@")
     name="worker"; pm="default"; as_json=0
     while [ $# -gt 0 ]; do case "$1" in --name) name="$2"; shift 2;; --permission-mode) pm="$2"; shift 2;; --json) as_json=1; shift;; *) shift;; esac; done
     sd=$(state_dir); rd="$sd/$name"; st=$(site); sn=$(session_name "$name"); eu=$(env_url)
     dsd=$(show "$sd"); drd=$(show "$rd") # the same two directories as the student sees them
     case "$sub" in
       start)
+        # framework 10's start (the queued file; the mock portal's job simulator takes the job from there)
+        if [ "${MOCK_SIM:-}" = 1 ] || [ "${MOCK_QUEUE_S:-0}" != 0 ] || [ "${MOCK_START_S:-0}" != 0 ]; then tool start "${args[@]}"; fi
+        # the 10.0.0 stand-in's instant start: the job is online the moment it is submitted
         [ -e "$sd/workspaces/$name/.restricted" ] && die "refusing to start: the workspace $dsd/workspaces/$name is marked restricted (remove .restricted yourself if that no longer applies)"
         mkdir -p "$rd" "$sd/workspaces/$name"
         if [ -s "$rd/job.id" ] && node "$MOCK_LIB/jobs.mjs" list | grep -q "\"pbsid\":\"$(cat "$rd/job.id")\""; then echo "worker $name already has job $(cat "$rd/job.id") (RUNNING on node01); nothing submitted"; exit 0; fi
         id=$(node "$MOCK_LIB/jobs.mjs" add "hpcw_$name")
-        echo "$id" > "$rd/job.id"; echo node01 > "$rd/node"
+        echo "$id" > "$rd/job.id"; echo node01 > "$rd/node"; rm -f "$rd/stop" "$rd/stop.done"
         nid=$((id + 1)); echo "$nid $id" > "$rd/next.id"
-        printf '{"version":1,"site":"%s","run":"%s","job":"%s","node":"node01","pid":4242,"state":"online","message":"Open in Claude: %s and find %s (or tap Code in the Claude app). Connected · phone · HEAD","started_at":"%s","updated_at":"%s","session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","claude_login":{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max","checked_at":"%s"},"consent":true,"consent_source":"claude_config","workspace_trusted":true,"rc_alive":true,"resumed":false,"tmux":true,"restarts":0,"chain":true,"next_job":"%s","chain_note":"successor %s queued (afterany:%s)","workspace":"%s","rc_log":"%s","token_path":"%s"}\n' \
-          "$st" "$name" "$id" "$eu" "$sn" "$(now)" "$(now)" "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$(now)" "$nid" "$nid" "$id" "$dsd/workspaces/$name" "$drd/rc.log" "$drd/job.token" > "$rd/status.json"
-        printf '{"session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","node":"node01","job":"%s","pid":4242,"started_at":"%s","token_path":"%s","workspace":"%s","rc_log":"%s","permission_mode":"%s","capacity":"1/32","resumed":false,"next_job":"%s"}\n' \
-          "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$id" "$(now)" "$drd/job.token" "$dsd/workspaces/$name" "$drd/rc.log" "$pm" "$nid" > "$rd/connection.json"
-        { printf '\n===== %s job %s on node01: starting claude remote-control --name %s-%s --permission-mode %s =====\n' "$(now)" "$id" "$st" "$id" "$pm"; registration_block "$sn"; } > "$rd/rc.log"
+        t=$(now); ends=$(date -u -d "+8 hours" +%FT%TZ 2>/dev/null || echo "$t")
+        title=$(tr -d '\n' < "$PROFILE" 2>/dev/null | grep -o '"session_title": *"[^"]*"' | head -1 | cut -d'"' -f4); title="${title:-Grid worker}"; [ "$name" = worker ] || title="$title · $name"
+        printf '{"version":10,"site":"%s","run":"%s","job":"%s","node":"node01","pid":4242,"state":"online","message":"Open in Claude: %s and find %s (or tap Code in the Claude app). Connected · phone · HEAD","needs":"nothing","hint":"Your worker is online.","submitted_at":"%s","got_computer_at":"%s","started_at":"%s","online_at":"%s","ends_at":"%s","renewal":false,"updated_at":"%s","title":"%s","session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","claude_login":{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max","checked_at":"%s"},"consent":true,"consent_source":"claude_config","workspace_trusted":true,"rc_alive":true,"resumed":false,"tmux":true,"restarts":0,"chain":true,"next_job":"%s","chain_note":"successor %s queued (afterany:%s)","workspace":"%s","rc_log":"%s","token_path":"%s"}\n' \
+          "$st" "$name" "$id" "$eu" "$sn" "$t" "$t" "$t" "$t" "$ends" "$t" "$title" "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$t" "$nid" "$nid" "$id" "$dsd/workspaces/$name" "$drd/rc.log" "$drd/job.token" > "$rd/status.json"
+        printf '{"session_name":"%s","requested_name":"%s-%s","session_url":"%s","environment_url":"%s","environment_id":"%s","node":"node01","job":"%s","pid":4242,"started_at":"%s","token_path":"%s","workspace":"%s","rc_log":"%s","permission_mode":"%s","capacity":"1/32","resumed":false,"next_job":"%s","title":"%s","online_at":"%s"}\n' \
+          "$sn" "$st" "$id" "$eu" "$eu" "$(env_id)" "$id" "$t" "$drd/job.token" "$dsd/workspaces/$name" "$drd/rc.log" "$pm" "$nid" "$title" "$t" > "$rd/connection.json"
+        { printf '\n===== %s job %s on node01: starting claude remote-control --name %s-%s --permission-mode %s =====\n' "$t" "$id" "$st" "$id" "$pm"; registration_block "$sn"; } > "$rd/rc.log"
+        printf '%s Asked the grid for a computer\n%s Got a computer\n%s Connecting to Claude\n%s Online: %s\n' "$t" "$t" "$t" "$t" "$eu" >> "$rd/progress.log"
         echo "worker $name submitted as job $id (secp/secondary, 8 h). When it registers, find its session under Code in the Claude app (the name is in status.json) or open $eu"
         echo "watch it with: hpcworker worker status --name $name   (reads $drd/status.json; no scheduler polling)"
         ;;
-      stop)
-        [ -d "$rd" ] || die "no worker named $name"
-        touch "$rd/stop"; jid=$(cat "$rd/job.id" 2>/dev/null || true)
-        [ -n "$jid" ] && node "$MOCK_LIB/jobs.mjs" remove "$jid"
-        [ -s "$rd/status.json" ] && sed -i 's/"state":"online"/"state":"stopped"/' "$rd/status.json"
-        touch "$rd/stop.done"; nid=$(awk '{print $1; exit}' "$rd/next.id" 2>/dev/null); rm -f "$rd/next.id"
-        echo "worker $name: stopped (the job left on its own${nid:+; queued successor $nid cancelled}; the chain ended)"
-        ;;
-      status)
-        [ -d "$rd" ] || die "no worker named $name (hpcworker worker start)"
-        if [ $as_json = 1 ]; then printf '{"run":"%s","job":"%s","status":%s,"connection":%s}\n' "$name" "$(cat "$rd/job.id" 2>/dev/null)" "$([ -s "$rd/status.json" ] && cat "$rd/status.json" || echo null)" "$([ -s "$rd/connection.json" ] && cat "$rd/connection.json" || echo null)"
-        else echo "worker $name: $(grep -o '"state":"[a-z_]*"' "$rd/status.json" | cut -d'"' -f4) (job $(cat "$rd/job.id") on node01); session $sn; $eu"; fi
-        ;;
+      stop|status|restrict) tool "$sub" "${args[@]}" ;;
       list) for d in "$sd"/*/; do [ -s "$d/job.id" ] && printf '%-16s job %-10s %s\n' "$(basename "$d")" "$(cat "$d/job.id")" "online"; done ;;
-      *) die "worker: start|stop|status|list|log";;
+      *) die "worker: start|stop|status|restrict|list";;
     esac
     ;;
   claude)
@@ -224,6 +243,8 @@ EOF
             exit 1
           fi
           mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent"
+          # the account is now signed in to Claude (what the framework 10 stand-in and the job simulator read)
+          mkdir -p "$HOME/.mock-ood"; printf '{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max","at":"%s"}\n' "$(now)" > "$HOME/.mock-ood/claude.json"
           echo "Login successful. Press Enter to continue…"
           echo "SIGNED-IN student@example.edu max (Remote Control answer on record)"
           exit 0
@@ -231,7 +252,9 @@ EOF
         echo "(mock) Sign in to Claude on the cluster, in one sitting: the real tool runs Claude Code's own 'claude auth login' inside an allocation on a compute node and never sees the credential;"
         echo "(mock) then, if Claude Code has not yet recorded your answer to \"Enable Remote Control?\" (remoteDialogSeen in its own settings file), it starts 'claude remote-control' once in your workspace so you answer y and press Ctrl-C."
         mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent";;
-      consent) echo "(mock) Nothing separate to do: 'hpcworker claude login' asks the Remote Control question in the same sitting when it has not been answered yet. This alias runs that step alone for a sign-in made earlier."; mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent";;
+      consent)
+        if [ "${3:-}" = "--record" ]; then tool consent-record "${4:-}"; fi
+        echo "(mock) Nothing separate to do: 'hpcworker claude login' asks the Remote Control question in the same sitting when it has not been answered yet. This alias runs that step alone for a sign-in made earlier."; mkdir -p "$HPCW_HOME"; touch "$HPCW_HOME/consent";;
       status) echo '{"loggedIn":true,"email":"student@example.edu","subscriptionType":"max"}';;
       *) die "claude: login|consent|status";;
     esac
@@ -247,7 +270,7 @@ EOF
     else echo 1; fi
     ;;
   *)
-    echo "usage: hpcworker install [--profile NAME] [--shared [DIR]] | discover | probe | worker start|stop|status|list [--name N] [--permission-mode M] [--json] | claude login [--plain]|consent|status | diag [--json] | version" >&2
+    echo "usage: hpcworker install [--profile NAME] [--shared [DIR]] | discover | probe | connect [--name N] [--profile SITE] [--consent ID] [--login auto|always|fresh|never] [--permission-mode M] [--no-chain] | worker start|stop|status|restrict|list [--name N] [--permission-mode M] [--json] | claude login [--plain]|consent [--record ID]|status | login-setup [--remove] | diag [--json] | version" >&2
     exit 2
     ;;
 esac

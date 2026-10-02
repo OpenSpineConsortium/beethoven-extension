@@ -2,12 +2,20 @@
 // One codebase; WXT emits the Chrome/Edge MV3 service worker, the Firefox MV2 persistent
 // background with a sidebar, and the Safari build for Apple's packager.
 //
-// What is deliberately absent, and must stay absent: any host_permissions at install time, the
-// cookies, tabs, webRequest, nativeMessaging, debugger and identity permissions, and any origin
-// on claude.ai, anthropic.com or claude.com. The one origin the extension works on is the
-// student's own Open OnDemand portal, granted from a button click and registered at runtime; the
-// only other addresses it fetches are the maintainer's (the approval check, the services file and
-// the withdrawn-versions list), with plain cross-origin fetches and no host permission.
+// 11.0.0: storage, alarms, scripting and sidePanel, and nothing else. activeTab is gone: the toolbar
+// click inspects no tab any more, it opens the window-wide panel (sidePanel.setPanelBehavior
+// {openPanelOnActionClick: true}); the one origin is asked for from the welcome page's "Agree and
+// continue" (or "Use this portal"), inside that click. scripting loads Beethoven's page script with
+// executeScript into a tab Beethoven opened itself on the granted origin, in two cases only: a portal
+// whose sign-in the browser does not carry on the extension's own requests ("tab mode"), and the
+// one-time grid terminal step (AM2), where it reads the page title and types one line after the
+// student signs in there. No page script is registered.
+//
+// What is deliberately absent, and must stay absent: any host_permissions at install time (Decision 2),
+// the cookies, tabs, notifications, webRequest, offscreen, nativeMessaging, tabGroups, debugger and
+// identity permissions, and any origin on claude.ai, anthropic.com or claude.com. The only other
+// addresses it fetches are the maintainer's (the approval check, the services file and the
+// withdrawn-versions list), with plain cross-origin fetches and no host permission.
 import { defineConfig } from 'wxt';
 
 // the manifest description: at most 132 characters in Chrome's manifest documentation; this is 128
@@ -46,11 +54,15 @@ export default defineConfig({
       description: SINGLE_PURPOSE,
       author: 'OpenSpineConsortium',
       homepage_url: 'https://openspineconsortium.com/beethoven/',
-      permissions: ['storage', 'alarms', 'scripting', 'activeTab', ...(chromium ? ['sidePanel'] : [])],
+      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['sidePanel'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
-      // no default_popup: the toolbar button is the "go" button (action.onClicked opens the strip and,
-      // from a portal tab, asks for that one origin in the same gesture); WXT spells it browser_action on MV2
-      action: { default_title: 'Beethoven' },
+      // no default_popup: the toolbar button toggles the window-wide panel (the background sets
+      // openPanelOnActionClick); its badge, tooltip and lit icon report while the panel is closed.
+      // WXT spells it browser_action on MV2
+      // the toolbar starts unlit (icon/off-*: the rack alone, which recedes on a light or a dark toolbar);
+      // the background sets the lit one (icon/on-*) while the worker is online. The manifest's own icons
+      // (the store, the extensions page) stay the tiled ones.
+      action: { default_title: 'Beethoven', default_icon: { 16: 'icon/off-16.png', 32: 'icon/off-32.png', 48: 'icon/off-48.png', 128: 'icon/off-128.png' } },
       ...(chromium ? { minimum_chrome_version: '148' } : {}),
       browser_specific_settings: {
         gecko: {

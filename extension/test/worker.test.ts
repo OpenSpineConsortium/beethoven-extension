@@ -1,129 +1,125 @@
-// Starting and stopping through a fake portal: the refusals before anything is typed (no
-// statement, no tool, a restricted workspace), the one line a start types, and the stop path
-// (stop file first, the tool's line only when the scheduler floor allows it).
+// The worker's verbs through a fake portal (11.0.0): every write is the lab's tool's own verb typed
+// through the shell, never a Files write (the dashboard's Rails origin check would refuse a PUT from
+// chrome-extension://). Connect is one line; Stop is `worker stop` alone; Mark restricted is `worker
+// restrict`; the scheduler's reason comes from `worker status --json`. A refused floor is waited out
+// silently and retried, never shown. And a queued worker is live.
 import { describe, expect, it } from 'vitest';
 import { FloorError } from '../src/core/audit';
 import { commands, paths } from '../src/core/contract';
-import { makeAcknowledgement, type Acknowledgement } from '../src/core/disclosure';
 import type { PortalApi } from '../src/core/portal';
-import { restrictedReason, startWorker, stopWorker, workerLive, clusterContext } from '../src/core/worker';
+import { clusterContext, connectLine, recordConsentByShell, restrictByShell, restrictedReason, statusByShell, stopByShell, withFloor, workerLive } from '../src/core/worker';
 
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
+const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
 const PROFILE = JSON.stringify({ site: 'wayne', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker' });
-const ACK: Acknowledgement = makeAcknowledgement('worker');
 
-function fake(o: { profile?: string | false; files?: string[]; shellOutput?: string; shellError?: Error; floorScheduler?: boolean } = {}) {
-  const files = new Set<string>(o.files ?? []);
+function fake(o: { output?: string | ((cmd: string) => string); exitCode?: number; floors?: number; files?: string[] } = {}) {
   const typed: string[] = [];
-  const touched: string[] = [];
-  const written: Array<[string, string]> = [];
+  const writes: string[] = [];
+  let floors = o.floors ?? 0;
+  const files = new Set(o.files ?? []);
   const p = {
     home: async () => '/home/ab1234',
     whoAmI: async () => 'ab1234',
-    readFileIfExists: async (path: string) => (path === '/home/ab1234/.hpcworker/profile.json' ? (o.profile === false ? undefined : o.profile ?? PROFILE) : files.has(path) ? '' : undefined),
-    // existence from a listing, never from a download
+    readFileIfExists: async (path: string) => (path === '/home/ab1234/.hpcworker/profile.json' ? PROFILE : undefined),
     exists: async (path: string) => files.has(path),
-    writeFile: async (path: string, body: string) => {
-      written.push([path, body]);
-      files.add(path);
-    },
-    touch: async (path: string) => void touched.push(path),
+    // any write through the Files app is a defect in 11.0.0
+    writeFile: async (path: string) => void writes.push(`write ${path}`),
+    touch: async (path: string) => void writes.push(`touch ${path}`),
+    mkdir: async (path: string) => void writes.push(`mkdir ${path}`),
+    cancelJob: async (c: string, id: string) => void writes.push(`cancel ${c} ${id}`),
     shell: async (command: string) => {
+      if (floors > 0) {
+        floors--;
+        throw new FloorError('scheduler', 1_000);
+      }
       typed.push(command);
-      if (o.shellError) throw o.shellError;
-      if (o.floorScheduler && /worker (start|stop)/.test(command)) throw new FloorError('scheduler', 41_000);
-      return { output: o.shellOutput ?? 'worker worker submitted as job 4243102 (reqp/requeue, 8 h). When it runs...', exitCode: 0, transcript: '', ms: 1200 };
+      const output = typeof o.output === 'function' ? o.output(command) : (o.output ?? '');
+      return { output, exitCode: o.exitCode ?? 0, transcript: '', ms: 10 };
     },
   } as unknown as PortalApi;
-  return { p, typed, touched, written, files };
+  return { p, typed, writes };
 }
 
-describe('worker start and stop', () => {
-  it('reads the cluster context from the profile through the portal', async () => {
-    const { p } = fake();
+const noSleep = async () => undefined;
+
+describe('the worker through the shell', () => {
+  it('connect is one line, built from checked parts', () => {
+    expect(connectLine(SHARED, { name: 'worker', site: 'wayne', installId: '0123456789abcdef0123456789abcdef', login: 'auto', permissionMode: 'default', chain: true })).toBe(commands.connect(SHARED, { name: 'worker', site: 'wayne', installId: '0123456789abcdef0123456789abcdef', login: 'auto', permissionMode: 'default', chain: true }));
+    expect(() => connectLine(SHARED, { name: '../x', site: 'wayne', login: 'auto', permissionMode: 'default', chain: true })).toThrow();
+  });
+
+  it('Stop is `worker stop` alone, typed through the shell; no stop file is written through the Files app', async () => {
+    const { p, typed, writes } = fake({ output: 'worker worker: stopped (the job left on its own; the chain ended)' });
+    const out = await stopByShell(p, SHARED, 'worker', noSleep);
+    expect(typed).toEqual([`bash '${SHARED}/bin/hpcworker' worker stop --name 'worker'`]);
+    expect(writes).toEqual([]);
+    expect(out).toMatchObject({ stopped: true, exitCode: 0 });
+    const notStopped = fake({ output: 'hpcworker: no worker named worker', exitCode: 1 });
+    expect((await stopByShell(notStopped.p, SHARED, 'worker', noSleep)).stopped).toBe(false);
+  });
+
+  it('a refused floor is waited out and retried silently, at most twice, then said', async () => {
+    const once = fake({ floors: 1, output: 'worker worker: stopped (x)' });
+    expect((await stopByShell(once.p, SHARED, 'worker', noSleep)).stopped).toBe(true);
+    expect(once.typed).toHaveLength(1);
+    const always = fake({ floors: 5 });
+    await expect(stopByShell(always.p, SHARED, 'worker', noSleep)).rejects.toBeInstanceOf(FloorError);
+    const slept: number[] = [];
+    await withFloor(
+      (() => {
+        let n = 0;
+        return async () => {
+          if (n++ === 0) throw new FloorError('scheduler', 41_000);
+          return 'ok';
+        };
+      })(),
+      async (ms) => void slept.push(ms),
+    );
+    expect(slept).toEqual([41_250]);
+  });
+
+  it('Mark restricted is `worker restrict`, through the shell', async () => {
+    const { p, typed, writes } = fake({ output: 'worker worker: marked restricted (/x/.restricted); it will not start there until the marker is removed' });
+    expect((await restrictByShell(p, SHARED, 'worker', noSleep)).marked).toBe(true);
+    expect(typed).toEqual([`bash '${SHARED}/bin/hpcworker' worker restrict --name 'worker'`]);
+    expect(writes).toEqual([]);
+    const already = fake({ output: 'worker worker: already marked restricted (/x/.restricted)' });
+    expect((await restrictByShell(already.p, SHARED, 'worker', noSleep)).marked).toBe(true);
+  });
+
+  it('the scheduler\'s reason comes from `worker status --json`, one line among the shell\'s noise', async () => {
+    const json = { v: 1, run: 'worker', job: '40501234', next_job: '', state_dir: STATE, status: { state: 'queued', job: '40501234' }, connection: null, scheduler: { state: 'PENDING', reason: 'Priority', expected_start: '', node: '', checked_at: '2026-10-01T12:58:03Z' }, line: 'Your worker is in line for a computer (14 min so far).' };
+    const { p, typed } = fake({ output: `Last login: x\n${JSON.stringify(json)}\n` });
+    const out = await statusByShell(p, SHARED, 'worker', noSleep);
+    expect(typed).toEqual([`bash '${SHARED}/bin/hpcworker' worker status --name 'worker' --json`]);
+    expect(out?.scheduler?.reason).toBe('Priority');
+    expect(out?.status?.state).toBe('queued');
+  });
+
+  it('the Remote Control answer alone (Details) is `claude consent --record`', async () => {
+    const { p, typed } = fake({ output: 'recorded in /home/ab1234/.hpcworker/consent (fallback marker): your workers may now host Remote Control' });
+    expect(await recordConsentByShell(p, SHARED, '0123456789abcdef0123456789abcdef', noSleep)).toBe(true);
+    expect(typed).toEqual([`bash '${SHARED}/bin/hpcworker' claude consent --record '0123456789abcdef0123456789abcdef'`]);
+  });
+
+  it('reads the cluster context and a restricted marker from listings, never a download', async () => {
+    const { p } = fake({ files: [paths.restrictedMarker(STATE, 'worker')] });
     const ctx = await clusterContext(p);
     expect(ctx).toMatchObject({ home: '/home/ab1234', user: 'ab1234', stateDir: STATE, site: 'wayne' });
+    expect(await restrictedReason(p, ctx, 'worker')).toMatch(/\.restricted file/);
+    expect(await restrictedReason(p, ctx, 'other')).toBeUndefined();
   });
 
-  it('refuses a start without the statement, without the tool, or in a restricted workspace, typing nothing', async () => {
-    const { p, typed } = fake();
-    await expect(startWorker(p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: undefined })).rejects.toThrow(/make the data statement/);
-    await expect(startWorker(p, { name: 'thesis', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/worker "thesis"/);
-    const noTool = fake({ profile: false });
-    await expect(startWorker(noTool.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/not installed yet/);
-    const marked = fake({ files: [paths.restrictedMarker(STATE, 'worker')] });
-    await expect(startWorker(marked.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/marked restricted/);
-    expect(await restrictedReason(marked.p, await clusterContext(marked.p), 'worker')).toMatch(/\.restricted file/);
-    expect(await restrictedReason(marked.p, await clusterContext(marked.p), 'other')).toBeUndefined();
-    const byProfile = fake({ profile: JSON.stringify({ site: 'wayne', shared_state_dir: STATE, restricted_workspaces: ['worker'] }) });
-    await expect(startWorker(byProfile.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/site profile marks/);
-    expect(typed).toEqual([]);
-    expect(marked.typed).toEqual([]);
-  });
-
-  it('a start types exactly the tool\'s line and reads the job id and site back', async () => {
-    const { p, typed } = fake();
-    const out = await startWorker(p, { name: 'worker', permissionMode: 'acceptEdits', site: 'fallback', ack: ACK });
-    expect(typed).toEqual([commands.workerStart('worker', 'acceptEdits')]);
-    expect(out).toMatchObject({ job: '4243102', site: 'wayne', stateDir: STATE, alreadyRunning: false });
-    const again = fake({ shellOutput: 'worker worker already has job 4243102 (RUNNING on asx15); nothing submitted' });
-    expect((await startWorker(again.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).alreadyRunning).toBe(true);
-    const bad = fake({ shellOutput: 'hpcworker: the scheduler refused the job: invalid partition' });
-    await expect(startWorker(bad.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK })).rejects.toThrow(/printed no job id/);
-  });
-
-  it('writes the consent marker before the start when the statement has not reached the cluster yet, and not twice', async () => {
-    const { p, typed, written } = fake();
-    const out = await startWorker(p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: false } });
-    expect(out.consentWritten).toBe(true);
-    expect(written).toHaveLength(1);
-    expect(written[0]![0]).toBe(paths.consent('/home/ab1234'));
-    expect(written[0]![1]).toMatch(/^yes \d{4}-\d{2}-\d{2}T[^ ]+ a1b2c3\n$/);
-    // the marker is written before the one line is typed
-    expect(typed).toEqual([commands.workerStart('worker', 'default')]);
-    // recorded as written and present on the cluster: nothing to write
-    const again = await startWorker(p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: true } });
-    expect(again.consentWritten).toBe(false);
-    expect(written).toHaveLength(1);
-    // recorded as written but gone from the cluster (a fresh home): written again
-    const fresh = fake();
-    const third = await startWorker(fresh.p, { name: 'worker', permissionMode: 'default', site: 'wayne', ack: ACK, consent: { installId: 'a1b2c3', written: true } });
-    expect(third.consentWritten).toBe(true);
-    expect(fresh.written).toHaveLength(1);
-  });
-
-  it('a stop touches the stop file first, then runs the tool\'s stop once; a held scheduler clock leaves the file to do the work', async () => {
-    const { p, typed, touched } = fake({ shellOutput: 'worker worker: stopped (the job left on its own)' });
-    const out = await stopWorker(p, { stateDir: STATE, run: 'worker', job: '4243102' });
-    expect(touched).toEqual([paths.stop(STATE, 'worker')]);
-    expect(typed).toEqual([commands.workerStop('worker')]);
-    expect(out.stopFile).toBe(true);
-    expect(out.toolStop?.exitCode).toBe(0);
-    const held = fake({ floorScheduler: true });
-    const o2 = await stopWorker(held.p, { stateDir: STATE, run: 'worker', job: '4243102' });
-    expect(held.touched).toHaveLength(1);
-    expect(o2.stopFile).toBe(true);
-    expect(o2.toolStop).toBeUndefined();
-    expect(o2.note).toMatch(/stop file is enough/);
-  });
-
-  it('when neither the file nor the line can be sent, the stop fails and says why', async () => {
-    const { p } = fake({ shellError: new Error('the portal tab did not answer') });
-    (p as { touch: unknown }).touch = async () => {
-      throw new Error('403 not allowed');
-    };
-    await expect(stopWorker(p, { stateDir: STATE, run: 'worker', job: '1' })).rejects.toThrow(/could not be written.*did not answer/s);
-  });
-
-  it('knows a live worker from a finished or stale one', () => {
-    const now = Date.parse('2026-09-28T12:00:00Z');
+  it('knows a live worker: queued is live with no heartbeat; others need one under 3 minutes', () => {
+    const now = Date.parse('2026-10-01T12:00:00Z');
     expect(workerLive(undefined, now)).toBe(false);
-    expect(workerLive({ state: 'online', updated_at: '2026-09-28T11:59:30Z' }, now)).toBe(true);
+    expect(workerLive({ state: 'queued', updated_at: '2026-10-01T10:00:00Z' }, now)).toBe(true);
+    expect(workerLive({ state: 'online', updated_at: '2026-10-01T11:59:30Z' }, now)).toBe(true);
     expect(workerLive({ state: 'starting' }, now)).toBe(true);
-    expect(workerLive({ state: 'need_consent', updated_at: '2026-09-28T11:58:00Z' }, now)).toBe(true);
-    expect(workerLive({ state: 'online', updated_at: '2026-09-28T11:50:00Z' }, now)).toBe(false);
-    expect(workerLive({ state: 'stopped', updated_at: '2026-09-28T11:59:59Z' }, now)).toBe(false);
-    expect(workerLive({ state: 'preempted', updated_at: '2026-09-28T11:59:59Z' }, now)).toBe(false);
+    expect(workerLive({ state: 'online', updated_at: '2026-10-01T11:50:00Z' }, now)).toBe(false);
+    expect(workerLive({ state: 'stopped', updated_at: '2026-10-01T11:59:59Z' }, now)).toBe(false);
+    expect(workerLive({ state: 'preempted', updated_at: '2026-10-01T11:59:59Z' }, now)).toBe(false);
     expect(workerLive({ state: 'error' }, now)).toBe(false);
   });
 });

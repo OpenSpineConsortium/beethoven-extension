@@ -1,15 +1,23 @@
-// The terms constants against something outside the code: the first line of the LICENSE.txt at the
-// repository root (the canonical text), the copy the extension ships, and the sentence the signing
-// dialog records. A mismatch here is the defect that shipped once: an acceptance recorded as
-// "version 1" beside a text headed "Version 2".
+// The agreement of 11.0.0 against something outside the code: the first line of the LICENSE.txt at the
+// repository root (the canonical text) and the copy the extension ships; and the record (TermsRecord
+// v2) against what the welcome page shows: one tick (Decision 1's shipping variant), the counsel
+// variant ready as one constant, "Show terms" optional and recorded truthfully, no typed name, no
+// scrolling gate. A version 1 record (8.0.0 to 10.0.0) is kept and out of force: everyone accepts once
+// more. A mismatch between the constants and the text is the defect that shipped once: an acceptance
+// recorded as "version 1" beside a text headed "Version 2".
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { acceptanceComplete, AFFIRMATIONS, END_SLACK_PX, laidOut, measureReading, NOT_READ, openedInTab, readingHint, readingRecord, recordInForce, TERMS_DATE, TERMS_VERSION, textRead, type BoxGeometry, type TermsRecord } from '../src/core/terms';
+import { acceptanceComplete, AFFIRMATION, AFFIRMATIONS_TWO, AGREE_BUTTON, bindAccount, buildTermsRecord, endReached, END_SLACK_PX, openedSentence, recordInForce, recordText, withHistory, sha256, SUMMARY, TERMS_DATE, TERMS_REFUSAL, TERMS_VERSION, tickLabel, ticks, TWO_TICKS, type TermsRecord, type TermsRecordV1 } from '../src/core/terms';
 
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('the terms version', () => {
+  it('is 8, dated 2026-10-01 (AM6)', () => {
+    expect(TERMS_VERSION).toBe(8);
+    expect(TERMS_DATE).toBe('2026-10-01');
+  });
+
   it('is an integer that names the LICENSE.txt line at the repository root, with its date', () => {
     expect(Number.isInteger(TERMS_VERSION)).toBe(true);
     const head = /^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../LICENSE.txt'));
@@ -22,100 +30,107 @@ describe('the terms version', () => {
     expect(read('../public/LICENSE.txt')).toBe(read('../../LICENSE.txt'));
     expect(read('../public/PRIVACY.md')).toBe(read('../../PRIVACY.md'));
   });
+});
 
-  it('names the version and date in the sentence the student ticks, and keeps no acceptance of an earlier version in force', () => {
-    const agree = AFFIRMATIONS.find((a) => a.id === 'read_agree')!;
-    expect(agree.label).toContain(`(version ${TERMS_VERSION}, ${TERMS_DATE})`);
-    const record = { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' };
-    expect(recordInForce(record)).toBe(true);
-    expect(recordInForce({ ...record, terms_version: TERMS_VERSION - 1 })).toBe(false);
+describe('what the welcome page shows', () => {
+  it('the four summary lines, verbatim', () => {
+    expect(SUMMARY).toEqual([
+      "Free while you're approved. Licensed to you, not sold.",
+      'To check your approval, it sends the lab your AccessID and an ID for this browser.',
+      'The grid, Anthropic or the browser store can stop it working at any time. You accept that risk.',
+      'Disputes: written notice first, then one person at a time in Michigan courts, with no jury.',
+    ]);
+  });
+
+  it('one tick (Greg\'s decision), its sentence naming the waivers and the risks; the button says Agree', () => {
+    expect(TWO_TICKS).toBe(false);
+    expect(ticks()).toEqual([AFFIRMATION]);
+    expect(AFFIRMATION).toEqual({ id: 'agree', bold: "I've read and agree to the Beethoven terms and privacy statement, and I'm 18 or older.", soft: 'That includes giving up a jury trial and class actions, and accepting the risks above.' });
+    expect(tickLabel(AFFIRMATION)).toBe("I've read and agree to the Beethoven terms and privacy statement, and I'm 18 or older. That includes giving up a jury trial and class actions, and accepting the risks above.");
+    expect(AGREE_BUTTON).toBe('Agree and continue');
+  });
+
+  it('the two-tick variant for counsel is ready: the agree box alone, and a second, separate box', () => {
+    expect(AFFIRMATIONS_TWO).toEqual([
+      { id: 'agree', bold: "I've read and agree to the Beethoven terms and privacy statement, and I'm 18 or older." },
+      { id: 'specific', bold: 'I specifically accept the dispute terms (no jury trial, no class actions) and the known risks (sections 8, 19 and 20).' },
+    ]);
+  });
+
+  it('is complete with the tick alone: no name, no reading gate', () => {
+    expect(acceptanceComplete([{ id: 'agree', checked: true }])).toEqual({ ok: true, missing: [] });
+    expect(acceptanceComplete([{ id: 'agree', checked: false }])).toEqual({ ok: false, missing: ['agree'] });
+    expect(acceptanceComplete([])).toEqual({ ok: false, missing: ['agree'] });
+  });
+
+  it('the refusal wherever the terms are not accepted', () => {
+    expect(TERMS_REFUSAL).toBe("The Beethoven terms haven't been accepted in this browser yet. Open Beethoven's welcome page to accept them.");
   });
 });
 
-// The reading gate of the signing dialog (9.0.0 measured the box before it was on the page, found
-// scrollHeight 0, called the text read and enabled the button with the text unread at the top).
-describe('the reading gate', () => {
-  /** the box as 9.0.0 measured it: built, not yet on the page */
-  const DETACHED: BoxGeometry = { scrollTop: 0, clientHeight: 0, scrollHeight: 0 };
-  /** the box on the page: 46vh tall, the agreement and the privacy statement far longer */
-  const AT_TOP: BoxGeometry = { scrollTop: 0, clientHeight: 420, scrollHeight: 61_000 };
-  const HALFWAY: BoxGeometry = { scrollTop: 30_000, clientHeight: 420, scrollHeight: 61_000 };
-  const AT_END: BoxGeometry = { scrollTop: 60_580, clientHeight: 420, scrollHeight: 61_000 };
-  const SHORT: BoxGeometry = { scrollTop: 0, clientHeight: 420, scrollHeight: 400 };
+describe('the record (TermsRecord v2)', () => {
+  const input = { license: 'Version 8, 2026-10-01.\r\nThe text.', privacy: 'Version 9, 2026-10-01.\nThe statement.', checked: { agree: true }, termsEndReached: false, openedInTab: false, savedCopy: true, printed: false, productVersion: '11.0.0', host: 'Chrome 153', installId: '0123456789abcdef0123456789abcdef', at: '2026-10-01T12:00:00.000Z' };
 
-  it('a box not yet on the page proves nothing: the gate stays shut', () => {
-    expect(laidOut(DETACHED)).toBe(false);
-    const s = measureReading(NOT_READ, DETACHED);
-    expect(textRead(s)).toBe(false);
-    expect(s).toEqual(NOT_READ);
-    expect(readingHint(s)).toBe('Scroll the text above to its end to continue, or open it in tabs.');
+  it('says what was shown, what was ticked, whether the full text was opened, and from which installation', async () => {
+    const r = await buildTermsRecord(input);
+    expect(r).toMatchObject({ v: 2, terms_version: 8, terms_date: '2026-10-01', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
+    expect(r.affirmations).toEqual([{ id: 'agree', label: tickLabel(AFFIRMATION), checked: true }]);
+    expect(r.license_sha256).toBe(await sha256(input.license));
+    // CRLF and LF hash alike: the text, not its line endings
+    expect(r.license_sha256).toBe(await sha256('Version 8, 2026-10-01.\nThe text.'));
+    expect(r.summary_sha256).toBe(await sha256(SUMMARY.join('\n')));
+    expect(r.terms_opened_at).toBeUndefined();
+    expect(r.bound_account).toBeUndefined();
+    expect(recordInForce(r)).toBe(true);
+    expect(openedSentence(r)).toBe('The full text was not opened before Agree.');
+    const opened = await buildTermsRecord({ ...input, termsOpenedAt: '2026-10-01T11:59:00.000Z', termsEndReached: true });
+    expect(opened).toMatchObject({ terms_opened: true, terms_opened_at: '2026-10-01T11:59:00.000Z', terms_end_reached: true });
+    expect(openedSentence(opened)).toBe('The full text was opened before Agree.');
   });
 
-  it('the text at the top or halfway is not read; at its end it is, within the slack', () => {
-    expect(textRead(measureReading(NOT_READ, AT_TOP))).toBe(false);
-    expect(textRead(measureReading(NOT_READ, HALFWAY))).toBe(false);
-    const end = measureReading(NOT_READ, AT_END);
-    expect(end).toEqual({ scrolledToEnd: true, fits: false, openedInTab: false });
-    expect(readingHint(end)).toBe('You have reached the end of the text.');
-    expect(textRead(measureReading(NOT_READ, { ...AT_END, scrollTop: AT_END.scrollTop - END_SLACK_PX }))).toBe(true);
-    expect(textRead(measureReading(NOT_READ, { ...AT_END, scrollTop: AT_END.scrollTop - END_SLACK_PX - 1 }))).toBe(false);
+  it('is in force only as v2 for version 8 with the box ticked; a v1 record is kept, out of force', async () => {
+    const r = await buildTermsRecord(input);
+    expect(recordInForce({ ...r, terms_version: 7 })).toBe(false);
+    expect(recordInForce({ ...r, affirmations: [{ ...r.affirmations[0]!, checked: false }] })).toBe(false);
+    expect(recordInForce(await buildTermsRecord({ ...input, checked: {} }))).toBe(false);
+    const v1: TermsRecordV1 = { v: 1, terms_version: 8, edition: 'trial', license_sha256: 'a', privacy_sha256: 'b', accepted_at: 'x', surface: 'extension', button_label: 'Accept and Continue', affirmations: [], signed_name: 'A. Student', scrolled_to_end: true, product_version: '10.0.0', host: 'Chrome', install_id: 'x' };
+    expect(recordInForce(v1)).toBe(false);
+    expect(recordInForce({ ...v1, terms_version: 7 })).toBe(false);
+    // a v1 record with its box ticked and this version's number is still out of force: only a v2 record counts
+    expect(recordInForce({ ...v1, edition: 'trial', affirmations: [{ id: 'agree', label: 'x', checked: true }], accepted_at: '2026-10-01T00:00:00Z' })).toBe(false);
+    expect(recordInForce(undefined)).toBe(false);
+    expect(recordInForce(JSON.parse(JSON.stringify(r)))).toBe(true);
   });
 
-  it('a text that fits its laid-out box needs no scrolling, and says so', () => {
-    const s = measureReading(NOT_READ, SHORT);
-    expect(s).toEqual({ scrolledToEnd: false, fits: true, openedInTab: false });
-    expect(textRead(s)).toBe(true);
-    expect(readingHint(s)).toMatch(/whole text was in view/);
+  it('keeps the records it replaces (10.0.0\'s v1 included), and gives the person their record as text with the install id', async () => {
+    const r = await buildTermsRecord(input);
+    const v1 = { v: 1, terms_version: 7, signed_name: 'A. Student' };
+    expect(withHistory(undefined, v1)).toEqual([v1]);
+    expect(withHistory([v1], v1)).toEqual([v1]);
+    expect(withHistory([v1], undefined)).toEqual([v1]);
+    expect(withHistory(Array.from({ length: 12 }, (_, i) => ({ i })), v1)).toHaveLength(10);
+    const text = recordText(bindAccount(r, 'st1234', '2026-10-01T09:00:00Z'));
+    expect(text).toContain(`Installation ID: ${r.install_id}`);
+    expect(text).toContain('Account: st1234 (shown by your portal at 2026-10-01T09:00:00Z, after the acceptance)');
+    expect(text).toContain('The full text was not opened before Agree.');
+    expect(text).toContain(`Ticked: yes: "${r.affirmations[0]!.label}"`);
+    expect(text).toContain('"v": 2');
   });
 
-  it('opening both texts in tabs counts, and the hint says that is what happened', () => {
-    const s = openedInTab(measureReading(NOT_READ, AT_TOP));
-    expect(textRead(s)).toBe(true);
-    expect(readingHint(s)).toBe('You opened the agreement and the privacy statement in tabs, which counts as reading them.');
+  it('gains the account the grid showed, once, afterwards, and says so', async () => {
+    const r = await buildTermsRecord(input);
+    const bound: TermsRecord = bindAccount(r, 'st1234', '2026-10-01T12:05:00.000Z');
+    expect(bound).toMatchObject({ bound_account: 'st1234', bound_account_seen_at: '2026-10-01T12:05:00.000Z' });
+    expect(bindAccount(bound, 'zz9999')).toBe(bound);
+    expect(recordInForce(bound)).toBe(true);
   });
 
-  it('what is done stays done: the box leaving the page or scrolling back up does not undo it', () => {
-    const end = measureReading(NOT_READ, AT_END);
-    expect(measureReading(end, DETACHED)).toEqual(end);
-    expect(measureReading(end, AT_TOP)).toEqual(end);
-    expect(textRead(measureReading(openedInTab(NOT_READ), DETACHED))).toBe(true);
-  });
-
-  it('the record says what happened: scrolled_to_end only for the end reached or a text that fitted, opened_in_tab apart', () => {
-    expect(readingRecord(NOT_READ)).toEqual({ scrolled_to_end: false, opened_in_tab: false });
-    expect(readingRecord(measureReading(NOT_READ, AT_END))).toEqual({ scrolled_to_end: true, opened_in_tab: false });
-    expect(readingRecord(measureReading(NOT_READ, SHORT))).toEqual({ scrolled_to_end: true, opened_in_tab: false });
-    expect(readingRecord(openedInTab(NOT_READ))).toEqual({ scrolled_to_end: false, opened_in_tab: true });
-    expect(readingRecord(openedInTab(measureReading(NOT_READ, AT_END)))).toEqual({ scrolled_to_end: true, opened_in_tab: true });
-  });
-
-  it('the agreement is not complete until the text is read, whatever else is done', () => {
-    const all = AFFIRMATIONS.map((a) => ({ ...a, checked: true }));
-    expect(acceptanceComplete(all, 'A. Student', textRead(measureReading(NOT_READ, DETACHED)))).toEqual({ ok: false, missing: ['text_read'] });
-    expect(acceptanceComplete(all, 'A. Student', textRead(measureReading(NOT_READ, AT_END))).ok).toBe(true);
-    expect(acceptanceComplete(all, 'A. Student', textRead(openedInTab(NOT_READ))).ok).toBe(true);
-  });
-
-  it('keeps a record written by 9.0.0 in force (scrolled_to_end true, no opened_in_tab) and one written now', () => {
-    const v9: TermsRecord = {
-      v: 1,
-      terms_version: TERMS_VERSION,
-      edition: 'trial',
-      license_sha256: 'a'.repeat(64),
-      privacy_sha256: 'b'.repeat(64),
-      accepted_at: '2026-09-30T20:00:00.000Z',
-      surface: 'extension',
-      button_label: 'Accept and Continue',
-      affirmations: AFFIRMATIONS.map((a) => ({ ...a, checked: true })),
-      signed_name: 'A. Student',
-      scrolled_to_end: true,
-      product_version: '9.0.0',
-      host: 'Chrome 148',
-      install_id: '0123456789abcdef0123456789abcdef',
-    };
-    expect('opened_in_tab' in v9).toBe(false);
-    expect(recordInForce(v9)).toBe(true);
-    expect(recordInForce(JSON.parse(JSON.stringify(v9)))).toBe(true);
-    expect(recordInForce({ ...v9, product_version: '10.0.0', ...readingRecord(openedInTab(NOT_READ)) })).toBe(true);
+  it('the one measure left of the reading gate sets terms_end_reached and gates nothing', () => {
+    expect(endReached({ scrollTop: 0, clientHeight: 0, scrollHeight: 0 })).toBe(false);
+    expect(endReached({ scrollTop: 0, clientHeight: 360, scrollHeight: 61_000 })).toBe(false);
+    expect(endReached({ scrollTop: 60_640, clientHeight: 360, scrollHeight: 61_000 })).toBe(true);
+    expect(endReached({ scrollTop: 60_640 - END_SLACK_PX, clientHeight: 360, scrollHeight: 61_000 })).toBe(true);
+    expect(endReached({ scrollTop: 60_640 - END_SLACK_PX - 1, clientHeight: 360, scrollHeight: 61_000 })).toBe(false);
+    expect(endReached({ scrollTop: 0, clientHeight: 360, scrollHeight: 300 })).toBe(true);
   });
 });

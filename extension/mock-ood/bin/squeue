@@ -1,4 +1,5 @@
 #!/bin/bash
-# mock squeue: one line per job, "id|state|node"
-node "$MOCK_LIB/jobs.mjs" list | node -e '
-let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{ for (const j of JSON.parse(s||"[]")) console.log(`${j.pbsid}|RUNNING|${(j.nodes||[]).join(",")}`); });'
+# mock squeue: the job table as Slurm prints it. Without -o, the 10.0.0 stand-in's own lines
+# ("id|STATE|node"); with -o, the fields asked for (%i %T %t %r %S %N %j %P %u %M), a pending job
+# reporting its reason and expected start (lib/jobs.mjs squeueLines)
+exec node "$MOCK_LIB/jobs.mjs" squeue "$@"

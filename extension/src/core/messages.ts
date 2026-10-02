@@ -3,10 +3,36 @@
 // content script additionally answers only operations named in PORTAL_OPS. Errors do not
 // survive sendMessage, so answers are wrapped. The login terminal is not a message: it is a port
 // (LOGIN_PORT) from the panel to the page script, so that closing the panel closes the shell.
+//
+// 11.0.0 (docs/V11_CONTRACT.md, "Messages") adds, without removing anything 10.0.0's page script
+// and tab mode use:
+//   - VIEW_PORT: each open page holds one port to the background; it subscribes to its surface and
+//     receives every new view (model.ts SurfaceView). An open port is how the background knows the
+//     panel is open (the 5-second cadence, the 2-second sign-in watch); the page sends "tick" every
+//     2 s while it is open, which also keeps the service worker awake.
+//   - { type: 'action' }: every button and automatic step (model.ts Action), answered with its result.
+//   - the page script in the grid's terminal tab (AM2): "terminal.watch", "terminal.type" from the
+//     background, "terminal.shell-up" back. The page script reads the page title only and types the
+//     one login-setup line only (contract.ts isLoginSetupLine).
+//   - CONNECT_PORT: the connect sitting in tab mode, hosted by the page script; parsed events only.
+import type { ConnectEvent, ConnectOptions } from './contract';
+import type { Action, ActionKind, ResultOf, Surface, SurfaceView, TerminalInput } from './model';
 import type { PortalOp } from './portal';
 
-/** the port name the panel connects to the portal page script with for the login terminal */
+/** the port name the panel connects to the portal page script with for the login terminal (10.0.0) */
 export const LOGIN_PORT = 'beethoven-login';
+
+/** 11.0.0: the port each open page (panel, welcome, settings) holds to the background */
+export const VIEW_PORT = 'beethoven-view';
+
+/** 11.0.0: the port the background (or, as a fallback, the panel) opens to the page script in tab mode for one connect sitting */
+export const CONNECT_PORT = 'beethoven-connect';
+
+/** how often an open page sends "tick" on VIEW_PORT */
+export const TICK_MS = 2_000;
+
+/** how often a frame "{}" goes to the portal's shell while a connect sitting is open (keeps the service worker's 30 s window open; the portal ignores it) */
+export const SHELL_KEEPALIVE_MS = 20_000;
 
 export type Request =
   /** the page script announcing itself from a portal tab */
@@ -35,8 +61,38 @@ export type Request =
   | { type: 'killlist.refresh' }
   /** ask Licensor's access service whether the signed-in account is approved (the background honours its caches; `force` asks again after a refusal or a failed attempt) */
   | { type: 'access.check'; force?: boolean }
-  /** the background pushing a new run state to open pages */
-  | { type: 'run.changed' };
+  /** the background pushing a new run state to open pages (10.0.0; 11.0.0 pages listen on VIEW_PORT, the welcome page's hand-off mirror may listen to either) */
+  | { type: 'run.changed' }
+  // ---- 11.0.0 ----
+  /** a page asking for its view once (VIEW_PORT pushes the rest) */
+  | { type: 'view.get'; surface: Surface }
+  /** a button or an automatic step: model.ts Action; answered with Answer<ResultOf<kind>> */
+  | { type: 'action'; action: Action }
+  /** the panel on load: triggers the access re-check LICENSE 3(a) ties to opening the panel after a day or after a no, and the live grid check */
+  | { type: 'panel.opened'; windowId?: number }
+  /** background -> the page script in the grid's terminal tab (AM2): start watching the page title for the shell's own title, user part `account` */
+  | { type: 'terminal.watch'; account: string }
+  /** background -> that page script: type this one line (it must pass contract.ts isLoginSetupLine), then Enter */
+  | { type: 'terminal.type'; line: string }
+  /** that page script -> background, once: the title says the shell is up ("st1234@warrior:~"); carries no title text */
+  | { type: 'terminal.shell-up' };
+
+/** what "terminal.type" answers */
+export interface TerminalTyped {
+  typed: boolean;
+  how: TerminalInput;
+  /** when not typed: "unsupported" (no xterm.js helper textarea), "refused" (the line failed isLoginSetupLine), "hidden" (the tab is not visible) */
+  why?: 'unsupported' | 'refused' | 'hidden';
+}
+
+/** frames on VIEW_PORT, page -> background */
+export type ViewIn = { type: 'subscribe'; surface: Surface; windowId?: number } | { type: 'tick' };
+
+/** frames on VIEW_PORT, background -> page */
+export type ViewOut = { type: 'view'; view: SurfaceView };
+
+/** an action's answer, typed by its kind */
+export type ActionAnswer<K extends ActionKind> = Answer<ResultOf<K>>;
 
 /** frames on the login port, panel -> page script */
 export type LoginIn = { type: 'input'; text: string } | { type: 'close' };
@@ -50,6 +106,25 @@ export type LoginOut =
   | { type: 'code-prompt' }
   | { type: 'signed-in'; detail: string }
   | { type: 'failed'; detail: string }
+  | { type: 'closed'; reason: string; closeCode?: number; closeReason?: string }
+  | { type: 'error'; message: string };
+
+/**
+ * frames on CONNECT_PORT, opener -> page script. The first frame is "connect": the page script builds
+ * the line itself with contract.ts commands.connect from the site profile's shared copy and these
+ * options (it never runs a line it did not build; commands.connect refuses any value that fails its
+ * check, the shared folder included). `sharedDir` is the bundled site profile's shared_install, which
+ * the background read (a page script cannot read the package's files). "input" is the pasted code,
+ * typed once.
+ */
+export type ConnectIn = { type: 'connect'; options: ConnectOptions; sharedDir: string } | { type: 'input'; text: string } | { type: 'close' };
+
+/** frames on CONNECT_PORT, page script -> opener: parsed events only, never the terminal's text */
+export type ConnectOut =
+  | { type: 'open' }
+  | { type: 'event'; event: ConnectEvent }
+  /** the shell asked for a password before the line was typed: nothing was typed (AM2's key step follows) */
+  | { type: 'password' }
   | { type: 'closed'; reason: string; closeCode?: number; closeReason?: string }
   | { type: 'error'; message: string };
 

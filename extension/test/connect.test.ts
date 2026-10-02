@@ -10,10 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { acceptedSettings, ANTHROPIC_REFUSAL, connectSequence, dropAnthropicGrants, guardedRequest, isAnthropicAddress, isAnthropicHost, isAnthropicPattern, lookAtTab, mayRequestOrigin, normaliseOrigin, type ConnectApi } from '../src/core/connect';
-import { gatherFacts } from '../src/core/facts';
-import { DEFAULT_PREFS, type ClickNote, type PortalSettings } from '../src/core/keys';
-import { decide } from '../src/core/steps';
-import { memoryKV } from './helpers';
+import type { ClickNote, PortalSettings } from '../src/core/keys';
 
 function fakeBrowser(o: { registered?: string; settings?: PortalSettings; answersAfterInject?: number; answersBeforeInject?: boolean; injectFails?: boolean } = {}) {
   const calls: string[] = [];
@@ -209,24 +206,14 @@ describe('never an Anthropic address', () => {
     expect(lookAtTab('http://localhost:8080/pun/sys/dashboard/')).toMatchObject({ origin: 'http://localhost:8080', ood: true, anthropic: false });
   });
 
-  it('the strip offers no Anthropic tab as a portal: it says why, and its button only opens the setup page', async () => {
-    // a note as 9.0.0 wrote it for claude.ai with a /pun/ path (looksLikeOod true), and one as 10.0.0 writes it
-    for (const click of [
-      { tabId: 4, origin: 'https://claude.ai', path: '/pun/x', looksLikeOod: true, granted: false, at: '2026-09-30T00:00:00Z' },
-      { tabId: 4, origin: 'https://www.claude.ai', path: '', looksLikeOod: false, granted: false, at: '2026-09-30T00:00:00Z' },
-    ] satisfies ClickNote[]) {
-      const g = await gatherFacts({ version: '10.0.0', now: () => Date.parse('2026-10-01T00:00:00Z'), local: memoryKV(), prefs: DEFAULT_PREFS, granted: async () => false, alive: async () => false, portal: () => undefined, click, transient: {} });
-      expect(g.facts.portal.candidate, click.origin).toBeUndefined();
-      expect(g.facts.portal.refusedTab).toBe(new URL(click.origin).hostname);
-      const v = decide(g.facts);
-      expect(v.step).toBe('portal');
-      expect(v.primary?.action).toBe('open-setup');
-      expect(v.status).toMatch(/Anthropic address, not a portal/);
-      expect(v.status).not.toMatch(/Connect it as your portal/);
+  it('11.0.0 has no toolbar click that inspects a tab: the only way a portal is offered is the welcome page\'s address, refused for an Anthropic one before any prompt', () => {
+    // the welcome page's default (the site profile's ood_base_url) and a typed "Use another portal"
+    expect(mayRequestOrigin(normaliseOrigin('ondemand.grid.wayne.edu'))).toBe(true);
+    for (const typed of ['claude.ai', 'https://claude.ai/code', 'www.claude.com', 'api.anthropic.com']) {
+      expect(() => normaliseOrigin(typed), typed).toThrow(ANTHROPIC_REFUSAL);
+      expect(mayRequestOrigin(typed), typed).toBe(false);
     }
-    // a look-alike /pun/ tab is still offered
-    const g = await gatherFacts({ version: '10.0.0', now: () => Date.now(), local: memoryKV(), prefs: DEFAULT_PREFS, granted: async () => false, alive: async () => false, portal: () => undefined, click: { tabId: 5, origin: 'https://claude.ai.example.edu', path: '/pun/sys/dashboard/', looksLikeOod: true, granted: false, at: 'x' }, transient: {} });
-    expect(decide(g.facts).primary).toEqual({ label: 'Connect this portal', action: 'connect' });
+    void (undefined as unknown as ClickNote);
   });
 
   it('the connect sequence refuses one even after a grant, and touches nothing', async () => {

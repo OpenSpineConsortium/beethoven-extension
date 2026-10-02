@@ -15,7 +15,13 @@ export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment link
 export const LOGIN_SEEN_KEY = 'bridge.loginSeen'; // {at, detail}: when the login terminal in this browser last reported SIGNED-IN
 export const PROBE_KEY = 'bridge.probe'; //      {submitted_at, job}: the probe job the strip submitted by itself, so it is not submitted again while it runs
 export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail, dir, note}: the last install, so Details can say which copy it set up, or why the lab's could not be used
-// TERMS_KEY ('bridge.terms') is in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
+// 11.0.0 (docs/V11_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 9:
+export const LAST_KNOWN_KEY = 'bridge.lastKnown'; // LastKnown: the worker's last known state, title, link and when, so the panel shows it at once and "Open my session" works with no grid
+export const CHANNEL_KEY = 'bridge.channel'; //      ChannelNote: how this browser reaches the portal ("direct" from the background, or "tab")
+export const WAIT_HISTORY_KEY = 'bridge.waits'; //  WaitHistory: the last five waits for a computer, in whole minutes ("Last time: 6 min.")
+export const TOUR_SEEN_KEY = 'bridge.tourSeen'; //  TourSeen: that the tour was seen
+export const ONCE_KEY = 'bridge.once'; //            OnceNotes: which one-time tips were shown or dismissed (pin tip, Try asking, the tour card, the New session toast)
+// TERMS_KEY ('bridge.terms') and TERMS_HISTORY_KEY ('bridge.termsHistory', the earlier acceptance records, kept out of force) are in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
 export const PORTAL_TAB_KEY = 'bridge.portalTab'; // {tabId, origin}: the tab whose page script answers
@@ -23,7 +29,16 @@ export const RUN_KEY = 'bridge.run'; //             {stateDir, run, job, site, s
 export const CHECKS_KEY = 'bridge.checks'; //       the last diagnostics report
 export const SESSION_SEEN_KEY = 'bridge.sessionSeen'; // {checked_at}: when check 4 last passed
 export const AUTO_START_KEY = 'bridge.autoStart'; // {attempted_at, outcome}: what the last automatic start did
-export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksLikeOod, granted, at}: the tab the toolbar button was last clicked from
+export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksLikeOod, granted, at}: the tab the toolbar button was last clicked from (10.0.0; unused from 11.0.0)
+// 11.0.0:
+export const SIGNIN_TAB_KEY = 'bridge.signinTab'; //  OpenedTab: the grid sign-in tab Beethoven opened or navigated (the welcome tab, or one opened for a press)
+export const ANTHROPIC_TAB_KEY = 'bridge.anthropicTab'; // AnthropicTab: Anthropic's sign-in tab Beethoven opened, and whether it has started a new load since the paste
+export const CLAUDE_TAB_KEY = 'bridge.claudeTab'; //  OpenedTab: the claude.ai tab Beethoven opened for "Open my session" (session storage: a tab id means nothing after a restart)
+export const TERMINAL_TAB_KEY = 'bridge.terminalTab'; // OpenedTab: the grid's terminal tab Beethoven opened for the one-time key step (AM2)
+export const ACTIVITY_KEY = 'bridge.activity'; //     ActivityEntry[]: Beethoven's own plain-words events for Show log, oldest first, at most ACTIVITY_MAX
+export const GRID_KEY = 'bridge.grid'; //             GridNote: whether the grid answers and whether the browser holds a grid sign-in, as last checked
+export const PRESS_KEY = 'bridge.press'; //           PendingPress: a press kept until the grid can carry it ("Connecting when ready…")
+export const WELCOME_PRESS_KEY = 'bridge.welcomePress'; // {at}: the welcome page's "Agree and continue" was pressed, written inside the click before Chrome asks, so the panel opening beside it can say "Almost there." instead of "not accepted yet"
 
 export interface PortalSettings {
   origin: string;
@@ -38,11 +53,141 @@ export interface PortalSettings {
 export interface Prefs {
   /** the worker's name: its run directory and workspace are named after it (hpcworker worker start --name) */
   worker_name: string;
+  /** Settings, "Your worker": "Ask before each command" (default) / "Accept edits" (acceptEdits) / "Plan only" (plan) */
   permission_mode: 'default' | 'acceptEdits' | 'plan';
-  /** "start my worker when I open my portal", on by default (DEFAULT_PREFS): the background starts the worker when the portal tab connects and everything is in order; a stopped or failed worker is never started this way */
+  /**
+   * 11.0.0: "Keep my worker running" (the stored name is kept so a 10.0.0 profile carries over): the
+   * always-on chain (off adds --no-chain to connect), plus a start through connect when the grid
+   * sign-in is seen and the worker ended without the student's Stop. Never opens a tab by itself;
+   * a stopped or failed worker is never started this way. (10.0.0: "start my worker when I open my portal".)
+   */
   auto_start: boolean;
-  /** open the worker's claude.ai link in a new tab the first time this browser sees it */
+  /** 11.0.0: "Open Claude when my worker is ready": opens the environment link once, only for a Connect the student pressed */
   open_claude_on_connect: boolean;
+  /** 11.0.0: Settings, "Appearance": "Cream" (cream, the default whatever the system says) / "Match system" (system). Optional so a 10.0.0 profile reads as cream. */
+  appearance?: Appearance;
+}
+
+/** <html data-theme>: "cream" always light; "system" follows prefers-color-scheme */
+export type Appearance = 'cream' | 'system';
+
+// ---- 11.0.0 storage shapes ------------------------------------------------------------------------
+
+/** the hero state names the core computes (model.ts HeroState), as stored */
+export type KnownState = 'asked' | 'queued' | 'starting' | 'needs-you' | 'online' | 'renewing' | 'stopped' | 'error' | 'unknown';
+
+/**
+ * LAST_KNOWN_KEY (local). What the panel shows the moment it opens, before any live check, and what
+ * "Open my session" needs with no grid and no VPN. Written on every state change the background sees.
+ * Nothing secret: the environment link is the student's own claude.ai address.
+ */
+export interface LastKnown {
+  /** the worker's name this belongs to */
+  worker_name: string;
+  state: KnownState;
+  /** the session title ("Wayne State grid") */
+  title?: string;
+  /** https://claude.ai/code?environment=env_… (checked with isEnvironmentUrl before it is stored) */
+  environment_url?: string;
+  /** when this state was seen (ISO): "As of 9:02 AM" */
+  seen_at: string;
+  /** status.json online_at of the job last seen online: "up 2 h 14 min" */
+  online_since?: string;
+  /** status.json ends_at, when the chain is on: "Renews itself at 4:50 PM" */
+  ends_at?: string;
+  /** the AccessID the grid showed with it */
+  account?: string;
+}
+
+/** CHANNEL_KEY (local): the channel test's verdict, per portal origin */
+export interface ChannelNote {
+  origin: string;
+  /** "direct": the background's own requests carry the browser's grid sign-in; "tab": they do not, so actions run through a portal tab */
+  mode: 'direct' | 'tab';
+  /** the portal's shell reached a prompt without a password ("ok"), or asked for one ("password": the one-time key step, AM2) */
+  shell: 'ok' | 'password' | 'unknown';
+  tested_at: string;
+}
+
+/** WAIT_HISTORY_KEY (local): whole minutes from submitted_at to got_computer_at, newest last, at most five; only for a Connect the student pressed */
+export interface WaitHistory {
+  minutes: number[];
+}
+
+/** TOUR_SEEN_KEY (local) */
+export interface TourSeen {
+  seen_at: string;
+  /** played to its end (true) or skipped (false) */
+  completed: boolean;
+}
+
+/** ONCE_KEY (local): one-time cards and toasts */
+export interface OnceNotes {
+  /** the first time this browser saw the worker online: "Try asking" shows for 3 days from here */
+  first_online_at?: string;
+  try_asking_dismissed_at?: string;
+  pin_tip_shown_at?: string;
+  /** the pin tip changed to "Pinned." (action.onUserSettingsChanged) or was dismissed */
+  pin_tip_done_at?: string;
+  tour_card_dismissed_at?: string;
+  /** the once-only tour began playing below the queue (its card is then not offered on the first online home) */
+  tour_auto_played_at?: string;
+  /** "Start a new session there. It runs on your worker." was shown */
+  new_session_tip_at?: string;
+}
+
+/** SIGNIN_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY (session): a tab Beethoven opened or navigated itself, so it may bring it forward or close it */
+export interface OpenedTab {
+  tabId: number;
+  windowId: number;
+  /** the URL Beethoven loaded; the tab is closed only while tabs.get still shows it on this origin (and path, for the terminal) */
+  url: string;
+  opened_at: string;
+  /** "welcome": the welcome tab, navigated to the grid; "press": opened for a press; "session": claude.ai; "terminal": the grid's terminal (AM2); "anthropic": Anthropic's sign-in page (ANTHROPIC_TAB_KEY) */
+  purpose: 'welcome' | 'press' | 'session' | 'terminal' | 'anthropic';
+  /** the tab that was in front before, to return focus to */
+  return_tab_id?: number;
+  /** tabs.onUpdated status "loading" events seen after Beethoven's own load completed (claude.ai: bring forward only while 0) */
+  loads_after?: number;
+  /** Beethoven's own load completed (status "complete" seen once) */
+  loaded?: boolean;
+}
+
+/** ANTHROPIC_TAB_KEY (session) */
+export interface AnthropicTab extends OpenedTab {
+  /** when the student's code was typed into the sitting; the tab is closed on SIGNED-IN only while loads_since_paste is 0 */
+  pasted_at?: string;
+  loads_since_paste?: number;
+}
+
+/** ACTIVITY_KEY (session): one Show log line from Beethoven itself (the worker's own lines come from progress.log) */
+export interface ActivityEntry {
+  /** ISO-8601 */
+  at: string;
+  /** the plain words, from model.ts LOG_WORDS; never a job id, node, path or shell output */
+  text: string;
+}
+
+/** at most this many ActivityEntry are kept (oldest dropped) */
+export const ACTIVITY_MAX = 200;
+
+/** GRID_KEY (session): the last reachability and sign-in checks */
+export interface GridNote {
+  /** the credential-free no-cors request: the grid answered, or there was no route (GlobalProtect off), or not asked yet */
+  reach: 'answers' | 'no-route' | 'unknown';
+  /** the background GET of the dashboard: 200 with "Logged in as" (signed-in), 401 or a redirect off the origin (signed-out), a network error or 5 s timeout (unreachable) */
+  session: 'signed-in' | 'signed-out' | 'unreachable' | 'unknown';
+  /** the AccessID the dashboard showed */
+  account?: string;
+  checked_at: string;
+}
+
+/** PRESS_KEY (session): a press that waits for the grid (sign-in, approval, setup, or the one-time key step) and goes ahead by itself */
+export interface PendingPress {
+  kind: 'connect' | 'stop' | 'sign-in-claude' | 'restrict' | 'open-files';
+  /** "Use another account": connect --login fresh */
+  fresh?: boolean;
+  at: string;
 }
 
 /** the account name the portal's dashboard showed ("Logged in as <name>"), and when; the only identity the extension ever uses */
@@ -96,7 +241,22 @@ export interface ClickNote {
   at: string;
 }
 
-export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true };
+export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true, appearance: 'cream' };
+
+/**
+ * 11.0.0: the portal the welcome page offers before anything is stored: the bundled site profile's
+ * ood_base_url (public/profiles/wayne.json), as {origin, hostname}. PortalSettings is written only
+ * when the student presses "Agree and continue" or "Use this portal" and Chrome grants the origin.
+ */
+export function defaultPortalFrom(profile: { ood_base_url?: string; site?: string } | undefined): { origin: string; hostname: string; site: string } | undefined {
+  try {
+    const u = new URL(String(profile?.ood_base_url ?? ''));
+    if (u.protocol !== 'https:') return undefined;
+    return { origin: u.origin, hostname: u.hostname, site: profile?.site || siteFromHostname(u.hostname) };
+  } catch {
+    return undefined;
+  }
+}
 
 /** "ondemand.grid.wayne.edu" -> "wayne": the default site profile name */
 export function siteFromHostname(hostname: string): string {

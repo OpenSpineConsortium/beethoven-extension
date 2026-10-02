@@ -9,11 +9,17 @@
 // asks the portal's job list (another clock), and the Files reads have none; so a full run never
 // refuses one of its own checks, and a check whose clock is still running is skipped with the
 // time left, never failed.
+//
+// 11.0.0: these are Details only ("Details for your lab lead"); a student never needs them. The third
+// check is now the channel (how Beethoven reaches the grid: "direct" from its own background, or "tab"
+// through a page script in a portal tab, and whether the shell asks for a password); nothing here
+// writes through the Files app any more (every write is one of the tool's shell verbs, run by the
+// panel's buttons, not by a check); and the probe is offered as "Check a compute node".
 import type { KV } from './audit';
 import { statementFor, type Statements } from './disclosure';
-import { commands, consentSourceWords, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
+import { commands, consentSourceWords, LOGIN_SETUP_PROVEN, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
-import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, SERVICES_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type IdentityNote, type LoginSeen, type PortalSettings, type Prefs } from './keys';
+import { ACCESS_KEY, CHANNEL_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, SERVICES_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type ChannelNote, type IdentityNote, type LoginSeen, type PortalSettings, type Prefs } from './keys';
 import { accessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import type { PortalApi, SessionInfo } from './portal';
@@ -25,9 +31,7 @@ export interface DiagEnv {
   local: KV;
   session: KV;
   hasOriginPermission(origin: string): Promise<boolean>;
-  /** is a page script answering in a portal tab? */
-  portalAlive(): Promise<boolean>;
-  /** the portal operations, relayed to the page script; undefined when no portal tab is open */
+  /** the portal operations: the background's own client in direct mode, relayed through a portal tab in tab mode; undefined when no portal is connected */
   portal(): PortalApi | undefined;
 }
 
@@ -53,7 +57,7 @@ const SESSION_HOURS = 8;
 
 function portalOf(ctx: DiagCtx): PortalApi {
   const p = ctx.env.portal();
-  if (!p) throw new Error('no portal tab is open');
+  if (!p) throw new Error('no portal is connected');
   return p;
 }
 
@@ -93,7 +97,7 @@ function discoveryOf(ctx: DiagCtx): Discovery | undefined {
 }
 
 /** The sign-in instruction, used wherever a check points at it. */
-export const SIGN_IN_INSTRUCTION = `Choose "Sign in on the cluster": the strip at the top opens a small terminal, asks a compute node for Claude Code's own sign-in, opens Anthropic's sign-in page in a tab, and takes the code that page shows in one box; Claude Code exchanges the code on the compute node and ${PRODUCT_NAME} never sees the credential. Never use setup-token: Remote Control needs a full sign-in.`;
+export const SIGN_IN_INSTRUCTION = `Press "Sign in to Claude" in the panel: the lab's tool asks a compute node for Claude Code's own sign-in, ${PRODUCT_NAME} opens Anthropic's sign-in page in a tab, and the panel takes the code that page shows in one box; Claude Code exchanges the code on the compute node and ${PRODUCT_NAME} never sees the credential. Never use setup-token: Remote Control needs a full sign-in.`;
 
 export function buildNodes(): DiagNode<DiagCtx>[] {
   return [
@@ -103,7 +107,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'access',
       dependsOn: [],
       assumption: "the terms are accepted in this browser; Licensor's access service has confirmed, within the last day (an older answer is kept up to seven days when the service cannot be reached), that the account your portal's dashboard shows is on the approved list; the kill-list is valid and this version is not withdrawn",
-      manualFix: `Open the setup page and accept the terms. If your account is not approved yet, ask for access with the button in the strip; once the maintainer has approved it, click the ${PRODUCT_NAME} button again.`,
+      manualFix: `Open ${PRODUCT_NAME}'s welcome page and accept the terms. If your account is not approved yet, press "Ask for access" in the panel; once the maintainer has approved it, open the panel again.`,
       fixAction: 'open-onboarding',
       futureRisk: 'an approval withdrawn from the list, a withdrawn release, or a service outage longer than seven days changes the answer without any change on the cluster',
       async check(ctx) {
@@ -127,7 +131,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'browser',
       dependsOn: [],
       assumption: 'the student granted this extension access to exactly one origin, their Open OnDemand portal',
-      manualFix: `Open your portal in a tab and click the ${PRODUCT_NAME} button there; the browser asks you to allow that one site.`,
+      manualFix: `On ${PRODUCT_NAME}'s welcome page (or Settings, "Your grid"), press the button that names your portal; the browser asks you to allow that one site.`,
       fixAction: 'connect-portal',
       futureRisk: 'Firefox and Safari let a person revoke a site permission from the address bar; the grant is re-checked at every start',
       async check(ctx) {
@@ -137,27 +141,29 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       },
     },
     {
-      id: 'portal-tab',
-      title: 'Portal tab open',
+      id: 'channel',
+      title: 'How Beethoven reaches the grid',
       layer: 'browser',
       dependsOn: ['origin-granted'],
-      assumption: 'a portal tab is open, so the page script that carries your sign-in can answer (this extension never reads cookies; it works only from your own portal tab)',
-      manualFix: `Open your portal in a tab and keep it open while ${PRODUCT_NAME} works.`,
-      fixAction: 'open-portal',
-      futureRisk: 'a browser that unloads background tabs aggressively makes the page script disappear until the tab is shown again',
+      assumption: `the channel test after the first grid sign-in found how the browser carries the grid sign-in: "direct" (the extension's own background requests and its shell connection carry it, so no portal tab is needed) or "tab" (only its reads carry it; each shell line runs in a page script in a portal tab ${PRODUCT_NAME} opens and closes); and whether the portal's shell reached a prompt without a password`,
+      manualFix: `Sign in to the grid from the panel; the test runs right after. If the shell asks for a password, the panel offers the one-time grid key step when a button needs the shell${LOGIN_SETUP_PROVEN ? '' : ' (that step has not yet been tried on the grid by a student without a key: it is unproven there)'}.`,
+      futureRisk: 'a browser that stops attaching the HTTP sign-in to extension requests, or a portal that moves to a SameSite=Lax cookie, turns "direct" into "tab"; the test runs again after a refused shell connection',
       async check(ctx) {
-        return (await ctx.env.portalAlive()) ? { ok: true, detail: 'the page script answers from your portal tab' } : { ok: false, detail: 'no portal tab is open (or it has not finished loading)' };
+        const c = await ctx.env.local.get<ChannelNote>(CHANNEL_KEY);
+        if (!c || !ctx.settings || c.origin !== ctx.settings.origin) return { ok: false, detail: 'not tested yet: the test runs right after the first grid sign-in' };
+        const shell = c.shell === 'ok' ? 'the shell reached a prompt without a password' : c.shell === 'password' ? 'the shell asked for a password (the one-time grid key step follows a press that needs it)' : 'the shell gave no word either way';
+        return { ok: true, warn: c.shell !== 'ok', detail: `${c.mode} (tested ${c.tested_at.slice(0, 16).replace('T', ' ')} UTC); ${shell}` };
       },
     },
     {
       id: 'signed-in',
       title: 'Portal reachable and signed in',
       layer: 'portal',
-      dependsOn: ['portal-tab'],
-      assumption: 'GET /pun/sys/dashboard/ answers 200 with the dashboard (a redirect to a sign-in page or a VPN page means it does not)',
-      manualFix: `Connect the VPN and sign in to your portal in its tab, then check again. ${PRODUCT_NAME} never signs in for you.`,
+      dependsOn: ['origin-granted'],
+      assumption: 'GET /pun/sys/dashboard/ from the extension\'s background answers 200 with the dashboard (a 401, or a redirect to a sign-in page, means signed out; no answer within 5 s means the grid cannot be reached)',
+      manualFix: `Connect the VPN and press "Sign in" on the Grid row; sign in in your browser's own box. ${PRODUCT_NAME} never signs in for you and never sees what you type there.`,
       fixAction: 'open-portal',
-      futureRisk: 'the portal session lasts about eight hours; a 302 or 401 after that is the sign to sign in again',
+      futureRisk: 'the browser keeps an HTTP sign-in until it closes; a 401 after a browser restart is the sign to sign in again',
       async check(ctx) {
         const s = await portalOf(ctx).session();
         ctx.cache.session = s;
@@ -299,7 +305,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'compute-node',
       dependsOn: ['files', 'login-discovery'],
       assumption: 'a short job (ten minutes at most) on the default partition wrote <state_dir>/probe/probe.json: node-local temp and /dev/shm, user namespaces, the container running, and the reach of api.anthropic.com, platform.claude.com and claude.ai with and without the proxy',
-      manualFix: 'Run "Set up the cluster" (it installs the tool), then "Run the probe job", and check again once the job has finished.',
+      manualFix: 'Press "Check a compute node" below (a short job, ten minutes at most), and run the checks again once it has finished.',
       fixAction: 'run-probe',
       futureRisk: 'egress is the least uniform thing across campuses and can change without notice; the probe is cheap to rerun',
       slow: true,
@@ -352,14 +358,14 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Remote Control consent recorded',
       layer: 'claude',
       dependsOn: ['claude-login'],
-      assumption: 'the student\'s answer to Claude Code\'s one-time "Enable Remote Control?" is on record: Claude Code\'s own settings file (remoteDialogSeen), or the marker file ' + PRODUCT_NAME + ' writes when the data statement is acknowledged; the probe reads that; the image\'s `claude remote-control` accepts the flags the job uses',
-      manualFix: `Make the data statement in the strip at the top: it writes the answer for your worker. ${SIGN_IN_INSTRUCTION} If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
+      assumption: 'the student\'s answer to Claude Code\'s one-time "Enable Remote Control?" is on record: Claude Code\'s own settings file (remoteDialogSeen), or the marker file the lab\'s tool writes when the student ticks the data statement and presses Connect (`hpcworker connect --consent`); the probe reads that; the image\'s `claude remote-control` accepts the flags the job uses',
+      manualFix: `Tick the data statement in the panel and press Connect: the lab's tool records the answer for your worker. ${SIGN_IN_INSTRUCTION} If a running job reports "Couldn't verify Remote Control eligibility", the compute nodes cannot reach Anthropic's feature-flag service; tell your centre.`,
       fixAction: 'acknowledge',
       futureRisk: 'Anthropic can change Remote Control eligibility for a plan class at any time; a running job\'s status.json is where it would show',
       async check(ctx) {
         const p = await probeFile(ctx);
         if (p?.consent_recorded === undefined) return { ok: false, detail: 'the probe did not report on your Remote Control answer' };
-        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" was not on record when the probe ran (the data statement in the strip records it; the job waits for it otherwise)' };
+        if (!p.consent_recorded) return { ok: false, detail: 'your answer to "Enable Remote Control?" was not on record when the probe ran (Connect with the data statement ticked records it; the job waits for it otherwise)' };
         if (p.remote_control_flags === '') {
           // signed out, `claude remote-control --help` prints nothing (measured on the grid, probe of 2026-09-29 04:06Z); that says nothing about the version
           if (!p.claude_auth?.loggedIn) return { ok: true, warn: true, detail: `your answer is ${consentSourceWords(p.consent_source) || 'on record'}; whether this Claude Code can host Remote Control is known once you are signed in (the probe ran signed out; the next probe after the sign-in tells)` };
@@ -393,7 +399,7 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'student',
       dependsOn: ['access'],
       assumption: 'the worker\'s workspace is not marked restricted (no .restricted file in it, read from the workspace\'s listing; no profile flag), and the student read where the transcript goes and made the data statement for this workspace on the text now in force (kept in this browser per workspace; asked again when the text or the workspace changes)',
-      manualFix: 'Read the disclosure in the strip and tick the statement for the worker you will start. A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
+      manualFix: 'Read "Where your work goes" in the panel and tick the statement for the worker you will start. A workspace marked restricted is never started: remove the marker in the portal\'s Files app only if the restriction no longer applies.',
       fixAction: 'acknowledge',
       futureRisk: 'a change of plan class (Team, Enterprise, ZDR) changes what the disclosure must say',
       async check(ctx) {
@@ -407,12 +413,12 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
           else if (await portalOf(ctx).exists(paths.restrictedMarker(sd, name))) restricted = `the workspace of worker "${name}" is marked restricted (.restricted file present)`;
           else markerNote = '; the workspace is not marked restricted';
         } catch {
-          markerNote = '; the restricted marker could not be checked (no portal tab)';
+          markerNote = '; the restricted marker could not be checked (the grid could not be read)';
         }
         if (restricted) return { ok: false, detail: `${restricted}; the worker will not start there` };
         const ack = statementFor(await ctx.env.local.get<Statements>(STATEMENTS_KEY), name);
         if (!ack) return { ok: false, detail: `the data statement has not been made for worker "${name}" on the text now in force${markerNote}` };
-        return { ok: true, warn: !ack.consent_written_at, detail: `statement made for worker "${name}" on ${ack.acknowledged_at.slice(0, 10)}${ack.consent_written_at ? '; the consent marker is written on the cluster' : '; the consent marker is written at the next start'}${markerNote}` };
+        return { ok: true, warn: !ack.consent_recorded_at, detail: `statement made for worker "${name}" on ${ack.acknowledged_at.slice(0, 10)}${ack.consent_recorded_at ? '; the lab\'s tool recorded the Remote Control answer when you pressed Connect' : '; the Remote Control answer is recorded by the next Connect'}${markerNote}` };
       },
     },
     {
@@ -420,8 +426,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Portal session age',
       layer: 'portal',
       dependsOn: ['signed-in'],
-      assumption: 'the portal session lasts about eight hours; after that (or on the first 302/401) the student signs in again in a tab and nothing is cached across the re-login',
-      manualFix: `Sign in to the portal again in its tab. ${PRODUCT_NAME} keeps nothing from the old session.`,
+      assumption: 'the browser keeps the grid sign-in until it closes (an HTTP sign-in), or the portal session lasts about eight hours (a cookie); after that (or on the first 302/401) the student signs in again in the browser\'s own box and nothing is cached across the re-login',
+      manualFix: `Press "Sign in" on the Grid row and sign in in your browser's own box. ${PRODUCT_NAME} keeps nothing from the old session.`,
       fixAction: 'open-portal',
       async check(ctx) {
         const seen = await ctx.env.session.get<{ checked_at: string }>(SESSION_SEEN_KEY);
@@ -435,4 +441,4 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
 }
 
 /** the ids in the report's order; the test pins the graph to it */
-export const CHECK_IDS = ['access', 'origin-granted', 'portal-tab', 'signed-in', 'shell', 'files', 'active-jobs', 'optional-routes', 'reverse-proxy', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'data-classification', 'session-lifetime'];
+export const CHECK_IDS = ['access', 'origin-granted', 'channel', 'signed-in', 'shell', 'files', 'active-jobs', 'optional-routes', 'reverse-proxy', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'data-classification', 'session-lifetime'];

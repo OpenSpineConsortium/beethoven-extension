@@ -1,16 +1,17 @@
-// Starting and stopping the worker, in one place, so the strip, the Details buttons and the
-// background's "start when my portal opens" setting do exactly the same thing. Everything goes
-// through the portal client the caller hands in: the panel passes the relayed one, the
-// background its own.
+// The worker's verbs, in one place, through the portal client the caller hands in (the background's
+// own in direct mode, the page script's in tab mode). 11.0.0: every write is one of the lab's tool's
+// own verbs typed through the shell, never a Files write: the dashboard's Rails origin check would
+// refuse a PUT carrying Origin chrome-extension://.
 //
-// A start is one shell line (`hpcworker worker start`), which the chokepoint classes as a
-// scheduler call: once a minute, refused otherwise. A stop is the framework's stop file, touched
-// through the Files app (no floor: it is a write), and then the tool's own stop line once if the
-// scheduler floor allows it; the job notices the file within seconds, leaves on its own, writes
-// stop.done and ends its own chain, so the extra line is belt and braces, never the mechanism.
+//   start    `exec bash '<shared>/bin/hpcworker' connect …` (the interactive sitting; core/login.ts reads it)
+//   stop     `bash '<shared>/bin/hpcworker' worker stop --name N`: the tool's stop alone
+//   restrict `bash '<shared>/bin/hpcworker' worker restrict --name N`: the restricted marker
+//   status   `bash '<shared>/bin/hpcworker' worker status --name N --json`: one squeue, only while queued
+//
+// The chokepoint (audit.ts) holds the scheduler-class lines (connect, worker status, worker stop) to
+// one a minute; a refusal of that floor is waited out here and retried, never shown to the student.
 import { FloorError } from './audit';
-import { commands, parseJobId, paths, profileRestricts, siteFrom, stateDirFrom, type StatusFile, type WorkerState } from './contract';
-import { ackCovers, ackSubject, consentFileContent, type Acknowledgement } from './disclosure';
+import { commands, parseStatusJson, paths, profileRestricts, siteFrom, stateDirFrom, type ConnectOptions, type StatusFile, type StatusJson, type WorkerState } from './contract';
 import type { PortalApi } from './portal';
 
 export interface ClusterContext {
@@ -21,7 +22,7 @@ export interface ClusterContext {
   profile?: string;
 }
 
-/** home, username, the profile's state directory and site: what a start, a stop or a probe needs to know */
+/** home, username, the profile's state directory and site: what finding a run, a restricted marker or a probe needs to know */
 export async function clusterContext(portal: PortalApi): Promise<ClusterContext> {
   const home = await portal.home();
   const user = (await portal.whoAmI()) ?? home.split('/').filter(Boolean).pop() ?? '';
@@ -41,97 +42,96 @@ export async function restrictedReason(portal: PortalApi, ctx: ClusterContext, w
   return undefined;
 }
 
+const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
- * The framework's fallback consent marker, ~/.hpcworker/consent: written when the student
- * acknowledges the data statement, and again before a start when that write is still owed. Its
- * presence is what lets the job answer Claude Code's one-time question for the student.
+ * Run a scheduler-class or shell line, waiting out a refused floor silently (at most twice): a
+ * clicked button never becomes a refusal the student reads, and never a polling loop either.
  */
-export async function writeConsentFile(portal: PortalApi, home: string, installId: string, at = new Date().toISOString()): Promise<string> {
-  const path = paths.consent(home);
-  await portal.writeFile(path, consentFileContent(at, installId));
-  return path;
-}
-
-export interface StartOpts {
-  name: string;
-  permissionMode: string;
-  /** the site name to fall back on when the profile names none */
-  site: string;
-  /** the acknowledgement for this worker's workspace; the start is refused without one */
-  ack: Acknowledgement | undefined;
-  /** write the consent marker first when the acknowledgement has not been written to the cluster yet */
-  consent?: { installId: string; written: boolean };
-}
-
-export interface StartOutcome {
-  job: string;
-  site: string;
-  stateDir: string;
-  home: string;
-  output: string;
-  /** the tool found the worker's job already pending or running and submitted nothing */
-  alreadyRunning: boolean;
-  /** the consent marker was written by this start */
-  consentWritten: boolean;
-}
-
-export async function startWorker(portal: PortalApi, o: StartOpts): Promise<StartOutcome> {
-  if (!ackCovers(o.ack, ackSubject(o.name))) throw new Error(`Before a start: read "Where your work goes" and make the data statement for worker "${o.name}".`);
-  const ctx = await clusterContext(portal);
-  if (!ctx.profile) throw new Error('the tool is not installed yet on the cluster (it has no profile there): set up the cluster first.');
-  const why = await restrictedReason(portal, ctx, o.name);
-  if (why) throw new Error(`Not started: ${why}.`);
-  let consentWritten = false;
-  if (o.consent && (!o.consent.written || !(await portal.exists(paths.consent(ctx.home))))) {
-    await writeConsentFile(portal, ctx.home, o.consent.installId);
-    consentWritten = true;
+export async function withFloor<T>(fn: () => Promise<T>, sleep: (ms: number) => Promise<void> = realSleep, still: () => boolean = () => true): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    if (!still()) throw new GivenUpError();
+    try {
+      return await fn();
+    } catch (e) {
+      const waitMs = (e as FloorError).waitMs;
+      if (attempt < 2 && (e instanceof FloorError || (e as Error)?.name === 'FloorError') && typeof waitMs === 'number') {
+        await sleep(waitMs + 250);
+        continue;
+      }
+      throw e;
+    }
   }
-  const r = await portal.shell(commands.workerStart(o.name, o.permissionMode), { timeoutMs: 90_000 });
-  const job = parseJobId(r.output);
-  if (!job) throw new Error(`the start command printed no job id (exit ${r.exitCode}); see its output`);
-  return { job, site: ctx.site ?? o.site, stateDir: ctx.stateDir, home: ctx.home, output: r.output, alreadyRunning: /already has job/i.test(r.output), consentWritten };
+}
+
+/** the press a floor wait was for was given up meanwhile (Stop, Cancel, another sign-in): nothing was sent */
+export class GivenUpError extends Error {
+  constructor() {
+    super('given up before it was sent');
+    this.name = 'GivenUpError';
+  }
+}
+
+/** the one connect line for these options (contract.ts commands.connect); throws on a bad value before anything is typed */
+export function connectLine(sharedDir: string, o: ConnectOptions): string {
+  return commands.connect(sharedDir, o);
 }
 
 export interface StopOutcome {
-  /** the stop file was written through the Files app */
-  stopFile: boolean;
-  /** the tool's own stop line ran (exit code and what it printed), when the scheduler floor allowed it */
-  toolStop?: { exitCode: number; output: string };
-  /** what to tell the student, in plain words */
-  note: string;
+  /** the tool said the worker is stopped (exit 0 and "worker <name>: stopped (") */
+  stopped: boolean;
+  exitCode: number;
+  /** what the tool printed, for Details only */
+  output: string;
 }
 
-export async function stopWorker(portal: PortalApi, state: { stateDir: string; run: string; job: string }): Promise<StopOutcome> {
-  let stopFile = false;
-  let note = '';
-  try {
-    await portal.touch(paths.stop(state.stateDir, state.run), state.job);
-    stopFile = true;
-    note = 'The stop file is written; the job ends itself within a few seconds and its chain with it.';
-  } catch (e) {
-    note = `The stop file could not be written (${(e as Error).message}).`;
-  }
-  try {
-    const r = await portal.shell(commands.workerStop(state.run), { timeoutMs: 60_000, job: state.job });
-    note += ` The tool's stop ran (exit ${r.exitCode}).`;
-    return { stopFile, toolStop: { exitCode: r.exitCode, output: r.output }, note };
-  } catch (e) {
-    if (e instanceof FloorError || (e as Error).name === 'FloorError') {
-      note += stopFile ? ` The scheduler was asked less than a minute ago, so it was not asked again; the stop file is enough.` : ` The scheduler was asked less than a minute ago; press Stop again in ${Math.ceil(((e as FloorError).waitMs ?? 60_000) / 1000)} s.`;
-    } else note += ` The tool's stop did not run (${(e as Error).message}).`;
-    if (!stopFile) throw new Error(note);
-    return { stopFile, note };
-  }
+/** The tool's stop alone, through the shell (contract §7.1): the stop file, the job's own leaving, then one scancel if needed. */
+export async function stopByShell(portal: PortalApi, sharedDir: string, name: string, sleep?: (ms: number) => Promise<void>): Promise<StopOutcome> {
+  const line = commands.stop(sharedDir, name);
+  const r = await withFloor(() => portal.shell(line, { timeoutMs: 90_000 }), sleep);
+  return { stopped: r.exitCode === 0 && /^worker \S+: stopped \(/m.test(r.output), exitCode: r.exitCode, output: r.output };
 }
 
-const LIVE: WorkerState[] = ['starting', 'need_login', 'need_consent', 'running', 'online'];
-/** a heartbeat older than this means the job has gone (it writes every 30 s) */
+/** The restricted marker, written by the tool (contract §7.2); it does not stop a running worker. */
+export async function restrictByShell(portal: PortalApi, sharedDir: string, name: string, sleep?: (ms: number) => Promise<void>): Promise<{ marked: boolean; output: string }> {
+  const r = await withFloor(() => portal.shell(commands.restrict(sharedDir, name), { timeoutMs: 45_000 }), sleep);
+  return { marked: r.exitCode === 0 && /^worker \S+: (already )?marked restricted/m.test(r.output), output: r.output };
+}
+
+/** `worker status --json` (contract §6): one JSON line; asks the scheduler once, and only while the run is queued */
+export async function statusByShell(portal: PortalApi, sharedDir: string, name: string, sleep?: (ms: number) => Promise<void>, still?: () => boolean | Promise<boolean>): Promise<StatusJson | undefined> {
+  // the background asks this for itself: when its floor's wait is over, it asks only if the answer is still wanted
+  let wanted = true;
+  const r = await withFloor(
+    async () => {
+      if (still && !(await still())) {
+        wanted = false;
+        return { output: '', exitCode: -1, transcript: '', ms: 0 };
+      }
+      return portal.shell(commands.statusJson(sharedDir, name), { timeoutMs: 45_000 });
+    },
+    sleep,
+  );
+  if (!wanted) return undefined;
+  return parseStatusJson(r.output);
+}
+
+/** the Remote Control answer alone (Details; connect --consent does the same inside connect) */
+export async function recordConsentByShell(portal: PortalApi, sharedDir: string, installId: string, sleep?: (ms: number) => Promise<void>): Promise<boolean> {
+  const r = await withFloor(() => portal.shell(commands.consentRecord(sharedDir, installId), { timeoutMs: 45_000 }), sleep);
+  return r.exitCode === 0 && /^recorded in /m.test(r.output);
+}
+
+/** the states in which a job of the run is alive on the cluster; framework 10's "queued" is one (R2) */
+const LIVE: WorkerState[] = ['queued', 'starting', 'need_login', 'need_consent', 'running', 'online'];
+/** a heartbeat older than this means the job has gone (it writes every 30 s); a queued file has no heartbeat to keep */
 export const STALE_AFTER_MS = 3 * 60_000;
 
-/** Is a worker alive on the cluster, as far as its status file says? */
+/** Is a worker alive on the cluster, as far as its status file says? A queued file is live without a heartbeat (the job has not started). */
 export function workerLive(status: StatusFile | undefined, now = Date.now()): boolean {
   if (!status) return false;
   if (!LIVE.includes(status.state)) return false;
+  if (status.state === 'queued') return true;
   if (!status.updated_at) return true;
   const age = now - new Date(status.updated_at).getTime();
   return !Number.isFinite(age) || age < STALE_AFTER_MS;

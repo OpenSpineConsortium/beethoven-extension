@@ -84,6 +84,29 @@ describe('audit chokepoint', () => {
     expect(classifyCommand('echo hello')).toBe('shell');
   });
 
+  it('11.0.0: recognises the verbs behind the shared copy\'s full path: connect and worker stop on the 60 s floor, worker status on its own 60 s clock, worker restrict and consent --record as shell lines', () => {
+    const S = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
+    expect(classifyCommand(commands.connect(S, { name: 'worker', site: 'wayne', installId: '0123456789abcdef0123456789abcdef', login: 'auto', permissionMode: 'default', chain: true }))).toBe('scheduler');
+    // the background's own question has a clock of its own: it never takes the turn of a Stop or a Connect
+    expect(classifyCommand(commands.statusJson(S, 'worker'))).toBe('status');
+    expect(classifyCommand(commands.stop(S, 'worker'))).toBe('scheduler');
+    expect(classifyCommand(commands.restrict(S, 'worker'))).toBe('shell');
+    expect(classifyCommand(commands.consentRecord(S, '0123456789abcdef0123456789abcdef'))).toBe('shell');
+    expect(classifyCommand(commands.installShared(S, 'wayne'))).toBe('shell');
+    expect(classifyCommand(commands.loginSetup(S))).toBe('shell');
+  });
+
+  it('11.0.0: a shell test has its own short clock, and the record says where the request came from', async () => {
+    const { audit, tick } = clockAudit();
+    await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shelltest', via: 'extension' }, ok('ok'));
+    await expect(audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shelltest' }, ok('ok'))).rejects.toBeInstanceOf(FloorError);
+    tick(1_500);
+    expect(await audit.request({ method: 'WS', endpoint: '/pun/sys/shell/ssh/default', cls: 'shelltest', via: 'page' }, ok('again'))).toBe('again');
+    const rs = await audit.records();
+    expect(rs[0]?.via).toBe('extension');
+    expect(rs.at(-1)?.via).toBe('page');
+  });
+
   it('never stores a token: csrf query values, signed tokens, sk-ant keys and bearer tokens are redacted', async () => {
     const { audit } = clockAudit();
     await audit.request({ method: 'WS', endpoint: 'wss://ood.example/pun/sys/shell/ssh/default?csrf=AbC-123_xyz', cls: 'shell' }, ok(1, 5, 'exit 0; printed ASHLEY1.eyJ2IjoxfQ.c2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJlc2lnbmF0dXJl and sk-ant-api03-SECRET and Bearer eyJhbGciOi'));

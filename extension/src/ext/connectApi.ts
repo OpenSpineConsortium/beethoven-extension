@@ -1,12 +1,15 @@
-// The browser behind core/connect.ts: the one place the extension asks for a permission,
-// registers its page script and loads it into an open tab. Used by the background (toolbar
-// click) and by the strip's own "Connect this portal" button. `permissions.request` itself is
-// called by the caller, synchronously inside the click, and its promise handed in. No Anthropic
-// address ever reaches the browser from here: requestOrigin and registerScript refuse one before
-// the browser is called, and an earlier build's grants on one are removed at start.
+// The browser behind core/connect.ts: the one place the extension asks for a permission and
+// loads its page script into a tab. `permissions.request` itself is called by the page, synchronously
+// inside the click (ext/gesture.ts), through requestOrigin below. No Anthropic address ever reaches the
+// browser from here: requestOrigin and registerScript refuse one before the browser is called, and an
+// earlier build's grants on one are removed at start.
+//
+// 11.0.0 registers no page script: it loads it with scripting.executeScript into the tabs it opened
+// itself, and only while they are on the granted origin (tab mode's action tab, and the grid's terminal
+// tab of the one-time key step). A registration an earlier build left is removed at start.
 import { browser } from 'wxt/browser';
 import { acceptedSettings, ANTHROPIC_REFUSAL, connectSequence, dropAnthropicGrants, guardedRequest, isAnthropicAddress, SCRIPT_FILE, SCRIPT_ID, type ConnectApi, type ConnectOutcome } from '../core/connect';
-import { ACCESS_KEY, IDENTITY_KEY, PORTAL_KEY, PORTAL_TAB_KEY, RUN_KEY, type PortalSettings } from '../core/keys';
+import { ACCESS_KEY, CHANNEL_KEY, GRID_KEY, IDENTITY_KEY, LAST_KNOWN_KEY, PORTAL_KEY, PORTAL_TAB_KEY, PRESS_KEY, RUN_KEY, SIGNIN_TAB_KEY, type PortalSettings } from '../core/keys';
 import type { Answer } from '../core/messages';
 import { local, portalSettings, session } from './storage';
 
@@ -73,8 +76,31 @@ export async function disconnectPortal(): Promise<void> {
   await local.remove(IDENTITY_KEY);
   // the approval was for this account at this portal; the next portal is asked about afresh
   await local.remove(ACCESS_KEY);
+  // how this browser reaches the portal, and the worker last seen there, belong to that portal
+  await local.remove(CHANNEL_KEY);
+  await local.remove(LAST_KNOWN_KEY);
   await session.remove(PORTAL_TAB_KEY);
   await session.remove(RUN_KEY);
+  await session.remove(GRID_KEY);
+  await session.remove(PRESS_KEY);
+  await session.remove(SIGNIN_TAB_KEY);
+}
+
+/** save the portal the student granted (welcome's "Agree and continue", "Use this portal", Settings' "Change"); a new origin forgets what belonged to the old one */
+export async function savePortal(s: PortalSettings): Promise<{ changed: boolean }> {
+  const previous = await portalSettings();
+  if (previous && previous.origin === s.origin) return { changed: false };
+  if (previous) {
+    await browser.permissions.remove({ origins: [`${previous.origin}/*`] }).catch(() => undefined);
+    await local.remove(IDENTITY_KEY);
+    await local.remove(ACCESS_KEY);
+    await local.remove(CHANNEL_KEY);
+    await local.remove(LAST_KNOWN_KEY);
+    await session.remove(RUN_KEY);
+    await session.remove(GRID_KEY);
+  }
+  await local.set(PORTAL_KEY, s);
+  return { changed: true };
 }
 
 export async function originGranted(origin: string): Promise<boolean> {

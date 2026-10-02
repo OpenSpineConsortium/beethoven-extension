@@ -21,13 +21,64 @@
 // framework keeps running it, the panel says "your own copy, version N", and "Set up the cluster
 // again" under Details moves it to the lab's copy where the site has one; nothing here updates it.
 // The site profile is read through `fetchAsset`, which the pages implement with the extension's own URL.
-import { commands, sharedInstallFrom } from './contract';
+//
+// 11.0.0: moment 6 runs this line once, before Connect, when the account does not yet run the lab's
+// shared copy (that is what ticks "Your grid account is ready"); `hpcworker connect` sets the account up
+// itself as a safety net for a returning run. The whole bundled profile is read here too, for the words
+// (bundledProfile: the VPN's name and address, the session title, the help links).
+import { commands, LAUNCHER_TAG, paths, sharedInstallFrom, sharedRootOf, siteProfileFrom, type SiteProfile } from './contract';
 import type { InstallNote } from './keys';
 import type { PortalApi } from './portal';
-import type { Facts } from './steps';
+
+/** what is known of the tool in the student's account (Details' tool line; the setup check) */
+export interface InstallFacts {
+  /** undefined until the home directory has been listed */
+  installed?: boolean;
+  /** the account runs the lab's shared copy (~/.hpcworker/shared names its folder); its VERSION as the Files app read it, or why it could not be read */
+  shared?: { dir: string; version?: string; unreadable?: string };
+  /** the VERSION of the account's own copy (~/.hpcworker/VERSION), when it still runs one set up by a build before 8.0.0 */
+  version?: string;
+  /** the shared folder the bundled site profile names: the one way the tool is set up */
+  sharedRoot?: string;
+  /** why the account cannot use a lab's shared copy, for Details */
+  noSharedCopy?: string;
+  installing?: boolean;
+  failed?: string;
+}
 
 /** where a site's profile sits in the package (scripts/sync-profiles.mjs writes public/profiles/) */
 export const profileAsset = (site: string): string => `/profiles/${site}.json`;
+
+/** the whole site profile this build carries for a site, or undefined when it carries none */
+export async function bundledProfile(site: string, fetchAsset: (path: string) => Promise<Response>): Promise<SiteProfile | undefined> {
+  if (!/^[A-Za-z0-9_-]+$/.test(String(site ?? ''))) return undefined;
+  try {
+    const res = await fetchAsset(profileAsset(site));
+    if (!res.ok) return undefined;
+    return siteProfileFrom(await res.text());
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Does the account already run the lab's shared copy that `sharedDir` names? The marker names that
+ * folder, the launcher carries its tag, and the profile is there. Read through the Files app (reads
+ * only); a read that fails says "unknown", never "no".
+ */
+export async function usesSharedCopy(portal: PortalApi, sharedDir: string): Promise<boolean | undefined> {
+  try {
+    const home = await portal.home();
+    if (!(await portal.exists(paths.profile(home)))) return false;
+    const marker = ((await portal.readFileIfExists(paths.sharedMarker(home))) ?? '').trim();
+    if (!marker || sharedRootOf(marker) !== sharedRootOf(sharedDir)) return false;
+    const launcher = await portal.readFileIfExists(paths.bin(home));
+    if (launcher === undefined) return false;
+    return (launcher.split('\n')[1] ?? '').trim() === LAUNCHER_TAG;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * The shared folder the site profile this build carries names ("shared_install" in
@@ -178,7 +229,7 @@ export function installNoteOf(r: InstallOutcome, at: Date): InstallNote {
  * could not be used, why; or, for an own copy at a site with a shared folder, that the button moves
  * the account to it. Empty until the home was read.
  */
-export function toolWords(install: Facts['install'] | undefined, note?: InstallNote): string[] {
+export function toolWords(install: InstallFacts | undefined, note?: InstallNote): string[] {
   if (!install || install.installed === undefined) return [];
   if (!install.installed) {
     const lines = [`tool: not set up yet${install.sharedRoot ? '; your lab keeps a shared copy' : ''}`];

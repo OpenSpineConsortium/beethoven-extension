@@ -1,0 +1,8 @@
+/* the fixture gallery: development builds only. gallery.ts imports this file, so a production build,
+   which carries no gallery, carries none of these rules either. */
+.gallery { padding: 24px; display: flex; flex-wrap: wrap; gap: 28px 20px; background: var(--paper-deep); min-height: 100vh; }
+.gallery h1 { width: 100%; font: 500 28px var(--font-display); }
+.gallery figure { margin: 0; }
+.gallery figcaption { font: 12px var(--font-mono); color: var(--ink-soft); margin-bottom: 6px; }
+.gallery iframe { display: block; width: 360px; height: 658px; border: 0; border-radius: 6px; background: var(--paper); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08); }
+.gallery a { font: 12px var(--font-mono); }

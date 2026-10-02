@@ -22,7 +22,7 @@ function area(): Area {
   };
 }
 
-const seen = { request: [] as unknown[], remove: [] as unknown[], getAll: 0, register: [] as unknown[], unregister: 0, execute: [] as unknown[] };
+const seen = { request: [] as unknown[], remove: [] as unknown[], getAll: 0, register: [] as unknown[], unregister: 0, execute: [] as unknown[], order: [] as string[] };
 let held: string[] = [];
 const tabUrls = new Map<number, string | undefined>();
 let registered: Array<{ id: string; matches: string[] }> = [];
@@ -30,6 +30,7 @@ const local = area();
 const fake = {
   permissions: {
     request: (o: { origins: string[] }) => {
+      seen.order.push('permissions.request');
       seen.request.push(o);
       return Promise.resolve(true);
     },
@@ -63,16 +64,24 @@ const fake = {
     get: async (id: number) => ({ id, url: tabUrls.get(id) }),
   },
   storage: { local, session: area() },
+  sidePanel: {
+    open: (o: { windowId?: number }) => {
+      seen.order.push(`sidePanel.open ${o.windowId}`);
+      return Promise.resolve();
+    },
+  },
 };
 
 let api: typeof import('../src/ext/connectApi');
 let storage: typeof import('../src/ext/storage');
+let gesture: typeof import('../src/ext/gesture');
 
 beforeAll(async () => {
   // wxt/browser picks globalThis.chrome when there is no globalThis.browser with a runtime id; it reads it once, at import
   vi.stubGlobal('chrome', fake);
   api = await import('../src/ext/connectApi');
   storage = await import('../src/ext/storage');
+  gesture = await import('../src/ext/gesture');
 });
 
 beforeEach(() => {
@@ -82,6 +91,7 @@ beforeEach(() => {
   seen.register = [];
   seen.unregister = 0;
   seen.execute = [];
+  seen.order = [];
   tabUrls.clear();
   held = [];
   registered = [];
@@ -164,5 +174,35 @@ describe('ext/connectApi.ts', () => {
     expect(registered).toEqual([]);
     await local.set({ [PORTAL_KEY]: PORTAL });
     expect(await storage.portalSettings()).toEqual(PORTAL);
+  });
+});
+
+// 11.0.0: the welcome page's one press (ext/gesture.ts). Both calls go out inside the click, in the same
+// turn, before anything is awaited (a gesture survives no await): the panel for the window, and the one
+// origin. An Anthropic address opens nothing and asks for nothing.
+describe('ext/gesture.ts', () => {
+  it('"Agree and continue" opens the panel for the window and asks for the one origin, both before anything is awaited', async () => {
+    const g = gesture.agreeGesture({ windowId: 12, origin: PORTAL.origin });
+    expect(seen.order).toEqual(['sidePanel.open 12', 'permissions.request']);
+    expect(seen.request).toEqual([{ origins: [`${PORTAL.origin}/*`] }]);
+    await expect(g.panel).resolves.toBe(true);
+    await expect(g.granted).resolves.toBe(true);
+    expect(gesture.hasPanel()).toBe(true);
+  });
+
+  it('an Anthropic address opens no panel and asks the browser for nothing', async () => {
+    for (const o of ['https://claude.ai', 'https://api.anthropic.com', 'https://www.claude.com']) {
+      const g = gesture.agreeGesture({ windowId: 12, origin: o });
+      await expect(g.panel, o).resolves.toBe(false);
+      await expect(g.granted, o).resolves.toBe(false);
+    }
+    expect(seen.order).toEqual([]);
+    expect(seen.request).toEqual([]);
+  });
+
+  it('"Use this portal" asks for the origin alone, in the same turn', () => {
+    void gesture.portalGesture('https://ood.example.edu');
+    expect(seen.request).toEqual([{ origins: ['https://ood.example.edu/*'] }]);
+    expect(seen.order).toEqual(['permissions.request']);
   });
 });

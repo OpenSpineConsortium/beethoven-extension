@@ -118,15 +118,17 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-09-30 and extension 8.0.0 `LICENSE.txt` is version 7 and `PRIVACY.md` version
-  8, which add the shared copy as the only install, one installation per approved account with the
+  Edition; since 2026-10-01 and extension 11.0.0 `LICENSE.txt` is version 8 and `PRIVACY.md` version
+  9, which describe 11.0.0's first run (one tick with "Show terms" optional, no scroll gate; the
+  grid sign-in in the browser's own box; the one-time grid key step; the acceptance history and the
+  installation identifier in Settings) on top of version 7 and 8, which added the shared copy as the only install, one installation per approved account with the
   installation identifier in the approval check, the request page's Google account, purpose,
   optional CV (deleted twelve months after the decision) and mailbox confirmation, and the private
   Chrome Web Store listing as the only channel; both describe the software as built (no keys; the
   approval check against the access service with the account name the portal shows and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 7 to match, with `TERMS_DATE` 2026-09-30; the framework's
+  `extension/src/core/terms.ts` is 8 to match, with `TERMS_DATE` 2026-10-01; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and

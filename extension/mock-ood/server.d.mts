@@ -34,8 +34,86 @@ export interface MockPortalOptions {
   seats?: Record<string, string>;
   /** false plays the service with REQUIRE_INSTALL_ID "0" (the CLI's --install-optional): an approved account asking without an installation identifier is approved; default true, which answers reason "update_required" */
   requireInstallId?: boolean;
+  /** the access stand-in's answer for every account; "list" (default) is the per-account behaviour above; /_mock/access?mode= changes it while running */
+  accessMode?: 'list' | 'approved' | 'denied' | 'other-installation' | 'other-account' | 'update-required' | 'withdrawn' | 'down';
+  /** "cookie" (default; the identity-provider stand-in at /login) or "basic" (the live portal: 401 Basic realm="private" on /pun/* and the shell handshake) */
+  auth?: 'cookie' | 'basic';
+  /** the Basic password; default MOCK_PASSWORD, else "mockpass" */
+  password?: string;
+  /** the session cookie's SameSite in cookie mode; default "lax" (10.0.0's mock); "none" adds Secure */
+  sameSite?: 'lax' | 'none' | 'strict' | string;
+  /** AM2: every shell asks for the password until login-setup has authorised the OnDemand server's address */
+  keyless?: boolean;
+  /** the Shell page: "stub" (the token script only), "xterm" (a working terminal with xterm.js's helper textarea), "hterm" (a working terminal without it); default xterm when keyless, else stub */
+  terminal?: 'stub' | 'xterm' | 'hterm';
+  /** each prompt sets the terminal title (OSC 0 "<user>@<host>:~"); default true */
+  shellTitle?: boolean;
+  /** each prompt turns on bracketed paste; default false (CentOS 7's bash does not) */
+  bracketedPaste?: boolean;
+  /** OnDemand's inactivity limit (default 300), maximum session (3600) and sweep period (30), in seconds */
+  shellIdleS?: number;
+  shellMaxS?: number;
+  shellSweepS?: number;
+  /** run the job clock (lib/jobsim.mjs) once a second; default true */
+  simulate?: boolean;
+  /** the stand-in tool's knobs (MOCK_QUEUE_S and the rest, lib/tool.mjs); undefined keeps the server's own environment */
+  queueS?: number | string;
+  queueReason?: string;
+  queueExpect?: 'estimate' | 'none';
+  startS?: number | string;
+  signinWaitS?: number | string;
+  allocWaitS?: number | string;
+  codeWaitS?: number | string;
+  keepaliveS?: number | string;
+  plan?: string;
+  email?: string;
+  /** the account starts signed in to Claude (MOCK_LOGGED_IN) */
+  claudeSignedIn?: boolean;
+  loginFail?: boolean;
+  codeReject?: number | string;
+  consent?: boolean;
+  sbatchFail?: boolean;
+  renewS?: number | string;
+  renewQueueS?: number | string;
+  abandonS?: number | string;
+  reconnectAfterS?: number | string;
   tls?: { cert: string; key: string };
   log?: (line: string) => void;
+}
+
+/** one request or WebSocket handshake the mock answered (/_mock/log) */
+export interface MockRequestRecord {
+  t: string;
+  kind: 'http' | 'ws';
+  method: string;
+  /** path and query, the shell token redacted */
+  path: string;
+  /** the sign-in it carried: "good" / "bad" / "none" (basic), "cookie" / "none" / "open" (cookie) */
+  auth: string;
+  origin: string;
+  site: string;
+  mode: string;
+  status: number;
+}
+
+/** one shell (/_mock/log) */
+export interface MockShellRecord {
+  id: number;
+  host: string;
+  origin: string;
+  opened: string;
+  closed: string | null;
+  closeCode: number | null;
+  closeReason: string;
+  /** "exit", "exec", "idle", "max", "password", "interrupted" or "" */
+  ended: string;
+  /** "none", "asked", "accepted", "refused": never what was typed */
+  password: string;
+  /** the command lines typed at the prompt (never what was typed into a running command) */
+  lines: string[];
+  inputFrames: number;
+  keepalives: number;
+  bytesToCommand: number;
 }
 
 export interface MockPortal {
@@ -58,6 +136,11 @@ export interface MockPortal {
   sharedInstall?: string;
   /** the directory on disk behind it */
   sharedDir?: string;
+  /** the Authorization header of a signed-in request in auth basic */
+  basicAuth: string;
+  auth: 'cookie' | 'basic';
+  /** Wayne State's state folder (/rs/rs_grp_oschome/<user>) and where it is on disk */
+  rsRoot: { virtual: string; dir: string };
   state: {
     coldDone: boolean;
     shells: number;
@@ -75,11 +158,26 @@ export interface MockPortal {
     conflicts: Record<string, number>;
     /** the content-type, origin and cookie headers each POST carried */
     accessHeaders: Array<{ 'content-type': string; origin: string; cookie: string }>;
+    accessMode: string;
+    keepaliveFrames: number;
+    idleKills: number;
+    passwordPrompts: number;
+    passwordFailures: number;
+    typedAtPasswordPrompt: number;
+    requests: MockRequestRecord[];
+    shellLog: MockShellRecord[];
+    simulator: string[];
   };
   close(): Promise<void>;
 }
 
 export function createMockPortal(opts?: MockPortalOptions): Promise<MockPortal>;
+
+/** the address every shell's SSH_CONNECTION names as the client: the OnDemand server */
+export const SSH_CLIENT: string;
+
+/** the access stand-in's modes */
+export const ACCESS_MODES: string[];
 
 /** where the CLI keeps the lab's shared copy when neither --shared-install PATH nor MOCK_SHARED_INSTALL names one */
 export const DEFAULT_SHARED_INSTALL: string;

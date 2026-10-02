@@ -1,14 +1,18 @@
 // browser.storage as the KV the core modules expect, plus the few typed reads the pages share.
 // storage.local holds only what the report allows to be durable (portal hostname and origin,
 // preferences, the acceptance record, the access service's last answer, the audit log, the last
-// good kill-list, the per-workspace data statement and the small notes the strip keeps: links it
-// opened, the last sign-in it saw, the probe it submitted); storage.session holds connection state.
+// good kill-list, the per-workspace data statement, and 11.0.0's notes: the worker's last known
+// state and link, how the portal is reached, the last five waits, the tour and the one-time tips);
+// storage.session holds connection state (the run, the grid's last check, a waiting press, the tabs
+// Beethoven opened, Show log's activity). Each key is named in PRIVACY.md (core/keys.ts).
 import { browser } from 'wxt/browser';
 import type { KV } from '../core/audit';
 import { acceptedSettings } from '../core/connect';
 import { DEFAULT_PREFS, INSTALL_ID_KEY, PORTAL_KEY, PREFS_KEY, type PortalSettings, type Prefs } from '../core/keys';
 
-function area(a: { get(keys: string): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void>; remove(keys: string): Promise<void> }): KV & { remove(key: string): Promise<void> } {
+type RawArea = { get(keys: string | string[]): Promise<Record<string, unknown>>; set(items: Record<string, unknown>): Promise<void>; remove(keys: string): Promise<void> };
+
+function area(a: RawArea): KV & { remove(key: string): Promise<void>; many(keys: string[]): Promise<Record<string, unknown>> } {
   return {
     async get<T>(key: string): Promise<T | undefined> {
       const r = await a.get(key);
@@ -19,6 +23,10 @@ function area(a: { get(keys: string): Promise<Record<string, unknown>>; set(item
     },
     async remove(key: string): Promise<void> {
       await a.remove(key);
+    },
+    /** several keys in one read */
+    async many(keys: string[]): Promise<Record<string, unknown>> {
+      return a.get(keys);
     },
   };
 }

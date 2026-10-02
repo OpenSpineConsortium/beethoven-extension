@@ -11,11 +11,10 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { Audit, FloorError } from '../src/core/audit';
 import { commands, isClaudeAuthUrl, isEnvironmentUrl, parseJobId, parseRegistration, paths, siteFrom, stateDirFrom } from '../src/core/contract';
-import { makeAcknowledgement, type Acknowledgement } from '../src/core/disclosure';
 import { LoginWatcher } from '../src/core/login';
 import { PortalClient, PortalError } from '../src/core/portal';
 import { runShellCommand, ShellError } from '../src/core/shell';
-import { startWorker, stopWorker } from '../src/core/worker';
+import { clusterContext, restrictedReason } from '../src/core/worker';
 import { createMockPortal } from '../mock-ood/server.mjs';
 import { cookieNet, memoryKV } from './helpers';
 
@@ -31,7 +30,13 @@ function client(p: Portal, net = cookieNet(p.cookie, p.origin), opts: { warmDela
   return { client: new PortalClient(p.origin, net, audit, { shellHost: 'default', ...opts }), audit };
 }
 
-const ACK: Acknowledgement = makeAcknowledgement('worker');
+/** the stand-in tool's own start (as 10.0.0 typed it; the mock's worker writes the files the extension reads) */
+async function startWorker(c: PortalClient, name: string): Promise<{ job: string; alreadyRunning: boolean }> {
+  const r = await c.shell(commands.workerStart(name, 'default'), { timeoutMs: 90_000 });
+  const job = parseJobId(r.output);
+  if (!job) throw new Error(`the start printed no job id: ${r.output}`);
+  return { job, alreadyRunning: /already has job/i.test(r.output) };
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 beforeAll(async () => {
@@ -307,10 +312,8 @@ describe('portal client against the mock portal', () => {
     it('worker start writes status.json, connection.json and rc.log with the registration block; a second start finds the job', async () => {
       const { client: c } = client(mock);
       clock.advance(61_000);
-      const start = await startWorker(c, { name: 'worker', permissionMode: 'default', site: 'fallback', ack: ACK });
+      const start = await startWorker(c, 'worker');
       expect(start.job).toMatch(/^\d+$/);
-      expect(start.site).toBe('mock');
-      expect(start.stateDir).toBe(stateDir);
       expect(start.alreadyRunning).toBe(false);
       const status = JSON.parse((await c.readFileIfExists(paths.status(stateDir, 'worker')))!);
       expect(status.state).toBe('online');
@@ -337,7 +340,7 @@ describe('portal client against the mock portal', () => {
       expect(reg.capacity).toBe('1/32');
       // a second start finds the running job instead of submitting another
       clock.advance(61_000);
-      const again = await startWorker(c, { name: 'worker', permissionMode: 'default', site: 'fallback', ack: ACK });
+      const again = await startWorker(c, 'worker');
       expect(again.job).toBe(start.job);
       expect(again.alreadyRunning).toBe(true);
     }, SLOW);
@@ -345,7 +348,7 @@ describe('portal client against the mock portal', () => {
     it('the environment link is the same for every worker on this login', async () => {
       const { client: c } = client(mock);
       clock.advance(61_000);
-      const second = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis') });
+      const second = await startWorker(c, 'thesis');
       const a = JSON.parse((await c.readFileIfExists(paths.connection(stateDir, 'worker')))!);
       const b = JSON.parse((await c.readFileIfExists(paths.connection(stateDir, 'thesis')))!);
       expect(b.environment_url).toBe(a.environment_url);
@@ -353,25 +356,19 @@ describe('portal client against the mock portal', () => {
       expect(second.job).not.toBe(a.job);
     }, SLOW);
 
-    it('stop right after a start: the stop file is written through the Files app and the scheduler is not asked again', async () => {
+    it('stop right after a start: the tool\'s own stop line waits out the scheduler clock (11.0.0 writes no stop file through the Files app)', async () => {
       const { client: c } = client(mock);
       clock.advance(61_000);
       // one client, as in the browser (the clocks live in storage.local there): the start a moment ago
-      // holds the scheduler clock, so the stop file is the mechanism and the tool line waits
-      const started = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis') });
+      // holds the scheduler clock, so the stop line is refused now and runs a minute later
+      const started = await startWorker(c, 'thesis');
       expect(started.alreadyRunning).toBe(true);
-      const out = await stopWorker(c, { stateDir, run: 'thesis', job: started.job });
-      expect(out.stopFile).toBe(true);
-      expect(out.toolStop).toBeUndefined();
-      expect(out.note).toMatch(/stop file is written/);
-      expect(out.note).toMatch(/asked less than a minute ago/);
-      expect(await c.readFileIfExists(paths.stop(stateDir, 'thesis'))).toBe('');
-      // a minute later the tool's own stop runs as well, once
+      await expect(c.shell(commands.workerStop('thesis'), { timeoutMs: 60_000 })).rejects.toBeInstanceOf(FloorError);
+      expect(await c.readFileIfExists(paths.stop(stateDir, 'thesis'))).toBeUndefined();
       clock.advance(61_000);
-      const later = await stopWorker(c, { stateDir, run: 'thesis', job: started.job });
-      expect(later.stopFile).toBe(true);
-      expect(later.toolStop?.exitCode).toBe(0);
-      expect(later.toolStop?.output).toMatch(/left on its own/);
+      const later = await c.shell(commands.workerStop('thesis'), { timeoutMs: 60_000 });
+      expect(later.exitCode).toBe(0);
+      expect(later.output).toMatch(/^worker \S+: stopped \(/m);
       expect(await c.readFileIfExists(paths.stopDone(stateDir, 'thesis'))).toBeDefined();
     }, SLOW);
 
@@ -379,32 +376,19 @@ describe('portal client against the mock portal', () => {
       const { client: c } = client(mock);
       const job = (await c.readFileIfExists(paths.jobId(stateDir, 'worker')))!.trim();
       clock.advance(61_000);
-      const stop = await stopWorker(c, { stateDir, run: 'worker', job });
-      expect(stop.toolStop?.exitCode).toBe(0);
+      const stop = await c.shell(commands.workerStop('worker'), { timeoutMs: 60_000 });
+      expect(stop.exitCode).toBe(0);
       const status = JSON.parse((await c.readFileIfExists(paths.status(stateDir, 'worker')))!);
       expect(status.state).toBe('stopped');
       clock.advance(61_000);
       expect((await c.activeJobs()).jobs.some((j) => j.pbsid === job)).toBe(false);
-      // the student's own marker: the extension refuses before typing anything, and so does the tool
+      // the student's own marker (arranged here through the Files app): the extension reads it from the listing, and the tool refuses
       await c.touch(paths.restrictedMarker(stateDir, 'worker'));
+      expect(await restrictedReason(c, await clusterContext(c), 'worker')).toMatch(/marked restricted/);
       clock.advance(61_000);
-      const before = mock.state.shells;
-      await expect(startWorker(c, { name: 'worker', permissionMode: 'default', site: 'mock', ack: ACK })).rejects.toThrow(/marked restricted/);
-      expect(mock.state.shells).toBe(before);
       const r = await c.shell(commands.workerStart('worker', 'default'), { timeoutMs: 30_000 });
       expect(r.exitCode).not.toBe(0);
       expect(r.output).toMatch(/marked restricted/);
-    }, SLOW);
-
-    it('a start writes the consent marker for the student\'s acknowledgement when it is not on the cluster yet', async () => {
-      const { client: c } = client(mock);
-      const consent = paths.consent(await c.home());
-      expect(await c.exists(consent)).toBe(false);
-      clock.advance(61_000);
-      const out = await startWorker(c, { name: 'thesis', permissionMode: 'default', site: 'mock', ack: makeAcknowledgement('thesis'), consent: { installId: 'install0001', written: false } });
-      expect(out.consentWritten).toBe(true);
-      expect(await c.exists(consent)).toBe(true);
-      expect(await c.readFile(consent)).toMatch(/^yes 20\d\d-\S+ install0001\n$/);
     }, SLOW);
 
     it('the login terminal: the plain sitting prints AUTH-URL, takes the typed code, ends with SIGNED-IN; the audit keeps byte counts and never the code', async () => {

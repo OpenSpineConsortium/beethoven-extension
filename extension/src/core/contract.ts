@@ -41,6 +41,18 @@
 //                                             student acknowledges the data statement ("yes <iso> <install id>")
 // At Wayne State shared_state_dir is /rs/rs_grp_oschome/$USER/hpcworker (CephFS), not the home.
 //
+// Framework 10 (for Beethoven 11.0.0; docs/V11_CONTRACT.md is the wire contract, exact to the
+// character, and wins over this comment where they differ) adds, without moving anything above:
+//   <state_dir>/<name>/progress.log           one plain line per event: "<ISO-8601 UTC> <sentence>", from a fixed set (PROGRESS)
+//   <state_dir>/<name>/node                   the compute node's short name, written by the job as its first act; removed by
+//                                             `worker start` right after a submit, so a fresh one means "this job has a computer"
+//   status.json state "queued"                written by `worker start` the moment the scheduler accepts the job, with submitted_at
+//   status.json submitted_at, got_computer_at, online_at, ends_at, renewal, title, stop_reason, and, while queued,
+//                                             scheduler_state, reason, expected_start, checked_at (from `worker status`)
+//   the verbs  connect, worker status --json (v 1), worker restrict, claude consent --record, login-setup [--remove]
+// Every 11.0.0 command line names the lab's shared copy by its full path (toolPath), never the
+// launcher in ~/.hpcworker/bin, so that the first `connect` works on an account not set up yet.
+//
 // Whether a file exists is learned from the JSON listing of its directory (files[] names), never from
 // a download: the Files app answers a download of a missing file with 200 and an HTML page.
 //
@@ -78,7 +90,63 @@ export const paths = {
   sharedMarker: (home: string) => `${home}/${FRAMEWORK_DIR}/shared`,
   /** the shared copy's own VERSION: the lab's copy is the one that counts (the package carries none) */
   sharedVersion: (dir: string) => `${dir}/VERSION`,
+  /** framework 10: the run's plain-words event log (PROGRESS), read for Show log and Details only */
+  progressLog: (stateDir: string, name: string) => `${stateDir}/${name}/progress.log`,
+  /** framework 10 (written since framework 2, removed at submit since framework 10): one line, the compute node's short name */
+  node: (stateDir: string, name: string) => `${stateDir}/${name}/node`,
 };
+
+/** the framework version that first has `connect`, status.json "queued", `worker status --json` v 1, `worker restrict`, `claude consent --record` and `login-setup` */
+export const FRAMEWORK_CONNECT_VERSION = 10;
+
+/**
+ * The tool as every 11.0.0 command line names it: the lab's shared copy by its full path. `sharedDir`
+ * has passed sharedRootOf (absolute; letters, digits and . _ + - only), so it needs no quoting.
+ */
+export function toolPath(sharedDir: string): string {
+  return `${sharedDir}/bin/hpcworker`;
+}
+
+/** how `connect` treats the Claude sign-in (V11_CONTRACT.md, "connect") */
+export type LoginMode = 'auto' | 'always' | 'fresh' | 'never';
+
+export type PermissionMode = 'default' | 'acceptEdits' | 'plan';
+
+/** what the extension hands `commands.connect`; every field is checked before it reaches a command line */
+export interface ConnectOptions {
+  /** the worker's name: ^[A-Za-z0-9_-]{1,32}$ */
+  name: string;
+  /** the site profile's name ("wayne"), for setting up an account that has none */
+  site: string;
+  /** this installation's 32 hex characters; given only when the data statement for this worker is in force (writes the Remote Control answer) */
+  installId?: string;
+  login: LoginMode;
+  permissionMode: PermissionMode;
+  /** "Keep my worker running": false adds --no-chain */
+  chain: boolean;
+}
+
+const WORKER_NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
+const SITE_RE = /^[a-z0-9-]{1,32}$/;
+const INSTALL_RE = /^[0-9a-f]{32}$/;
+const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
+const LOGINS: readonly LoginMode[] = ['auto', 'always', 'fresh', 'never'];
+
+/**
+ * The only line the portal page script will ever type into a terminal page (AM2): the login-setup
+ * line and nothing else. The page script checks a line against this before it dispatches anything.
+ */
+export const LOGIN_SETUP_LINE_RE = /^bash (\/[A-Za-z0-9._+-]+)+\/bin\/hpcworker login-setup$/;
+
+/** LOGIN_SETUP_LINE_RE, and the folder before /bin/hpcworker passes sharedRootOf (no "." or ".." segment) */
+export function isLoginSetupLine(line: unknown): line is string {
+  if (typeof line !== 'string' || !LOGIN_SETUP_LINE_RE.test(line)) return false;
+  const dir = line.slice('bash '.length, line.length - '/bin/hpcworker login-setup'.length);
+  return sharedRootOf(dir) === dir;
+}
+
+/** AM2's one-time key step has not yet been tried on the real grid by a student without a key: Details says so while this is false */
+export const LOGIN_SETUP_PROVEN = false;
 
 /**
  * A shared folder the extension will name on a command line: absolute, made of letters, digits and
@@ -191,6 +259,52 @@ export const commands = {
   claudeLoginPlain: `bash ${HPCWORKER} claude login --plain`,
   /** kept as an alias that explains; the login command covers it */
   claudeConsent: `bash ${HPCWORKER} claude consent`,
+
+  // ---- 11.0.0 (framework 10). V11_CONTRACT.md, "Command lines". Each is exactly one line and names
+  // the lab's shared copy by its full path. `connect` is the only interactive one: it is typed into an
+  // open shell (shell.ts openShell) with `exec`, so the ssh session ends when connect ends and nothing
+  // is left on the login node; the others go through the framed runShellCommand. Each builder throws
+  // on an argument that fails its check, so a bad value never reaches a shell.
+
+  connect(sharedDir: string, o: ConnectOptions): string {
+    if (!sharedRootOf(sharedDir)) throw new Error('no usable shared copy');
+    if (!WORKER_NAME_RE.test(o.name)) throw new Error('worker name must be letters, digits, _ or -');
+    if (!SITE_RE.test(o.site)) throw new Error('site profile name must be lower-case letters, digits or -');
+    if (o.installId !== undefined && !INSTALL_RE.test(o.installId)) throw new Error('installation id must be 32 hex characters');
+    if (!LOGINS.includes(o.login)) throw new Error('unknown login mode');
+    if (!MODES.includes(o.permissionMode)) throw new Error('unknown permission mode');
+    return `exec bash '${toolPath(sharedDir)}' connect --name '${o.name}' --profile '${o.site}'${o.installId ? ` --consent '${o.installId}'` : ''} --login '${o.login}' --permission-mode '${o.permissionMode}'${o.chain ? '' : ' --no-chain'}`;
+  },
+  /** one JSON line (StatusJson); asks the scheduler once, and only while the run is queued */
+  statusJson(sharedDir: string, name: string): string {
+    if (!sharedRootOf(sharedDir) || !WORKER_NAME_RE.test(name)) throw new Error('bad status arguments');
+    return `bash '${toolPath(sharedDir)}' worker status --name '${name}' --json`;
+  },
+  /** the tool's stop alone (the stop file, the job's own leaving, then one scancel if needed); prints "worker <name>: stopped (...)" */
+  stop(sharedDir: string, name: string): string {
+    if (!sharedRootOf(sharedDir) || !WORKER_NAME_RE.test(name)) throw new Error('bad stop arguments');
+    return `bash '${toolPath(sharedDir)}' worker stop --name '${name}'`;
+  },
+  /** the restricted marker, written by the tool; prints "worker <name>: marked restricted ..." or "worker <name>: already marked restricted" */
+  restrict(sharedDir: string, name: string): string {
+    if (!sharedRootOf(sharedDir) || !WORKER_NAME_RE.test(name)) throw new Error('bad restrict arguments');
+    return `bash '${toolPath(sharedDir)}' worker restrict --name '${name}'`;
+  },
+  /** the Remote Control answer alone, non-interactive (connect --consent does the same inside connect) */
+  consentRecord(sharedDir: string, installId: string): string {
+    if (!sharedRootOf(sharedDir) || !INSTALL_RE.test(installId)) throw new Error('bad consent arguments');
+    return `bash '${toolPath(sharedDir)}' claude consent --record '${installId}'`;
+  },
+  /**
+   * AM2: the one line the student's own terminal runs once (Beethoven types it for them, or they
+   * paste it from the clipboard). Unquoted on purpose: the student may read it ("What does the line
+   * do?"), and sharedRootOf has already refused anything that would need quotes. UNPROVEN ON THE
+   * GRID until a student without a key has tried it (LOGIN_SETUP_PROVEN).
+   */
+  loginSetup(sharedDir: string): string {
+    if (!sharedRootOf(sharedDir)) throw new Error('no usable shared copy');
+    return `bash ${toolPath(sharedDir)} login-setup`;
+  },
 };
 
 /**
@@ -238,7 +352,284 @@ export function parseLoginLine(line: string): LoginEvent | undefined {
   return undefined;
 }
 
-export type WorkerState = 'starting' | 'need_login' | 'need_consent' | 'running' | 'online' | 'stopped' | 'preempted' | 'error' | 'unknown';
+// ---- framework 10: the lines `hpcworker connect` prints (V11_CONTRACT.md, "connect") --------------
+
+/**
+ * The keepalive: printed as a whole line at least every 20 s while connect waits on anything in its
+ * sign-in part (the computer for the sitting, the link, the code), and only under connect (`claude
+ * login --plain`, which 10.0.0 types, stays silent as in framework 9). It keeps the portal's shell
+ * from closing an idle connection (OOD counts output as activity; OOD_SHELL_INACTIVE_TIMEOUT_MS is
+ * 300 s by default). The extension ignores it, and removes it wherever it appears in a line in case
+ * it was glued to another line's text.
+ */
+export const KEEPALIVE_LINE = 'HPCW-LOGIN: still waiting';
+
+/** the failure codes of `HPCW-STEP failed <code> <sentence>`; anything else reads as "other" */
+export type StepFailCode = 'usage' | 'setup' | 'restricted' | 'refused' | 'signin-node' | 'signin-code' | 'signin-timeout' | 'signin' | 'other';
+
+const FAIL_CODES: readonly StepFailCode[] = ['usage', 'setup', 'restricted', 'refused', 'signin-node', 'signin-code', 'signin-timeout', 'signin', 'other'];
+
+/** connect's exit status for each failure code (0 for "HPCW-STEP done"); the extension reads the line, a person at a terminal the status */
+export const STEP_EXIT: Record<StepFailCode | 'done', number> = { done: 0, other: 1, usage: 2, setup: 3, restricted: 4, refused: 5, 'signin-node': 6, 'signin-code': 7, 'signin-timeout': 7, signin: 7 };
+
+/** one `HPCW-STEP` line, parsed */
+export type StepEvent =
+  /** "HPCW-STEP setup ready" (the account already used the shared copy) or "HPCW-STEP setup changed" (connect set it up now) */
+  | { step: 'setup'; changed: boolean }
+  /** "HPCW-STEP consent": the Remote Control answer is in ~/.hpcworker/consent (written by this connect) */
+  | { step: 'consent' }
+  /** "HPCW-STEP queued <job> new [<run dir>]" (submitted now) or "... kept [<run dir>]" (the run already had a live job; nothing submitted) */
+  | { step: 'queued'; job: string; fresh: boolean; runDir?: string }
+  /** "HPCW-STEP signin": connect is asking for the computer the Claude sign-in runs on */
+  | { step: 'signin' }
+  /** "HPCW-STEP signed-in <email> <plan>": "-" in either place reads as undefined */
+  | { step: 'signed-in'; email?: string; plan?: string }
+  /** "HPCW-STEP done": the last line on success */
+  | { step: 'done' }
+  /** "HPCW-STEP failed <code> <sentence>": the last line on failure; the sentence is for Details and Show log's raw view only */
+  | { step: 'failed'; code: StepFailCode; detail: string };
+
+export const STEP_RE = {
+  setup: /^HPCW-STEP setup(?: (ready|changed))?$/,
+  consent: /^HPCW-STEP consent$/,
+  queued: /^HPCW-STEP queued ([0-9]+) (new|kept)(?: (.+))?$/,
+  signin: /^HPCW-STEP signin$/,
+  signedIn: /^HPCW-STEP signed-in (\S+) (\S+)$/,
+  done: /^HPCW-STEP done$/,
+  failed: /^HPCW-STEP failed ([a-z-]+)(?: (.*))?$/,
+};
+
+const dash = (s: string | undefined): string | undefined => (s && s !== '-' ? s : undefined);
+
+/** one cleaned line (terminal codes stripped, trimmed) -> its step, or undefined when it is not an HPCW-STEP line of this grammar */
+export function parseStepLine(line: string): StepEvent | undefined {
+  const l = String(line ?? '').trim();
+  if (!l.startsWith('HPCW-STEP ')) return undefined;
+  let m: RegExpExecArray | null;
+  if ((m = STEP_RE.setup.exec(l))) return { step: 'setup', changed: m[1] === 'changed' };
+  if (STEP_RE.consent.test(l)) return { step: 'consent' };
+  if ((m = STEP_RE.queued.exec(l))) return { step: 'queued', job: m[1]!, fresh: m[2] === 'new', ...(m[3] ? { runDir: m[3] } : {}) };
+  if (STEP_RE.signin.test(l)) return { step: 'signin' };
+  if ((m = STEP_RE.signedIn.exec(l))) return { step: 'signed-in', email: dash(m[1]), plan: dash(m[2]) };
+  if (STEP_RE.done.test(l)) return { step: 'done' };
+  if ((m = STEP_RE.failed.exec(l))) {
+    const code = (FAIL_CODES as readonly string[]).includes(m[1]!) ? (m[1] as StepFailCode) : 'other';
+    return { step: 'failed', code, detail: (m[2] ?? '').trim() };
+  }
+  return undefined;
+}
+
+/** the keepalive alone on its line */
+export function isKeepaliveLine(line: string): boolean {
+  return String(line ?? '').trim() === KEEPALIVE_LINE;
+}
+
+/** a line with any glued keepalive removed (the defensive half of the one-writer rule) */
+export function withoutKeepalive(line: string): string {
+  return String(line ?? '').split(KEEPALIVE_LINE).join('').trim();
+}
+
+/** what one cleaned line of a connect sitting means to the extension */
+export type ConnectEvent =
+  | { kind: 'step'; step: StepEvent }
+  | { kind: 'keepalive' }
+  /** "HPCW-LOGIN: requesting a compute node": the wait for the sign-in computer begins */
+  | { kind: 'signin-wait' }
+  /** "HPCW-LOGIN: on <host>; checking whether you are signed in already": the sign-in has its computer */
+  | { kind: 'signin-node' }
+  /** "AUTH-URL: <url>": only an https link on claude.ai or claude.com (isClaudeAuthUrl) is reported; anything else is "refused-url" */
+  | { kind: 'auth-url'; url: string }
+  | { kind: 'refused-url' }
+  /** "HPCW-LOGIN: paste the code from that page" (or Claude Code's own "Paste code here"): focus the box */
+  | { kind: 'code-prompt' }
+  /** "HPCW-LOGIN: code received, checking" */
+  | { kind: 'code-received' }
+  /** "HPCW-LOGIN: that code was not accepted; paste it again" */
+  | { kind: 'code-rejected' }
+  /** "SIGNED-IN <email> <plan>" from the sitting; connect follows it with "HPCW-STEP signed-in", which is the one the extension acts on */
+  | { kind: 'signed-in'; email?: string; plan?: string }
+  /** "HPCW-LOGIN-FAILED: <sentence>"; connect follows it with "HPCW-STEP failed signin…" */
+  | { kind: 'login-failed'; detail: string }
+  /** any other HPCW-LOGIN progress line */
+  | { kind: 'progress'; detail: string };
+
+/** one cleaned line of a connect sitting -> its event, or undefined for ordinary terminal text (never shown to a student) */
+export function parseConnectLine(line: string): ConnectEvent | undefined {
+  const raw = String(line ?? '').trim();
+  if (!raw) return undefined;
+  if (raw === KEEPALIVE_LINE) return { kind: 'keepalive' };
+  const l = withoutKeepalive(raw);
+  if (!l) return { kind: 'keepalive' };
+  const step = parseStepLine(l);
+  if (step) return { kind: 'step', step };
+  if (/^HPCW-LOGIN: requesting a compute node\b/.test(l)) return { kind: 'signin-wait' };
+  if (/^HPCW-LOGIN: on \S+; /.test(l)) return { kind: 'signin-node' };
+  if (/^HPCW-LOGIN: code received, checking\b/.test(l)) return { kind: 'code-received' };
+  if (/^HPCW-LOGIN: that code was not accepted\b/.test(l)) return { kind: 'code-rejected' };
+  const ev = parseLoginLine(l);
+  if (!ev) return undefined;
+  switch (ev.kind) {
+    case 'auth-url':
+      return isClaudeAuthUrl(ev.url) ? { kind: 'auth-url', url: ev.url } : { kind: 'refused-url' };
+    case 'code-prompt':
+      return { kind: 'code-prompt' };
+    case 'signed-in': {
+      const [email, plan] = ev.detail.split(/\s+/);
+      return { kind: 'signed-in', email: dash(email), plan: dash(plan) };
+    }
+    case 'failed':
+      return { kind: 'login-failed', detail: ev.detail };
+    case 'started':
+      return { kind: 'progress', detail: ev.detail };
+  }
+}
+
+/**
+ * A code the student pasted, as the extension will type it: trimmed, printable ASCII without spaces,
+ * 8 to 512 characters. Anything else is not typed ("That code didn't work. Copy it again from the
+ * Claude tab."). The code is typed once into the sitting and forgotten: never stored, logged or shown.
+ */
+export function plausibleCode(code: unknown): string | undefined {
+  const c = String(code ?? '').trim();
+  return /^[\x21-\x7e]{8,512}$/.test(c) ? c : undefined;
+}
+
+/** the Claude plans Remote Control works on; "-" or nothing (unknown) is not refused */
+export function planAllowsRemoteControl(plan: string | undefined): boolean {
+  if (!plan || plan === '-') return true;
+  return ['pro', 'max', 'team', 'enterprise'].includes(plan.toLowerCase());
+}
+
+/** "max" -> "Max": the plan as the panel says it ("Signed in as alex@wayne.edu · Max") */
+export function planWord(plan: string | undefined): string | undefined {
+  if (!plan || plan === '-') return undefined;
+  const p = plan.toLowerCase();
+  const known: Record<string, string> = { max: 'Max', pro: 'Pro', team: 'Team', enterprise: 'Enterprise', free: 'Free' };
+  return known[p] ?? plan.charAt(0).toUpperCase() + plan.slice(1);
+}
+
+// ---- framework 10: the scheduler's reason, in three classes (V11_CONTRACT.md, "Waiting") -----------
+
+/** "line": an ordinary wait; "share": the account's own limits; "maintenance": nodes held back or a reservation */
+export type ReasonClass = 'line' | 'share' | 'maintenance';
+
+/** Slurm's %r -> its class. Unknown reasons are an ordinary wait. */
+export function reasonClass(reason: string | undefined): ReasonClass {
+  const r = String(reason ?? '').trim();
+  if (/^(QOS(Max|Grp)|Assoc(Grp|Max))/.test(r)) return 'share';
+  if (/^ReqNodeNotAvail|Reserv/i.test(r)) return 'maintenance';
+  return 'line';
+}
+
+// ---- framework 10: progress.log (V11_CONTRACT.md, "progress.log") ---------------------------------
+
+/** the fixed sentences of progress.log, by kind; `arg` is the rest of the line after "<sentence>: " where a kind has one */
+export type ProgressKind = 'asked' | 'got-computer' | 'connecting' | 'online' | 'waiting-signin' | 'reconnecting' | 'renewing' | 'ended' | 'stopped' | 'signin-abandoned' | 'error';
+
+export const PROGRESS: Record<ProgressKind, string> = {
+  asked: 'Asked the grid for a computer',
+  'got-computer': 'Got a computer',
+  connecting: 'Connecting to Claude',
+  /** followed by ": <environment link>" */
+  online: 'Online',
+  'waiting-signin': 'Waiting for your Claude sign-in',
+  reconnecting: 'Reconnecting',
+  renewing: 'Renewing',
+  ended: 'Ended',
+  stopped: 'Stopped',
+  'signin-abandoned': 'Stopped: waiting for your Claude sign-in timed out',
+  /** followed by ": <the job's message>" (Details only; Show log says "Couldn't start") */
+  error: "Couldn't start",
+};
+
+export interface ProgressLine {
+  /** ISO-8601 UTC */
+  at: string;
+  kind: ProgressKind;
+  /** the link after "Online: ", or the message after "Couldn't start: " */
+  arg?: string;
+}
+
+/** one line of progress.log -> its event, or undefined for a line outside the fixed set (shown in Details only) */
+export function parseProgressLine(line: string): ProgressLine | undefined {
+  const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ) (.+)$/.exec(String(line ?? '').trim());
+  if (!m) return undefined;
+  const at = m[1]!;
+  const text = m[2]!;
+  // longest sentences first: "Stopped: waiting ..." before "Stopped"
+  const kinds = (Object.keys(PROGRESS) as ProgressKind[]).sort((a, b) => PROGRESS[b].length - PROGRESS[a].length);
+  for (const kind of kinds) {
+    const s = PROGRESS[kind];
+    if (text === s) return { at, kind };
+    if ((kind === 'online' || kind === 'error') && text.startsWith(`${s}: `)) return { at, kind, arg: text.slice(s.length + 2) };
+  }
+  return undefined;
+}
+
+// ---- framework 10: login-setup (AM2; V11_CONTRACT.md, "login-setup"). UNPROVEN ON THE GRID. -------
+
+/** the success line of `login-setup`, exactly */
+export const LOGIN_SETUP_DONE = 'Done. The grid will not ask again.';
+/** the success lines of `login-setup --remove`, exactly */
+export const LOGIN_SETUP_REMOVED = "Done. Removed Beethoven's grid key.";
+export const LOGIN_SETUP_NOTHING = 'Nothing to remove.';
+
+/** the last non-empty line of login-setup's output says how it ended; only LOGIN_SETUP_DONE is success */
+export function loginSetupOutcome(output: string): { done: boolean; line: string } {
+  const lines = String(output ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const line = lines[lines.length - 1] ?? '';
+  return { done: line === LOGIN_SETUP_DONE, line };
+}
+
+// ---- framework 10: the site profile's keys the extension reads (V11_CONTRACT.md, "Site profile") ---
+
+export interface SiteProfile {
+  site?: string;
+  display_name?: string;
+  /** the portal the welcome page offers ("https://ondemand.grid.wayne.edu") */
+  ood_base_url?: string;
+  /** the Shell app host; "" lets the portal pick its default ("default") */
+  ood_shell_host?: string;
+  /** "http-basic" | "cookie": a hint only; the channel test decides at run time */
+  ood_auth?: string;
+  vpn_required?: boolean;
+  /** the VPN's portal address the student types into the VPN app ("protect.wayne.edu") */
+  vpn_portal?: string;
+  /** the VPN app's name ("GlobalProtect") */
+  vpn_app?: string;
+  vpn_help_url?: string;
+  grid_account_help_url?: string;
+  /** the Remote Control session title ("Wayne State grid") */
+  session_title?: string;
+  /** seconds a job waits in need_login before it stops itself and queues no successor */
+  login_abandon_s?: number;
+  shared_install?: string;
+  shared_state_dir?: string;
+  submit_host?: string;
+  worker_defaults?: { hours?: number; capacity?: number; permission_mode?: string };
+}
+
+/** a bundled or downloaded profile.json -> its keys, or undefined when it does not parse */
+export function siteProfileFrom(profileJson: string | undefined): SiteProfile | undefined {
+  return parseProfile(profileJson) as SiteProfile | undefined;
+}
+
+/** the session title for a worker: the profile's title, with " · <name>" for a worker not named "worker" (framework 10 asks Claude Code for the same) */
+export function sessionTitleFor(profileTitle: string | undefined, workerName: string): string {
+  const base = profileTitle || 'Grid worker';
+  return workerName === DEFAULT_WORKER_NAME ? base : `${base} · ${workerName}`;
+}
+
+/**
+ * status.json "state". "queued" is framework 10's: `worker start` writes it the moment the scheduler
+ * accepts the job, before the job has a computer; the job's own first write replaces it. (A 10.0.0
+ * extension does not know "queued" and treats it as not live: see V11_CONTRACT.md, "What framework 10
+ * keeps for 10.0.0".)
+ */
+export type WorkerState = 'queued' | 'starting' | 'need_login' | 'need_consent' | 'running' | 'online' | 'stopped' | 'preempted' | 'error' | 'unknown';
+
+/** why a worker is "stopped" (framework 10): the student's stop, or the job gave up waiting for the Claude sign-in (login_abandon_s) */
+export type StopReason = 'request' | 'login_abandoned';
 
 /** where the framework found the student's Remote Control answer: Claude Code's own settings file, a marker file, or nowhere */
 export type ConsentSource = 'claude_config' | 'marker' | 'none' | string;
@@ -270,7 +661,7 @@ export interface StatusFile {
   updated_at?: string;
   /** the name Claude Code printed at registration (e.g. asx10-hazy-meadow); until then the requested one */
   session_name?: string;
-  /** "<site>-<jobid>", what the job asked for with --name */
+  /** what the job asked Claude Code for with --name: framework 10's session title ("Wayne State grid"); framework 9 wrote "<site>-<jobid>" */
   requested_name?: string;
   /** https://claude.ai/code?environment=env_...: stable per machine id, so every job on this login opens the same environment */
   environment_url?: string;
@@ -296,6 +687,73 @@ export interface StatusFile {
   workspace?: string;
   rc_log?: string;
   token_path?: string;
+  /** framework 9: the host's Slurm client is bound into the worker's container */
+  scheduler_in_worker?: boolean;
+  scheduler_note?: string;
+
+  // ---- framework 10 (V11_CONTRACT.md, "status.json"); every time is ISO-8601 UTC, "YYYY-MM-DDTHH:MM:SSZ"
+  /** when the scheduler accepted the job named in `job` (written by `worker start` with state "queued"; kept by the job) */
+  submitted_at?: string;
+  /** when the job named in `job` began on its node (the same instant the `node` file is written); equal to started_at for a framework 10 job */
+  got_computer_at?: string;
+  /** when this job's Remote Control first registered (state online with a link); "" until then */
+  online_at?: string;
+  /** when this job's wall time ends (got_computer_at + hours): "Renews itself at" when chain is on */
+  ends_at?: string;
+  /** true when this job was queued by its predecessor in the always-on chain, not by a person's start: no queue clock, no "ready N min after you asked" */
+  renewal?: boolean;
+  /** the session title asked of Claude Code with --name: the profile's session_title, or "<session_title> · <name>" for a worker not named "worker" */
+  title?: string;
+  /** state "stopped" only: why */
+  stop_reason?: StopReason;
+  /** written by `worker status` while state is "queued" (and only then): Slurm's %T, verbatim (PENDING, RUNNING, CONFIGURING ...), or "GONE" when squeue no longer lists the job */
+  scheduler_state?: string;
+  /** Slurm's %r, verbatim (Priority, Resources, None, QOSMaxJobsPerUserLimit, AssocGrpCPULimit, ReqNodeNotAvail, ...); "" when none */
+  reason?: string;
+  /** Slurm's %S as ISO-8601 UTC, or "" when Slurm gives N/A, Unknown, or a time not in the future */
+  expected_start?: string;
+  /** when `worker status` asked the scheduler */
+  checked_at?: string;
+}
+
+/** `hpcworker worker status --name N --json` (framework 10, v 1): one JSON object on one line */
+export interface StatusJson {
+  v: 1;
+  run: string;
+  /** job.id ("" when none) */
+  job: string;
+  /** the queued successor (next.id's first field), "" when none */
+  next_job: string;
+  /** the state directory, expanded */
+  state_dir: string;
+  /** status.json after any update this call made, or null when there is none yet */
+  status: StatusFile | null;
+  connection: ConnectionFile | null;
+  /** what this call learned from its one squeue, or null when it did not ask (the run was not queued) */
+  scheduler: {
+    state: string;
+    reason: string;
+    expected_start: string;
+    node: string;
+    checked_at: string;
+  } | null;
+  /** the person-facing first line `worker status` prints without --json ("Your worker is in line for a computer (6 min so far).") */
+  line: string;
+}
+
+/** the JSON line of `worker status --json`, or undefined when the output holds none (the first line starting with "{" is read) */
+export function parseStatusJson(output: string): StatusJson | undefined {
+  for (const raw of String(output ?? '').split('\n')) {
+    const l = raw.trim();
+    if (!l.startsWith('{')) continue;
+    try {
+      const j = JSON.parse(l) as StatusJson;
+      if (j && typeof j === 'object' && j.v === 1 && typeof j.run === 'string') return j;
+    } catch {
+      /* not this line */
+    }
+  }
+  return undefined;
 }
 
 /** connection.json as worker.sbatch.tpl writes it */
@@ -317,6 +775,10 @@ export interface ConnectionFile {
   capacity?: string;
   resumed?: boolean;
   next_job?: string;
+  /** framework 10: the session title asked for (as in status.json) */
+  title?: string;
+  /** framework 10: when this job's Remote Control first registered */
+  online_at?: string;
 }
 
 /** probe.json as probe.sbatch writes it; every field optional because a partial probe still tells a story */
@@ -466,9 +928,9 @@ export function parseJobId(output: string): string | undefined {
 }
 
 /**
- * "<site>-<jobid>": the name the framework asks Claude Code for with `--name`. Claude Code 2.1.283
- * names the session itself at registration (asx10-hazy-meadow, in the maintainer's run), so the
- * panel shows what the files report and uses this only to say what was asked for.
+ * "<site>-<jobid>": the name framework 9 asked Claude Code for with `--name` (framework 10 asks for the
+ * profile's session title, sessionTitleFor). Kept for reading a framework 9 worker's files; 11.0.0 does
+ * not call it. Claude Code 2.1.283 names the session itself at registration (asx10-hazy-meadow).
  */
 export function sessionName(site: string, job: string): string {
   return `${site}-${job}`;

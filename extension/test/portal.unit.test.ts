@@ -58,6 +58,65 @@ describe('readFileIfExists', () => {
   });
 });
 
+// 11.0.0: the background's dashboard GET tells signed in, signed out and unreachable apart, and never
+// says "Failed to fetch" (spec: portal.ts session()).
+describe('the grid sign-in, as one dashboard GET says it', () => {
+  const page = '<html><head><meta name="csrf-token" content="tok"></head><body>Open OnDemand. Logged in as st1234</body></html>';
+  function net(answer: (url: string, init?: RequestInit) => Promise<Response>, seen: RequestInit[] = []): PortalNet {
+    return {
+      fetch: async (input, init) => {
+        seen.push(init ?? {});
+        return answer(String(input), init);
+      },
+      WebSocket: class {
+        constructor() {
+          throw new Error('no sockets in this test');
+        }
+      } as unknown as PortalNet['WebSocket'],
+    };
+  }
+  const redirected = (body: string, status: number, url: string) => {
+    const r = new Response(body, { status, headers: { 'content-type': 'text/html' } });
+    Object.defineProperty(r, 'url', { value: url });
+    return r;
+  };
+  const mk = (n: PortalNet, timeoutMs?: number) => new PortalClient(ORIGIN, n, new Audit(memoryKV()), { credentials: 'include', vpnApp: 'GlobalProtect', ...(timeoutMs ? { sessionTimeoutMs: timeoutMs } : {}) });
+
+  it('200 on the dashboard with its form token is signed in, with the account it shows; the request carries the browser\'s sign-in (credentials "include")', async () => {
+    const seen: RequestInit[] = [];
+    const s = await mk(net(async () => new Response(page, { status: 200, headers: { 'content-type': 'text/html' } }), seen)).session();
+    expect(s).toMatchObject({ state: 'signed-in', signedIn: true, username: 'st1234' });
+    expect(seen[0]?.credentials).toBe('include');
+  });
+
+  it('401 (the browser holds no HTTP sign-in), a redirect to another site, or off the dashboard, is signed out', async () => {
+    expect((await mk(net(async () => new Response('sign in', { status: 401, headers: { 'www-authenticate': 'Basic realm="private"' } }))).session()).state).toBe('signed-out');
+    expect((await mk(net(async () => redirected('<html>idp</html>', 200, 'https://login.wayne.edu/idp'))).session()).state).toBe('signed-out');
+    expect((await mk(net(async () => redirected('<html>start</html>', 200, `${ORIGIN}/public/start.html`))).session()).state).toBe('signed-out');
+  });
+
+  it('a network error or no answer within the timeout is unreachable, in the panel\'s words; never "Failed to fetch"', async () => {
+    const failed = await mk(net(async () => Promise.reject(new TypeError('Failed to fetch')))).session();
+    expect(failed).toMatchObject({ state: 'unreachable', status: 0, signedIn: false, detail: "Can't reach the grid. Is GlobalProtect on?" });
+    expect(JSON.stringify(failed)).not.toMatch(/Failed to fetch/);
+    const t0 = Date.now();
+    const slow = await mk(
+      net((_u, init) => new Promise<Response>((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new DOMException('aborted', 'AbortError'))))),
+      200,
+    ).session();
+    expect(slow.state).toBe('unreachable');
+    expect(Date.now() - t0).toBeLessThan(2_000);
+    // a client with no VPN name says "your VPN"
+    const plain = await new PortalClient(ORIGIN, net(async () => Promise.reject(new TypeError('Failed to fetch'))), new Audit(memoryKV())).session();
+    expect(plain.detail).toBe("Can't reach the grid. Is your VPN on?");
+  });
+
+  it('200 with no form token is not an OnDemand portal; 5xx is a per-user server still starting', async () => {
+    expect((await mk(net(async () => new Response('<html>hello</html>', { status: 200, headers: { 'content-type': 'text/html' } }))).session()).state).toBe('not-ood');
+    expect((await mk(net(async () => new Response('Server Error', { status: 503 }))).session()).state).toBe('cold');
+  });
+});
+
 describe('the dashboard is the only identity', () => {
   it("a directory owner found by whoAmI() is never reported by session() as who is signed in", async () => {
     const page = '<html><head><meta name="csrf-token" content="tok"></head><body>Open OnDemand</body></html>';

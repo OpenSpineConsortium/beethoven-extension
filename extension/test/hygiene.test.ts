@@ -11,7 +11,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
+import { LOG_WORDS, WORDS } from '../src/core/model';
 import { PRODUCT_NAME } from '../src/core/terms';
+import { FIXTURES, fixtureStrings } from '../src/ui/fixtures';
+import { LABELS } from '../src/ui/labels';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -36,11 +39,12 @@ describe('what the source must not contain', () => {
     expect(hits).toEqual([]);
   });
 
-  it('asks for exactly storage, alarms, scripting, activeTab and sidePanel, optional https hosts only, and nothing on an Anthropic domain', () => {
+  it('asks for exactly storage, alarms, scripting and sidePanel (no activeTab since 11.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
     const cfg = read(path.join(ROOT, 'wxt.config.ts'));
     const perms = /permissions:\s*\[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
     const named = [...perms.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(named.sort()).toEqual(['activeTab', 'alarms', 'scripting', 'sidePanel', 'storage']);
+    expect(named.sort()).toEqual(['alarms', 'scripting', 'sidePanel', 'storage']);
+    expect(/'activeTab'/.test(perms)).toBe(false);
     expect(/'cookies'|"cookies"/.test(perms)).toBe(false);
     const hosts = /const hosts = \[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
     expect(hosts).toMatch(/'https:\/\/\*\/\*'/);
@@ -163,9 +167,11 @@ describe('the built package', () => {
     ? readdirSync(OUT)
         .map((n) => path.join(OUT, n))
         .filter((d) => statSync(d).isDirectory() && existsSync(path.join(d, 'manifest.json')))
+        // a development build (wxt --mode development: "<browser>-mv3-dev") carries the fixture gallery and is never shipped
+        .filter((d) => !/-dev$/.test(path.basename(d)))
         .filter((d) => (JSON.parse(read(path.join(d, 'manifest.json'))) as { version?: string }).version === VERSION)
     : [];
-  const zips = existsSync(OUT) ? readdirSync(OUT).filter((n) => n.startsWith(`beethoven-${VERSION}-`) && n.endsWith('.zip')).map((n) => path.join(OUT, n)) : [];
+  const zips = existsSync(OUT) ? readdirSync(OUT).filter((n) => n.startsWith(`beethoven-${VERSION}-`) && n.endsWith('.zip') && !n.endsWith('-dev.zip')).map((n) => path.join(OUT, n)) : [];
   const storeZips = zips.filter((z) => !z.endsWith('-sources.zip'));
   const sourcesZip = zips.find((z) => z.endsWith('-sources.zip'));
 
@@ -246,10 +252,21 @@ describe('the built package', () => {
         expect(`profiles/${String(p.site)}.json`, label).toBe(e.name);
       }
       if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
-      // nothing beside the manifest, the pages, the scripts, the styles, the icons, the profiles, the two texts, and
-      // the bundled fonts with their licences (9.0.0)
-      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt)$/.test(n));
+      // nothing beside the manifest, the pages, the scripts, the styles, the icons (11.0.0: and their lit variants), the
+      // profiles, the texts, the bundled fonts with their licences (9.0.0) and the tour's copy of the site diagram (11.0.0)
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css))$/.test(n));
       expect(other, label).toEqual([]);
+      // 11.0.0: what the pages need is there: the lit icons, the tour's diagram, the notices
+      for (const need of ['icon/on-16.png', 'icon/on-32.png', 'icon/on-48.png', 'icon/on-128.png', 'icon/off-16.png', 'icon/off-32.png', 'icon/off-48.png', 'icon/off-128.png', 'tour/diagram.js', 'tour/diagram.css', 'THIRD_PARTY_NOTICES.md']) expect(names, `${label} ${need}`).toContain(need);
+      // the GPU a student may use depends on their account: the diagram names none
+      const diagram = entries.find((e) => e.name === 'tour/diagram.js')!.bytes().toString('utf8');
+      expect(diagram).not.toMatch(/H200/);
+      // the fixture gallery is a development build's only: no fixture name, no gallery code
+      const js = entries.filter((e) => e.name.endsWith('.js') && !e.name.startsWith('tour/')).map((e) => e.bytes().toString('utf8')).join('\n');
+      expect(js, label).not.toMatch(/h-online-confirm|j-statement-not-approved|\[gallery\]|alex@wayne\.edu/);
+      // and none of its styles (11.0.0: gallery.css travels with gallery.ts)
+      const css = entries.filter((e) => e.name.endsWith('.css') && !e.name.startsWith('tour/')).map((e) => e.bytes().toString('utf8')).join('\n');
+      expect(css, label).not.toMatch(/\.gallery\b/);
       // every font the pages use is in the package, beside the licence of its family
       const fonts = names.filter((n) => n.endsWith('.woff2'));
       expect(fonts.length, label).toBeGreaterThan(0);
@@ -284,5 +301,38 @@ describe('the built package', () => {
     const names = zipEntries(sourcesZip!).map((e) => e.name);
     expect(names.filter((n) => n.startsWith('public/framework/') || n === 'scripts/sync-framework.mjs')).toEqual([]);
     expect(names).toContain('scripts/sync-profiles.mjs');
+  });
+});
+
+// No sentence a student can read may name the machinery: job, node, partition, heartbeat, shell, portal tab,
+// probe, scheduler, hpcworker, OnDemand or "Failed to fetch" (the specification's hygiene rule). Details for
+// the lab lead and Settings' folded "For your lab lead" are exempt. Five sentences of the specification itself
+// break the rule and are allowed by name: the third Try asking question, the share subline and the tour's third
+// caption ("job", "jobs"), and the two grid sign-in sentences that name the portal's own page ("OnDemand",
+// "LOGIN TO ONDEMAND").
+// The one-time key step's line is a command the student pastes, not a sentence; it is not in these tables.
+describe('the words a student reads', () => {
+  const BANNED = (t: string) => /\b(jobs?|nodes?|partition|heartbeat|shell|scheduler|hpcworker|probe)\b|portal tab|Failed to fetch/i.test(t) || /OnDemand|ONDEMAND/.test(t);
+  const ALLOWED = new Set<string>([WORDS.home.prompts[2], WORDS.queue.shareSub, WORDS.tour.captions[2], WORDS.grid.notOod, WORDS.grid.startPage]);
+  const strings = (v: unknown, skip: string[] = []): string[] => {
+    if (typeof v === 'string') return [v];
+    if (typeof v === 'function') return [String((v as (...a: unknown[]) => unknown)('st1234', 'GlobalProtect', 'protect.wayne.edu', 'Wayne State grid'))];
+    if (Array.isArray(v)) return v.flatMap((x) => strings(x, skip));
+    if (v && typeof v === 'object') return Object.entries(v).flatMap(([k, x]) => (skip.includes(k) ? [] : strings(x, skip)));
+    return [];
+  };
+
+  it('the sentence tables hold none of the internal words', () => {
+    const all = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS)];
+    expect(all.length).toBeGreaterThan(200);
+    expect(all.filter((t) => BANNED(t) && !ALLOWED.has(t))).toEqual([]);
+    // the allow-list is exactly what it says: each allowed sentence is still in the tables
+    for (const a of ALLOWED) expect(all).toContain(a);
+  });
+
+  it('every fixture (every state the pages draw) holds none of them', () => {
+    expect(FIXTURES.length).toBeGreaterThan(90);
+    const hits = FIXTURES.flatMap((f) => fixtureStrings(f).filter((t) => BANNED(t) && !ALLOWED.has(t)).map((t) => `${f.name}: ${t}`));
+    expect(hits).toEqual([]);
   });
 });

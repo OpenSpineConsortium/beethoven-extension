@@ -1,142 +1,286 @@
-// The background: a Chrome/Edge MV3 service worker or the Firefox persistent background, from
-// one file. The toolbar click is the whole start: it opens the panel and, when the click came from
-// an Open OnDemand tab, asks for that one origin and loads the page script into the tab, all
-// inside the same gesture. It brokers messages between the pages and the portal page script,
-// wakes once a minute to read the current run's status files, fetches the kill-list once a day,
-// asks Licensor's access service whether the signed-in account is approved (on the toolbar click,
-// when the portal tab connects, and once a day; never before the agreement is accepted), is the
-// one place a worker is started from (the strip asks it; the "start when my portal opens" setting
-// asks it too), opens the worker's Claude link once when it first appears, and keeps its state in
-// storage.session so any page can re-attach after it restarts. It never talks to the portal
-// itself: the page script on the portal origin is the only network client there.
+// The background (11.0.0): a Chrome/Edge MV3 service worker or the Firefox persistent background,
+// from one file. It is where everything happens; the pages only draw the views it pushes and send the
+// actions the student presses (core/model.ts, core/messages.ts VIEW_PORT).
+//
+//   The panel is window-wide and opens on the toolbar click (sidePanel.setPanelBehavior); the welcome
+//   page's one press of "Agree and continue" opens it and asks Chrome for the portal's site in the same
+//   click (ext/gesture.ts), then this background takes over.
+//   The grid sign-in: Wayne State's portal signs in with the browser's own HTTP box (AM1). This
+//   background navigates the welcome tab (or opens one sign-in tab for a later press), watches it with
+//   no timer loop of its own (tabs.onUpdated, the panel's 2-second tick, a 30-second alarm), reads the
+//   AccessID from the dashboard with its own GET, runs the channel test once, and closes the tab under
+//   the guards (core/tabs.ts).
+//   The channel: "direct", a portal client here with credentials "include" (the browser attaches the
+//   sign-in it holds), or "tab", where shell lines run in a page script in a portal tab Beethoven opens
+//   inactive and closes (core/channel.ts). Every write is one of the lab's tool's shell verbs.
+//   Connect: one `hpcworker connect` line carries the approval-checked press through to "You're online":
+//   the Remote Control answer, the queued worker, and the Claude sign-in sitting held here (the code is
+//   typed once and forgotten; core/login.ts CodeGate). The queue is narrated from status.json (R1 to
+//   R13, core/facts.ts).
+//   AM2's one-time key step (UNPROVEN ON THE GRID): when the shell asks for a password while a press
+//   waits, the student types it into the university's own terminal page; Beethoven types only the one
+//   setup line, after "I'm in" (core/loginSetup.ts).
+//
+// It never runs anything on, and holds no site permission for, claude.ai, claude.com or anthropic.com
+// (it opens Anthropic's sign-in page and the claude.ai link in tabs, as a bookmark would); it never
+// reads, stores or relays a Claude credential or the university password; nothing goes to the lab
+// before the agreement is accepted, and the approval check's fields are unchanged.
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
-import { acceptedSettings, isAnthropicAddress, lookAtTab, mayRequestOrigin } from '../core/connect';
-import { isEnvironmentUrl, parseRegistration, paths, type ConnectionFile, type StatusFile } from '../core/contract';
-import { statementFor, type Statements } from '../core/disclosure';
-import { environmentLinkOf, gatherFacts, type Transient } from '../core/facts';
-import { bundledSharedInstall } from '../core/install';
-import { ACCESS_KEY, AUTO_START_KEY, CLICK_KEY, IDENTITY_KEY, OPENED_KEY, PORTAL_TAB_KEY, REVOKED_KEY, RUN_KEY, SERVICES_KEY, STATEMENTS_KEY, type AutoStartNote, type ClickNote, type IdentityNote, type OpenedLinks, type PortalSettings } from '../core/keys';
-import { fail, succeed, unwrap, type Answer, type Request } from '../core/messages';
-import { PORTAL_OPS, type PortalApi, type PortalOp, type SessionInfo } from '../core/portal';
-import { decide } from '../core/steps';
-import { recordInForce, TERMS_KEY } from '../core/terms';
-import { startWorker } from '../core/worker';
-import { ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, type AccessRecord, type StoredServices } from '../licensing/access';
+import { Audit, AUDIT_KEY, clearRecordsKeepingClocks } from '../core/audit';
+import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/channel';
+import { buildNodes, type DiagCtx } from '../core/checks';
+import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
+import { commands, isEnvironmentUrl, parseJobId, parseRegistration, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectOptions, type LoginMode, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
+import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
+import { addActivity, addWait, applyConnection, applyStatus, environmentLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
+import { bundledProfile, usesSharedCopy } from '../core/install';
+import {
+  ACCESS_KEY,
+  ACTIVITY_KEY,
+  ANTHROPIC_TAB_KEY,
+  CHANNEL_KEY,
+  CHECKLIST_KEY,
+  CHECKS_KEY,
+  CLAUDE_TAB_KEY,
+  DEFAULT_PREFS,
+  defaultPortalFrom,
+  GRID_KEY,
+  IDENTITY_KEY,
+  KILLLIST_KEY,
+  LAST_KNOWN_KEY,
+  ONCE_KEY,
+  PORTAL_KEY,
+  PREFS_KEY,
+  PRESS_KEY,
+  PROBE_KEY,
+  REVOKED_KEY,
+  RUN_KEY,
+  SERVICES_KEY,
+  SIGNIN_TAB_KEY,
+  siteFromHostname,
+  STATEMENTS_KEY,
+  TERMINAL_TAB_KEY,
+  TOUR_SEEN_KEY,
+  WAIT_HISTORY_KEY,
+  WELCOME_PRESS_KEY,
+  type ActivityEntry,
+  type AnthropicTab,
+  type ChannelNote,
+  type Checklist,
+  type GridNote,
+  type IdentityNote,
+  type LastKnown,
+  type OnceNotes,
+  type OpenedTab,
+  type PendingPress,
+  type PortalSettings,
+  type Prefs,
+  type ProbeNote,
+  type TourSeen,
+  type WaitHistory,
+} from '../core/keys';
+import { CodeGate, ConnectWatcher } from '../core/login';
+import { LoginSetupFlow } from '../core/loginSetup';
+import { CONNECT_PORT, fail, succeed, unwrap, VIEW_PORT, type Answer, type ConnectOut, type Request, type TerminalTyped, type ViewIn, type ViewOut } from '../core/messages';
+import { BADGE_COLORS, LOG_WORDS, WORDS, type Action, type ActionResults, type ConnectFailure, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
+import type { WsConstructor } from '../core/net';
+import { reach } from '../core/net';
+import { DASHBOARD, PORTAL_OPS, PortalClient, type PortalApi, type SessionInfo } from '../core/portal';
+import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell';
+import { detailsView, settingsView } from '../core/sheets';
+import { firstRunDone, heroOf, home, lastKnownOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
+import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
+import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
+import { connectLine, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
+import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, requestUrl, type AccessRecord, type AccessTrigger, type StoredServices } from '../licensing/access';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
-import { connectApi, connectPortal, dropAnthropicLeftovers, requestOrigin } from '../ext/connectApi';
-import { assetUrl, installId, local, portalSettings, prefs as loadPrefs, session, version } from '../ext/storage';
+import { connectApi, disconnectPortal, dropAnthropicLeftovers, savePortal } from '../ext/connectApi';
+import { hasPanel } from '../ext/gesture';
+import { assetUrl, installId, local, prefs as loadPrefs, session, version } from '../ext/storage';
+import { activeTabIn, closeUnderGuards, focusTab, openTab, tabHost, tabNow } from '../ext/tabs';
+
+export type { RunState } from '../core/facts';
 
 const POLL_ALARM = 'bridge.poll';
+const SIGNIN_ALARM = 'bridge.signin';
 const KILLLIST_ALARM = 'bridge.killlist';
 const ACCESS_ALARM = 'bridge.access';
-/** the report's floor: clients read the job's files no more than once a minute */
-const POLL_MINUTES = 1;
-/** the "start when my portal opens" setting asks the login node at most this often */
-const AUTO_START_EVERY_MS = 60_000;
-/** the daily alarm leaves the kill-list alone when it was fetched this recently (its first firing, a minute after install, would otherwise repeat the fetch the acceptance just made) */
+/** the daily alarm leaves the kill-list alone when it was fetched this recently */
 const KILLLIST_ALARM_SKIP_MS = 60 * 60_000;
 
-export interface RunState {
-  /** the framework's state directory (the profile's shared_state_dir, expanded) */
-  stateDir: string;
-  /** the worker's name: its run directory is <stateDir>/<run> */
-  run: string;
-  /** the job the start command reported; the status file carries the chain's current one */
-  job: string;
-  /** the profile's site name */
-  site?: string;
-  /** when this run was recorded here */
-  set_at?: string;
-  /** how it was started */
-  started_by?: 'button' | 'auto' | 'strip';
-  status?: StatusFile;
-  connection?: ConnectionFile;
-  /** what the registration block in rc.log says, when the files do not carry them yet */
-  registration?: { session_name?: string; environment_url?: string; capacity?: string };
-  rc_tail?: string;
-  updated?: string;
-  error?: string;
-  /** the student pressed Stop; the run stays stopped until they start it again */
-  stopped_by_student?: boolean;
+/** the bundled site profile the welcome page offers first (public/profiles/wayne.json) */
+const DEFAULT_SITE = 'wayne';
+const HELP_URL = 'https://openspineconsortium.com/beethoven/support.html';
+
+// cadences (docs/V11_CONTRACT.md §12)
+/** the run folder's listing while a start is in progress and a page is open */
+const LIST_STARTING_MS = 5_000;
+/** otherwise */
+const LIST_IDLE_MS = 60_000;
+/** `worker status --json` while queued, a page open */
+const STATUS_JSON_MS = 60_000;
+/** the Grid row's live check while a page is open (D37) */
+const GRID_LIVE_MS = 60_000;
+/** the sign-in watch on the panel's tick */
+const SIGNIN_WATCH_MS = 2_000;
+/** the GlobalProtect moment's reachability check */
+const REACH_EVERY_MS = 3_000;
+/** "Done. You won't need this again." holds this long before the waiting press carries on */
+const KEY_DONE_HOLD_MS = 1_500;
+/** a waiting press asks again for what it waits on (the approval, the setup) at most this often */
+const PRESS_RETRY_MS = 15_000;
+
+/** the toolbar's unlit rack (no tile, the ink's faint tone): it recedes on a light and a dark toolbar, so the lit one always reads as "on" */
+const PLAIN_ICONS = { 16: '/icon/off-16.png', 32: '/icon/off-32.png', 48: '/icon/off-48.png', 128: '/icon/off-128.png' };
+const LIT_ICONS = { 16: '/icon/on-16.png', 32: '/icon/on-32.png', 48: '/icon/on-48.png', 128: '/icon/on-128.png' };
+
+type ViewPort = { name: string; sender?: { id?: string; tab?: { id?: number } }; postMessage(m: ViewOut): void; onMessage: { addListener(fn: (m: unknown) => void): void }; onDisconnect: { addListener(fn: () => void): void } };
+
+/** the welcome page is still open in that tab: its own port says so (no "tabs" permission, no address read) */
+function welcomeStillIn(tabId: number | undefined): boolean {
+  if (tabId === undefined) return false;
+  for (const [port, sub] of mem.ports) if (sub.surface === 'welcome' && port.sender?.tab?.id === tabId) return true;
+  return false;
 }
 
-interface PortalTab {
-  tabId: number;
-  origin: string;
+/** the Claude sign-in sitting in flight (one at most) */
+interface Sitting {
+  id: number;
+  mode: 'direct' | 'tab';
+  login: LoginMode;
+  gate: CodeGate;
+  close(): void;
+  /** Anthropic's authorize link, in memory only, for "Open the Claude tab again" */
+  authUrl?: string;
+  /** tab mode: the tab the sitting runs in, and whether this sitting opened it */
+  tabId?: number;
+  ownTab?: boolean;
 }
 
-export interface StartResult {
-  started: boolean;
-  /** why not, in the student's words, when not started */
-  reason?: string;
-  /** not started only because the scheduler was asked less than a minute ago: ask again after this long */
-  waitMs?: number;
-  job?: string;
-  alreadyRunning?: boolean;
+const freshConnect = (): ConnectFacts => ({ inFlight: false, queued: false, signin: 'none' });
+
+const mem = {
+  ports: new Map<ViewPort, { surface: Surface; windowId?: number; last?: string }>(),
+  panelWindowId: undefined as number | undefined,
+  sitting: undefined as Sitting | undefined,
+  sittingSeq: 0,
+  connect: freshConnect(),
+  loginSetup: undefined as LoginSetupFlow | undefined,
+  setup: { state: 'unknown' } as SetupFacts,
+  signin: { waiting: false } as SigninFacts,
+  lookingSince: undefined as number | undefined,
+  answeredAt: undefined as number | undefined,
+  accessChecking: false,
+  stopping: false,
+  restricted: false,
+  logOpen: false,
+  checksRunning: false,
+  toast: undefined as { text: string; until: number } | undefined,
+  onlineAnnouncedAt: undefined as number | undefined,
+  tourFromMenu: false,
+  welcome: { state: 'idle' as WelcomeView['state'], problem: undefined as string | undefined },
+  welcomeTab: undefined as { tabId?: number; windowId?: number } | undefined,
+  pinned: undefined as boolean | undefined,
+  workingInTab: 0,
+  keptTabId: undefined as number | undefined,
+  sharedDir: undefined as { key: string; dir?: string } | undefined,
+  profile: undefined as { site: string; profile?: SiteProfile } | undefined,
+  client: undefined as { key: string; client: PortalClient } | undefined,
+  failDetail: '',
+  last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0 },
+  busy: { list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false },
+  lastToolbar: '',
+  lastKnownJson: '',
+  pollEvery: 0,
+  /**
+   * the start of a connect line under way (its sitting id), 0 when none: claimed before the first await
+   * of startConnect, so a press and the panel's tick carrying the same press never type two lines
+   */
+  startId: 0,
+  /** student presses being carried out now (Connect, Stop, Sign in to Claude…): the tick carries nothing meanwhile */
+  pressDepth: 0,
+};
+
+/** the presses whose handling keeps the tick from carrying a kept press at the same moment */
+const PRESS_KINDS: ReadonlySet<Action['kind']> = new Set(['connect', 'sign-in-claude', 'stop', 'restrict', 'retry', 'cancel']);
+
+let runChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Every write of the run record (session RUN_KEY) goes through here, one at a time: `fn` sees the
+ * record as it is now, never a copy read before an await, and returns the next one (undefined: leave it
+ * as it is; null: remove it). A listing, the scheduler's answer, a Connect's queued step and a Stop can
+ * all land within the same second; none of them may write back a copy that another has moved on from.
+ */
+function mutateRun(fn: (cur: RunState | undefined) => RunState | null | undefined | Promise<RunState | null | undefined>): Promise<RunState | undefined> {
+  const next = runChain.then(async () => {
+    const cur = await session.get<RunState>(RUN_KEY);
+    const out = await fn(cur);
+    if (out === null) {
+      await session.remove(RUN_KEY);
+      return undefined;
+    }
+    if (out === undefined) return cur;
+    await session.set(RUN_KEY, out);
+    return out;
+  });
+  runChain = next.catch(() => undefined);
+  return next;
 }
 
-/** what an access check came to, for the page that asked */
-export interface AccessOutcome {
-  /** the service was asked this time (false: a cache held, or nothing to ask with yet) */
-  asked: boolean;
-  detail: string;
-  /** the service's word on file after this attempt, when it has ever answered */
-  approved?: boolean;
-}
+/** the same run (its folder): a listing or an answer about one run is never written into another */
+const sameRun = (a: RunState | undefined, b: RunState | undefined): boolean => !!a && !!b && a.stateDir === b.stateDir && a.run === b.run;
 
-/** the settings, cached so the click handler can decide synchronously inside the gesture */
-let settingsCache: PortalSettings | undefined;
-/** at most one start in flight */
-let startInFlight: Promise<StartResult> | undefined;
-/** at most one access check in flight */
-let accessInFlight: Promise<AccessOutcome> | undefined;
-/** serialises the once-only opening of the Claude link */
-let openChain: Promise<unknown> = Promise.resolve();
-/** the clean-up of anything an earlier build left on an Anthropic address, once per start of this background */
 let leftovers: Promise<unknown> | undefined;
 const dropLeftoversOnce = (): Promise<unknown> => (leftovers ??= dropAnthropicLeftovers().catch(() => undefined));
+let accessInFlight: Promise<AccessOutcome> | undefined;
 
 export default defineBackground({
   // Firefox MV2: a persistent background keeps the alarm and message listeners simple; ignored on MV3
   persistent: true,
   main() {
-    // install, update and browser start all start this background: a grant on an Anthropic address
-    // that 9.0.0 obtained (it asked before it refused) is removed here, before anything else uses grants
     void dropLeftoversOnce();
-    void portalSettings().then((s) => (settingsCache = s));
+    void setPanelBehavior();
+    void unregisterOldScripts();
     browser.storage.onChanged.addListener((changes, area) => {
-      if (area === 'local' && changes['bridge.portal']) settingsCache = acceptedSettings(changes['bridge.portal']?.newValue as PortalSettings | undefined);
-      // the first request to Licensor's site follows the acceptance of the agreement, never precedes it
-      if (area === 'local' && changes[TERMS_KEY] && recordInForce(changes[TERMS_KEY]?.newValue)) {
+      // the first request to the lab follows the acceptance of the agreement, never precedes it
+      if (area === 'local' && changes[TERMS_KEY] && recordInForce(changes[TERMS_KEY]?.newValue) && !recordInForce(changes[TERMS_KEY]?.oldValue)) {
         void refreshKillListNow();
         void checkAccessNow('terms');
       }
+      if (area === 'local' && (changes[PREFS_KEY] || changes[PORTAL_KEY] || changes[TERMS_KEY] || changes[STATEMENTS_KEY])) schedulePush();
+      // the welcome page's press, written inside its click: the panel opening beside it says "Almost there."
+      if (area === 'session' && changes[WELCOME_PRESS_KEY]) schedulePush();
     });
-
     browser.runtime.onInstalled.addListener(async (details) => {
-      if (details.reason === 'install') await browser.runtime.openOptionsPage();
+      // the options page shows the welcome until the agreement is accepted
+      if (details.reason === 'install') await browser.runtime.openOptionsPage().catch(() => undefined);
       await ensureAlarms();
       await dropLeftoversOnce();
-      await reRegisterPortalScript();
+      await unregisterOldScripts();
     });
     browser.runtime.onStartup?.addListener(async () => {
       await ensureAlarms();
       await dropLeftoversOnce();
-      await reRegisterPortalScript();
     });
     void ensureAlarms();
 
-    // the toolbar button: `action` on MV3, `browserAction` on the Firefox MV2 build
-    const b = browser as unknown as { action?: { onClicked: { addListener(fn: (tab: ClickedTab) => void): void } }; browserAction?: { onClicked: { addListener(fn: (tab: ClickedTab) => void): void } } };
-    (b.action ?? b.browserAction)?.onClicked.addListener((tab) => onActionClicked(tab));
+    // a browser with no side panel: the toolbar opens the panel page another way
+    if (!(browser as unknown as { sidePanel?: unknown }).sidePanel) {
+      const b = browser as unknown as { action?: { onClicked: { addListener(fn: () => void): void } }; browserAction?: { onClicked: { addListener(fn: () => void): void } }; sidebarAction?: { open(): Promise<void> } };
+      (b.action ?? b.browserAction)?.onClicked.addListener(() => {
+        if (b.sidebarAction) void b.sidebarAction.open().catch(() => browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') }));
+        else void browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') });
+      });
+    }
 
     browser.alarms.onAlarm.addListener(async (alarm) => {
-      if (alarm.name === POLL_ALARM) {
-        await pollRun();
-        await maybeAutoStart('alarm');
-      } else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow({ skipIfFetchedWithinMs: KILLLIST_ALARM_SKIP_MS });
+      if (alarm.name === POLL_ALARM) await backgroundPoll();
+      else if (alarm.name === SIGNIN_ALARM) await signinAlarm();
+      else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow({ skipIfFetchedWithinMs: KILLLIST_ALARM_SKIP_MS });
       else if (alarm.name === ACCESS_ALARM) await checkAccessNow('alarm');
     });
 
@@ -147,433 +291,2187 @@ export default defineBackground({
       if (!msg || typeof msg !== 'object' || typeof msg.type !== 'string') return undefined;
       return handle(msg, sender).catch((e) => fail(e));
     });
+
+    browser.runtime.onConnect.addListener((port) => {
+      const p = port as unknown as ViewPort;
+      if (p.sender?.id !== browser.runtime.id || p.name !== VIEW_PORT) return;
+      onViewPort(p);
+    });
+
+    browser.tabs.onUpdated.addListener((tabId, info, tab) => void onTabUpdated(tabId, info as { status?: string; url?: string }, tab as { url?: string; windowId?: number }));
+    browser.tabs.onRemoved.addListener((tabId) => void onTabRemoved(tabId));
+
+    const a = browser.action as unknown as { getUserSettings?: () => Promise<{ isOnToolbar?: boolean }>; onUserSettingsChanged?: { addListener(fn: (s: { isOnToolbar?: boolean }) => void): void } } | undefined;
+    void a
+      ?.getUserSettings?.()
+      .then((s) => (mem.pinned = !!s.isOnToolbar))
+      .catch(() => undefined);
+    a?.onUserSettingsChanged?.addListener((s) => void onPinChanged(!!s.isOnToolbar));
+
+    schedulePush();
   },
 });
 
-interface ClickedTab {
-  id?: number;
-  url?: string;
-  windowId?: number;
+// ---- small helpers -----------------------------------------------------------------------------------
+
+const nowIso = () => new Date().toISOString();
+
+async function setPanelBehavior(): Promise<void> {
+  const sp = (browser as unknown as { sidePanel?: { setPanelBehavior(o: { openPanelOnActionClick: boolean }): Promise<void> } }).sidePanel;
+  await sp?.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => undefined);
 }
 
-/**
- * Icon click = go. Everything that needs the gesture happens before the first await: the panel
- * opens, and when the tab looks like Open OnDemand (a /pun/ page, or the portal already connected)
- * the browser is asked for that origin. The rest (registering and loading the page script,
- * remembering the hostname, then the access check with the account the dashboard shows) follows
- * the grant. The click is the one moment a refusal is asked about again at once. A tab on
- * claude.ai, claude.com or anthropic.com is never an Open OnDemand page, whatever its path
- * (lookAtTab), and an origin normaliseOrigin refuses is never asked for: both are decided
- * synchronously, before the request, so a click there asks the browser for nothing.
- */
-function onActionClicked(tab: ClickedTab): void {
-  openPanelFor(tab);
-  const look = lookAtTab(tab.url, settingsCache?.hostname);
-  const note: ClickNote | undefined = look && tab.id !== undefined ? { tabId: tab.id, origin: look.origin, path: look.path, looksLikeOod: look.ood, granted: false, at: new Date().toISOString() } : undefined;
-  if (look && tab.id !== undefined && look.ood && !look.anthropic && mayRequestOrigin(look.origin)) {
-    const tabId = tab.id;
-    const granting = requestOrigin(look.origin);
-    void (async () => {
-      // the panel describes this tab while the browser's prompt is open, not the tab clicked before it
-      // (the request above is already made; nothing here waits before it)
-      if (note) await session.set(CLICK_KEY, note);
-      await tellPages();
-      try {
-        const out = await connectPortal(look.origin, tabId, granting);
-        settingsCache = out.settings;
-        if (note) await session.set(CLICK_KEY, { ...note, granted: true });
-        if (out.answered) await session.set(PORTAL_TAB_KEY, { tabId, origin: out.settings.origin } satisfies PortalTab);
-        await tellPages();
-      } catch {
-        if (note) await session.set(CLICK_KEY, note);
-        await tellPages();
-      }
-      await checkAccessNow('click');
-    })();
-    return;
-  }
-  void (async () => {
-    if (note) await session.set(CLICK_KEY, note);
-    await tellPages();
-    await checkAccessNow('click');
-  })();
-}
-
-/** the monitoring surface this browser has: Chrome/Edge side panel, Firefox sidebar, else a tab (Safari) */
-function openPanelFor(tab: ClickedTab): void {
-  const b = browser as unknown as { sidePanel?: { open(o: { tabId?: number; windowId?: number }): Promise<void> }; sidebarAction?: { open(): Promise<void> } };
+/** 11.0.0 registers no page script; one an earlier build left (10.0.0 registered it for the portal) goes */
+async function unregisterOldScripts(): Promise<void> {
   try {
-    if (b.sidePanel && tab.id !== undefined) {
-      b.sidePanel.open({ tabId: tab.id }).catch(() => browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') }));
-      return;
-    }
-    if (b.sidebarAction) {
-      b.sidebarAction.open().catch(() => browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') }));
-      return;
-    }
+    const all = await browser.scripting.getRegisteredContentScripts();
+    // 10.0.0 registered SCRIPT_ID for the portal (and builds before 7.0.0 another id); 11.0.0 registers none
+    const ids = all.map((s) => s.id);
+    if (ids.length) await browser.scripting.unregisterContentScripts({ ids });
+    void SCRIPT_ID;
   } catch {
-    /* fall through */
+    /* none, or this browser keeps none */
   }
-  void browser.tabs.create({ url: browser.runtime.getURL('/sidepanel.html') });
 }
 
 async function ensureAlarms(): Promise<void> {
-  const poll = await browser.alarms.get(POLL_ALARM);
-  if (!poll) await browser.alarms.create(POLL_ALARM, { periodInMinutes: POLL_MINUTES });
-  const kl = await browser.alarms.get(KILLLIST_ALARM);
-  if (!kl) {
-    await browser.alarms.create(KILLLIST_ALARM, { delayInMinutes: 1, periodInMinutes: KILLLIST_PERIOD_MINUTES });
+  if (!(await browser.alarms.get(POLL_ALARM))) await setPollEvery(1);
+  if (!(await browser.alarms.get(KILLLIST_ALARM))) await browser.alarms.create(KILLLIST_ALARM, { delayInMinutes: 1, periodInMinutes: KILLLIST_PERIOD_MINUTES });
+  if (!(await browser.alarms.get(ACCESS_ALARM))) await browser.alarms.create(ACCESS_ALARM, { delayInMinutes: 2, periodInMinutes: ACCESS_PERIOD_MINUTES });
+}
+
+/** the background's own alarm: every 30 s from Connect until online, then every 60 s */
+async function setPollEvery(minutes: number): Promise<void> {
+  if (mem.pollEvery === minutes && (await browser.alarms.get(POLL_ALARM))) return;
+  mem.pollEvery = minutes;
+  await browser.alarms.create(POLL_ALARM, { periodInMinutes: minutes });
+}
+
+async function settingsNow(): Promise<PortalSettings | undefined> {
+  return acceptedSettings(await local.get<PortalSettings>(PORTAL_KEY));
+}
+
+async function termsInForce(): Promise<boolean> {
+  return recordInForce(await local.get(TERMS_KEY));
+}
+
+/** the site profile this build carries for a site (cached) */
+async function siteProfile(site: string): Promise<SiteProfile | undefined> {
+  if (mem.profile?.site === site) return mem.profile.profile;
+  const profile = await bundledProfile(site, (p) => fetch(assetUrl(p)));
+  mem.profile = { site, profile };
+  return profile;
+}
+
+/** the words the site profile gives (D20 when there is none) */
+function siteWords(profile: SiteProfile | undefined, workerName: string): SiteWords {
+  return {
+    ...(profile?.vpn_app ? { vpnApp: profile.vpn_app } : {}),
+    ...(profile?.vpn_portal ? { vpnPortal: profile.vpn_portal } : {}),
+    title: sessionTitleFor(profile?.session_title, workerName),
+    hours: Number(profile?.worker_defaults?.hours) || 8,
+    ...(profile?.grid_account_help_url ? { gridAccountHelpUrl: profile.grid_account_help_url } : {}),
+    ...(profile?.vpn_help_url ? { vpnHelpUrl: profile.vpn_help_url } : {}),
+  };
+}
+
+/** the portal client of this background: credentials "include", the shell from here (direct) */
+async function directClient(): Promise<PortalClient | undefined> {
+  const s = await settingsNow();
+  if (!s) return undefined;
+  const profile = await siteProfile(s.site);
+  const key = `${s.origin}|${s.shell_host}|${profile?.vpn_app ?? ''}`;
+  if (mem.client?.key === key) return mem.client.client;
+  const audit = new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) });
+  const net = { fetch: (input: string, init?: RequestInit) => fetch(input, init), WebSocket: globalThis.WebSocket as unknown as WsConstructor };
+  const client = new PortalClient(s.origin, net, audit, { shellHost: s.shell_host, credentials: 'include', vpnApp: profile?.vpn_app, via: 'extension' });
+  mem.client = { key, client };
+  return client;
+}
+
+async function channelNow(): Promise<ChannelNote | undefined> {
+  const s = await settingsNow();
+  const c = await local.get<ChannelNote>(CHANNEL_KEY);
+  return c && s && c.origin === s.origin ? c : undefined;
+}
+
+/**
+ * The tool's full path for this account: the bundled profile's shared_install, or, for a portal this
+ * build carries no profile for, the folder the account's own marker names (~/.hpcworker/shared).
+ */
+async function sharedDirNow(): Promise<string | undefined> {
+  const s = await settingsNow();
+  if (!s) return undefined;
+  const key = `${s.origin}|${s.site}`;
+  if (mem.sharedDir?.key === key && mem.sharedDir.dir) return mem.sharedDir.dir;
+  let dir = sharedRootOf((await siteProfile(s.site))?.shared_install);
+  if (!dir) {
+    try {
+      const c = await directClient();
+      const home = c ? await c.home() : undefined;
+      if (c && home) dir = sharedRootOf(((await c.readFileIfExists(paths.sharedMarker(home))) ?? '').trim());
+    } catch {
+      dir = undefined;
+    }
   }
-  const ac = await browser.alarms.get(ACCESS_ALARM);
-  if (!ac) {
-    await browser.alarms.create(ACCESS_ALARM, { delayInMinutes: 2, periodInMinutes: ACCESS_PERIOD_MINUTES });
+  mem.sharedDir = { key, dir };
+  return dir;
+}
+
+/** the site name connect is given: the portal's (a bundled profile's name), else the account's own profile's */
+async function siteForConnect(s: PortalSettings): Promise<string> {
+  if (await siteProfile(s.site)) return s.site;
+  try {
+    const c = await directClient();
+    const ctx = c ? await clusterContext(c) : undefined;
+    if (ctx?.site && /^[a-z0-9-]{1,32}$/.test(ctx.site)) return ctx.site;
+  } catch {
+    /* the portal's own name stands */
+  }
+  return s.site;
+}
+
+/**
+ * Run something that needs the shell: from this background in direct mode, or through a page script
+ * in a portal tab (the sign-in tab kept, or one opened inactive and closed) in tab mode.
+ */
+async function withShell<T>(fn: (p: PortalApi) => Promise<T>, o: { viaTabId?: number } = {}): Promise<T> {
+  const s = await settingsNow();
+  if (!s) throw new Error('no portal connected');
+  const ch = await channelNow();
+  if (ch?.mode === 'tab') {
+    mem.workingInTab++;
+    schedulePush();
+    // a tab of Beethoven's already on the portal (the grid terminal of the key step) carries it, else the kept sign-in tab, else one opened for this
+    const kept = o.viaTabId ?? mem.keptTabId;
+    try {
+      return await withPortalTab(tabHost(s.origin), { origin: s.origin, ...(mem.panelWindowId !== undefined ? { windowId: mem.panelWindowId } : {}), ...(kept !== undefined ? { keptTabId: kept } : {}) }, (_id, p) => fn(p));
+    } finally {
+      mem.workingInTab--;
+      schedulePush();
+    }
+  }
+  const c = await directClient();
+  if (!c) throw new Error('no portal connected');
+  return fn(c);
+}
+
+async function activity(text: string): Promise<void> {
+  await session.set(ACTIVITY_KEY, addActivity(await session.get<ActivityEntry[]>(ACTIVITY_KEY), text, nowIso()));
+}
+
+async function once(patch: Partial<OnceNotes>): Promise<OnceNotes> {
+  const cur = (await local.get<OnceNotes>(ONCE_KEY)) ?? {};
+  const next = { ...cur, ...Object.fromEntries(Object.entries(patch).filter(([k]) => !(cur as Record<string, unknown>)[k])) };
+  await local.set(ONCE_KEY, next);
+  return next;
+}
+
+function toast(text: string): void {
+  mem.toast = { text, until: Date.now() + 2_400 };
+  schedulePush();
+}
+
+// ---- the facts and the views ---------------------------------------------------------------------------
+
+async function buildFacts(): Promise<Facts> {
+  const now = Date.now();
+  const L = await local.many([TERMS_KEY, PORTAL_KEY, PREFS_KEY, ACCESS_KEY, SERVICES_KEY, IDENTITY_KEY, STATEMENTS_KEY, LAST_KNOWN_KEY, CHANNEL_KEY, WAIT_HISTORY_KEY, TOUR_SEEN_KEY, ONCE_KEY, KILLLIST_KEY]);
+  const S = await session.many([GRID_KEY, PRESS_KEY, RUN_KEY, ANTHROPIC_TAB_KEY, WELCOME_PRESS_KEY, ...(mem.logOpen ? [ACTIVITY_KEY] : [])]);
+  const settings = acceptedSettings(L[PORTAL_KEY] as PortalSettings | undefined);
+  const prefs: Prefs = { ...DEFAULT_PREFS, ...((L[PREFS_KEY] as Partial<Prefs> | undefined) ?? {}) };
+  const granted = settings ? await connectApi.containsOrigin(settings.origin).catch(() => false) : false;
+  const profile = settings ? await siteProfile(settings.site) : await siteProfile(DEFAULT_SITE);
+  const grid = (S[GRID_KEY] as GridNote | undefined) ?? { reach: 'unknown', session: 'unknown', checked_at: '' };
+  const account = grid.account ?? (L[IDENTITY_KEY] as IdentityNote | undefined)?.username;
+  const verdict = killListVerdict(L[KILLLIST_KEY] as StoredKillList | undefined, version());
+  const access = accessFact({ record: L[ACCESS_KEY] as AccessRecord | undefined, services: L[SERVICES_KEY] as StoredServices | undefined, accessId: account, portal: settings?.hostname, now: new Date(now), versionRevoked: verdict.versionRevoked, revokedMessage: verdict.message, checking: mem.accessChecking });
+  const run = S[RUN_KEY] as RunState | undefined;
+  const channel = L[CHANNEL_KEY] as ChannelNote | undefined;
+  const words = siteWords(profile, prefs.worker_name);
+  const rf = runFacts(run, now);
+  const log = mem.logOpen ? mergeLog(S[ACTIVITY_KEY] as ActivityEntry[] | undefined, run?.progress_tail, rf.title ?? words.title) : undefined;
+  // a Claude sign-in this background no longer holds (the service worker was stopped mid-sitting):
+  // Anthropic's tab is still on record, and nothing on the grid says the sign-in finished
+  const interrupted = !!S[ANTHROPIC_TAB_KEY] && !mem.sitting && !mem.startId && !mem.connect.inFlight && mem.connect.signin !== 'signed-in' && !rf.claude?.loggedIn;
+  const press = S[WELCOME_PRESS_KEY] as { at?: string } | undefined;
+  const pressAt = press?.at ? Date.parse(press.at) : NaN;
+  return {
+    now,
+    terms: recordInForce(L[TERMS_KEY]),
+    ...(settings ? { portal: { origin: settings.origin, hostname: settings.hostname, site: settings.site } } : {}),
+    granted,
+    site: words,
+    grid: { reach: grid.reach, session: grid.session, ...(account ? { account } : {}), ...(mem.lookingSince !== undefined ? { lookingSince: mem.lookingSince } : {}), ...(mem.answeredAt !== undefined ? { answeredAt: mem.answeredAt } : {}) },
+    signin: mem.signin,
+    ...(channel && settings && channel.origin === settings.origin ? { channel } : {}),
+    access,
+    setup: mem.setup,
+    statement: { inForce: !!statementFor(L[STATEMENTS_KEY] as Statements | undefined, prefs.worker_name), workerName: prefs.worker_name, ...(mem.restricted ? { restricted: true } : {}) },
+    ...(S[PRESS_KEY] ? { press: S[PRESS_KEY] as PendingPress } : {}),
+    connect: interrupted ? { ...mem.connect, interrupted: true } : mem.connect,
+    welcome: { state: mem.welcome.state, ...(Number.isFinite(pressAt) ? { pressAt } : {}) },
+    ...(mem.loginSetup ? { loginSetup: { phase: mem.loginSetup.phase, line: mem.loginSetup.line } } : {}),
+    run: rf,
+    ...(L[LAST_KNOWN_KEY] && (L[LAST_KNOWN_KEY] as LastKnown).worker_name === prefs.worker_name ? { lastKnown: L[LAST_KNOWN_KEY] as LastKnown } : {}),
+    waits: (L[WAIT_HISTORY_KEY] as WaitHistory | undefined)?.minutes ?? [],
+    once: (L[ONCE_KEY] as OnceNotes | undefined) ?? {},
+    ...(L[TOUR_SEEN_KEY] ? { tourSeen: L[TOUR_SEEN_KEY] as TourSeen } : {}),
+    prefs,
+    ...(mem.pinned !== undefined ? { pinned: mem.pinned } : {}),
+    stopping: mem.stopping,
+    workingInTab: mem.workingInTab > 0,
+    ...(log ? { log } : {}),
+    ...(mem.toast && mem.toast.until > now ? { toast: mem.toast.text } : {}),
+    ...(mem.onlineAnnouncedAt !== undefined ? { onlineAnnouncedAt: mem.onlineAnnouncedAt } : {}),
+    ...(mem.tourFromMenu ? { tourFromMenu: true } : {}),
+  };
+}
+
+async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
+  switch (surface) {
+    case 'panel':
+      return { surface: 'panel', view: panelView(f) };
+    case 'welcome': {
+      const settings = await settingsNow();
+      const def = defaultPortalFrom(await siteProfile(DEFAULT_SITE));
+      const portal = settings ? { origin: settings.origin, hostname: settings.hostname } : def ? { origin: def.origin, hostname: def.hostname } : { origin: 'https://ondemand.grid.wayne.edu', hostname: 'ondemand.grid.wayne.edu' };
+      const state: WelcomeView['state'] = f.terms && mem.welcome.state === 'idle' && settings ? 'handoff' : mem.welcome.state;
+      return { surface: 'welcome', view: welcomeView({ portal, site: f.site, state, ...(mem.welcome.problem ? { problem: mem.welcome.problem } : {}), ...(state === 'handoff' && firstRunDone(f) ? { hero: home(f).hero } : state === 'handoff' ? { hero: (({ live: _l, ...h }) => h)(heroOf(f)) } : {}), licenseUrl: browser.runtime.getURL('/LICENSE.txt' as never), privacyUrl: browser.runtime.getURL('/PRIVACY.md' as never) }) };
+    }
+    case 'details': {
+      const settings = await settingsNow();
+      const report = await session.get<DiagReport>(CHECKS_KEY);
+      const audit = (await local.get<{ records?: Array<Record<string, unknown>> }>(AUDIT_KEY))?.records ?? [];
+      return {
+        surface: 'details',
+        view: detailsView({
+          reports: report?.reports,
+          running: mem.checksRunning,
+          run: await session.get<RunState>(RUN_KEY),
+          ...(settings ? { settings, profile: await siteProfile(settings.site) } : {}),
+          ...(f.channel ? { channel: f.channel } : {}),
+          audit: audit.slice(-60).map((r) => `${String(r.ts ?? '')} ${String(r.method ?? '')} ${String(r.endpoint ?? '')} ${String(r.outcome ?? '')}${r.via ? ` (${String(r.via)})` : ''}`),
+          now: f.now,
+        }),
+      };
+    }
+    case 'settings': {
+      const terms = await local.get<TermsRecord>(TERMS_KEY);
+      const audit = (await local.get<{ records?: unknown[] }>(AUDIT_KEY))?.records ?? [];
+      const drive = !!(await local.get<Checklist>(CHECKLIST_KEY))?.drive_connected_at;
+      const settings = await settingsNow();
+      return { surface: 'settings', view: settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId() }) };
+    }
   }
 }
 
+let pushQueued = false;
+let pushChain: Promise<void> = Promise.resolve();
+
+/** recompute the views and send each open page its own when it changed; set the toolbar; keep the last known state */
+function schedulePush(): void {
+  if (pushQueued) return;
+  pushQueued = true;
+  pushChain = pushChain
+    .then(() => new Promise<void>((r) => setTimeout(r, 0)))
+    .then(async () => {
+      pushQueued = false;
+      const f = await buildFacts();
+      await reflect(f);
+      for (const [port, sub] of mem.ports) {
+        try {
+          const view = await viewFor(sub.surface, f);
+          const json = JSON.stringify(view);
+          if (json === sub.last) continue;
+          sub.last = json;
+          port.postMessage({ type: 'view', view });
+        } catch {
+          /* the page went away */
+        }
+      }
+    })
+    .catch(() => {
+      pushQueued = false;
+    });
+}
+
+/** the toolbar (badge, title, the lit icon) and the last known state, from the facts */
+async function reflect(f: Facts): Promise<void> {
+  const tb = toolbarView(f);
+  const key = JSON.stringify(tb);
+  if (key !== mem.lastToolbar) {
+    mem.lastToolbar = key;
+    const act = (browser.action ?? (browser as unknown as { browserAction?: typeof browser.action }).browserAction) as typeof browser.action | undefined;
+    try {
+      await act?.setBadgeText({ text: tb.badge?.text ?? '' });
+      if (tb.badge) await act?.setBadgeBackgroundColor({ color: BADGE_COLORS[tb.badge.color] });
+      await act?.setTitle({ title: tb.title });
+      await act?.setIcon({ path: tb.lit ? LIT_ICONS : PLAIN_ICONS }).catch(() => act?.setIcon({ path: PLAIN_ICONS }));
+    } catch {
+      /* a browser without one of these */
+    }
+  }
+  // the last known state, kept across browser restarts so the panel shows it at once
+  const lk = lastKnownOf(f);
+  if (lk) {
+    const json = JSON.stringify(lk);
+    if (json !== mem.lastKnownJson || f.now - mem.last.lastKnownAt > 30_000) {
+      mem.lastKnownJson = json;
+      mem.last.lastKnownAt = f.now;
+      await local.set(LAST_KNOWN_KEY, { ...lk, seen_at: new Date(f.now).toISOString() } satisfies LastKnown);
+    }
+  }
+  // the pin tip is shown once the worker is online and the icon is not pinned
+  if (f.run.phase === 'online' && f.pinned === false && !f.once.pin_tip_shown_at) await once({ pin_tip_shown_at: nowIso() });
+}
+
+function onViewPort(port: ViewPort): void {
+  mem.ports.set(port, { surface: 'panel' });
+  port.onMessage.addListener((m: unknown) => {
+    const msg = m as ViewIn;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'subscribe') {
+      const sub = mem.ports.get(port);
+      if (!sub) return;
+      sub.surface = msg.surface;
+      sub.windowId = msg.windowId;
+      sub.last = undefined;
+      if (msg.surface === 'panel' && msg.windowId !== undefined) mem.panelWindowId = msg.windowId;
+      schedulePush();
+    } else if (msg.type === 'tick') void tick();
+  });
+  port.onDisconnect.addListener(() => {
+    mem.ports.delete(port);
+    if (![...mem.ports.values()].some((s) => s.surface === 'panel')) {
+      // the log is closed every time the panel opens
+      mem.logOpen = false;
+      mem.tourFromMenu = false;
+    }
+  });
+}
+
+/** a page is open: the panel's 2-second timer drives the watch, the cadence and the clocks */
+async function tick(): Promise<void> {
+  const now = Date.now();
+  if (!(await termsInForce())) return schedulePush();
+  const settings = await settingsNow();
+  if (!settings) return schedulePush();
+  const grid = await session.get<GridNote>(GRID_KEY);
+  // the grid sign-in: a dashboard GET on each tick while a sign-in tab is watched
+  if (mem.signin.waiting && now - mem.last.signin >= SIGNIN_WATCH_MS) {
+    mem.last.signin = now;
+    void checkGrid('watch');
+  }
+  // GlobalProtect: is the grid answering yet?
+  else if ((grid?.reach === 'no-route' || grid?.session === 'unreachable') && now - mem.last.reach >= REACH_EVERY_MS) void recheckReach();
+  // the Grid row's live check, once a minute
+  else if (now - mem.last.grid >= GRID_LIVE_MS) void checkGrid('minute');
+  const run = await session.get<RunState>(RUN_KEY);
+  const rf = runFacts(run, now);
+  const starting = mem.connect.inFlight || ['queued', 'got-computer', 'connecting', 'slow', 'reconnecting', 'needs-claude', 'needs-consent', 'renewing'].includes(rf.phase);
+  if (grid?.session === 'signed-in' && now - mem.last.list >= (starting ? LIST_STARTING_MS : LIST_IDLE_MS)) void pollRun();
+  const pressWaiting = !!(await session.get<PendingPress>(PRESS_KEY));
+  // the scheduler's reason, once a minute while in line; never while a press of the student's waits or runs
+  if (grid?.session === 'signed-in' && rf.phase === 'queued' && now - mem.last.statusJson >= STATUS_JSON_MS && !pressWaiting && !mem.stopping && !mem.startId && mem.pressDepth === 0) void refreshStatusJson();
+  // a press kept for later goes ahead by itself once what it waits on is there (never beside a press being handled now)
+  if (grid?.session === 'signed-in' && !mem.sitting && !mem.startId && mem.pressDepth === 0 && now - mem.last.carry >= PRESS_RETRY_MS && pressWaiting) {
+    mem.last.carry = now;
+    void carryPress();
+  }
+  schedulePush();
+}
+
+/** the alarm, with or without a page open: the run's files only (no shell, no scheduler) */
+async function backgroundPoll(): Promise<void> {
+  if (!(await termsInForce()) || !(await settingsNow())) return;
+  const grid = await session.get<GridNote>(GRID_KEY);
+  if (grid?.session === 'signed-in' || mem.ports.size === 0) await pollRun();
+  schedulePush();
+}
+
+async function signinAlarm(): Promise<void> {
+  if (!mem.signin.waiting && !(await session.get<OpenedTab>(SIGNIN_TAB_KEY))) {
+    await browser.alarms.clear(SIGNIN_ALARM);
+    return;
+  }
+  await checkGrid('alarm');
+}
+
+// ---- messages ---------------------------------------------------------------------------------------
+
 async function handle(msg: Request, sender: { tab?: { id?: number }; url?: string }): Promise<Answer> {
   switch (msg.type) {
-    case 'portal.hello': {
-      // only a page script on the granted origin may register as the portal tab
-      const settings = await portalSettings();
-      const from = sender.url ? new URL(sender.url).origin : '';
-      if (!settings || isAnthropicAddress(from) || from !== settings.origin || from !== msg.origin || sender.tab?.id === undefined) return fail(new Error('hello from an unexpected origin'));
-      await session.set(PORTAL_TAB_KEY, { tabId: sender.tab.id, origin: from } satisfies PortalTab);
-      await tellPages();
-      // the portal tab just connected: the access check reads the dashboard's account name from it
-      // (its caches decide whether the service is asked), and the "start when my portal opens" setting acts
-      void checkAccessNow('hello').then(() => maybeAutoStart('hello'));
-      return succeed({ registered: true });
+    case 'action':
+      return succeed(await act(msg.action));
+    case 'view.get':
+      return succeed(await viewFor(msg.surface, await buildFacts()));
+    case 'panel.opened':
+      if (msg.windowId !== undefined) mem.panelWindowId = msg.windowId;
+      mem.logOpen = false;
+      void panelOpened();
+      return succeed(true);
+    case 'terminal.shell-up': {
+      const rec = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+      if (rec && sender.tab?.id === rec.tabId) void mem.loginSetup?.shellUp();
+      return succeed(true);
     }
+    case 'portal.hello':
+      // 11.0.0 loads the page script into its own tabs only; a hello says nothing it does not know
+      return succeed({ registered: false });
     case 'portal.ping':
-      return succeed(await pingPortal());
-    case 'portal.tab': {
-      const id = await portalTabId();
-      const settings = await portalSettings();
-      return succeed(id !== undefined && settings ? { tabId: id, origin: settings.origin } : undefined);
-    }
+      return succeed(!!(await directClient()));
+    case 'portal.tab':
+      return succeed(undefined);
     case 'portal.call': {
       if (!PORTAL_OPS.includes(msg.op)) return fail(new Error(`unknown portal operation ${String(msg.op)}`));
-      return succeed(await callPortal(msg.op, msg.args ?? []));
+      const c = await directClient();
+      if (!c) return fail(new Error('no portal connected'));
+      const fn = c[msg.op] as (...a: unknown[]) => Promise<unknown>;
+      return succeed(await fn.apply(c, msg.args ?? []));
     }
     case 'run.get':
       return succeed(await session.get<RunState>(RUN_KEY));
-    case 'run.set': {
-      const state: RunState = { stateDir: msg.stateDir, run: msg.run, job: msg.job, ...(msg.site ? { site: msg.site } : {}), set_at: new Date().toISOString(), started_by: 'button' };
-      await session.set(RUN_KEY, state);
-      await pollRun();
-      return succeed(await session.get<RunState>(RUN_KEY));
-    }
-    case 'run.stopped': {
-      const state = await session.get<RunState>(RUN_KEY);
-      if (state) await session.set(RUN_KEY, { ...state, stopped_by_student: true } satisfies RunState);
-      await pollRun();
-      return succeed(await session.get<RunState>(RUN_KEY));
-    }
-    case 'run.clear':
-      await session.remove(RUN_KEY);
-      return succeed(undefined);
     case 'run.refresh':
-      await pollRun();
+      await pollRun(true);
       return succeed(await session.get<RunState>(RUN_KEY));
     case 'run.open':
-      return succeed(await openEnvironmentOnce(true));
+      return succeed(await openSession());
+    case 'run.clear':
+      await mutateRun(() => null);
+      return succeed(undefined);
+    case 'run.set':
+    case 'run.stopped':
     case 'worker.start':
-      return succeed(await startNow('strip'));
+      return fail(new Error('11.0.0 starts and stops the worker through the panel actions'));
     case 'killlist.refresh':
       return succeed(await refreshKillListNow());
     case 'access.check':
-      return succeed(await checkAccessNow(msg.force ? 'page-force' : 'page'));
+      return succeed(await checkAccessNow(msg.force ? 'retry' : 'open'));
     default:
       return fail(new Error(`unhandled message ${(msg as { type: string }).type}`));
   }
 }
 
-/** find the tab whose page script answers: the one that said hello, else any tab on the granted origin */
-async function portalTabId(): Promise<number | undefined> {
-  const settings = await portalSettings();
-  if (!settings) return undefined;
-  const remembered = await session.get<PortalTab>(PORTAL_TAB_KEY);
-  if (remembered && remembered.origin === settings.origin) {
-    try {
-      await browser.tabs.get(remembered.tabId);
-      return remembered.tabId;
-    } catch {
-      await session.remove(PORTAL_TAB_KEY);
-    }
+/** the panel on load: the access re-check LICENSE 3(a) ties to opening it (after a day or after a no), and the live grid check */
+async function panelOpened(): Promise<void> {
+  if (!(await termsInForce())) return;
+  await checkGrid('open');
+  void checkAccessNow('open');
+  void pollRun(true);
+}
+
+async function onPinChanged(pinned: boolean): Promise<void> {
+  const was = mem.pinned;
+  mem.pinned = pinned;
+  if (pinned && was === false) {
+    const o = (await local.get<OnceNotes>(ONCE_KEY)) ?? {};
+    if (o.pin_tip_shown_at) await once({ pin_tip_done_at: nowIso() });
   }
-  // matching by URL needs host permission for that URL, which the grant provides; no "tabs" permission
+  schedulePush();
+}
+
+// ---- actions ----------------------------------------------------------------------------------------
+
+/** what a page may ask before the agreement is accepted: nothing that reaches the network or opens a tab of Beethoven's own doing */
+const BEFORE_TERMS: ReadonlySet<Action['kind']> = new Set(['agree', 'use-portal', 'open-settings', 'open-help', 'open-details', 'set-pref', 'tour', 'dismiss', 'log', 'audit', 'copy-details', 'drive-connected']);
+
+async function act(a: Action): Promise<unknown> {
+  // PRIVACY.md: nothing is sent anywhere before the agreement; the pages offer nothing else then, and
+  // the background holds to it whatever a page asks
+  if (!BEFORE_TERMS.has(a.kind) && !(await termsInForce())) throw new Error(TERMS_REFUSAL);
+  const press = PRESS_KINDS.has(a.kind);
+  if (press) mem.pressDepth++;
   try {
-    const tabs = await browser.tabs.query({ url: `${settings.origin}/*` });
-    for (const tab of tabs) {
-      if (tab.id === undefined) continue;
-      // a tab that was open before the grant has no page script yet: load it now, as the click would have
-      if (!(await connectApi.ping(tab.id).catch(() => false))) {
-        await connectApi.inject(tab.id, settings.origin).catch(() => undefined);
-        let ok = false;
-        for (let i = 0; i < 8 && !ok; i++) {
-          await connectApi.sleep(250);
-          ok = await connectApi.ping(tab.id).catch(() => false);
-        }
-        if (!ok) continue;
+    return await actInner(a);
+  } finally {
+    if (press) mem.pressDepth = Math.max(0, mem.pressDepth - 1);
+    schedulePush();
+  }
+}
+
+async function actInner(a: Action): Promise<unknown> {
+  switch (a.kind) {
+    case 'agree':
+      return onAgree(a);
+    case 'use-portal':
+    case 'change-portal':
+      return onUsePortal(a.origin, a.granted, a.kind === 'change-portal');
+    case 'sign-in-grid':
+      if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
+      return { opened: await openSigninTab('press') } satisfies ActionResults['sign-in-grid'];
+    case 'retry-grid': {
+      const r = await recheckReach();
+      const s = r === 'answers' ? await checkGrid('retry') : 'unreachable';
+      return { reach: r, session: s === 'signed-in' ? 'signed-in' : s === 'unreachable' ? 'unreachable' : 'signed-out' } satisfies ActionResults['retry-grid'];
+    }
+    case 'ask-access': {
+      const f = await buildFacts();
+      const url = f.access.requestUrl || requestUrl(undefined, f.grid.account);
+      return { opened: !!(await openTab(url, { active: true, ...(mem.panelWindowId !== undefined ? { windowId: mem.panelWindowId } : {}) })) } satisfies ActionResults['ask-access'];
+    }
+    case 'retry-access': {
+      await checkAccessNow('retry');
+      const f = await buildFacts();
+      void carryPress();
+      return { approved: f.access.ok } satisfies ActionResults['retry-access'];
+    }
+    case 'update':
+      return { opened: !!(await openTab(`https://chromewebstore.google.com/detail/${browser.runtime.id}`, { active: true })) } satisfies ActionResults['update'];
+    case 'copy-details':
+      return { text: await detailsText() } satisfies ActionResults['copy-details'];
+    case 'restrict':
+      return pressRestrict(a.workerName);
+    case 'connect':
+      return pressConnect(a.statement);
+    case 'cancel':
+      return cancelPress();
+    case 'stop':
+      return pressStop();
+    case 'sign-in-claude':
+      return pressSignInClaude(!!a.fresh);
+    case 'paste-code':
+      return pasteCode(a.code);
+    case 'reopen-claude-tab': {
+      const url = mem.sitting?.authUrl;
+      if (!url) return { opened: false } satisfies ActionResults['reopen-claude-tab'];
+      mem.connect = { ...mem.connect, claudeTabClosed: false };
+      return { opened: await openAnthropicTab(url) } satisfies ActionResults['reopen-claude-tab'];
+    }
+    case 'retry':
+      return retry();
+    case 'open-session':
+      return openSession();
+    case 'new-session': {
+      const f = await buildFacts();
+      const link = f.run.link ?? f.lastKnown?.environment_url;
+      if (!isEnvironmentUrl(link)) return { opened: false, firstTime: false } satisfies ActionResults['new-session'];
+      const o = (await local.get<OnceNotes>(ONCE_KEY)) ?? {};
+      const firstTime = !o.new_session_tip_at;
+      if (firstTime) {
+        await once({ new_session_tip_at: nowIso() });
+        toast(WORDS.home.newSessionTip);
       }
-      await session.set(PORTAL_TAB_KEY, { tabId: tab.id, origin: settings.origin } satisfies PortalTab);
-      return tab.id;
+      return { opened: !!(await openTab(link, { active: true, anthropicOk: true, ...(mem.panelWindowId !== undefined ? { windowId: mem.panelWindowId } : {}) })), firstTime } satisfies ActionResults['new-session'];
     }
-  } catch {
-    /* no match */
-  }
-  return undefined;
-}
-
-async function pingPortal(): Promise<boolean> {
-  const id = await portalTabId();
-  if (id === undefined) return false;
-  return connectApi.ping(id).catch(() => false);
-}
-
-async function callPortal(op: PortalOp, args: unknown[]): Promise<unknown> {
-  const id = await portalTabId();
-  if (id === undefined) throw new Error('Open your portal in a tab first (the extension works only from your own portal tab).');
-  let a: Answer | undefined;
-  try {
-    a = (await browser.tabs.sendMessage(id, { type: 'portal.call', op, args })) as Answer | undefined;
-  } catch (e) {
-    throw new Error(`The portal tab did not answer (${(e as Error).message}). Reload the portal tab and try again.`);
-  }
-  return unwrap(a);
-}
-
-/** the typed view of the page script's operations, for the background's own reads and starts */
-function portal(): PortalApi {
-  return new Proxy({} as PortalApi, { get: (_t, op: string) => (...args: unknown[]) => callPortal(op as PortalOp, args) });
-}
-
-/** the once-a-minute read of the current run's files; the job writes them, we never ask the scheduler */
-async function pollRun(): Promise<void> {
-  const state = await session.get<RunState>(RUN_KEY);
-  if (!state) return;
-  const p = portal();
-  const next: RunState = { ...state, updated: new Date().toISOString(), error: undefined };
-  try {
-    const status = await p.readFileIfExists(paths.status(state.stateDir, state.run));
-    if (status) next.status = JSON.parse(status) as StatusFile;
-    const conn = await p.readFileIfExists(paths.connection(state.stateDir, state.run));
-    if (conn) next.connection = JSON.parse(conn) as ConnectionFile;
-    const log = await p.readFileIfExists(paths.rcLog(state.stateDir, state.run));
-    if (log !== undefined) {
-      next.rc_tail = log.slice(-4000);
-      // the registration block is the ground truth for the name and the link; the files echo it
-      const reg = parseRegistration(log);
-      if (reg.session_name || reg.environment_url) next.registration = reg;
-    }
-    const url = next.connection?.environment_url ?? next.status?.environment_url ?? next.registration?.environment_url;
-    if (url && !isEnvironmentUrl(url)) next.error = 'the job reported a link that is not a claude.ai/code environment link; it is not shown';
-  } catch (e) {
-    next.error = (e as Error).message;
-  }
-  await session.set(RUN_KEY, next);
-  await tellPages();
-  await openEnvironmentOnce(false);
-}
-
-/**
- * Open the worker's claude.ai link in a new tab the first time this browser profile sees it
- * (setting "open claude.ai when the worker connects", on by default); afterwards the green
- * button does it on request. The link opened is only ever Claude's own Code page for an
- * environment (isEnvironmentUrl), and nothing of the extension runs on it.
- */
-function openEnvironmentOnce(byRequest: boolean): Promise<{ opened: boolean; url?: string }> {
-  const step = openChain.then(async () => {
-    const state = await session.get<RunState>(RUN_KEY);
-    const url = environmentLinkOf(state);
-    if (!url) return { opened: false };
-    const opened = (await local.get<OpenedLinks>(OPENED_KEY)) ?? { urls: [] };
-    const prefs = await loadPrefs();
-    if (!byRequest && (!prefs.open_claude_on_connect || opened.urls.includes(url))) return { opened: false, url };
-    await browser.tabs.create({ url });
-    if (!opened.urls.includes(url)) await local.set(OPENED_KEY, { urls: [...opened.urls.slice(-19), url] } satisfies OpenedLinks);
-    await tellPages();
-    return { opened: true, url };
-  });
-  openChain = step.catch(() => undefined);
-  return step;
-}
-
-async function tellPages(): Promise<void> {
-  try {
-    await browser.runtime.sendMessage({ type: 'run.changed' } satisfies Request);
-  } catch {
-    /* no page open to hear it */
-  }
-}
-
-/**
- * The one start path. The facts are gathered afresh here and the step machine decides: the
- * worker is started only when it is the next step (terms, access, tool, probe, sign-in and the
- * statement all in order, no worker alive, the scheduler floor open). The strip and the
- * "start my worker when I open my portal" setting both come through here, so two starts can
- * never race: at most one is in flight, and hpcworker itself finds a job that already exists.
- * A stopped or failed worker is the one case the two callers differ on: the strip asks after the
- * student pressed its "Start again" button (the machine offers that button and nothing automatic),
- * and that press is honoured; the setting never restarts one.
- */
-function startNow(trigger: 'strip' | 'auto'): Promise<StartResult> {
-  if (startInFlight) return startInFlight;
-  startInFlight = (async (): Promise<StartResult> => {
-    const settings = await portalSettings();
-    if (!settings) return { started: false, reason: 'no portal connected' };
-    const p = portal();
-    const prefs = await loadPrefs();
-    const transient: Transient = {};
-    try {
-      const w = await p.warm();
-      await rememberIdentity(w.session);
-      transient.warm = w.ok && w.signedIn ? { state: 'warm' } : w.status === 0 ? { state: 'unreachable', detail: w.detail } : w.ok ? { state: 'signed-out', detail: w.detail } : { state: 'cold', detail: w.detail };
-    } catch (e) {
-      return { started: false, reason: (e as Error).message };
-    }
-    const run = await session.get<RunState>(RUN_KEY);
-    const click = await session.get<ClickNote>(CLICK_KEY);
-    const g = await gatherFacts({
-      version: version(),
-      now: () => Date.now(),
-      local,
-      settings,
-      prefs,
-      granted: (o) => connectApi.containsOrigin(o),
-      alive: () => pingPortal(),
-      portal: () => p,
-      run,
-      click,
-      transient,
-      bundledSharedInstall: (site) => bundledSharedInstall(site, (path) => fetch(assetUrl(path))),
-    });
-    const view = decide(g.facts);
-    const byButton = view.step === 'start' && (view.primary?.action === 'start' || view.primary?.action === 'retry-start');
-    const allowed = view.step === 'start' && (view.auto === 'start' || (trigger === 'strip' && byButton));
-    if (!allowed) return { started: false, reason: view.status };
-    const wait = g.facts.run.schedulerWaitMs;
-    if (wait > 0) return { started: false, waitMs: wait, reason: `Starting your worker in ${Math.ceil(wait / 1000)} s (the scheduler is asked at most once a minute)...` };
-    const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
-    try {
-      const out = await startWorker(p, { name: prefs.worker_name, permissionMode: prefs.permission_mode, site: settings.site, ack, consent: { installId: await installId(), written: !!ack?.consent_written_at } });
-      if (out.consentWritten && ack) {
-        const all = (await local.get<Statements>(STATEMENTS_KEY)) ?? {};
-        await local.set(STATEMENTS_KEY, { ...all, [ack.work_dir]: { ...ack, consent_written_at: new Date().toISOString() } } satisfies Statements);
+    case 'open-files':
+      return { opened: await openFiles() } satisfies ActionResults['open-files'];
+    case 'open-settings':
+      await browser.runtime.openOptionsPage().catch(() => undefined);
+      return { opened: true } satisfies ActionResults['open-settings'];
+    case 'open-details':
+      return { opened: true } satisfies ActionResults['open-details'];
+    case 'open-help':
+      return { opened: !!(await openTab(HELP_URL, { active: true })) } satisfies ActionResults['open-help'];
+    case 'tour':
+      if (a.event === 'start') mem.tourFromMenu = true;
+      // the once-only tour below the queue began: noted as shown (no card for it later), not as the menu's
+      else if (a.event === 'auto') await once({ tour_auto_played_at: nowIso() });
+      else {
+        mem.tourFromMenu = false;
+        await local.set(TOUR_SEEN_KEY, { seen_at: nowIso(), completed: a.event === 'done' } satisfies TourSeen);
       }
-      const state: RunState = { stateDir: out.stateDir, run: prefs.worker_name, job: out.job, site: out.site, set_at: new Date().toISOString(), started_by: trigger };
-      await session.set(RUN_KEY, state);
-      await pollRun();
-      return { started: true, job: out.job, alreadyRunning: out.alreadyRunning };
-    } catch (e) {
-      return { started: false, reason: (e as Error).message };
+      return { recorded: true } satisfies ActionResults['tour'];
+    case 'dismiss':
+      await once(a.card === 'try-asking' ? { try_asking_dismissed_at: nowIso() } : a.card === 'pin-tip' ? { pin_tip_done_at: nowIso() } : { tour_card_dismissed_at: nowIso() });
+      return { recorded: true } satisfies ActionResults['dismiss'];
+    case 'log': {
+      mem.logOpen = a.open;
+      if (!a.open) return { lines: [] } satisfies ActionResults['log'];
+      await pollRun(true, { progress: true });
+      const f = await buildFacts();
+      return { lines: f.log ?? [] } satisfies ActionResults['log'];
     }
-  })();
-  startInFlight.finally(() => (startInFlight = undefined)).catch(() => undefined);
-  return startInFlight;
+    case 'open-terminal-for-login-setup':
+      if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
+      return { opened: (await mem.loginSetup?.open()) ?? false } satisfies ActionResults['open-terminal-for-login-setup'];
+    case 'login-setup-in': {
+      const r = await mem.loginSetup?.imIn();
+      return { typed: !!r?.typed, ...(r ? { how: r.how } : {}) } satisfies ActionResults['login-setup-in'];
+    }
+    case 'run-checks':
+      return { done: await runChecks() } satisfies ActionResults['run-checks'];
+    case 'copy-report': {
+      const rep = await session.get<DiagReport>(CHECKS_KEY);
+      return { text: rep ? formatReport(rep) : '' } satisfies ActionResults['copy-report'];
+    }
+    case 'check-compute-node':
+      return { submitted: await checkComputeNode() } satisfies ActionResults['check-compute-node'];
+    case 'set-pref': {
+      const cur = await loadPrefs();
+      const next = { ...cur, ...a.prefs };
+      if (next.worker_name !== cur.worker_name) {
+        if (!/^[A-Za-z0-9_-]{1,32}$/.test(next.worker_name)) return { saved: false } satisfies ActionResults['set-pref'];
+        // another worker: its own run, its own statement
+        await mutateRun(() => null);
+        mem.restricted = false;
+      }
+      await local.set(PREFS_KEY, next);
+      return { saved: true } satisfies ActionResults['set-pref'];
+    }
+    case 'disconnect':
+      await cancelPress();
+      await disconnectPortal();
+      mem.client = undefined;
+      mem.sharedDir = undefined;
+      mem.setup = { state: 'unknown' };
+      return { disconnected: true } satisfies ActionResults['disconnect'];
+    case 'audit': {
+      if (a.op === 'clear') {
+        await clearRecordsKeepingClocks(local);
+        return { cleared: true } satisfies ActionResults['audit'];
+      }
+      const audit = new Audit(local);
+      return { text: await audit.exportText() } satisfies ActionResults['audit'];
+    }
+    case 'drive-connected':
+      await local.set(CHECKLIST_KEY, a.done ? ({ drive_connected_at: nowIso() } satisfies Checklist) : ({} satisfies Checklist));
+      return { recorded: true } satisfies ActionResults['drive-connected'];
+  }
 }
+
+// ---- the welcome page -------------------------------------------------------------------------------
 
 /**
- * The "start my worker when I open my portal" setting (on by default). It runs the one start
- * path when the portal tab connects and at the once-a-minute check, at most once a minute, and
- * records what it did for the panel to show. The step machine inside startNow keeps it honest:
- * nothing starts while a step is missing, while a worker is alive, or while a stopped worker is
- * meant to stay stopped.
+ * After the welcome page's one press: the page already opened the panel, asked Chrome for the site
+ * and wrote the acceptance record, all inside the click. Then: the portal is remembered, the lab's two
+ * daily files are fetched (storage.onChanged on the record), the grid's reachability is checked, and
+ * either the browser already holds a grid sign-in (moment 5 is skipped) or this same tab becomes the
+ * grid's own sign-in box.
  */
-async function maybeAutoStart(trigger: 'hello' | 'alarm'): Promise<void> {
-  const prefs = await loadPrefs();
-  if (!prefs.auto_start) return;
-  if (!(await portalSettings())) return;
-  const last = await session.get<AutoStartNote>(AUTO_START_KEY);
-  if (last && Date.now() - new Date(last.attempted_at).getTime() < AUTO_START_EVERY_MS) return;
-  const run = await session.get<RunState>(RUN_KEY);
-  if (run?.stopped_by_student || run?.status?.state === 'stopped') return;
-  if (!(await pingPortal())) return;
-  const r = await startNow('auto');
-  await session.set(AUTO_START_KEY, { attempted_at: new Date().toISOString(), outcome: r.started ? `${r.alreadyRunning ? 'found running' : 'started'} on the portal ${trigger === 'hello' ? 'connecting' : 'check'}: job ${r.job}` : `not started: ${r.reason ?? 'a step is missing'}` } satisfies AutoStartNote);
-  await tellPages();
-}
-
-async function refreshKillListNow(opts: { skipIfFetchedWithinMs?: number } = {}): Promise<{ detail: string; revoked: boolean }> {
-  // PRIVACY.md and LICENSE.txt: the extension makes no request to Licensor before the agreement is accepted
-  if (!recordInForce(await local.get(TERMS_KEY))) return { detail: 'not fetched: the agreement has not been accepted yet', revoked: false };
-  const previous = await local.get<StoredKillList>('bridge.killlist');
-  if (opts.skipIfFetchedWithinMs && previous && Date.now() - new Date(previous.fetched_at).getTime() < opts.skipIfFetchedWithinMs) {
-    return { detail: 'not fetched: the list on file is less than an hour old', revoked: killListVerdict(previous, version()).versionRevoked };
+async function onAgree(a: Extract<Action, { kind: 'agree' }>): Promise<ActionResults['agree']> {
+  const no = { navigated: false, signedInAlready: false };
+  if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
+  mem.welcomeTab = { ...(a.tabId !== undefined ? { tabId: a.tabId } : {}), ...(a.windowId !== undefined ? { windowId: a.windowId } : {}) };
+  // Chrome's box has been answered: the panel no longer says "Waiting for Chrome…"
+  await session.remove(WELCOME_PRESS_KEY).catch(() => undefined);
+  if (!(await termsInForce())) {
+    mem.welcome = { state: 'save-failed', problem: undefined };
+    return no;
   }
-  const out = await refreshKillList(previous, BUNDLED_KEYS, fetch);
-  if (out.fresh && out.current) await local.set('bridge.killlist', out.current);
-  const verdict = killListVerdict(out.current, version());
-  // what the page script's chokepoint consults before sending any command
-  await local.set(REVOKED_KEY, { revoked: verdict.versionRevoked, message: verdict.message, checked_at: new Date().toISOString() });
-  return { detail: out.detail, revoked: verdict.versionRevoked };
+  if (!a.granted) {
+    mem.welcome = { state: 'denied', problem: undefined };
+    return no;
+  }
+  let origin: string;
+  try {
+    origin = normaliseOrigin(a.origin);
+  } catch (e) {
+    mem.welcome = { state: 'denied', problem: isAnthropicAddress(a.origin) ? WORDS.welcome.anthropicRefused : (e as Error).message };
+    return no;
+  }
+  await rememberPortal(origin);
+  const noPanel = !a.panelOpened && hasPanel();
+  mem.welcome = { state: noPanel ? 'no-panel' : 'opening', problem: undefined };
+  schedulePush();
+  // the panel carries GlobalProtect's moment; the welcome page hands over to it, and this same tab
+  // becomes the sign-in once the grid answers (afterReach)
+  const handoff = () => {
+    if (!noPanel) mem.welcome = { state: 'handoff', problem: undefined };
+  };
+  const r = await recheckReach();
+  if (r === 'no-route') {
+    handoff();
+    return no;
+  }
+  const s = await checkGrid('agree');
+  if (s === 'signed-in') {
+    mem.welcome = { state: 'handoff', problem: undefined };
+    return { navigated: false, signedInAlready: true };
+  }
+  if (s === 'unreachable') {
+    handoff();
+    return no;
+  }
+  const opened = await openSigninTab('welcome', a.tabId, a.windowId);
+  if (!opened) mem.welcome = { state: 'handoff', problem: undefined };
+  return { navigated: opened && a.tabId !== undefined, signedInAlready: false };
 }
 
-/** the account name the dashboard showed for the signed-in session, kept for the access check and the facts; nothing else is ever recorded as an identity */
-async function rememberIdentity(s: SessionInfo | undefined): Promise<string | undefined> {
-  if (!s?.signedIn || !s.username) return undefined;
+/** store the portal the student granted (its site from the bundled profile that names it, else from its hostname) */
+async function rememberPortal(origin: string): Promise<PortalSettings> {
+  const hostname = new URL(origin).hostname;
+  const def = defaultPortalFrom(await siteProfile(DEFAULT_SITE));
+  const site = def && def.origin === origin ? def.site : siteFromHostname(hostname);
+  const profile = await siteProfile(site);
+  const prev = await settingsNow();
+  const s: PortalSettings = prev && prev.origin === origin ? prev : { origin, hostname, connected_at: nowIso(), shell_host: profile?.ood_shell_host || 'default', site };
+  const out = await savePortal(s);
+  if (out.changed) {
+    mem.client = undefined;
+    mem.sharedDir = undefined;
+    mem.setup = { state: 'unknown' };
+    mem.signin = { waiting: false };
+  }
+  return s;
+}
+
+async function onUsePortal(raw: string, granted: boolean, settingsPage: boolean): Promise<{ origin: string }> {
+  let origin = '';
+  try {
+    origin = normaliseOrigin(raw);
+  } catch (e) {
+    mem.welcome = { state: 'denied', problem: isAnthropicAddress(raw) ? WORDS.welcome.anthropicRefused : (e as Error).message };
+    return { origin: '' };
+  }
+  if (!granted) {
+    mem.welcome = { state: 'denied', problem: WORDS.welcome.denied(new URL(origin).hostname) };
+    return { origin };
+  }
+  await rememberPortal(origin);
+  mem.welcome = { state: 'idle', problem: undefined };
+  // after acceptance (Settings' "Change", or the panel's "Allow again" when the grant had been taken
+  // away), the portal is checked at once; before it, nothing is sent
+  if (await termsInForce()) {
+    if (settingsPage) await local.remove(CHANNEL_KEY);
+    void recheckReach().then((r) => (r === 'answers' ? checkGrid('change') : undefined));
+  }
+  return { origin };
+}
+
+// ---- the grid: reachability, sign-in, the channel ----------------------------------------------------
+
+async function writeGrid(patch: Partial<GridNote>): Promise<GridNote> {
+  const cur = (await session.get<GridNote>(GRID_KEY)) ?? { reach: 'unknown', session: 'unknown', checked_at: '' };
+  const next: GridNote = { ...cur, ...patch, checked_at: nowIso() };
+  await session.set(GRID_KEY, next);
+  return next;
+}
+
+/** the credential-free check (net.ts reach), only after acceptance; "Connected." when it starts answering */
+async function recheckReach(): Promise<'answers' | 'no-route'> {
+  const s = await settingsNow();
+  if (!s || !(await termsInForce())) return 'no-route';
+  if (mem.busy.reach) return ((await session.get<GridNote>(GRID_KEY))?.reach as 'answers' | 'no-route' | undefined) ?? 'no-route';
+  mem.busy.reach = true;
+  mem.last.reach = Date.now();
+  try {
+    const r = await reach(s.origin, (i, init) => fetch(i, init));
+    const grid = await session.get<GridNote>(GRID_KEY);
+    const before = grid?.reach;
+    if (r === 'no-route') {
+      mem.lookingSince ??= Date.now();
+      mem.answeredAt = undefined;
+      await writeGrid({ reach: 'no-route' });
+    } else {
+      const wasLooking = before === 'no-route' || mem.lookingSince !== undefined;
+      if (wasLooking) mem.answeredAt = Date.now();
+      mem.lookingSince = undefined;
+      await writeGrid({ reach: 'answers' });
+      // the grid answers again: its sign-in is checked (after "Connected." has been held a moment)
+      if (wasLooking || grid?.session === 'unreachable') setTimeout(() => void afterReach(), wasLooking ? 750 : 0);
+    }
+    schedulePush();
+    return r;
+  } finally {
+    mem.busy.reach = false;
+  }
+}
+
+/** the grid answers after GlobalProtect: check the sign-in, and open the sign-in box if it is needed for the first run or a waiting press */
+async function afterReach(): Promise<void> {
+  const s = await checkGrid('reach');
+  if (s !== 'signed-out') return;
+  const press = await session.get<PendingPress>(PRESS_KEY);
+  const f = await buildFacts();
+  if (!press && firstRunDone(f)) return;
+  // the welcome tab becomes the sign-in only while the welcome page is still what it shows; a tab the
+  // student has since used for something else is theirs, and a new tab opens instead (AM7)
+  const wt = mem.welcomeTab;
+  const still = welcomeStillIn(wt?.tabId);
+  await openSigninTab(still ? 'welcome' : 'press', still ? wt?.tabId : undefined, wt?.windowId);
+}
+
+/** remember the account the dashboard showed, and bind it once to the acceptance record */
+async function rememberIdentity(s: SessionInfo): Promise<void> {
+  if (!s.signedIn || !s.username) return;
   await local.set(IDENTITY_KEY, { username: s.username, seen_at: s.checkedAt } satisfies IdentityNote);
-  return s.username;
+  const t = await local.get<TermsRecord>(TERMS_KEY);
+  if (recordInForce(t) && !t.bound_account) await local.set(TERMS_KEY, bindAccount(t, s.username));
 }
 
-/**
- * The account name to ask about: read from the portal tab now when one answers (one dashboard
- * GET, no floor), else the last one the dashboard showed. Never the home directory's name, and
- * never anything typed.
- */
-async function dashboardAccount(): Promise<string | undefined> {
-  if (await pingPortal()) {
-    try {
-      const fresh = await rememberIdentity(await portal().session());
-      if (fresh) return fresh;
-    } catch {
-      /* the tab did not answer; the last name it showed stands */
-    }
+/** one dashboard GET from this background: signed in, signed out, unreachable (never "Failed to fetch") */
+async function checkGrid(reason: string): Promise<'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown'> {
+  if (!(await termsInForce())) return 'unknown';
+  const c = await directClient();
+  if (!c) return 'unknown';
+  if (mem.busy.grid) return ((await session.get<GridNote>(GRID_KEY))?.session as 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | undefined) ?? 'unknown';
+  mem.busy.grid = true;
+  mem.last.grid = Date.now();
+  try {
+    const before = (await session.get<GridNote>(GRID_KEY))?.session;
+    const s = await c.session();
+    // a cold per-user server is signed in; the next check reads it
+    const word = s.state === 'cold' ? before ?? 'unknown' : s.state;
+    await writeGrid({ session: word as GridNote['session'], ...(s.state === 'unreachable' ? {} : { reach: 'answers' }), ...(s.username ? { account: s.username } : {}) });
+    if (s.signedIn) await rememberIdentity(s);
+    if (s.state === 'signed-in' && before !== 'signed-in') void onSignedIn(reason);
+    else if (s.state === 'signed-in' && mem.signin.waiting) void onSignedIn(reason);
+    if (s.state === 'unreachable') mem.lookingSince ??= Date.now();
+    schedulePush();
+    return word as 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown';
+  } catch {
+    return 'unknown';
+  } finally {
+    mem.busy.grid = false;
   }
-  return (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
 }
 
-type AccessTrigger = 'click' | 'hello' | 'alarm' | 'terms' | 'page' | 'page-force';
+/**
+ * Open the grid's sign-in: the welcome tab itself (first run), or one tab in front in the panel's
+ * window for a press. Watched by tabs.onUpdated, the panel's tick and a 30-second alarm.
+ */
+async function openSigninTab(purpose: 'welcome' | 'press', tabId?: number, windowId?: number): Promise<boolean> {
+  const s = await settingsNow();
+  if (!s) return false;
+  const url = `${s.origin}${DASHBOARD}`;
+  const existing = await session.get<OpenedTab>(SIGNIN_TAB_KEY);
+  // one sign-in tab at a time: reload the one Beethoven already opened (its loads are counted afresh),
+  // only while it is still where Beethoven left it (on the portal); one that has moved on is the student's
+  if (existing) {
+    const now = await tabNow(existing.tabId);
+    if (now && stillWhereLeft(existing, now)) {
+      await session.set(SIGNIN_TAB_KEY, { ...existing, loaded: false, loads_after: 0 } satisfies OpenedTab);
+      await browser.tabs.update(existing.tabId, { url, active: true }).catch(() => undefined);
+      mem.signin = { waiting: true };
+      await browser.alarms.create(SIGNIN_ALARM, { periodInMinutes: 0.5 });
+      return true;
+    }
+    await session.remove(SIGNIN_TAB_KEY);
+  }
+  let rec: OpenedTab | undefined;
+  if (purpose === 'welcome' && tabId !== undefined) {
+    try {
+      await browser.tabs.update(tabId, { url });
+      rec = { tabId, windowId: windowId ?? mem.panelWindowId ?? -1, url, opened_at: nowIso(), purpose: 'welcome' };
+    } catch {
+      rec = undefined;
+    }
+    // the welcome tab is used once
+    mem.welcomeTab = undefined;
+  }
+  if (!rec) {
+    const win = windowId ?? mem.panelWindowId;
+    const ret = await activeTabIn(win);
+    const t = await openTab(url, { active: true, ...(win !== undefined ? { windowId: win } : {}) });
+    if (!t) return false;
+    rec = { tabId: t.tabId, windowId: t.windowId, url, opened_at: nowIso(), purpose: 'press', ...(ret !== undefined ? { return_tab_id: ret } : {}) };
+  }
+  await session.set(SIGNIN_TAB_KEY, rec);
+  mem.signin = { waiting: true };
+  await browser.alarms.create(SIGNIN_ALARM, { periodInMinutes: 0.5 });
+  schedulePush();
+  return true;
+}
 
 /**
- * The one place the access service is asked (licensing/access.ts does the asking and the cache
- * arithmetic; this gathers what it needs). Gated like the kill-list on the acceptance record, and
- * on a connected portal whose dashboard has shown who is signed in. A click or a page's button
- * (`force`) asks again after a refusal or a failed attempt; an approval under a day old holds.
+ * Signed in to the grid: the drawn check, the channel test (once per origin), the sign-in tab closed
+ * under the guards (kept, out of the way, in tab mode), then approval, setup and any waiting press.
  */
+async function onSignedIn(reason: string): Promise<void> {
+  if (mem.busy.signedIn) return;
+  mem.busy.signedIn = true;
+  try {
+    const grid = await session.get<GridNote>(GRID_KEY);
+    const wasWaiting = mem.signin.waiting;
+    mem.signin = { waiting: false, signedInAt: Date.now() };
+    if (grid?.account) await activity(LOG_WORDS.gridSignedIn(grid.account));
+    let ch = await channelNow();
+    if (!ch) ch = await runChannelTest();
+    const rec = await session.get<OpenedTab>(SIGNIN_TAB_KEY);
+    if (rec) {
+      if (ch?.mode === 'tab') {
+        // tab mode: the sign-in tab carries the shell's lines; it is kept out of the way and closed when the work ends
+        mem.keptTabId = rec.tabId;
+        await browser.tabs.update(rec.tabId, { autoDiscardable: false } as never).catch(() => undefined);
+        if (rec.return_tab_id !== undefined) await focusTab(rec.return_tab_id).catch(() => false);
+      } else {
+        await closeUnderGuards(rec);
+      }
+      await session.remove(SIGNIN_TAB_KEY);
+    }
+    await browser.alarms.clear(SIGNIN_ALARM);
+    schedulePush();
+    void reason;
+    void wasWaiting;
+    await checkAccessNow('signin');
+    await ensureSetup();
+    await carryPress();
+    void pollRun(true).then(() => maybeKeepRunning());
+  } finally {
+    mem.busy.signedIn = false;
+  }
+}
+
+/** the channel test after the first sign-in (core/channel.ts), stored per origin */
+async function runChannelTest(): Promise<ChannelNote | undefined> {
+  const s = await settingsNow();
+  const c = await directClient();
+  if (!s || !c) return undefined;
+  try {
+    const keep = mem.keptTabId ?? (await session.get<OpenedTab>(SIGNIN_TAB_KEY))?.tabId;
+    const v = await testChannel(c, async () => {
+      const host = tabHost(s.origin);
+      if (keep !== undefined && (await host.onPortal(keep)) && (await readyScript(host, keep))) return (await tabPortal(host, keep).shellTest()) as Awaited<ReturnType<PortalApi['shellTest']>>;
+      return withPortalTab(host, { origin: s.origin, ...(mem.panelWindowId !== undefined ? { windowId: mem.panelWindowId } : {}) }, (_id, p) => p.shellTest());
+    });
+    const note: ChannelNote = { origin: s.origin, mode: v.mode, shell: v.shell, tested_at: nowIso() };
+    await local.set(CHANNEL_KEY, note);
+    return note;
+  } catch {
+    return undefined;
+  }
+}
+
+async function setShellWord(shell: ChannelNote['shell']): Promise<void> {
+  const ch = await channelNow();
+  const s = await settingsNow();
+  if (!s) return;
+  await local.set(CHANNEL_KEY, { origin: s.origin, mode: ch?.mode ?? 'direct', shell, tested_at: nowIso() } satisfies ChannelNote);
+}
+
+// ---- tabs Beethoven opened ---------------------------------------------------------------------------
+
+async function onTabUpdated(tabId: number, info: { status?: string; url?: string }, tab: { url?: string; windowId?: number }): Promise<void> {
+  // every tab load in the browser wakes this: one read of the four records, and nothing more for a tab not Beethoven's
+  if (!info.status) return;
+  const T = await session.many([SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY]);
+  if (![SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY].some((k) => (T[k] as OpenedTab | undefined)?.tabId === tabId)) return;
+  const signin = T[SIGNIN_TAB_KEY] as OpenedTab | undefined;
+  if (signin && signin.tabId === tabId && info.status) {
+    const rec = noteLoad(signin, info.status);
+    if (rec !== signin) await session.set(SIGNIN_TAB_KEY, rec);
+    if (info.status !== 'complete') return;
+    const s = await settingsNow();
+    let path = '';
+    let onPortal = false;
+    try {
+      const u = new URL(tab.url ?? '');
+      path = u.pathname;
+      onPortal = !!s && u.origin === s.origin;
+    } catch {
+      /* not visible: another site (a sign-in page elsewhere) */
+    }
+    if (onPortal && path === '/public/start.html') {
+      mem.signin = { ...mem.signin, problem: 'start-page' };
+      schedulePush();
+      return;
+    }
+    const word = await checkGrid('tab-complete');
+    // Measured in Chromium 153 (scratchpad/v11/core/authexp): the first load completes with Chrome's
+    // box still up over the portal's 401; a Cancel and a wrong password each load the tab once more,
+    // still 401. So only a later load with no sign-in says "not yet", and neither cause is claimed.
+    if (word === 'signed-out' && onPortal && (rec.loads_after ?? 0) >= 1) mem.signin = { waiting: true, problem: 'cancelled' };
+    schedulePush();
+    return;
+  }
+  const anth = await session.get<AnthropicTab>(ANTHROPIC_TAB_KEY);
+  if (anth && anth.tabId === tabId && info.status) {
+    await session.set(ANTHROPIC_TAB_KEY, noteLoad(anth, info.status));
+    return;
+  }
+  const claude = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
+  if (claude && claude.tabId === tabId && info.status) {
+    await session.set(CLAUDE_TAB_KEY, noteLoad(claude, info.status));
+    return;
+  }
+  const term = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+  if (term && term.tabId === tabId && info.status === 'complete') await watchTerminal(term);
+}
+
+async function onTabRemoved(tabId: number): Promise<void> {
+  const signin = await session.get<OpenedTab>(SIGNIN_TAB_KEY);
+  if (signin?.tabId === tabId) {
+    await session.remove(SIGNIN_TAB_KEY);
+    const grid = await session.get<GridNote>(GRID_KEY);
+    if (grid?.session !== 'signed-in') mem.signin = { waiting: false, problem: 'tab-closed' };
+    await browser.alarms.clear(SIGNIN_ALARM);
+  }
+  const anth = await session.get<AnthropicTab>(ANTHROPIC_TAB_KEY);
+  if (anth?.tabId === tabId) {
+    await session.remove(ANTHROPIC_TAB_KEY);
+    if (mem.sitting && (mem.connect.signin === 'link' || mem.connect.signin === 'checking')) mem.connect = { ...mem.connect, claudeTabClosed: true };
+  }
+  const claude = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
+  if (claude?.tabId === tabId) await session.remove(CLAUDE_TAB_KEY);
+  const term = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+  if (term?.tabId === tabId) {
+    await session.remove(TERMINAL_TAB_KEY);
+    void mem.loginSetup?.tabClosed();
+  }
+  if (mem.keptTabId === tabId) mem.keptTabId = undefined;
+  schedulePush();
+}
+
+/** close the portal tab tab mode kept, once the work ends (online or stopped) */
+async function releaseKeptTab(): Promise<void> {
+  const id = mem.keptTabId;
+  if (id === undefined) return;
+  mem.keptTabId = undefined;
+  const s = await settingsNow();
+  if (!s) return;
+  const now = await tabNow(id);
+  if (!now) return;
+  await closeUnderGuards({ tabId: id, windowId: now.windowId, url: `${s.origin}${DASHBOARD}`, opened_at: nowIso(), purpose: 'press' });
+}
+
+// ---- access, kill-list --------------------------------------------------------------------------------
+
+/** what an access check came to, for a page that asked (Details, Settings) */
+export interface AccessOutcome {
+  /** the service was asked this time (false: a cache held, or nothing to ask with yet) */
+  asked: boolean;
+  /** the bare reason; the page that shows it puts the label in front (licensing/access.ts accessOutcomeWords) */
+  detail: string;
+  approved?: boolean;
+}
+
+/** the one place the lab's access service is asked (licensing/access.ts does the asking); never before acceptance */
 function checkAccessNow(trigger: AccessTrigger): Promise<AccessOutcome> {
   if (accessInFlight) return accessInFlight;
   accessInFlight = (async (): Promise<AccessOutcome> => {
-    // PRIVACY.md and LICENSE.txt: no request to Licensor before the agreement is accepted
-    // the detail is the bare reason; the page that shows it says "Not asked" or "Checked" (licensing/access.ts accessOutcomeWords)
-    if (!recordInForce(await local.get(TERMS_KEY))) return { asked: false, detail: NOT_ASKED_TERMS };
-    const settings = await portalSettings();
+    // PRIVACY.md and LICENSE.txt: no request to the lab before the agreement is accepted
+    if (!(await termsInForce())) return { asked: false, detail: NOT_ASKED_TERMS };
+    const settings = await settingsNow();
     if (!settings) return { asked: false, detail: NOT_ASKED_NO_PORTAL };
-    const account = await dashboardAccount();
+    const account = (await session.get<GridNote>(GRID_KEY))?.account ?? (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
     if (!account) return { asked: false, detail: NOT_ASKED_NO_ACCOUNT };
+    mem.accessChecking = true;
+    schedulePush();
     const previous = await local.get<AccessRecord>(ACCESS_KEY);
-    const services = await local.get<StoredServices>(SERVICES_KEY);
-    let out;
     try {
-      out = await checkAccess({ previous, services, accessId: account, portal: settings.hostname, version: version(), installId: await installId(), fetchFn: fetch, force: trigger === 'click' || trigger === 'page-force' });
+      const services = await local.get<StoredServices>(SERVICES_KEY);
+      const out = await checkAccess({ previous, services, accessId: account, portal: settings.hostname, version: version(), installId: await installId(), fetchFn: fetch, force: accessForced(trigger) });
+      if (out.services) await local.set(SERVICES_KEY, out.services);
+      await local.set(ACCESS_KEY, out.record);
+      if (out.record.approved && !previous?.approved) await activity(LOG_WORDS.approved);
+      return { asked: out.asked, detail: out.detail, approved: out.record.approved };
     } catch (e) {
+      // the record on file stands
       return { asked: false, detail: (e as Error).message, approved: previous?.approved };
+    } finally {
+      mem.accessChecking = false;
+      schedulePush();
     }
-    if (out.services) await local.set(SERVICES_KEY, out.services);
-    await local.set(ACCESS_KEY, out.record);
-    await tellPages();
-    return { asked: out.asked, detail: out.detail, approved: out.record.approved };
   })();
   accessInFlight.finally(() => (accessInFlight = undefined)).catch(() => undefined);
   return accessInFlight;
 }
 
-/** Chrome keeps runtime registrations across restarts, Firefox does not; re-register when the grant still stands. */
-async function reRegisterPortalScript(): Promise<void> {
-  const settings = await portalSettings();
-  if (!settings) return;
-  if (!(await connectApi.containsOrigin(settings.origin))) return;
-  if ((await connectApi.scriptRegisteredFor()) === settings.origin) return;
-  await connectApi.unregisterScript();
-  await connectApi.registerScript(settings.origin);
+async function refreshKillListNow(opts: { skipIfFetchedWithinMs?: number } = {}): Promise<{ detail: string; revoked: boolean }> {
+  // PRIVACY.md and LICENSE.txt: the extension makes no request to the lab before the agreement is accepted
+  if (!(await termsInForce())) return { detail: 'not fetched: the agreement has not been accepted yet', revoked: false };
+  const previous = await local.get<StoredKillList>(KILLLIST_KEY);
+  if (opts.skipIfFetchedWithinMs && previous && Date.now() - new Date(previous.fetched_at).getTime() < opts.skipIfFetchedWithinMs) {
+    return { detail: 'not fetched: the list on file is less than an hour old', revoked: killListVerdict(previous, version()).versionRevoked };
+  }
+  const out = await refreshKillList(previous, BUNDLED_KEYS, fetch);
+  if (out.fresh && out.current) await local.set(KILLLIST_KEY, out.current);
+  const verdict = killListVerdict(out.current, version());
+  await local.set(REVOKED_KEY, { revoked: verdict.versionRevoked, message: verdict.message, checked_at: nowIso() });
+  return { detail: out.detail, revoked: verdict.versionRevoked };
 }
+
+// ---- setup ("Your grid account is ready") ---------------------------------------------------------------
+
+/** after approval: does the account run the lab's shared copy? If not, one shell line sets it up (moment 6) */
+async function ensureSetup(): Promise<void> {
+  if (mem.setup.state === 'ready' || mem.busy.setup) return;
+  const f = await buildFacts();
+  if (!f.access.ok || f.grid.session !== 'signed-in') return;
+  mem.busy.setup = true;
+  try {
+    mem.setup = { state: 'checking' };
+    schedulePush();
+    const dir = await sharedDirNow();
+    const s = await settingsNow();
+    if (!dir || !s) {
+      mem.setup = { state: 'no-shared', detail: `no shared copy of the tool is known for the site "${s?.site ?? ''}"` };
+      mem.failDetail = mem.setup.detail ?? '';
+      return;
+    }
+    const c = await directClient();
+    const uses = c ? await usesSharedCopy(c, dir) : undefined;
+    if (uses === true) {
+      mem.setup = { state: 'ready' };
+      await activity(LOG_WORDS.ready);
+      return;
+    }
+    if (uses === undefined) {
+      // the Files app could not tell: connect sets the account up itself (its step 2), and says so
+      mem.setup = { state: 'ready', detail: 'not confirmed through the Files app; connect sets the account up itself if it must' };
+      return;
+    }
+    const ch = await channelNow();
+    if (ch?.shell === 'password') {
+      // the key step comes with the student's next press; connect sets the account up itself after it
+      mem.setup = { state: 'unknown' };
+      return;
+    }
+    mem.setup = { state: 'setting-up' };
+    schedulePush();
+    const site = await siteForConnect(s);
+    try {
+      const r = await withShell((p) => withFloor(() => p.shell(commands.installShared(dir, site), { timeoutMs: 120_000 })));
+      if (r.exitCode === 0) {
+        mem.setup = { state: 'ready' };
+        await activity(LOG_WORDS.ready);
+      } else {
+        mem.setup = { state: 'failed', detail: `the setup line ended with exit ${r.exitCode}: ${r.output.slice(-300)}` };
+        mem.failDetail = mem.setup.detail ?? '';
+      }
+    } catch (e) {
+      if (isPasswordError(e)) {
+        await setShellWord('password');
+        mem.setup = { state: 'unknown' };
+      } else {
+        mem.setup = { state: 'failed', detail: (e as Error).message };
+        mem.failDetail = (e as Error).message;
+      }
+    }
+  } finally {
+    mem.busy.setup = false;
+    schedulePush();
+  }
+}
+
+// ---- presses ------------------------------------------------------------------------------------------
+
+/**
+ * What a press needs before it can go: the grid signed in (else one sign-in tab, and the press waits),
+ * the approval, the setup, and a shell that does not ask for a password (else the key step).
+ */
+async function readyForPress(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
+  const g = await checkGrid('press');
+  if (g === 'unreachable') return { go: false, drop: true };
+  if (g !== 'signed-in') {
+    await openSigninTab('press');
+    return { go: false, waiting: 'grid' };
+  }
+  if (kind === 'open-files') return { go: true };
+  const f = await buildFacts();
+  const now = Date.now();
+  // a worker is started, signed in or marked restricted through the lab's copy in an account set up for it
+  if (kind === 'connect' || kind === 'sign-in-claude' || kind === 'restrict') {
+    if (!f.access.ok) {
+      // the service is asked for this press once; the press then waits for its answer (the panel's tick carries it on)
+      if (f.access.state === 'checking' && f.access.accessId) {
+        if (now - mem.last.pressAccess >= PRESS_RETRY_MS) {
+          mem.last.pressAccess = now;
+          void checkAccessNow('press').then(() => carryPress());
+        }
+        return { go: false, waiting: 'approval' };
+      }
+      return { go: false, drop: true };
+    }
+    if (mem.setup.state !== 'ready') {
+      const ch = await channelNow();
+      if (ch?.shell !== 'password') {
+        if (mem.setup.state === 'no-shared' || mem.setup.state === 'failed') return { go: false, drop: true };
+        if (now - mem.last.pressSetup >= PRESS_RETRY_MS) {
+          mem.last.pressSetup = now;
+          void ensureSetup().then(() => carryPress());
+        }
+        return { go: false, waiting: 'setup' };
+      }
+    }
+  }
+  const ch = await channelNow();
+  if (ch?.shell === 'password') {
+    offerLoginSetup();
+    return { go: false, waiting: 'login-setup' };
+  }
+  return { go: true };
+}
+
+/** a press kept while the grid, the approval, the setup or the key step was not ready: it goes ahead by itself */
+async function carryPress(): Promise<void> {
+  if (mem.busy.press) return;
+  const p = await session.get<PendingPress>(PRESS_KEY);
+  if (!p) return;
+  mem.busy.press = true;
+  try {
+    const r = await readyForPress(p.kind);
+    if (r.drop) {
+      await session.remove(PRESS_KEY);
+      return;
+    }
+    if (!r.go) return;
+    await session.remove(PRESS_KEY);
+    if (p.kind === 'connect') await startConnect('auto');
+    else if (p.kind === 'sign-in-claude') await startConnect(p.fresh ? 'fresh' : 'always');
+    else if (p.kind === 'stop') await doStop();
+    else if (p.kind === 'restrict') await doRestrict((await loadPrefs()).worker_name);
+    else if (p.kind === 'open-files') await openFiles();
+  } finally {
+    mem.busy.press = false;
+    schedulePush();
+  }
+}
+
+/** Connect: the statement (when the press made it), then one connect line carried through to "You're online." */
+async function pressConnect(statement?: { tick: string; lines: string[]; buttonLabel: string }): Promise<ActionResults['connect']> {
+  const prefs = await loadPrefs();
+  if (statement) {
+    const all = (await local.get<Statements>(STATEMENTS_KEY)) ?? {};
+    const ack = makeAcknowledgement(prefs.worker_name, nowIso(), statement);
+    await local.set(STATEMENTS_KEY, { ...all, [ack.work_dir]: ack } satisfies Statements);
+  }
+  // one connect at a time: a start or a sitting under way is this press's own
+  if (mem.sitting || mem.startId) return { started: true };
+  mem.connect = { ...freshConnect() };
+  await session.set(PRESS_KEY, { kind: 'connect', at: nowIso() } satisfies PendingPress);
+  const r = await readyForPress('connect');
+  if (r.drop) {
+    await session.remove(PRESS_KEY);
+    return { started: false };
+  }
+  if (!r.go) return { started: false, kept: true, ...(r.waiting ? { waiting: r.waiting } : {}) };
+  await session.remove(PRESS_KEY);
+  return { started: await startConnect('auto') };
+}
+
+/** "Sign in to Claude" / "Sign in again" / "Use another account": the same connect line, with the sitting asked for */
+async function pressSignInClaude(fresh: boolean): Promise<ActionResults['sign-in-claude']> {
+  // a sitting (or the start of one) already under way gives way to this one
+  cancelStart();
+  if (mem.sitting) {
+    mem.sitting.gate.close();
+    mem.sitting.close();
+    mem.sitting = undefined;
+  }
+  mem.connect = { ...freshConnect() };
+  await session.set(PRESS_KEY, { kind: 'sign-in-claude', ...(fresh ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+  const r = await readyForPress('sign-in-claude');
+  if (r.drop) {
+    await session.remove(PRESS_KEY);
+    return { started: false };
+  }
+  if (!r.go) return { started: false, ...(r.waiting === 'grid' || r.waiting === 'login-setup' ? { waiting: r.waiting } : {}) };
+  await session.remove(PRESS_KEY);
+  return { started: await startConnect(fresh ? 'fresh' : 'always') };
+}
+
+/** a connect line not typed yet is not typed at all (its floor wait ends; a shell it opened is closed before the line) */
+function cancelStart(): void {
+  mem.startId = 0;
+}
+
+async function cancelPress(): Promise<ActionResults['cancel']> {
+  const had = !!(await session.get<PendingPress>(PRESS_KEY)) || !!mem.sitting || !!mem.startId;
+  cancelStart();
+  await session.remove(PRESS_KEY);
+  if (mem.sitting) {
+    mem.sitting.gate.close();
+    mem.sitting.close();
+    mem.sitting = undefined;
+  }
+  mem.loginSetup?.stop();
+  mem.loginSetup = undefined;
+  mem.connect = { ...freshConnect() };
+  return { cancelled: had };
+}
+
+async function retry(): Promise<ActionResults['retry']> {
+  const f = await buildFacts();
+  const failure = mem.connect.failure;
+  if (failure === 'signin-node' || failure === 'signin-code' || failure === 'signin-timeout') return { started: (await pressSignInClaude(false)).started };
+  if (failure || f.run.phase === 'error' || f.run.phase === 'stopped' || f.run.phase === 'ended' || !f.run.present) {
+    if (!f.access.ok) {
+      await checkAccessNow('retry');
+      return { started: false };
+    }
+    return { started: (await pressConnect()).started };
+  }
+  if (f.grid.session !== 'signed-in') {
+    await recheckReach();
+    await checkGrid('retry');
+  }
+  return { started: false };
+}
+
+// ---- the connect sitting ------------------------------------------------------------------------------
+
+/**
+ * Type the one connect line and hold its sitting: here (direct), or behind CONNECT_PORT in a portal
+ * tab's page script (tab mode). The code is typed through the gate, once, and never kept.
+ */
+async function startConnect(login: LoginMode): Promise<boolean> {
+  // claimed before the first await: a second caller in the same moment (the press, the tick carrying
+  // it, "Keep my worker running") finds it taken and types nothing
+  if (mem.sitting || mem.startId) return true;
+  const id = ++mem.sittingSeq;
+  mem.startId = id;
+  try {
+    return await startConnectClaimed(id, login);
+  } finally {
+    if (mem.startId === id) mem.startId = 0;
+  }
+}
+
+async function startConnectClaimed(id: number, login: LoginMode): Promise<boolean> {
+  const s = await settingsNow();
+  if (!s || mem.sitting) return false;
+  const prefs = await loadPrefs();
+  const dir = await sharedDirNow();
+  if (!dir) {
+    mem.connect = { ...freshConnect(), failure: 'setup' };
+    return false;
+  }
+  const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
+  const opts: ConnectOptions = {
+    name: prefs.worker_name,
+    site: await siteForConnect(s),
+    ...(ack ? { installId: await installId() } : {}),
+    login,
+    permissionMode: prefs.permission_mode,
+    chain: prefs.auto_start,
+  };
+  let line: string;
+  try {
+    line = connectLine(dir, opts);
+  } catch (e) {
+    mem.connect = { ...freshConnect(), failure: 'other' };
+    mem.failDetail = (e as Error).message;
+    return false;
+  }
+  if (mem.startId !== id) return false;
+  mem.connect = { ...freshConnect(), inFlight: true, pressedAt: Date.now() };
+  mem.restricted = false;
+  await mutateRun((cur) => (cur && cur.stopped_by_student ? { ...cur, stopped_by_student: false } : undefined));
+  schedulePush();
+  const ch = await channelNow();
+  return ch?.mode === 'tab' ? startTabSitting(id, s, opts, dir, login) : startDirectSitting(id, line, login);
+}
+
+async function startDirectSitting(id: number, line: string, login: LoginMode): Promise<boolean> {
+  const c = await directClient();
+  if (!c) return false;
+  // events that arrive before the sitting is registered (none should: the line is typed after the
+  // prompt settles) are kept and handed on in order once it is
+  let registered = false;
+  const early: ConnectEvent[] = [];
+  const watcher = new ConnectWatcher((ev) => (registered ? void onConnectEvent(id, ev) : void early.push(ev)));
+  let shell: ShellSession;
+  try {
+    // the floor's wait is given up the moment the start is (Stop, Cancel, another sign-in)
+    shell = await withFloor(() => c.openLoginShell(line, (text) => watcher.feed(text)), undefined, () => mem.startId === id);
+  } catch (e) {
+    if (mem.startId !== id) {
+      mem.connect = { ...mem.connect, inFlight: false };
+      schedulePush();
+      return false;
+    }
+    const status = (e as { status?: number }).status;
+    if (status === 401 || status === 403) {
+      // the grid sign-in lapsed: the press waits for it, as any press does (the sign-in tab, then on by itself)
+      mem.connect = { ...freshConnect() };
+      await writeGrid({ session: 'signed-out' });
+      await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', ...(login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+      await openSigninTab('press');
+      schedulePush();
+      return false;
+    }
+    mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
+    mem.failDetail = (e as Error).message;
+    schedulePush();
+    return false;
+  }
+  if (mem.startId !== id || mem.sitting) {
+    // given up while the shell opened (or another sitting won): closed before its line is typed
+    shell.close();
+    if (mem.startId !== id) mem.connect = { ...mem.connect, inFlight: false };
+    schedulePush();
+    return false;
+  }
+  const gate = new CodeGate((input) => shell.send(input));
+  mem.sitting = { id, mode: 'direct', login, gate, close: () => shell.close() };
+  registered = true;
+  for (const ev of early.splice(0)) await onConnectEvent(id, ev);
+  void shell.done.then((end) => onSittingEnd(id, end.reason, watcher.tail));
+  return true;
+}
+
+async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptions, dir: string, login: LoginMode): Promise<boolean> {
+  const host = tabHost(s.origin);
+  let tabId = mem.keptTabId;
+  let ownTab = false;
+  try {
+    if (tabId === undefined || !(await host.onPortal(tabId))) {
+      tabId = await host.openInactive(`${s.origin}${DASHBOARD}`, mem.panelWindowId);
+      ownTab = true;
+      await host.keep(tabId).catch(() => undefined);
+    }
+    if (!(await readyScript(host, tabId))) throw new Error('the page script did not answer in the portal tab');
+  } catch (e) {
+    if (ownTab && tabId !== undefined) await host.close(tabId).catch(() => undefined);
+    mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
+    mem.failDetail = (e as Error).message;
+    return false;
+  }
+  if (mem.startId !== id) {
+    // given up while the portal tab opened: nothing is typed
+    if (ownTab) await host.close(tabId).catch(() => undefined);
+    mem.connect = { ...mem.connect, inFlight: false };
+    return false;
+  }
+  const port = browser.tabs.connect(tabId, { name: CONNECT_PORT });
+  const gate = new CodeGate((input) => {
+    try {
+      port.postMessage({ type: 'input', text: input });
+    } catch {
+      /* the tab is gone */
+    }
+  });
+  const theTab = tabId;
+  mem.sitting = {
+    id,
+    mode: 'tab',
+    login,
+    gate,
+    tabId: theTab,
+    ownTab,
+    close: () => {
+      try {
+        port.postMessage({ type: 'close' });
+        port.disconnect();
+      } catch {
+        /* gone */
+      }
+    },
+  };
+  mem.workingInTab++;
+  let ended = false;
+  const finish = (reason: string) => {
+    if (ended) return;
+    ended = true;
+    mem.workingInTab = Math.max(0, mem.workingInTab - 1);
+    if (ownTab) void host.close(theTab).catch(() => undefined);
+    void onSittingEnd(id, reason, []);
+  };
+  port.onMessage.addListener((m: unknown) => {
+    const msg = m as ConnectOut;
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'event') void onConnectEvent(id, msg.event);
+    else if (msg.type === 'password') finish('password');
+    else if (msg.type === 'closed') finish(msg.reason);
+    else if (msg.type === 'error') {
+      mem.failDetail = msg.message;
+      finish('closed');
+    }
+  });
+  port.onDisconnect.addListener(() => finish('closed'));
+  port.postMessage({ type: 'connect', options: opts, sharedDir: dir });
+  return true;
+}
+
+/** what the connect line said; the views follow from mem.connect */
+async function onConnectEvent(id: number, ev: ConnectEvent): Promise<void> {
+  const sit = mem.sitting;
+  if (!sit || sit.id !== id) return;
+  sit.gate.onEvent(ev);
+  const c = mem.connect;
+  switch (ev.kind) {
+    case 'step': {
+      const st = ev.step;
+      switch (st.step) {
+        case 'setup':
+          if (mem.setup.state !== 'ready') {
+            mem.setup = { state: 'ready' };
+            await activity(LOG_WORDS.ready);
+          }
+          break;
+        case 'consent': {
+          const prefs = await loadPrefs();
+          const all = (await local.get<Statements>(STATEMENTS_KEY)) ?? {};
+          const ack = statementFor(all, prefs.worker_name);
+          if (ack) await local.set(STATEMENTS_KEY, { ...all, [ack.work_dir]: withConsentRecorded(ack) } satisfies Statements);
+          break;
+        }
+        case 'queued':
+          // the run record first, then the moment: a listing that runs between the two must find the Connect's record
+          await recordQueued(st.job, st.fresh, st.runDir);
+          mem.connect = { ...mem.connect, queued: true };
+          break;
+        case 'signin':
+          mem.connect = { ...c, signin: 'asked' };
+          break;
+        case 'signed-in': {
+          const allowed = planAllowsRemoteControl(st.plan);
+          mem.connect = { ...c, signin: 'signed-in', signedIn: { ...(st.email ? { email: st.email } : {}), ...(st.plan ? { plan: st.plan } : {}), at: Date.now() }, badCode: false, ...(allowed ? {} : { noPlan: true }) };
+          if (allowed) await activity(LOG_WORDS.claudeSignedIn(planWord(st.plan) ?? 'Claude'));
+          await closeAnthropicTab();
+          // already signed in on the grid (no link was shown): the Claude moment never appears, a toast says who (spec moment 8)
+          if (!c.linkShown && allowed) {
+            const plan = planWord(st.plan);
+            toast(plan ? WORDS.claude.signedIn(st.email ?? 'your account', plan) : `Signed in as ${st.email ?? 'your account'}`);
+          }
+          // the drawn check holds 3 s, then the panel moves on
+          setTimeout(() => schedulePush(), 3_100);
+          break;
+        }
+        case 'done':
+          mem.connect = { ...mem.connect, inFlight: false };
+          break;
+        case 'failed':
+          mem.connect = { ...mem.connect, inFlight: false, failure: st.code };
+          mem.failDetail = st.detail;
+          if (st.code === 'restricted') mem.restricted = true;
+          if (st.code === 'setup') mem.setup = { state: 'failed', detail: st.detail };
+          break;
+      }
+      break;
+    }
+    case 'signin-wait':
+      mem.connect = { ...c, signinWaitSince: Date.now() };
+      break;
+    case 'signin-node': {
+      const { signinWaitSince: _w, ...rest } = c;
+      mem.connect = rest;
+      break;
+    }
+    case 'auth-url':
+      sit.authUrl = ev.url;
+      mem.connect = { ...c, signin: 'link', claudeTabClosed: false, linkShown: true };
+      await openAnthropicTab(ev.url);
+      break;
+    case 'code-prompt':
+      if (c.signin === 'asked') mem.connect = { ...c, signin: 'link' };
+      break;
+    case 'code-received':
+      mem.connect = { ...c, signin: 'checking', badCode: false };
+      break;
+    case 'code-rejected':
+      mem.connect = { ...c, signin: 'link', badCode: true };
+      break;
+    default:
+      break;
+  }
+  schedulePush();
+}
+
+/** the sitting's socket closed: a password before anything was typed means the key step (AM2) */
+async function onSittingEnd(id: number, reason: string, tail: string[]): Promise<void> {
+  const sit = mem.sitting;
+  if (!sit || sit.id !== id) return;
+  sit.gate.close();
+  mem.sitting = undefined;
+  if (reason === 'password') {
+    mem.connect = { ...freshConnect(), failure: 'password' };
+    await setShellWord('password');
+    await session.set(PRESS_KEY, { kind: sit.login === 'auto' || sit.login === 'never' ? 'connect' : 'sign-in-claude', ...(sit.login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+    offerLoginSetup();
+  } else if (mem.connect.inFlight) {
+    // the socket closed with no done or failed
+    const c = mem.connect;
+    if (c.queued) {
+      // the worker keeps its place; a sign-in cut short shows as its own problem, the job says the rest
+      mem.connect = { ...c, inFlight: false, ...(c.signin === 'link' || c.signin === 'checking' ? { failure: 'signin-timeout' as ConnectFailure } : {}) };
+    } else {
+      mem.connect = { ...c, inFlight: false, failure: 'closed' };
+      mem.failDetail = tail.slice(-20).join('\n');
+    }
+  }
+  schedulePush();
+}
+
+/** `HPCW-STEP queued <job> new|kept <run dir>`: the run, at once, and its folder listed within a second */
+async function recordQueued(job: string, fresh: boolean, runDir: string | undefined): Promise<void> {
+  const prefs = await loadPrefs();
+  const prev = await session.get<RunState>(RUN_KEY);
+  let stateDir = prev?.stateDir;
+  let name = prefs.worker_name;
+  if (runDir) {
+    const i = runDir.replace(/\/+$/, '').lastIndexOf('/');
+    if (i > 0) {
+      stateDir = runDir.slice(0, i);
+      name = runDir.slice(i + 1) || name;
+    }
+  }
+  if (!stateDir) {
+    try {
+      const c = await directClient();
+      if (c) stateDir = (await clusterContext(c)).stateDir;
+    } catch {
+      /* found at the next listing */
+    }
+  }
+  if (!stateDir) return;
+  const dir = stateDir;
+  // merged into the record as it is now: a listing that found this run meanwhile (started_by "found")
+  // keeps what it read, and gains what only the Connect knows (pressed, started_by)
+  await mutateRun((cur) => {
+    const same = cur && cur.job === job && cur.stateDir === dir && cur.run === name;
+    return same
+      ? { ...cur, pressed: !!cur.pressed || fresh, started_by: cur.started_by === 'found' || !cur.started_by ? 'connect' : cur.started_by, stopped_by_student: false }
+      : { stateDir: dir, run: name, job, set_at: nowIso(), started_by: 'connect', pressed: fresh, stopped_by_student: false };
+  });
+  if (fresh) await activity(LOG_WORDS.asked);
+  await setPollEvery(0.5);
+  mem.last.list = 0;
+  void pollRun(true);
+}
+
+/** Anthropic's sign-in page, in a new tab in the panel's window; only an https link on claude.ai or claude.com reaches here */
+async function openAnthropicTab(url: string): Promise<boolean> {
+  const win = mem.panelWindowId;
+  const ret = await activeTabIn(win);
+  const t = await openTab(url, { active: true, anthropicOk: true, ...(win !== undefined ? { windowId: win } : {}) });
+  if (!t) return false;
+  let origin = 'https://claude.ai';
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    /* keep */
+  }
+  // the authorize link itself is not stored: only where the tab is, to count its loads
+  await session.set(ANTHROPIC_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url: origin, opened_at: nowIso(), purpose: 'anthropic', ...(ret !== undefined ? { return_tab_id: ret } : {}) } satisfies AnthropicTab);
+  return true;
+}
+
+/** the code, typed once into the sitting through the gate and forgotten; the tab's loads from now on decide whether it may be closed */
+async function pasteCode(code: string): Promise<ActionResults['paste-code']> {
+  const sit = mem.sitting;
+  if (!sit) return { typed: false };
+  const out = sit.gate.submit(code);
+  if (out === 'bad') {
+    mem.connect = { ...mem.connect, badCode: true };
+    return { typed: false };
+  }
+  if (out !== 'typed' && out !== 'held') return { typed: false };
+  mem.connect = { ...mem.connect, badCode: false, ...(out === 'typed' ? { signin: 'checking' as const } : {}) };
+  const anth = await session.get<AnthropicTab>(ANTHROPIC_TAB_KEY);
+  if (anth) await session.set(ANTHROPIC_TAB_KEY, { ...anth, pasted_at: nowIso(), loads_since_paste: 0 } satisfies AnthropicTab);
+  return { typed: true };
+}
+
+/** SIGNED-IN: Anthropic's tab closes itself, if it has started no new load since the paste; focus returns to the tab that was in front */
+async function closeAnthropicTab(): Promise<void> {
+  const anth = await session.get<AnthropicTab>(ANTHROPIC_TAB_KEY);
+  if (!anth) return;
+  await closeUnderGuards(anth);
+  await session.remove(ANTHROPIC_TAB_KEY);
+}
+
+// ---- AM2: the one-time key step ---------------------------------------------------------------------
+
+function offerLoginSetup(): void {
+  if (mem.loginSetup && mem.loginSetup.phase !== 'done') return;
+  void (async () => {
+    const dir = await sharedDirNow();
+    if (!dir) {
+      mem.connect = { ...freshConnect(), failure: 'setup' };
+      schedulePush();
+      return;
+    }
+    const line = commands.loginSetup(dir);
+    // the line is typed for the student only when its path is the site profile's own shared copy (a
+    // portal this build carries no profile for gets the copy-and-paste way: the line, never typed by Beethoven)
+    const s = await settingsNow();
+    const profiled = !!s && sharedRootOf((await siteProfile(s.site))?.shared_install) === dir;
+    mem.loginSetup = new LoginSetupFlow(line, {
+      now: () => Date.now(),
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      clearTimer: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+      openTerminal: openTerminalTab,
+      type: profiled ? typeInTerminal : async () => ({ typed: false, how: 'unsupported', why: 'unsupported' }),
+      test: async () => {
+        try {
+          // tab mode: the grid terminal tab itself carries the test (no portal tab opened and closed every few seconds)
+          const term = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+          return await withShell((p) => p.shellTest(), term ? { viaTabId: term.tabId } : {});
+        } catch (e) {
+          return isPasswordError(e) ? 'password' : 'error';
+        }
+      },
+      terminalOpen: async () => {
+        const rec = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+        return !!rec && !!(await tabNow(rec.tabId));
+      },
+      closeTerminal: async () => {
+        const rec = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+        if (rec) await closeUnderGuards(rec);
+        await session.remove(TERMINAL_TAB_KEY);
+      },
+      changed: () => schedulePush(),
+      done: () => {
+        void (async () => {
+          await setShellWord('ok');
+          await activity(LOG_WORDS.keyStepDone);
+          mem.connect = { ...freshConnect() };
+          schedulePush();
+          setTimeout(() => {
+            mem.loginSetup = undefined;
+            schedulePush();
+            void ensureSetup().then(() => carryPress());
+          }, KEY_DONE_HOLD_MS);
+        })();
+      },
+    });
+    schedulePush();
+  })();
+}
+
+/** "Open the grid terminal": the university's own terminal page, in front, in the panel's window */
+async function openTerminalTab(): Promise<boolean> {
+  const s = await settingsNow();
+  if (!s) return false;
+  const url = shellPageUrl(s.origin, s.shell_host || 'default');
+  const old = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+  if (old && (await tabNow(old.tabId))) {
+    await focusTab(old.tabId, old.windowId);
+    return true;
+  }
+  const win = mem.panelWindowId;
+  const ret = await activeTabIn(win);
+  const t = await openTab(url, { active: true, ...(win !== undefined ? { windowId: win } : {}) });
+  if (!t) return false;
+  await session.set(TERMINAL_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url, opened_at: nowIso(), purpose: 'terminal', ...(ret !== undefined ? { return_tab_id: ret } : {}) } satisfies OpenedTab);
+  return true;
+}
+
+/** the terminal page loaded: Beethoven's page script goes into that one tab, and watches the title only */
+async function watchTerminal(rec: OpenedTab): Promise<void> {
+  const s = await settingsNow();
+  if (!s) return;
+  const account = (await session.get<GridNote>(GRID_KEY))?.account ?? (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
+  try {
+    if (!(await connectApi.ping(rec.tabId).catch(() => false))) await connectApi.inject(rec.tabId, s.origin);
+    for (let i = 0; i < 12; i++) {
+      if (await connectApi.ping(rec.tabId).catch(() => false)) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    if (account) await browser.tabs.sendMessage(rec.tabId, { type: 'terminal.watch', account } satisfies Request);
+  } catch {
+    /* the student presses "I'm in" */
+  }
+}
+
+/** after "I'm in" (or the title's sign): the page script types the one line; it refuses any other */
+async function typeInTerminal(line: string): Promise<TerminalTyped> {
+  const rec = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
+  const s = await settingsNow();
+  if (!rec || !s) return { typed: false, how: 'unsupported', why: 'unsupported' };
+  if (!(await connectApi.ping(rec.tabId).catch(() => false))) {
+    await connectApi.inject(rec.tabId, s.origin).catch(() => undefined);
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  const a = (await browser.tabs.sendMessage(rec.tabId, { type: 'terminal.type', line } satisfies Request)) as Answer<TerminalTyped> | undefined;
+  return unwrap(a);
+}
+
+// ---- stop, restrict, files ---------------------------------------------------------------------------
+
+async function pressStop(): Promise<ActionResults['stop']> {
+  // a connect line not typed yet never is
+  cancelStart();
+  if (mem.sitting) {
+    mem.sitting.gate.close();
+    mem.sitting.close();
+    mem.sitting = undefined;
+    mem.connect = { ...freshConnect() };
+  }
+  await session.set(PRESS_KEY, { kind: 'stop', at: nowIso() } satisfies PendingPress);
+  const r = await readyForPress('stop');
+  if (r.drop) {
+    await session.remove(PRESS_KEY);
+    return { stopped: false };
+  }
+  if (!r.go) return { stopped: false };
+  await session.remove(PRESS_KEY);
+  return { stopped: await doStop() };
+}
+
+/** `worker stop` alone, through the shell; "Stopping…" until the job is gone */
+async function doStop(): Promise<boolean> {
+  const dir = await sharedDirNow();
+  const prefs = await loadPrefs();
+  const run = await session.get<RunState>(RUN_KEY);
+  const name = run?.run ?? prefs.worker_name;
+  if (!dir) return false;
+  mem.stopping = true;
+  schedulePush();
+  try {
+    const out = await withShell((p) => stopByShell(p, dir, name));
+    await mutateRun((cur) => (cur ? { ...cur, stopped_by_student: true } : undefined));
+    await pollRun(true);
+    if (out.stopped) await activity(LOG_WORDS.stopped);
+    await releaseKeptTab();
+    await setPollEvery(1);
+    return out.stopped;
+  } catch (e) {
+    if (isPasswordError(e)) {
+      await setShellWord('password');
+      await session.set(PRESS_KEY, { kind: 'stop', at: nowIso() } satisfies PendingPress);
+      offerLoginSetup();
+    }
+    return false;
+  } finally {
+    mem.stopping = false;
+    schedulePush();
+  }
+}
+
+async function pressRestrict(workerName: string): Promise<ActionResults['restrict']> {
+  const prefs = await loadPrefs();
+  if (workerName !== prefs.worker_name) return { marked: false };
+  await session.set(PRESS_KEY, { kind: 'restrict', at: nowIso() } satisfies PendingPress);
+  const r = await readyForPress('restrict');
+  if (!r.go) {
+    if (r.drop) await session.remove(PRESS_KEY);
+    return { marked: false };
+  }
+  await session.remove(PRESS_KEY);
+  return { marked: await doRestrict(workerName) };
+}
+
+async function doRestrict(name: string): Promise<boolean> {
+  const dir = await sharedDirNow();
+  if (!dir) return false;
+  try {
+    const out = await withShell((p) => restrictByShell(p, dir, name));
+    if (out.marked) mem.restricted = true;
+    return out.marked;
+  } catch (e) {
+    if (isPasswordError(e)) {
+      await setShellWord('password');
+      await session.set(PRESS_KEY, { kind: 'restrict', at: nowIso() } satisfies PendingPress);
+      offerLoginSetup();
+    }
+    return false;
+  }
+}
+
+/** "Your files": the worker's folder in the portal's Files app, in a tab (the browser asks for its sign-in there itself when it holds none) */
+async function openFiles(): Promise<boolean> {
+  const s = await settingsNow();
+  if (!s) return false;
+  const run = await session.get<RunState>(RUN_KEY);
+  const prefs = await loadPrefs();
+  let target = '';
+  if (run) target = paths.workspace(run.stateDir, run.run);
+  else {
+    try {
+      const c = await directClient();
+      if (c) target = paths.workspace((await clusterContext(c)).stateDir, prefs.worker_name);
+    } catch {
+      target = '';
+    }
+  }
+  const url = `${s.origin}/pun/sys/dashboard/files/fs${target.split('/').map(encodeURIComponent).join('/')}`;
+  return !!(await openTab(url, { active: true, ...(mem.panelWindowId !== undefined ? { windowId: mem.panelWindowId } : {}) }));
+}
+
+// ---- the run's files ---------------------------------------------------------------------------------
+
+/** find the worker's run on the grid when this browser session has none (after a browser restart) */
+async function discoverRun(c: PortalClient): Promise<RunState | undefined> {
+  const prefs = await loadPrefs();
+  try {
+    const ctx = await clusterContext(c);
+    const text = await c.readFileIfExists(paths.status(ctx.stateDir, prefs.worker_name));
+    if (!text) return undefined;
+    const st = JSON.parse(text) as StatusFile;
+    if (!st.job) return undefined;
+    return { stateDir: ctx.stateDir, run: prefs.worker_name, job: String(st.job), ...(ctx.site ? { site: ctx.site } : {}), set_at: nowIso(), started_by: 'found', ...(st.next_job ? { next_job: String(st.next_job) } : {}) };
+  } catch {
+    return undefined;
+  }
+}
+
+/** list the run folder and download only what changed (status.json, connection.json by modified_at; the node file once; progress.log when Show log or Details wants it) */
+async function pollRun(force = false, want: { progress?: boolean } = {}): Promise<void> {
+  if (mem.busy.list) return;
+  const grid = await session.get<GridNote>(GRID_KEY);
+  if (!force && grid?.session !== 'signed-in' && mem.ports.size > 0) return;
+  const c = await directClient();
+  if (!c || !(await termsInForce())) return;
+  mem.busy.list = true;
+  mem.last.list = Date.now();
+  try {
+    let snap = await session.get<RunState>(RUN_KEY);
+    if (!snap) {
+      if (grid?.session !== 'signed-in') return;
+      // never while a Connect is under way: its own record is on its way (recordQueued), and a record
+      // found here would carry none of what only the press knows
+      if (mem.connect.inFlight || mem.sitting || mem.startId) return;
+      const found = await discoverRun(c);
+      if (!found) return;
+      // written only while there is still no record (a Connect may have written its own meanwhile)
+      snap = await mutateRun((cur) => (cur ? undefined : found));
+      if (!snap) return;
+    }
+    const detailsOpen = [...mem.ports.values()].some((p) => p.surface === 'details');
+    let listing;
+    const asked = Date.now();
+    try {
+      listing = await c.listDir(paths.run(snap.stateDir, snap.run));
+    } catch (e) {
+      const status = (e as { status?: number }).status;
+      if (status === 401 || status === 403) await writeGrid({ session: 'signed-out' });
+      const why = (e as Error).message;
+      await mutateRun((cur) => (sameRun(cur, snap) ? { ...cur!, error: why } : undefined));
+      return;
+    }
+    const answered = Date.now();
+    const rawLink = environmentLinkOf(snap);
+    const needRc = detailsOpen || (snap.status?.state === 'running' && !rawLink);
+    const plan = listingPlan(snap, listing.files, { progress: mem.logOpen || detailsOpen || !!want.progress, rc: needRc });
+    // what this listing read, downloaded outside the queue and applied inside it to the record as it is then
+    const read: { status?: StatusFile; connection?: ConnectionFile; node?: string; progress?: string; rc?: string } = {};
+    if (plan.status) {
+      const t = await c.readFileIfExists(paths.status(snap.stateDir, snap.run)).catch(() => undefined);
+      if (t) {
+        try {
+          read.status = JSON.parse(t) as StatusFile;
+        } catch {
+          /* a file caught mid-write; the next listing reads it */
+        }
+      }
+    }
+    if (plan.connection) {
+      const t = await c.readFileIfExists(paths.connection(snap.stateDir, snap.run)).catch(() => undefined);
+      if (t) {
+        try {
+          read.connection = JSON.parse(t) as ConnectionFile;
+        } catch {
+          /* next time */
+        }
+      }
+    }
+    if (plan.node) {
+      const t = await c.readFileIfExists(paths.node(snap.stateDir, snap.run)).catch(() => undefined);
+      if (t) read.node = t.trim().slice(0, 100);
+    }
+    if (plan.progress) read.progress = await c.readFileIfExists(paths.progressLog(snap.stateDir, snap.run)).catch(() => undefined);
+    if (plan.rc) read.rc = await c.readFileIfExists(paths.rcLog(snap.stateDir, snap.run)).catch(() => undefined);
+    // the grid's clock against this computer's, from the Files app's own Date (R5, R12 and the timers compare like with like)
+    const offset = clockOffset(listing.serverDate, asked, answered);
+    const newer = (mtime: number | undefined, had: number | undefined) => mtime !== undefined && (had === undefined || mtime >= had);
+    const run = await mutateRun((cur) => {
+      if (!sameRun(cur, snap)) return undefined;
+      let r = cur!;
+      if (read.status && newer(plan.mtimes.status, r.status_mtime)) r = applyStatus(r, read.status, plan.mtimes.status).run;
+      if (read.connection && newer(plan.mtimes.connection, r.connection_mtime)) r = applyConnection(r, read.connection, plan.mtimes.connection).run;
+      if (plan.node && newer(plan.mtimes.node, r.node_mtime)) r = { ...r, node_mtime: plan.mtimes.node, ...(read.node ? { node: read.node } : {}) };
+      if (read.progress !== undefined && newer(plan.mtimes.progress, r.progress_mtime)) r = { ...r, progress_tail: read.progress.split('\n').filter(Boolean).slice(-40), progress_mtime: plan.mtimes.progress };
+      if (read.rc !== undefined && newer(plan.mtimes.rc, r.rc_mtime)) {
+        const reg = parseRegistration(read.rc);
+        r = { ...r, rc_tail: read.rc.slice(-4000), rc_mtime: plan.mtimes.rc, ...(reg.session_name || reg.environment_url ? { registration: reg } : {}) };
+      }
+      const keepOffset = offset === undefined ? r.clock_offset_ms : r.clock_offset_ms !== undefined && Math.abs(offset - r.clock_offset_ms) <= CLOCK_JITTER_MS ? r.clock_offset_ms : offset;
+      return { ...r, listed_at: nowIso(), error: undefined, ...(keepOffset !== undefined ? { clock_offset_ms: keepOffset } : {}) };
+    });
+    if (run) await afterRead();
+  } finally {
+    mem.busy.list = false;
+    schedulePush();
+  }
+}
+
+/** a difference this small between the two clocks is noise (the Date header has whole seconds); a larger one is kept */
+const CLOCK_JITTER_MS = 3_000;
+
+/** the grid's clock minus this computer's, in ms, from a response's Date header and when it was asked and answered; 0 inside the jitter */
+function clockOffset(serverDate: string | undefined, asked: number, answered: number): number | undefined {
+  if (!serverDate) return undefined;
+  const server = Date.parse(serverDate);
+  if (!Number.isFinite(server)) return undefined;
+  // the header carries whole seconds: its true moment is on average half a second later
+  const off = server + 500 - (asked + answered) / 2;
+  return Math.abs(off) <= CLOCK_JITTER_MS ? 0 : Math.round(off);
+}
+
+/** `worker status --json`, once a minute while queued with a page open: the scheduler's reason and estimate (direct only: tab mode would open a portal tab every minute) */
+async function refreshStatusJson(): Promise<void> {
+  if (mem.busy.statusJson) return;
+  const ch = await channelNow();
+  if (ch?.mode === 'tab') return;
+  mem.busy.statusJson = true;
+  mem.last.statusJson = Date.now();
+  try {
+    const snap = await session.get<RunState>(RUN_KEY);
+    const dir = await sharedDirNow();
+    const c = await directClient();
+    if (!snap || !dir || !c) return;
+    // asked only while the run is still in line and no press of the student's waits or runs
+    if (runFacts(snap, Date.now()).phase !== 'queued' || mem.stopping || mem.startId || mem.pressDepth > 0 || (await session.get<PendingPress>(PRESS_KEY))) return;
+    // still wanted when it goes: in line, the same job, and no press of the student's waiting or under way
+    const still = async () => {
+      const cur = await session.get<RunState>(RUN_KEY);
+      return !!cur && sameRun(cur, snap) && cur.job === snap.job && runFacts(cur, Date.now()).phase === 'queued' && !mem.stopping && !mem.startId && mem.pressDepth === 0 && !(await session.get<PendingPress>(PRESS_KEY));
+    };
+    const sj = await statusByShell(c, dir, snap.run, undefined, still).catch(() => undefined);
+    if (!sj) return;
+    let say: string | undefined;
+    await mutateRun((cur) => {
+      // merged into the record as it is now, for the same job only, and only while it is still in line:
+      // never a copy from before the floor's wait written back over what the listings read since
+      if (!sameRun(cur, snap) || cur!.job !== snap.job) return undefined;
+      let next: RunState = { ...cur!, scheduler: sj.scheduler, status_json_at: nowIso() };
+      const st = cur!.status?.state;
+      if (sj.status && (!st || st === 'queued')) next = applyStatus(next, sj.status).run;
+      // "In line: …" in Show log, once per job and reason class (D25)
+      if (sj.scheduler && sj.scheduler.state === 'PENDING') {
+        const tag = `${next.job}|${reasonClass(sj.scheduler.reason)}`;
+        if (next.reason_logged !== tag) {
+          next = { ...next, reason_logged: tag };
+          say = LOG_WORDS.inLine[reasonClass(sj.scheduler.reason)];
+        }
+      }
+      return next;
+    });
+    if (say) await activity(say);
+  } finally {
+    mem.busy.statusJson = false;
+    schedulePush();
+  }
+}
+
+/** what a read changed: the wait history, going online (open once, the burst, the first online), stopping, the alarm's cadence; decided on the record as it is now, once */
+async function afterRead(): Promise<void> {
+  const now = Date.now();
+  const prefs = await loadPrefs();
+  let open: string | undefined;
+  let online = false;
+  let waited: number | undefined;
+  let gotComputer = false;
+  let titled: string | undefined;
+  const run = await mutateRun((cur) => {
+    if (!cur) return undefined;
+    const rf = runFacts(cur, now);
+    let r = cur;
+    let changed = false;
+    // the wait, once per job the student's Connect submitted
+    if (rf.gotComputerAt && rf.pressed && r.wait_recorded_job !== r.job) {
+      waited = waitMinutes(rf);
+      r = { ...r, wait_recorded_job: r.job };
+      gotComputer = true;
+      changed = true;
+    }
+    if (rf.phase === 'online' && r.online_announced_job !== r.job) {
+      r = { ...r, online_announced_job: r.job };
+      changed = true;
+      online = true;
+      titled = rf.title;
+      if (r.started_by !== 'found' || rf.pressed) mem.onlineAnnouncedAt = now;
+      if (rf.pressed && prefs.open_claude_on_connect && rf.link && r.opened_env !== rf.link) {
+        r = { ...r, opened_env: rf.link };
+        open = rf.link;
+      }
+    }
+    return changed ? r : undefined;
+  });
+  if (waited !== undefined) {
+    const h = await local.get<WaitHistory>(WAIT_HISTORY_KEY);
+    await local.set(WAIT_HISTORY_KEY, { minutes: addWait(h?.minutes, waited) } satisfies WaitHistory);
+  }
+  if (gotComputer) await activity(LOG_WORDS.gotComputer);
+  if (online) {
+    await once({ first_online_at: nowIso() });
+    await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? DEFAULT_SITE))?.session_title, prefs.worker_name)));
+    if (open) await openSessionTab(open);
+    await releaseKeptTab();
+    setTimeout(() => schedulePush(), 4_100);
+  }
+  const rf = runFacts(run, Date.now());
+  await setPollEvery(rf.phase === 'online' || rf.phase === 'stopped' || rf.phase === 'ended' || rf.phase === 'error' || rf.phase === 'none' ? 1 : 0.5);
+}
+
+/** "Keep my worker running": a worker that ended without the student's Stop is started again on the grid sign-in, with no sign-in sitting and no tab */
+async function maybeKeepRunning(): Promise<void> {
+  const prefs = await loadPrefs();
+  if (!prefs.auto_start || mem.sitting) return;
+  const f = await buildFacts();
+  const run = await session.get<RunState>(RUN_KEY);
+  if (!run || run.stopped_by_student || f.run.phase !== 'ended') return;
+  if (!f.statement.inForce || !f.access.ok || mem.setup.state !== 'ready') return;
+  const ch = await channelNow();
+  if (ch?.shell === 'password') return;
+  await startConnect('never');
+}
+
+// ---- claude.ai --------------------------------------------------------------------------------------
+
+/** open the environment link in one new tab and remember it (claude.ai's tab is never closed by Beethoven) */
+async function openSessionTab(link: string): Promise<boolean> {
+  if (!isEnvironmentUrl(link)) return false;
+  const win = mem.panelWindowId;
+  const t = await openTab(link, { active: true, anthropicOk: true, ...(win !== undefined ? { windowId: win } : {}) });
+  if (!t) return false;
+  await session.set(CLAUDE_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url: 'https://claude.ai/code', opened_at: nowIso(), purpose: 'session', loaded: false, loads_after: 0 } satisfies OpenedTab);
+  return true;
+}
+
+/** "Open my session": the claude.ai tab Beethoven opened when it has had no new load since, else one new tab; never two; never needs the grid */
+async function openSession(): Promise<ActionResults['open-session']> {
+  const f = await buildFacts();
+  const link = f.run.link ?? f.lastKnown?.environment_url;
+  if (!isEnvironmentUrl(link)) return { focused: false, opened: false };
+  const rec = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
+  const exists = rec ? !!(await tabNow(rec.tabId)) : false;
+  if (rec && sessionTabDecision(rec, exists) === 'focus') {
+    const ok = await focusTab(rec.tabId, rec.windowId);
+    if (ok) return { focused: true, opened: false };
+  }
+  return { focused: false, opened: await openSessionTab(link) };
+}
+
+// ---- Details ------------------------------------------------------------------------------------------
+
+async function runChecks(): Promise<boolean> {
+  if (mem.checksRunning) return false;
+  mem.checksRunning = true;
+  schedulePush();
+  try {
+    const settings = await settingsNow();
+    const client = await directClient();
+    const ctx: DiagCtx = {
+      env: {
+        version: version(),
+        now: () => new Date(),
+        local,
+        session,
+        hasOriginPermission: (o) => connectApi.containsOrigin(o),
+        portal: () => client,
+      },
+      ...(settings ? { settings } : {}),
+      prefs: await loadPrefs(),
+      cache: {},
+    };
+    const rep = await runDiagnostics(buildNodes(), ctx, { timeoutMs: 60_000 });
+    await session.set(CHECKS_KEY, rep);
+    return true;
+  } finally {
+    mem.checksRunning = false;
+    schedulePush();
+  }
+}
+
+/** "Check a compute node": the probe job, Details only */
+async function checkComputeNode(): Promise<boolean> {
+  try {
+    const r = await withShell((p) => withFloor(() => p.shell(commands.probe(), { timeoutMs: 90_000 })));
+    const job = parseJobId(r.output);
+    if (job) await local.set(PROBE_KEY, { submitted_at: nowIso(), job } satisfies ProbeNote);
+    return !!job;
+  } catch {
+    return false;
+  }
+}
+
+/** "Copy details": the reason for the lab lead, in the tool's own words (Details-grade text) */
+async function detailsText(): Promise<string> {
+  const s = await settingsNow();
+  const ch = await channelNow();
+  const grid = await session.get<GridNote>(GRID_KEY);
+  const run = await session.get<RunState>(RUN_KEY);
+  return [
+    `Beethoven ${version()} at ${s?.hostname ?? 'no portal'} (site profile ${s?.site ?? '-'}), account ${grid?.account ?? '-'}`,
+    `channel: ${ch ? `${ch.mode}, shell ${ch.shell}` : 'not tested'}`,
+    `setup: ${mem.setup.state}${mem.setup.detail ? ` (${mem.setup.detail})` : ''}`,
+    `last failure: ${mem.connect.failure ?? 'none'}${mem.failDetail ? `: ${mem.failDetail}` : ''}`,
+    run ? `run: ${run.run} job ${run.job}${run.status ? ` state ${run.status.state}` : ''}` : 'run: none',
+  ].join('\n');
+}
+

@@ -26,9 +26,11 @@
 // more than that.
 //
 // Caches and grace: an approval is good for 24 hours without asking again, and is kept up to
-// 7 days when the service does not answer; a refusal is kept 10 minutes (a click on the toolbar
-// button asks again at once, so an approval just given is seen); an attempt that got no answer is
-// not repeated for 15 minutes. Withdrawal (the service answering approved:false for an account
+// 7 days when the service does not answer; a refusal is kept 10 minutes (opening the panel asks
+// again at once, so an approval just given is seen: LICENSE 3(a), 11.0.0); an attempt that got no
+// answer is not repeated for 15 minutes. There is no periodic re-check while the panel is open: the
+// triggers are the acceptance, the first grid sign-in, opening the panel, a page's "Try again", and
+// the daily alarm (accessForced says which of them ask past a refusal). Withdrawal (the service answering approved:false for an account
 // it approved before) stops every start at the next check and is said as such; an approval moved
 // to another installation reaches this one the same way. A reason the service gives is said in its
 // own sentence, ahead of the withdrawal. The service's answers are data: the only URL taken from
@@ -60,6 +62,18 @@ export const RETRY_MS = 15 * MINUTE;
 export const FETCH_TIMEOUT_MS = 30_000;
 /** what a dashboard may call an account (core/portal.ts reads it with the same alphabet), lower-cased */
 export const ACCOUNT_RE = /^[a-z0-9][a-z0-9._@-]{0,63}$/;
+
+/**
+ * What asks the service (11.0.0): the acceptance ("terms"), the grid sign-in that first shows the
+ * account ("signin"), the panel opening ("open", LICENSE 3(a): again after a day or after a no), a
+ * page's "Try again" ("retry"), a press waiting on the approval ("press"), and the daily alarm.
+ */
+export type AccessTrigger = 'terms' | 'signin' | 'open' | 'retry' | 'press' | 'alarm';
+
+/** the triggers a person made, which ask again past a refusal or a failed attempt (an approval under a day old still holds) */
+export function accessForced(trigger: AccessTrigger): boolean {
+  return trigger === 'open' || trigger === 'retry' || trigger === 'press';
+}
 
 /** the installation identifier as ext/storage.ts installId() makes it: 16 random bytes as 32 hex characters */
 export const INSTALL_ID_RE = /^[0-9a-f]{32}$/;

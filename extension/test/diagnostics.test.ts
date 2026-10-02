@@ -9,7 +9,7 @@ import type { EndpointClass } from '../src/core/audit';
 import { buildNodes, CHECK_IDS, type DiagCtx, type DiagEnv } from '../src/core/checks';
 import { formatReport, order, runDiagnostics } from '../src/core/diagnostics';
 import { ackSubject, makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
-import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, type PortalSettings } from '../src/core/keys';
+import { ACCESS_KEY, CHANNEL_KEY, IDENTITY_KEY, KILLLIST_KEY, type ChannelNote, type PortalSettings } from '../src/core/keys';
 import type { PortalApi } from '../src/core/portal';
 import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
 import { APPROVED_TTL_MS, type AccessRecord } from '../src/licensing/access';
@@ -40,7 +40,7 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
   if (o.withProfile !== false) files.set('/home/ab1234/.hpcworker/profile.json', o.profile ?? PROFILE);
   if (o.probe) files.set(`${STATE}/probe/probe.json`, JSON.stringify(o.probe));
   return {
-    session: async () => ({ ok: true, status: 200, finalUrl: 'https://ood.example/pun/sys/dashboard/', signedIn: true, isOnDemand: true, csrf: 't', username: 'ab1234', checkedAt: new Date(NOW * 1000).toISOString(), detail: 'signed in to the portal' }),
+    session: async () => ({ ok: true, state: 'signed-in' as const, status: 200, finalUrl: 'https://ood.example/pun/sys/dashboard/', signedIn: true, isOnDemand: true, csrf: 't', username: 'ab1234', checkedAt: new Date(NOW * 1000).toISOString(), detail: 'signed in to the portal' }),
     warm: async () => ({ ok: true, attempts: 1, status: 200, signedIn: true, detail: 'your portal is awake', session: await fakePortal().session() }),
     whoAmI: async () => 'ab1234',
     home: async () => '/home/ab1234',
@@ -60,6 +60,7 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
     activeJobs: async () => ({ jobs: [], clusters: ['wayne'], errors: [] }),
     cancelJob: async () => undefined,
     shell: async () => ({ output: o.discoverOutput ?? DISCOVER_JSON, exitCode: 0, transcript: '', ms: 900 }),
+    shellTest: async () => 'ok' as const,
     probeRnode: async () => ({ state: 'disabled', status: 404, detail: 'off' }),
     probeRoutes: async () => ({ workflows_json: 404, projects: 200 }),
     auditWait: async () => 0,
@@ -70,10 +71,11 @@ function fakePortal(over: Partial<PortalApi> = {}, o: FakeOpts = {}): PortalApi 
   };
 }
 
-async function ctxWith(opts: { terms?: boolean; /** the access record on file; null for none (default: approved an hour ago) */ access?: AccessRecord | null; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; /** the account name the dashboard showed; null for none (default ab1234) */ observed?: string | null; worker?: string }): Promise<DiagCtx> {
+async function ctxWith(opts: { /** the channel test's verdict on file; null for none (default: direct, shell ok) */ channel?: ChannelNote | null; terms?: boolean; /** the access record on file; null for none (default: approved an hour ago) */ access?: AccessRecord | null; settings?: boolean; granted?: boolean; alive?: boolean; portal?: PortalApi; ack?: boolean; /** the account name the dashboard showed; null for none (default ab1234) */ observed?: string | null; worker?: string }): Promise<DiagCtx> {
   const local = memoryKV();
   const session = memoryKV();
-  if (opts.terms !== false) await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
+  if (opts.terms !== false) await local.set(TERMS_KEY, { v: 2, terms_version: TERMS_VERSION, edition: 'trial', accepted_at: '2026-10-01T00:00:00Z', affirmations: [{ id: 'agree', label: 'x', checked: true }] });
+  if (opts.channel !== null) await local.set(CHANNEL_KEY, opts.channel ?? ({ origin: 'https://ood.example', mode: 'direct', shell: 'ok', tested_at: '2026-09-28T00:00:00Z' } satisfies ChannelNote));
   if (opts.access !== null) await local.set(ACCESS_KEY, opts.access ?? record());
   if (opts.observed !== null) await local.set(IDENTITY_KEY, { username: opts.observed ?? 'ab1234' });
   const worker = opts.worker ?? 'worker';
@@ -85,7 +87,6 @@ async function ctxWith(opts: { terms?: boolean; /** the access record on file; n
     local,
     session,
     hasOriginPermission: async () => opts.granted !== false,
-    portalAlive: async () => opts.alive !== false,
     portal: () => opts.portal,
   };
   return { env, settings, prefs: { worker_name: worker, permission_mode: 'default', auto_start: true, open_claude_on_connect: true }, cache: {} };
@@ -148,7 +149,7 @@ describe('diagnostics', () => {
     expect(['ok', 'warn']).toContain(by['access']!.status);
     expect(by['origin-granted']!.status).toBe('fail');
     expect(by['origin-granted']!.fixAction).toBe('connect-portal');
-    for (const id of ['portal-tab', 'signed-in', 'shell', 'files', 'active-jobs', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'session-lifetime']) {
+    for (const id of ['channel', 'signed-in', 'shell', 'files', 'active-jobs', 'login-discovery', 'probe-job', 'worker-binary', 'claude-login', 'remote-control-ready', 'xdg-runtime', 'session-lifetime']) {
       expect(by[id]!.status, id).toBe('blocked');
       expect(by[id]!.rootCause, id).toBe('origin-granted');
     }
@@ -334,9 +335,9 @@ describe('diagnostics', () => {
     expect(by2['data-classification']!.detail).toMatch(/site profile marks the workspace of worker "worker" restricted/);
     // another worker's marker does not touch this one
     const by3 = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE, files: marker }), ack: true, worker: 'thesis' })));
-    // a warn, not a fail: the statement is made and the consent marker is written at the next start
+    // a warn, not a fail: the statement is made and the Remote Control answer is recorded by the next Connect
     expect(by3['data-classification']!.status).toBe('warn');
-    expect(by3['data-classification']!.detail).toMatch(/consent marker is written at the next start/);
+    expect(by3['data-classification']!.detail).toMatch(/the Remote Control answer is recorded by the next Connect/);
   });
 
   it('each floor class has its own clock: a running jobs clock skips check 7 only, a running discover clock skips check 5 and its dependants', async () => {
@@ -356,6 +357,20 @@ describe('diagnostics', () => {
     expect(by2['probe-job']!.status).toBe('skipped');
     expect(by2['active-jobs']!.status).toBe('ok');
     expect(rep2.ok).toBe(true);
+  });
+
+  it('11.0.0: the third check says how Beethoven reaches the grid, and warns when the shell asks for a password', async () => {
+    const direct = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE }), ack: true })));
+    expect(direct['channel']!.status).toBe('ok');
+    expect(direct['channel']!.detail).toMatch(/^direct \(tested 2026-09-28 00:00 UTC\); the shell reached a prompt without a password$/);
+    const keyless = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE }), ack: true, channel: { origin: 'https://ood.example', mode: 'direct', shell: 'password', tested_at: '2026-09-28T00:00:00Z' } })));
+    expect(keyless['channel']!.status).toBe('warn');
+    expect(keyless['channel']!.detail).toMatch(/asked for a password \(the one-time grid key step/);
+    const none = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: GOOD_PROBE }), ack: true, channel: null })));
+    expect(none['channel']!.status).toBe('fail');
+    expect(none['channel']!.detail).toMatch(/not tested yet/);
+    // the reads do not wait on it: the grid can be read whatever the channel's verdict
+    expect(none['signed-in']!.status).toBe('ok');
   });
 
   it('a quick run skips the slow checks', async () => {

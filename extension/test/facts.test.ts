@@ -1,265 +1,196 @@
-// Fact gathering against a fake portal serving the framework's files: the sign-in made from this
-// browser outlives a live job's older "not signed in"; the tool is the lab's shared copy, named by
-// the marker, with its own VERSION (a shared VERSION the Files app refuses is said without making
-// the portal look asleep), or an own copy a build before 8.0.0 left, named with its version and
-// never set up again; an account with no usable shared copy gets the one sentence, not an install;
-// and the access service's record is read (never fetched) for the account the dashboard showed.
+// The run as its files say (core/facts.ts), by the contract's rules R1 to R13 (docs/V11_CONTRACT.md
+// §9.3), against the three defects 10.0.0 had (worker-start-status/states.out): a status.json from an
+// earlier job showed the wrong state (R1 ignores it); nothing on disk said "queued" (framework 10 writes
+// it, and it is live, R2); and the wait was counted from the browser (every clock counts from the files,
+// R10). Also: which files a listing downloads, the wait history, and Show log's merge.
 import { describe, expect, it } from 'vitest';
-import { makeAcknowledgement, STATEMENTS_KEY, type Statements } from '../src/core/disclosure';
-import { gatherFacts, type FactsEnv, type RunLike } from '../src/core/facts';
-import { noSharedForSite } from '../src/core/install';
-import { ACCESS_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, type LoginSeen, type PortalSettings } from '../src/core/keys';
-import type { PortalApi } from '../src/core/portal';
-import { decide, LOGIN_SEEN_FRESH_MS, NEEDS_SHARED_COPY } from '../src/core/steps';
-import { TERMS_KEY, TERMS_VERSION } from '../src/core/terms';
-import { APPROVED_GRACE_MS, APPROVED_TTL_MS, type AccessRecord } from '../src/licensing/access';
-import { memoryKV, NOW } from './helpers';
+import type { StatusFile } from '../src/core/contract';
+import { addActivity, addWait, applyConnection, applyStatus, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../src/core/facts';
+import { formatClock } from '../src/core/model';
+import type { DirEntry } from '../src/core/portal';
 
-const NOW_MS = NOW * 1000;
-const HOME = '/home/ab1234';
-const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
-const PROFILE = JSON.stringify({ schema_version: 1, site: 'wayne', scheduler: 'slurm', shared_state_dir: '/rs/rs_grp_oschome/$USER/hpcworker' });
-const iso = (ms: number) => new Date(ms).toISOString();
+const NOW = Date.parse('2026-10-01T13:00:00Z');
+const ago = (ms: number) => new Date(NOW - ms).toISOString();
+const S = 1000;
+const MIN = 60 * S;
+const LINK = 'https://claude.ai/code?environment=env_01AbCdEf';
+const STATE = '/rs/rs_grp_oschome/st1234/hpcworker';
 
-/** a probe that passes, written twenty minutes ago, signed out at the time */
-const PROBE = {
-  when: iso(NOW_MS - 20 * 60_000),
-  hostname: 'asx15',
-  node_tmp: { path: '/tmp/ab1234/x', ok: true, free_gb: 200 },
-  dev_shm: { free_kb: 64_000_000, writable: true },
-  user_namespaces: { unshare_works: true },
-  runtime: { ok: true, name: 'apptainer' },
-  tmux: { present: true },
-  egress: { class: 'direct', with_inherited_env: { 'api.anthropic.com': '404', 'platform.claude.com': '200', 'claude.ai': '403' } },
-  claude_auth: { loggedIn: false, config_dir_present: true },
-  consent_recorded: true,
-};
+const queuedFile = (job = '40501234', extra: Partial<StatusFile> = {}): StatusFile => ({ version: 10, run: 'worker', job, node: '', state: 'queued', message: 'waiting for a computer', needs: 'nothing', submitted_at: ago(3 * MIN), updated_at: ago(3 * MIN), title: 'Wayne State grid', renewal: false, chain: true, next_job: '', ...extra });
 
-/** the portal's Files routes over a map; a path in `denied` answers as the lab volume answers an outsider (the client throws on a 403) */
-function fakePortal(files: Record<string, string>, denied: string[] = []): PortalApi {
-  const m = new Map(Object.entries(files));
-  return {
-    auditWait: async () => 0,
-    home: async () => HOME,
-    whoAmI: async () => 'ab1234',
-    exists: async (p: string) => m.has(p),
-    readFileIfExists: async (p: string) => {
-      if (denied.includes(p)) throw Object.assign(new Error(`could not read ${p} (403)`), { name: 'PortalError', status: 403 });
-      return m.get(p);
-    },
-  } as unknown as PortalApi;
+function runWith(status: StatusFile | undefined, extra: Partial<RunState> = {}): RunState {
+  return { stateDir: STATE, run: 'worker', job: '40501234', set_at: ago(3 * MIN), started_by: 'connect', pressed: true, listed_at: ago(2 * S), ...(status ? { status, status_mtime: Math.floor((NOW - 3 * MIN) / 1000) } : {}), ...extra };
 }
 
-/** the access service's last word: approved for ab1234 at ood.example an hour ago (as the background records it) */
-const approved = (checkedAgoMs = 3_600_000, extra: Partial<AccessRecord> = {}): AccessRecord => ({ v: 1, access_id: 'ab1234', portal: 'ood.example', approved: true, checked_at: iso(NOW_MS - checkedAgoMs), until: null, last_attempt_at: iso(NOW_MS - checkedAgoMs), ...extra });
+const entry = (name: string, mtimeS: number): DirEntry => ({ id: name, type: 'f', name, size: 1, modified_at: mtimeS, owner: 'st1234', mode: 420 });
 
-async function env(o: { files?: Record<string, string>; run?: RunLike; seenAgoMs?: number; access?: AccessRecord | null; /** the shared folder the bundled site profile names */ shared?: string; denied?: string[] } = {}): Promise<FactsEnv> {
-  const local = memoryKV();
-  await local.set(TERMS_KEY, { v: 1, terms_version: TERMS_VERSION, edition: 'trial', signed_name: 'A. Student' });
-  if (o.access !== null) await local.set(ACCESS_KEY, o.access ?? approved());
-  await local.set(IDENTITY_KEY, { username: 'ab1234' });
-  await local.set(STATEMENTS_KEY, { 'workspaces/worker': { ...makeAcknowledgement('worker'), consent_written_at: iso(NOW_MS - 3_600_000) } } satisfies Statements);
-  if (o.seenAgoMs !== undefined) await local.set(LOGIN_SEEN_KEY, { at: iso(NOW_MS - o.seenAgoMs), detail: 'a@wayne.edu max' } satisfies LoginSeen);
-  const settings: PortalSettings = { origin: 'https://ood.example', hostname: 'ood.example', connected_at: '2026-09-28T00:00:00Z', shell_host: 'default', site: 'wayne' };
-  const files = { [`${HOME}/.hpcworker/profile.json`]: PROFILE, [`${HOME}/.hpcworker/VERSION`]: '2\n', [`${STATE}/probe/probe.json`]: JSON.stringify(PROBE), ...(o.files ?? {}) };
-  return {
-    version: '1.0.0',
-    now: () => NOW_MS,
-    local,
-    settings,
-    prefs: { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true },
-    granted: async () => true,
-    alive: async () => true,
-    portal: () => fakePortal(files, o.denied),
-    run: o.run,
-    transient: { warm: { state: 'warm' } },
-    bundledSharedInstall: async (site) => (site === 'wayne' ? o.shared : undefined),
-  };
-}
+describe('R1: a status.json for another job is ignored; the next job becomes the run\'s job', () => {
+  it('ignores a stale file left by an earlier job', () => {
+    const stale: StatusFile = { state: 'online', job: '39999999', environment_url: LINK, updated_at: ago(5 * S) };
+    const r = applyStatus(runWith(undefined), stale, 100);
+    expect(r.taken).toBe(false);
+    expect(r.run.status).toBeUndefined();
+    expect(r.run.status_mtime).toBe(100);
+    // the run itself reads as just asked for, not as the old job's online
+    expect(runFacts(r.run, NOW).phase).toBe('queued');
+  });
 
-const SHARED = '/rs/rs_grp_oschome/shared/ashley/hpcworker/current';
-/**
- * An account set up on the lab's shared copy: the marker, and the shared VERSION when given. The
- * env's own ~/.hpcworker/VERSION (2) stays, as a leftover of an own copy would if a conversion
- * left it behind: with the marker there it must not count.
- */
-const sharedFiles = (version: string | undefined): Record<string, string> => ({
-  [`${HOME}/.hpcworker/shared`]: `${SHARED}\n`,
-  [`${HOME}/.hpcworker/bin/hpcworker`]: `#!/bin/bash\n# hpcworker launcher for a shared copy (managed: "hpcworker install" rewrites this file)\nHPCW_SHARED_ROOT=${SHARED}\n`,
-  ...(version !== undefined ? { [`${SHARED}/VERSION`]: `${version}\n` } : {}),
+  it('takes the next job\'s file and moves the run to it (a renewal)', () => {
+    const base = applyStatus(runWith(undefined), { state: 'online', job: '40501234', next_job: '40509999', environment_url: LINK, updated_at: ago(10 * S) }).run;
+    expect(base.next_job).toBe('40509999');
+    const renewed = applyStatus(base, { state: 'starting', job: '40509999', renewal: true, got_computer_at: ago(20 * S), updated_at: ago(5 * S) });
+    expect(renewed.taken).toBe(true);
+    expect(renewed.run.job).toBe('40509999');
+    expect(renewed.run.next_job).toBeUndefined();
+    const f = runFacts(renewed.run, NOW);
+    expect(f.renewal).toBe(true);
+    // no queue clock counted from hours ago for a renewal (R10)
+    expect(f.submittedAt).toBeUndefined();
+  });
+
+  it('a status file of another job that is somehow on the run is never read as the run\'s state', () => {
+    // runFacts holds to R1 itself, whatever applyStatus let through
+    const foreign = runWith({ state: 'online', job: '39999999', environment_url: LINK, updated_at: ago(5 * S) });
+    expect(runFacts(foreign, NOW).phase).toBe('queued');
+    expect(runFacts(foreign, NOW).link).toBeUndefined();
+  });
+
+  it('compares the grid\'s times with the grid\'s clock (a laptop 4 min ahead still reads a fresh worker as online)', () => {
+    const online: StatusFile = { state: 'online', job: '40501234', environment_url: LINK, submitted_at: ago(10 * MIN), online_at: ago(5 * MIN), updated_at: ago(10 * S) };
+    // the laptop's clock runs 4 minutes ahead of the grid's: every grid time is 4 min "old" to it
+    const ahead = 4 * MIN;
+    const skewed = runWith({ ...online, updated_at: new Date(NOW - ahead - 10 * S).toISOString(), online_at: new Date(NOW - ahead - 5 * MIN).toISOString(), submitted_at: new Date(NOW - ahead - 10 * MIN).toISOString() }, { status_mtime: Math.floor((NOW - ahead - 10 * S) / 1000) });
+    expect(runFacts(skewed, NOW)).toMatchObject({ phase: 'connecting', stale: true });
+    const corrected = runFacts({ ...skewed, clock_offset_ms: -ahead }, NOW);
+    expect(corrected).toMatchObject({ phase: 'online', stale: false, live: true });
+    // and the clocks the student sees are on this computer's clock
+    expect(corrected.onlineAt).toBe(ago(5 * MIN));
+    expect(corrected.submittedAt).toBe(ago(10 * MIN));
+  });
+
+  it('connection.json is taken only for the run\'s job', () => {
+    expect(applyConnection(runWith(undefined), { job: '1', environment_url: LINK }).taken).toBe(false);
+    expect(applyConnection(runWith(undefined), { job: '40501234', environment_url: LINK }).taken).toBe(true);
+  });
 });
 
-/** a live job that says need_login, whose sign-in check was made `checkedAgoMs` ago */
-function needLoginRun(checkedAgoMs: number): RunLike {
-  return {
-    stateDir: STATE,
-    run: 'worker',
-    job: '4243102',
-    set_at: iso(NOW_MS - 30 * 60_000),
-    status: { state: 'need_login', needs: 'login', job: '4243102', updated_at: iso(NOW_MS - 20_000), claude_login: { loggedIn: false, checked_at: iso(NOW_MS - checkedAgoMs) } },
-  };
-}
-
-describe('gathering the facts', () => {
-  it('a sign-in made here after the job last asked outweighs the job\'s older "not signed in"; the machine then waits for the job to re-ask', async () => {
-    const g = await gatherFacts(await env({ run: needLoginRun(5 * 60_000), seenAgoMs: 2 * 60_000 }));
-    expect(g.facts.login.loggedIn).toBe(true);
-    expect(g.facts.login.seenAt).toBe(NOW_MS - 2 * 60_000);
-    expect(g.facts.run.live).toBe(true);
-    const v = decide(g.facts, NOW_MS);
-    expect(v.step).toBe('login');
-    expect(v.auto).toBe('poll');
-    expect(v.status).toMatch(/re-checks within a minute/);
+describe('R2, R3, R4: queued is live; never backwards; a node file for this job is a computer', () => {
+  it('a queued file is live without a heartbeat, with the clock from submitted_at', () => {
+    const f = runFacts(runWith(queuedFile()), NOW);
+    expect(f).toMatchObject({ present: true, phase: 'queued', live: true, stale: false, submittedAt: ago(3 * MIN), reason: 'line' });
   });
 
-  it('a job that checked after the sign-in and still says no is believed once the sign-in is older than the fresh window', async () => {
-    const g = await gatherFacts(await env({ run: needLoginRun(60_000), seenAgoMs: LOGIN_SEEN_FRESH_MS + 1 }));
-    expect(g.facts.login.loggedIn).toBe(false);
-    expect(g.facts.login.detail).toMatch(/your worker says so/);
-    expect(decide(g.facts, NOW_MS)).toMatchObject({ step: 'login', auto: 'login' });
+  it('a queued file for a job already seen further along is ignored (R3)', () => {
+    let run = applyStatus(runWith(undefined), queuedFile()).run;
+    run = applyStatus(run, { ...queuedFile(), state: 'starting', got_computer_at: ago(MIN), updated_at: ago(10 * S) }).run;
+    const back = applyStatus(run, queuedFile());
+    expect(back.taken).toBe(false);
+    expect(runFacts(back.run, NOW).phase).toBe('got-computer');
   });
 
-  it('with no sign-in from this browser, the probe\'s word stands until the job\'s', async () => {
-    const g = await gatherFacts(await env());
-    expect(g.facts.login.loggedIn).toBe(false);
-    expect(g.facts.install).toMatchObject({ installed: true });
-    expect(decide(g.facts, NOW_MS).step).toBe('login');
+  it('the node file written at or after submitted_at means a computer even under a queued file (R4); an older one does not', () => {
+    const fresh = runWith(queuedFile(), { node_mtime: Math.floor((NOW - MIN) / 1000) });
+    expect(runFacts(fresh, NOW)).toMatchObject({ phase: 'got-computer', gotComputerAt: new Date(Math.floor((NOW - MIN) / 1000) * 1000).toISOString() });
+    const old = runWith(queuedFile(), { node_mtime: Math.floor((NOW - 60 * MIN) / 1000) });
+    expect(runFacts(old, NOW).phase).toBe('queued');
   });
 
-  it('an own copy a build before 8.0.0 left is named with its version and never set up again, whatever the version', async () => {
-    for (const v of ['1', '2', '9']) {
-      const g = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: `${v}\n` } }));
-      expect(g.facts.install).toMatchObject({ installed: true, version: v });
-      expect(g.facts.install.failed).toBeUndefined();
-      expect(decide(g.facts, NOW_MS).step).toBe('login');
-    }
-    const e = await env();
-    // a copy without a VERSION file (the mock's stand-in tool) is just a version not known
-    e.portal = () => fakePortal({ [`${HOME}/.hpcworker/profile.json`]: PROFILE, [`${STATE}/probe/probe.json`]: JSON.stringify(PROBE) });
-    const missing = await gatherFacts(e);
-    expect(missing.facts.install).toMatchObject({ installed: true });
-    expect(missing.facts.install.version).toBeUndefined();
-    expect(decide(missing.facts, NOW_MS).step).toBe('login');
+  it('the scheduler\'s reason, its class, and an estimate only when it is in the future (D12)', () => {
+    expect(runFacts(runWith(queuedFile('40501234', { reason: 'QOSMaxJobsPerUserLimit' })), NOW).reason).toBe('share');
+    expect(runFacts(runWith(queuedFile('40501234', { reason: 'ReqNodeNotAvail' })), NOW).reason).toBe('maintenance');
+    expect(runFacts(runWith(queuedFile('40501234', { expected_start: ago(-12 * MIN) })), NOW).expectedStart).toBe(ago(-12 * MIN));
+    expect(runFacts(runWith(queuedFile('40501234', { expected_start: ago(12 * MIN) })), NOW).expectedStart).toBeUndefined();
+    // the reason can come from the last worker status --json too
+    expect(runFacts(runWith(queuedFile(), { scheduler: { state: 'PENDING', reason: 'AssocGrpCPULimit', expected_start: '', node: '', checked_at: ago(S) } }), NOW).reason).toBe('share');
+  });
+});
+
+describe('R5 to R9: online, reconnecting, slow, renewing, stopped', () => {
+  const st = (s: Partial<StatusFile>) => runWith({ ...queuedFile(), node: 'asx15', got_computer_at: ago(2 * MIN), ...s } as StatusFile);
+
+  it('online needs the link and a heartbeat under 90 s when the file was read (R5)', () => {
+    expect(runFacts(st({ state: 'online', environment_url: LINK, online_at: ago(MIN), updated_at: ago(20 * S) }), NOW)).toMatchObject({ phase: 'online', link: LINK });
+    const old = st({ state: 'online', environment_url: LINK, updated_at: ago(2 * MIN) });
+    expect(runFacts({ ...old, status_mtime: Math.floor((NOW - 2 * MIN) / 1000) }, NOW).phase).toBe('connecting');
+    expect(runFacts(st({ state: 'online', environment_url: 'https://evil.example/x', updated_at: ago(10 * S) }), NOW)).toMatchObject({ phase: 'online', badLink: true });
   });
 
-  it('reads the access record for the account the dashboard showed: approved, stale, lapsed, refused, withdrawn, none, another account; and never fetches', async () => {
-    const ok = await gatherFacts(await env());
-    expect(ok.facts.access).toMatchObject({ ok: true, state: 'approved', accessId: 'ab1234', portal: 'ood.example', needsCheck: false, warn: false });
-    expect(ok.facts.access.detail).toBe(`Access approved for ab1234 at ood.example (checked ${iso(NOW_MS - 3_600_000).slice(0, 16).replace('T', ' ')} UTC)`);
-    expect(ok.facts.access.requestUrl).toBe('https://openspineconsortium.com/beethoven/request.html?access_id=ab1234');
-    // past a day with the service silent: still good, warned, and due (the strip asks the background quietly)
-    const stale = await gatherFacts(await env({ access: approved(APPROVED_TTL_MS + 1, { last_error: 'x', last_attempt_at: iso(NOW_MS - 3_600_000) }) }));
-    expect(stale.facts.access).toMatchObject({ ok: true, state: 'stale', warn: true, needsCheck: true });
-    expect(decide(stale.facts, NOW_MS).step).toBe('login');
-    // past seven days: not good any more
-    const lapsed = await gatherFacts(await env({ access: approved(APPROVED_GRACE_MS + 1, { last_error: 'x', last_attempt_at: iso(NOW_MS - 3_600_000) }) }));
-    expect(lapsed.facts.access).toMatchObject({ ok: false, state: 'lapsed' });
-    expect(decide(lapsed.facts, NOW_MS)).toMatchObject({ step: 'access', primary: { action: 'retry-access' } });
-    // refused: the one button asks for access
-    const denied = await gatherFacts(await env({ access: approved(60_000, { approved: false, until: undefined }) }));
-    expect(denied.facts.access).toMatchObject({ ok: false, state: 'denied' });
-    expect(decide(denied.facts, NOW_MS)).toMatchObject({ step: 'access', primary: { label: 'Ask for access', action: 'ask-access' } });
-    // withdrawn: said as such
-    const withdrawn = await gatherFacts(await env({ access: approved(60_000, { approved: false, until: undefined, withdrawn: true }) }));
-    expect(withdrawn.facts.access.state).toBe('withdrawn');
-    expect(decide(withdrawn.facts, NOW_MS).status).toMatch(/^Access withdrawn: ask again/);
-    // nothing on record: checking, and the machine asks the background
-    const none = await gatherFacts(await env({ access: null }));
-    expect(none.facts.access).toMatchObject({ ok: false, state: 'checking', needsCheck: true });
-    expect(decide(none.facts, NOW_MS)).toMatchObject({ step: 'access', auto: 'check-access' });
-    // a record for another account (the dashboard now shows someone else) does not count
-    const other = await gatherFacts(await env({ access: approved(60_000, { access_id: 'zz9999' }) }));
-    expect(other.facts.access.state).toBe('checking');
-    // a record for another portal does not count either
-    const elsewhere = await gatherFacts(await env({ access: approved(60_000, { portal: 'ondemand.osc.edu' }) }));
-    expect(elsewhere.facts.access.state).toBe('checking');
-    // the strip's own attempt in flight, and one that could not ask
-    const e = await env({ access: null });
-    e.transient = { warm: { state: 'warm' }, accessChecking: true };
-    expect((await gatherFacts(e)).facts.access).toMatchObject({ state: 'checking', needsCheck: false });
-    e.transient = { warm: { state: 'warm' }, accessFailed: 'Your portal has not shown who is signed in yet' };
-    expect((await gatherFacts(e)).facts.access).toMatchObject({ state: 'failed', detail: 'Your portal has not shown who is signed in yet' });
-    // a withdrawn version outranks an approval
-    const e2 = await env();
-    await e2.local.set(KILLLIST_KEY, { fetched_at: 'x', list: { v: 1, kid: 'k1', issued: NOW, revoked_versions: ['1.0.0'], revoked_lids: [], message: 'update please' } });
-    const revoked = await gatherFacts(e2);
-    expect(revoked.facts.access).toMatchObject({ ok: false, state: 'version-revoked', versionRevoked: true });
-    expect(revoked.facts.access.detail).toMatch(/withdrawn; update to continue\. update please/);
-    const v = decide(revoked.facts, NOW_MS);
-    expect(v.step).toBe('access');
-    expect(v.primary).toBeUndefined();
-    expect(v.auto).toBeUndefined();
+  it('starting after having been online with a restart is reconnecting (R6); running 3 min with no link is slow (R7)', () => {
+    expect(runFacts(st({ state: 'starting', restarts: 1, online_at: ago(30 * MIN), updated_at: ago(5 * S) }), NOW).phase).toBe('reconnecting');
+    expect(runFacts(st({ state: 'starting', updated_at: ago(5 * S) }), NOW).phase).toBe('got-computer');
+    expect(runFacts(st({ state: 'running', updated_at: ago(5 * S) }), NOW).phase).toBe('connecting');
+    expect(runFacts(st({ state: 'running', got_computer_at: ago(4 * MIN), updated_at: ago(5 * S) }), NOW).phase).toBe('slow');
   });
 
-  it("the lab's shared copy: the marker names it and its own VERSION is shown", async () => {
-    const g = await gatherFacts(await env({ files: sharedFiles('5'), shared: SHARED }));
-    expect(g.facts.install).toMatchObject({ installed: true, shared: { dir: SHARED, version: '5' }, sharedRoot: SHARED });
-    expect(g.facts.install.failed).toBeUndefined();
-    expect(g.facts.install.version).toBeUndefined();
-    expect(decide(g.facts, NOW_MS).step).toBe('login');
-    // a marker at a site whose bundled profile names no shared folder is still the account's truth
-    const elsewhere = await gatherFacts(await env({ files: sharedFiles('6') }));
-    expect(elsewhere.facts.install.shared).toEqual({ dir: SHARED, version: '6' });
-    expect(elsewhere.facts.install.sharedRoot).toBeUndefined();
+  it('preempted with a successor is renewing (R8), without one has ended; stopped carries its reason (R9)', () => {
+    expect(runFacts(st({ state: 'preempted', next_job: '40509999', updated_at: ago(5 * S) }), NOW).phase).toBe('renewing');
+    expect(runFacts(st({ state: 'preempted', updated_at: ago(5 * S) }), NOW).phase).toBe('ended');
+    expect(runFacts(st({ state: 'stopped', stop_reason: 'login_abandoned' }), NOW)).toMatchObject({ phase: 'stopped', stopReason: 'login_abandoned', live: false });
+    expect(runFacts(st({ state: 'need_login', updated_at: ago(5 * S) }), NOW).phase).toBe('needs-claude');
+    expect(runFacts(st({ state: 'need_consent', updated_at: ago(5 * S) }), NOW).phase).toBe('needs-consent');
+    expect(runFacts(st({ state: 'error' }), NOW).phase).toBe('error');
+  });
+});
+
+describe('R10 to R13: the clocks, the Claude row, stale reads, "ready N min after you asked"', () => {
+  it('a live state whose heartbeat is over 3 minutes old reads as last known (R12)', () => {
+    const r = runWith({ ...queuedFile(), state: 'online', environment_url: LINK, updated_at: ago(4 * MIN) });
+    expect(runFacts({ ...r, status_mtime: Math.floor((NOW - 4 * MIN) / 1000) }, NOW)).toMatchObject({ stale: true, live: false });
   });
 
-  it("a shared VERSION the Files app will not serve is said, not taken for a cold portal, and does not set the tool up again", async () => {
-    const g = await gatherFacts(await env({ files: sharedFiles(undefined), shared: SHARED, denied: [`${SHARED}/VERSION`] }));
-    expect(g.facts.warm.state).toBe('warm');
-    expect(g.facts.install.shared?.dir).toBe(SHARED);
-    expect(g.facts.install.shared?.version).toBeUndefined();
-    expect(g.facts.install.shared?.unreadable).toMatch(/could not read its VERSION file.*403/);
-    // the rest of the facts were still read: the probe, then the sign-in
-    expect(g.facts.probe.present).toBe(true);
-    expect(decide(g.facts, NOW_MS).step).toBe('login');
-    // no VERSION there at all, and a marker that names no folder
-    const none = await gatherFacts(await env({ files: sharedFiles(undefined), shared: SHARED }));
-    expect(none.facts.install.shared?.unreadable).toMatch(/finds no VERSION file/);
-    const junk = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/shared`]: 'somewhere else\n' } }));
-    expect(junk.facts.install.shared).toMatchObject({ dir: 'somewhere else', unreadable: 'the marker file does not name a folder' });
+  it('the Claude row trusts claude_login only under 5 minutes old (R11)', () => {
+    const r = (checkedAgo: number) => runWith({ ...queuedFile(), state: 'online', environment_url: LINK, updated_at: ago(5 * S), claude_login: { loggedIn: true, subscriptionType: 'max', email: 'alex@wayne.edu', checked_at: ago(checkedAgo) } });
+    expect(runFacts(r(MIN), NOW).claude).toEqual({ loggedIn: true, plan: 'max', email: 'alex@wayne.edu' });
+    expect(runFacts(r(6 * MIN), NOW).claude).toBeUndefined();
   });
 
-  it('a marker without the launcher is an own copy (an upload over the launcher leaves the marker behind)', async () => {
-    const own = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/shared`]: `${SHARED}\n`, [`${HOME}/.hpcworker/bin/hpcworker`]: '#!/bin/bash\n# the full tool, copied into the account\nVERSION=2\n', [`${HOME}/.hpcworker/VERSION`]: '2\n' }, shared: SHARED }));
-    expect(own.facts.install.shared).toBeUndefined();
-    expect(own.facts.install).toMatchObject({ installed: true, version: '2', sharedRoot: SHARED });
+  it('"ready N min after you asked" is online_at − submitted_at, for the job the student\'s Connect submitted (R13); the wait history is got_computer_at − submitted_at', () => {
+    const r = runWith({ ...queuedFile(), submitted_at: ago(10 * MIN), got_computer_at: ago(4 * MIN), online_at: ago(3 * MIN), state: 'online', environment_url: LINK, updated_at: ago(5 * S) });
+    const f = runFacts(r, NOW);
+    expect(f.readyMinutes).toBe(7);
+    expect(waitMinutes(f)).toBe(6);
+    expect(waitMinutes({ ...f, pressed: false })).toBeUndefined();
+    expect(waitMinutes({ ...f, renewal: true })).toBeUndefined();
+    expect(addWait([1, 2, 3, 4, 5], 6)).toEqual([2, 3, 4, 5, 6]);
+  });
+});
+
+describe('a listing downloads only what changed', () => {
+  it('status.json and connection.json by modified_at, the node file once, progress.log and rc.log only when wanted', () => {
+    const r = runWith(queuedFile(), { status_mtime: 100, connection_mtime: 50 });
+    const entries = [entry('status.json', 100), entry('connection.json', 60), entry('node', 70), entry('progress.log', 80), entry('rc.log', 90), entry('job.token', 99)];
+    const p = listingPlan(r, entries);
+    expect(p).toMatchObject({ status: false, connection: true, node: true, progress: false, rc: false, noStatus: false });
+    expect(p.mtimes).toEqual({ status: 100, connection: 60, node: 70, progress: 80, rc: 90 });
+    expect(listingPlan(r, entries, { progress: true, rc: true })).toMatchObject({ progress: true, rc: true });
+    expect(listingPlan({ ...r, node_mtime: 70 }, entries).node).toBe(false);
+    expect(listingPlan(r, [entry('job.id', 1)]).noStatus).toBe(true);
+  });
+});
+
+describe('Show log', () => {
+  it('merges Beethoven\'s events with the worker\'s progress.log, oldest first, on the browser\'s clock; the same words within 90 s are one line (the worker\'s)', () => {
+    const t = (min: number) => new Date(Date.parse('2026-10-01T12:44:00Z') + min * MIN).toISOString().replace(/\.\d{3}Z$/, 'Z');
+    const activity = [
+      { at: t(0), text: 'Signed in to the grid as st1234' },
+      { at: t(0), text: 'Approved' },
+      { at: t(0.2), text: 'Asked the grid for a computer' },
+      { at: t(1), text: 'Signed in to Claude · Max' },
+      { at: t(2), text: 'In line: the grid is busy' },
+    ];
+    const progress = [`${t(0.1)} Asked the grid for a computer`, `${t(6)} Got a computer`, `${t(7)} Online: ${LINK}`, `${t(8)} Couldn't start: secret detail`, `${t(9)} something only Details shows`];
+    const lines = mergeLog(activity, progress, 'Wayne State grid');
+    expect(lines.map((l) => l.text)).toEqual(['Signed in to the grid as st1234', 'Approved', 'Asked the grid for a computer', 'Signed in to Claude · Max', 'In line: the grid is busy', 'Got a computer', 'Online · Wayne State grid', "Couldn't start"]);
+    expect(lines.find((l) => l.text === 'Asked the grid for a computer')?.source).toBe('worker');
+    expect(lines[0]!.clock).toBe(formatClock(t(0), false));
+    expect(lines.some((l) => /secret|Details shows/.test(l.text))).toBe(false);
   });
 
-  it("an own copy at a site with a shared folder: shown with its version and left running; a first set-up uses the lab's copy", async () => {
-    const own = await gatherFacts(await env({ files: { [`${HOME}/.hpcworker/VERSION`]: '1\n' }, shared: SHARED }));
-    expect(own.facts.install).toMatchObject({ installed: true, version: '1', sharedRoot: SHARED });
-    expect(own.facts.install.shared).toBeUndefined();
-    expect(decide(own.facts, NOW_MS).step).toBe('login');
-    // not installed yet: the first set-up says it uses the lab's copy, and runs by itself
-    const e = await env({ shared: SHARED });
-    e.portal = () => fakePortal({});
-    const fresh = await gatherFacts(e);
-    expect(fresh.facts.install).toMatchObject({ installed: false, sharedRoot: SHARED });
-    expect(fresh.facts.install.noSharedCopy).toBeUndefined();
-    expect(decide(fresh.facts, NOW_MS)).toMatchObject({ step: 'install', auto: 'install', status: "Setting up the cluster with your lab's shared copy of the tool..." });
-  });
-
-  it('no usable shared copy: the one sentence and a button, never an install by itself, and nothing to upload instead', async () => {
-    // a site whose bundled profile names no shared folder
-    const e = await env();
-    e.portal = () => fakePortal({});
-    const g = await gatherFacts(e);
-    expect(g.facts.install).toMatchObject({ installed: false, noSharedCopy: noSharedForSite('wayne') });
-    const v = decide(g.facts, NOW_MS);
-    expect(v).toMatchObject({ step: 'install', status: NEEDS_SHARED_COPY, primary: { label: 'Try again', action: 'retry-install' }, tone: 'fail' });
-    expect(v.auto).toBeUndefined();
-    expect(v.status).toBe("Beethoven needs your lab's shared copy of the tool on the cluster, and your account cannot use it yet: ask your lab lead (Details says why).");
-    // the install line said the account cannot use the shared copy (the panel's last attempt): the same sentence, with that reason
-    const why = "your lab's shared copy of the tool cannot be used from your account: your account may not read it";
-    const e2 = await env({ shared: SHARED });
-    e2.portal = () => fakePortal({});
-    e2.transient = { warm: { state: 'warm' }, installNoShared: why };
-    const g2 = await gatherFacts(e2);
-    expect(g2.facts.install).toMatchObject({ installed: false, sharedRoot: SHARED, noSharedCopy: why });
-    expect(decide(g2.facts, NOW_MS)).toMatchObject({ step: 'install', status: NEEDS_SHARED_COPY, primary: { action: 'retry-install' } });
-    // an account that is set up is never held on this, whatever the site's profile says
-    const g3 = await gatherFacts(await env());
-    expect(g3.facts.install.noSharedCopy).toBeUndefined();
-    expect(decide(g3.facts, NOW_MS).step).toBe('login');
+  it('keeps at most the newest entries and never the same words twice within a minute', () => {
+    let l = addActivity(undefined, 'Approved', ago(10 * S));
+    l = addActivity(l, 'Approved', ago(5 * S));
+    expect(l).toHaveLength(1);
+    for (let i = 0; i < 5; i++) l = addActivity(l, `e${i}`, ago(S), 3);
+    expect(l.map((x) => x.text)).toEqual(['e2', 'e3', 'e4']);
   });
 });

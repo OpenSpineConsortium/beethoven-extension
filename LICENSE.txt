@@ -1,11 +1,11 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 7, 2026-09-30. Applies to the Trial Edition of Beethoven 8.0.0 and later versions that ship
+Version 8, 2026-10-01. Applies to the Trial Edition of Beethoven 11.0.0 and later versions that ship
 this text, as distributed through its private listing on the Chrome Web Store, which only the Google
 accounts Licensor has invited can open. You can read, copy, save and print this text at any time: it
 is in the file LICENSE.txt inside the extension and inside the framework (in your computing account,
-or in your institution's shared copy), on the extension's own page ("Read the license terms"), in
-the signing dialog ("Open in a tab", "Save a copy"), at
+or in your institution's shared copy), on Beethoven's welcome page ("Show terms", "Open in a tab",
+"Save a copy", "Print") and on its settings page, at
 https://openspineconsortium.com/beethoven/terms.html, and from the support page at
 https://openspineconsortium.com/beethoven/support.html. You may ask for a paper copy at the notice
 address there.
@@ -20,10 +20,15 @@ TRIAL EDITION IS FREE OF CHARGE; YOU RECEIVE A LICENSE TO USE BEETHOVEN, NOT THE
 
 This is an agreement between Gregory Schwing, trading as OpenSpineConsortium ("Licensor", "we"), and
 you, the person whose institutional account is approved to use the Trial Edition ("you"). It is
-formed when, in the signing dialog Beethoven shows on its own page before first use, you tick the
-boxes, type your name and choose the button labelled "Accept and Continue". Beethoven records the
-version of this text you accepted, its hash, the time, what you ticked and the name you typed, and
-keeps a copy of the text for you. If you do not agree, choose "Decline" and do not use Beethoven.
+formed when, on the welcome page Beethoven shows before first use, you tick the box beside the
+sentence that names this agreement and choose the button labelled "Agree and continue". The full
+text is one click away there ("Show terms"); opening it is your choice, and you agree to all of it.
+Beethoven records the version and hash of this text and the hash of the privacy statement, the
+four-line summary and the sentence shown, that you ticked it, the label of the button, whether you
+opened the full text (and whether you scrolled it to its end, opened it in a tab, saved it or
+printed it), the time, the version of Beethoven, your browser and the installation identifier and,
+added once your portal first shows it after you agree, your account name and when it was seen; it
+keeps a copy of the text for you. If you do not agree, close the page and remove Beethoven.
 
 1. WHAT BEETHOVEN IS
 
@@ -40,9 +45,9 @@ persons whose institutional account Licensor has approved. "Full Edition" means 
 Licensor offers one, governed by the separate Beethoven Full Edition License Agreement, which you
 accept only if you choose that edition. "Your portal" means your institution's Open OnDemand portal,
 and "your account name" means the name that portal's dashboard shows for the session you signed in
-to; it is the only identifier of you that Beethoven uses, and there is nothing to type or paste (the
-Extension also names its own installation with a random number, section 3(e)). "Named Dependencies"
-are the outside parties and conditions listed in section 7.
+to; it is the only identifier of you that Beethoven uses, and you never type or paste it into
+Beethoven (the Extension also names its own installation with a random number, section 3(e)). "Named
+Dependencies" are the outside parties and conditions listed in section 7.
 
 2. YOUR LICENSE, AND WHAT IT IS NOT
 
@@ -64,10 +69,10 @@ refused or withdrawn at any time, with or without reason. Licensor may approve a
 membership of its lab only; such an approval does not cover Beethoven. There is no key and no
 password of Licensor's: your own sign-in to your portal identifies you. After you have accepted this
 agreement and connected your portal, the Extension asks Licensor's access service whether your
-account name is approved, when you connect, about once a day while it is in use, and again when you
-click its icon after a day has passed or after a no, and it starts a worker only while the answer is
-yes. A copy of Beethoven used from an account that is not approved does not start a worker; its
-panel offers a link to ask for access instead.
+account name is approved, when you first sign in to your portal after accepting it, about once a day
+while it is in use, and again when you open its panel after a day has passed or after a no, and it
+starts a worker only while the answer is yes. A copy of Beethoven used from an account that is not
+approved does not start a worker; its panel offers a link to ask for access instead.
 
 (b) Your approval is for you and the institutional account it names alone. Do not use Beethoven from
 an account that is not yours, and do not arrange for anyone else to use it under your approval.
@@ -126,26 +131,49 @@ This section describes the software as shipped, so that you can hold Licensor to
 
 (a) Claude. Beethoven never reads, stores, copies, prints or relays a Claude credential. You sign in
 to Claude Code yourself, through Anthropic's own flow, once, in a terminal on a compute node of your
-own cluster account. The Extension starts that terminal for you through your portal's shell, opens
-Anthropic's sign-in page in a new tab, and shows you one box; you sign in on Anthropic's page and
-paste the one-time code it shows into that box. The Extension types the code once into that terminal
-and keeps no copy of it: it is not stored, not written to the audit log and not sent to Licensor or
-anyone else, and the Extension never reads Anthropic's page or your clipboard to obtain it. Claude
-Code makes its credential from the code and keeps it in its own folder in your cluster account; the
-Framework only starts Claude Code where that credential already is, and Beethoven reads Claude
-Code's yes-or-no answer about whether it is signed in, nothing more. You use one Claude account,
-your own. You answer Claude Code's one-time question about Remote Control yourself, in the
-Extension's own panel, before your first worker starts; the Extension records that answer in one
-file in your cluster account, and your worker gives it to Claude Code when Claude Code asks. Trust
-for the worker's own folder is recorded in Claude Code's settings by the Framework when a worker
-starts. Beethoven gives Claude Code no answer you have not given.
+own cluster account. The Extension starts that terminal for you through your portal's shell, in the
+same command that starts your worker, opens Anthropic's sign-in page in a new tab, shows you one
+box, and closes that tab once Claude Code reports you are signed in, unless the tab has loaded
+another page since you pasted the code; you sign in on Anthropic's page and paste the one-time code
+it shows into that box. The Extension types the code once into that terminal and keeps no copy of
+it: it is not stored, not written to the audit log and not sent to Licensor or anyone else, and the
+Extension never reads Anthropic's page or your clipboard to obtain it. Claude Code makes its
+credential from the code and keeps it in its own folder in your cluster account; the Framework only
+starts Claude Code where that credential already is, and Beethoven reads Claude Code's own report of
+whether it is signed in, with the account and plan that report names, nothing more. You use one
+Claude account, your own. You answer Claude Code's one-time question about Remote Control yourself,
+with the box you tick in the Extension's panel before your first worker starts; the Framework
+records that answer in one file in your cluster account when you press Connect, and your worker
+gives it to Claude Code when Claude Code asks. Trust for the worker's own folder is recorded in
+Claude Code's settings by the Framework when a worker starts. Beethoven gives Claude Code no answer
+you have not given.
 
 (b) Your portal session. The Extension uses the sign-in your browser already holds for your
-institution's Open OnDemand portal, on that one website only, in the same way the portal's own pages
-do. It never reads the sign-in cookie, never stores a portal password, never signs in for you and
-never touches a multi-factor step. When the portal asks for a sign-in, the Extension asks you to
-sign in in a tab. The one thing it reads about you from the portal is your account name, from the
-portal's own dashboard page.
+institution's Open OnDemand portal, on that one website only, from its own background and without a
+portal tab where your browser allows it. It never reads that sign-in, never reads, stores or types a
+portal password, never signs in for you and never touches a multi-factor step. When the portal asks
+for a sign-in, the Extension opens the portal in a tab for you to sign in there (in your browser's
+own sign-in box, or on the portal's own sign-in page), never sees what you type there, and closes
+that tab once you are signed in, while it is still on the portal. Where your portal does not share
+its sign-in with the Extension, it keeps that tab behind your other tabs until the work in hand is
+done and then closes it, and for a later action opens the portal in a background tab and closes it
+again. The one thing it reads about you from the portal is your account name, from the portal's own
+dashboard page. If your portal's shell asks for your cluster password, as it may for an account that
+has no key on the cluster, the Extension types nothing there and offers a one-time step instead: it
+opens the portal's own terminal page in a tab, and you type your password there yourself; the
+Extension never sees it. Once you say you are in, or the page's title shows that your shell is up,
+the Extension types one line into that terminal (or leaves it on your clipboard for you to paste),
+which runs the Framework's login-setup step in your own account. That step makes a key in your
+cluster account, in its ~/.ssh folder, that opens your account only from the computer the terminal
+came from, which at your institution is its Open OnDemand server (it is a file in your own account,
+protected as your other files are, and hidden from Claude Code inside your worker; anyone who
+obtained it and could connect from that server could use it), and has ssh offer it when the portal's
+shell connects you, so that the shell need not ask for your password; it never reads, changes or
+prints a key you already have. The key stays in your cluster account: the Extension never sees it,
+keeps nothing about it in your browser and sends nothing about it to Licensor. The command
+"hpcworker login-setup --remove", run in a terminal on the cluster, removes it. This step has been
+tried only against the Licensor's mock portal, not yet on a real cluster by an account without a
+key.
 
 (c) Your account name, as the portal's dashboard shows it, and the answer of the last approval check
 with its time are stored in the Extension's own storage in your browser. Nothing about your approval
@@ -160,14 +188,22 @@ While you are connected through claude.ai the transcript is also stored on Anthr
 personal plan is retained five years if model training is on and 30 days otherwise. No BAA covers a
 personal plan. FERPA records, IRB data and export-controlled technical data must not be in the
 working directory. Remote Control usage draws from your plan's shared limit. The Extension shows
-these sentences at first run and before each job start, and does not start a worker in a folder you
-have marked restricted.
+these sentences in short form, with the full text one click away, before your first worker starts,
+and a one-line reminder beside Connect each time you start one, and does not start a worker in a
+folder you have marked restricted.
 
 (f) The Extension runs no code on claude.ai or any other Anthropic page and reads nothing from them.
-Its only page script runs on the one portal website you connect. It opens an Anthropic page only in
-a new tab, as a bookmark would: the sign-in page during the sign-in described in (a), your worker's
-session page when the worker connects, and the connectors settings page if you choose the optional
-Google Drive step.
+Its only page script runs on the one portal website you connect: where your portal does not share
+its sign-in with the Extension, to carry the Extension's requests there, and, during the one-time
+step in (b), on the portal's terminal page, where it watches only the page's title and types only
+the one line described there. It opens an Anthropic page only in a new tab, as a bookmark would: the
+sign-in page during the sign-in described in (a), your worker's session page when a worker you
+started is ready (unless you turn that off) and when you choose "Open my session" or "New session",
+the connectors settings page if you choose the optional Google Drive step, and the plans page if you
+follow "See plans" on the welcome page; it closes the sign-in tab it opened once you are signed in,
+and it may bring forward a claude.ai tab it opened itself. Of an Anthropic tab it opened, it learns
+only that the tab has begun loading a page, which the browser tells it without the page's address or
+content.
 
 (g) Of (a) to (f), only your account name in (c) is sent to Licensor, in the approval check that
 section 10 describes; nothing else is. Section 10 describes the only things that may be.
@@ -197,7 +233,7 @@ Licensor claims no right in such a review beyond permission to quote it.
 7. NAMED DEPENDENCIES: THE OUTSIDE THINGS BEETHOVEN NEEDS
 
 Beethoven works only while all of the following hold. None of them is within Licensor's control, and
-each is disclosed here, in the signing dialog and where Beethoven is offered, so that you can decide
+each is disclosed here, on the welcome page and where Beethoven is offered, so that you can decide
 with this in mind:
 
 (a) your institution keeps your account, your access to its network (including any VPN it requires),
@@ -221,13 +257,13 @@ section 9 says.
 You choose to use Beethoven knowing section 7. You accept the risk that any Named Dependency fails
 or changes, that Beethoven stops working as a result, and that work you had running, files you had
 in a worker's session, or time you had planned may be lost or delayed. In particular, and as Known
-Risks named in the signing dialog, you accept the risk of these three events, which are specific to
-how Beethoven works: Anthropic changing or enforcing Remote Control eligibility; your university
-disabling or reconfiguring Open OnDemand's shell, files or reverse proxy; and a browser store
-removing or disabling the Extension. You agree that such an event is not a defect in Beethoven, not
-a breach of this agreement by Licensor, and gives no claim against Licensor. This section is one of
-the terms you specifically acknowledge in the signing dialog. It does not cover loss caused by
-Licensor's own gross negligence, wilful misconduct or fraud.
+Risks named on the welcome page, above the box you tick, you accept the risk of these three events,
+which are specific to how Beethoven works: Anthropic changing or enforcing Remote Control
+eligibility; your university disabling or reconfiguring Open OnDemand's shell, files or reverse
+proxy; and a browser store removing or disabling the Extension. You agree that such an event is not
+a defect in Beethoven, not a breach of this agreement by Licensor, and gives no claim against
+Licensor. This section is one of the terms named in the sentence you tick on the welcome page. It
+does not cover loss caused by Licensor's own gross negligence, wilful misconduct or fraud.
 
 9. EVALUATION PERIOD, SUPPORT, NO FEES, AND THE FULL EDITION
 
@@ -250,7 +286,7 @@ Licensor; Licensor will, where practical, restore access once the dependency wor
 
 (d) The Full Edition. If and when Licensor offers the Full Edition, you may continue with the Trial
 Edition for as long as Licensor offers it, or take up the Full Edition by accepting the Beethoven
-Full Edition License Agreement in the signing dialog. Doing so is your choice; nothing in this
+Full Edition License Agreement on the welcome page. Doing so is your choice; nothing in this
 agreement obliges you to buy anything, and no Trial Edition data or record is used to charge you.
 
 (e) Nothing in this section limits rights that consumer law gives you and does not allow you to
@@ -261,23 +297,27 @@ waive, including under the Michigan Consumer Protection Act.
 (a) The approval check. Only after you have accepted this agreement, and only once your portal is
 connected and your account name is known, the Extension asks Licensor's access service
 (https://beethoven-access.openspineconsortium.workers.dev) whether that account is approved: when
-you connect, about once a day while it is in use, and again when you click the Extension's icon
-after a day has passed or after a no. Each check sends, over an encrypted connection and without
-cookies, your account name as your portal's dashboard shows it, your portal's hostname, the product
-name, the Extension's version, the installation identifier of section 3(e) and, as any request does,
-the time it was made. The service answers yes or no, and for a no may say that your account is bound
-to another installation, that this installation is bound to another account, or that the version is
-too old. Licensor's service records each check: the account name, the portal's hostname, the
-product, the version, the time, a salted hash of your network address (never the address itself) and
-the answer. For each approved account it also records the installation identifier the account is
-bound to, with the product, the version and when that installation first and last asked, and for
-that installation the account it is bound to; and, when a check is refused because of another
-installation or another account, how many times and when the first and the last time were, with the
-first eight characters of a one-way hash of the refused installation's identifier. When another
-installation asks about your account, Licensor is told by e-mail, at most once a day per account,
-with a link that can move your approval to that installation. The Extension keeps a yes for up to a
-day, and for up to seven days when the service cannot be reached, so that an outage on Licensor's
-side does not stop your work; it keeps a no for ten minutes.
+you first sign in to your portal after accepting this agreement, about once a day while it is in
+use, and again when you open the Extension's panel after a day has passed or after a no. Each check
+sends, over an encrypted connection and without cookies, your account name as your portal's
+dashboard shows it, your portal's hostname, the product name, the Extension's version, the
+installation identifier of section 3(e) and, as any request does, the time it was made. The service
+answers yes or no, and for a no may say that your account is bound to another installation, that
+this installation is bound to another account, or that the version is too old. Licensor's service
+keeps one record of the checks for each account and product: the account name, the product, the
+portal's hostname and the version of the latest check, when the account was first and last checked,
+how many checks there have been, the answer of the latest check and the reason given with a no, when
+the answer last changed, and a salted hash of the network address of the latest check (never the
+address itself); it also counts each day's checks per account and per hashed address, to limit them,
+and deletes those counts after two days. For each approved account it also records the installation
+identifier the account is bound to, with the product, the version and when that installation first
+and last asked, and for that installation the account it is bound to; and, when a check is refused
+because of another installation or another account, how many times and when the first and the last
+time were, with the first eight characters of a one-way hash of the refused installation's
+identifier. When another installation asks about your account, Licensor is told by e-mail, at most
+once a day per account, with a link that can move your approval to that installation. The Extension
+keeps a yes for up to a day, and for up to seven days when the service cannot be reached, so that an
+outage on Licensor's side does not stop your work; it keeps a no for ten minutes.
 
 (b) Two files. Once a day, and only after you have accepted this agreement, the Extension also
 fetches from Licensor's website a small file naming the address of the access service
@@ -288,10 +328,11 @@ in (a) and these two files are the only requests the Extension makes to Licensor
 
 (c) The Extension sends no error reports, no crash reports and no usage data, and there is no
 activation step: it has no code for them and no address to send them to. Your acceptance record (the
-version and hash of this text, what you ticked, your typed name, the time, the install id, the
-software versions), your statements, your audit log and your settings stay in your browser; Licensor
-does not receive them. The install id is the installation identifier of section 3(e), which the
-approval check in (a) sends.
+version and hash of this text, the summary and the sentence shown, what you ticked, whether you
+opened the full text, the time, the install id, your account name once known, the software
+versions), your statements, your audit log, your settings and what the Extension remembers about
+your worker stay in your browser; Licensor does not receive them. The install id is the installation
+identifier of section 3(e), which the approval check in (a) sends, as it sends your account name.
 
 (d) Access records. An access request on the request page records what you enter there: your account
 name, your name, your institutional e-mail, the Google account at which you are to receive the
@@ -299,8 +340,8 @@ invitation to the private listing (Licensor adds it to the Google Group that may
 what you will use Beethoven for and, if you attach one, your CV; and, when the service asks you to
 confirm your institutional mailbox, the time you confirmed it. Licensor's own records hold the
 approval and withdrawal decisions about your account, with the name and e-mail given and their
-dates, the installation your approval is bound to (section 3(e)) and the record of each approval
-check described in (a). Licensor deletes a CV twelve months after deciding on the request (twelve
+dates, the installation your approval is bound to (section 3(e)) and the record of the approval
+checks described in (a). Licensor deletes a CV twelve months after deciding on the request (twelve
 months after the request, if no decision is made), or at once if it refuses the request or withdraws
 the approval, and keeps the other records for the life of your access and six years after, to prove
 the license and its terms.
@@ -363,7 +404,9 @@ they are provided by their own publishers or by your institution under their own
 Licensor suggestions about Beethoven, Licensor may use them without obligation. Beethoven runs
 Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used
 here to say what it runs; "Open OnDemand" is the mark of its publisher. Your institution's names and
-marks belong to it, and Beethoven carries none of them.
+marks belong to it: Beethoven uses its name only in plain words, to say where your worker runs (for
+example, "Wayne State grid"), and carries none of its logos or other marks. "GlobalProtect" is the
+mark of Palo Alto Networks, named only to say which VPN program to turn on.
 
 16. SECURITY AND BREACH NOTICE
 
@@ -380,8 +423,8 @@ in your own cluster account is never updated on its own, and the Extension no lo
 updates one. Where your institution's lab keeps one shared copy of the Framework, the lab updates
 that copy, your next worker start uses it, and the Extension shows the version in use under Details.
 Each version ships the terms that apply to it. Licensor may change these terms for future versions.
-A change is never effective merely by being posted: Beethoven shows a changed agreement in the
-signing dialog and asks you to accept it again, by the same steps, before the new version is used. A
+A change is never effective merely by being posted: Beethoven shows a changed agreement on its
+welcome page and asks you to accept it again, by the same steps, before the new version is used. A
 change to section 19 or 20 applies only to disputes that arise after you accept it. If you decline a
 changed agreement, you may keep using the version you accepted for as long as your approval and the
 evaluation period last, or stop using Beethoven; earlier acceptance records are kept.
@@ -391,17 +434,18 @@ evaluation period last, or stop using Beethoven; earlier acceptance records are 
 You must comply with the export-control and sanctions laws that apply to you. You represent that you
 are not located in, and will not use Beethoven in, a country or region subject to a comprehensive US
 embargo, and that you are not on a US government restricted-party list. The Extension contains
-cryptography used only to verify signatures; the Framework generates random per-job tokens.
+cryptography used only to verify signatures; the Framework generates random per-job tokens and, in
+the one-time step of section 5(b), has the cluster's own ssh-keygen make a key in your account.
 
 19. DISPUTES: NOTICE FIRST, THEN INDIVIDUAL CLAIMS IN MICHIGAN COURTS
 
 Please read this section; it affects how disputes between you and Licensor are resolved and is one
-of the terms you specifically acknowledge in the signing dialog.
+of the terms named in the sentence you tick on the welcome page.
 
 (a) Notice and 60 days to fix it, before any lawsuit. Before starting any lawsuit or other
 proceeding, the party with a claim sends the other a written notice, signed by that party
 personally, stating their name, the e-mail in the access record, the install id shown with the
-acceptance record on the Extension's setup page, what the problem is and what outcome they want.
+acceptance record on Beethoven's settings page, what the problem is and what outcome they want.
 Notice to Licensor goes to the notice address on the support page at
 https://openspineconsortium.com/beethoven/support.html; notice to you goes to the e-mail in your
 access record. The parties then have 60 days to resolve it in good faith, including one telephone or
@@ -444,8 +488,8 @@ section 17.
 
 TO THE EXTENT THE LAW ALLOWS, YOU AND LICENSOR EACH KNOWINGLY AND VOLUNTARILY WAIVE ANY RIGHT TO A
 TRIAL BY JURY IN ANY PROCEEDING ARISING OUT OF OR RELATING TO BEETHOVEN, YOUR ACCESS OR THIS
-AGREEMENT. A CLAIM WILL BE DECIDED BY A JUDGE. This section is one of the terms you specifically
-acknowledge in the signing dialog.
+AGREEMENT. A CLAIM WILL BE DECIDED BY A JUDGE. This section is one of the terms named in the
+sentence you tick on the welcome page.
 
 21. YOUR STATE'S RIGHTS, AND AGE
 
@@ -471,8 +515,8 @@ chapter 93A, including their notice procedures, are not waived; section 19(a) ru
 agreement does not meet that form, that right is not waived.
 
 (f) Age. You must be at least eighteen years old to accept this agreement. A person under eighteen
-may use Beethoven only if a parent or guardian accepts this agreement on their behalf in the signing
-dialog and remains responsible for their use. Licensor does not invoke sections 19 or 20 against a
+may use Beethoven only if a parent or guardian accepts this agreement on their behalf on the welcome
+page and remains responsible for their use. Licensor does not invoke sections 19 or 20 against a
 person who was under eighteen when they accepted without such acceptance.
 
 22. GENERAL
