@@ -170,7 +170,11 @@ Decision 3 then adds "No GitHub needed." or a fourth requirement.
   page with the panel closed and DevTools shut.
 - Slurm's real output formats (`%T|%r|%S|%N`, `scontrol` SubmitTime), Python 3.6 and bash 4.2 on the
   login node, `srun --pty` with piped output, OnDemand's idle limit: one Connect and one Stop on the
-  grid, then `hpcworker worker status --name <name>` by hand.
+  grid, then `hpcworker worker status --name <name>` by hand. During that Connect's sign-in, from a
+  second terminal on warrior, `ps -o pid,pgid,etime,args -u <account>` should show the sitting's
+  processes as bash, srun and sleep only, all in one process group; closing the portal tab should end
+  all of them within a few seconds. The relay was run under a bash 4.2.46 built from source, not under
+  warrior's own.
 - Firefox and Safari builds: built, never loaded.
 - The lit toolbar icon in a real toolbar, and "Pinned." after pinning (no API reads either): look.
 - Failure paths seen only as drawn fixtures, never in a browser: a cancelled or wrong grid password
@@ -241,6 +245,22 @@ The specification is `scratchpad/v11/SPEC.md` of the build session; the contract
   refuses links and a half-written block, refuses to run as root, and puts back what it changed when a
   later step fails, so "nothing was changed" stays true. It runs with no `~/.hpcworker/profile.json`,
   because a student with no key meets the password before any setup.
+
+**The login node's banned list (2026-10-02, after commit 95d7eea; framework 10 still not deployed)**
+- warrior's banner bans `python3` (with `node`, `make`, `md5sum`, `rsync` and others) "on sight", and
+  the first framework 10 build relayed the whole sign-in sitting, up to 14 minutes, with
+  `lib/relay.py` under the system `python3`. It is now `lib/relay.sh`, bash builtins only, with the
+  same contract (whole lines; a part of a line alone after 5 s; the keepalive after 20 s of silence;
+  the two-line outcome file; status 0, connect keeping srun's). It never reads with a timer: bash
+  4.2.46, built from source for this, dropped the `SIGNED` of a split `SIGNED-IN` line on a `read -t`
+  timeout. A ticker beside srun (`relay.sh --ticks`, `sleep 1` between ticks) gives it its clock.
+  Under a cut shell, srun, the ticker and the relay end together with the terminal's SIGHUP.
+- Also off `python3`: the `status.json` patch of `worker status` and `worker stop` (awk), the six
+  plain top-level profile reads (awk, `profile.py get` only as a fallback), and connect's second read
+  of the profile. Still `python3`, each one process of a fraction of a second: `profile.py shellenv`
+  (every line that reads the profile), `render` (a submit), `guide` (a new workspace), `validate`
+  (install). The full list per line is in `framework/README.md`, "The login node", and
+  `framework/tests/test_login_node.py` fails if anything else on the list is looked for.
 
 **The texts**
 - LICENSE 5(b) and PRIVACY add the tab-mode behaviour and "or on the portal's own sign-in page" (the
@@ -337,3 +357,10 @@ None was edited here.
    could be shortened for a Connect that follows a Stop of a worker still in line.
 6. Before 11.0.0 goes to the store: the documents, images and pages in section 5, and the order of the
    grid checks in section 3 (A before B before C).
+7. Whether to ask C&IT about `python3` on warrior. After this pass the login node still runs the
+   system `python3` once to three times per command, each a single process of a fraction of a second
+   (`profile.py shellenv`, `render`, `guide`, `validate`; 0.19 s of wall time and 0.1 s of CPU each
+   under WSL, not measured on warrior), and never for the sign-in sitting. The banner says python3 is
+   "terminated on sight" without saying whether that means a short process. If C&IT says no, the next
+   integer version moves them off the login node (README "The login node" says how); the relay and
+   the status reads no longer need asking about.

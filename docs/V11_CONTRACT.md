@@ -368,6 +368,19 @@ allocation's output line by line and is then the only writer). As a second guard
 removes the text `HPCW-LOGIN: still waiting` wherever it appears inside a line before parsing the
 rest (`withoutKeepalive`), so a glued keepalive cannot hide a step.
 
+Framework 10 relays with `lib/relay.sh`, bash builtins only: the relay runs on the login node for the
+whole sitting, and warrior's banner bans `python3` (with `node`, `make`, `md5sum`, `rsync` and others,
+"terminated on sight"), which relayed it in the first build. The relay never reads with a timer, since
+bash 4.2's `read -t` can drop what it had read of a line when the timer fires; connect runs a ticker
+beside srun (`relay.sh --ticks`, coreutils `sleep 1` between ticks) that writes a 6-byte tick line
+into the relay's pipe once a second, never to the terminal. The keepalive is written at the first tick
+within half a second of 20 s without output (a gap of 19.5 to 20.5 s, as the earlier relay's 20 to
+20.5 s), a part of a line left waiting is written alone at the fifth tick after the one that brought
+its last byte (5 to 6 s after it, counted in ticks so a busy node cannot shorten it; the earlier
+relay, 5 to 5.5 s), carriage returns are removed, and the relay ends with status 0 (connect's status
+is srun's). When the portal's shell is cut, srun, the ticker and the relay are all in the terminal's
+process group and end with its SIGHUP; nothing of the sitting is left on the login node.
+
 ### 5.6 Time budget
 
 Connect ends within 840 s of its start: the sign-in computer is waited for at most 600 s
