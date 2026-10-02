@@ -3,8 +3,9 @@
 // the page is open (which also tells the background a panel is open), and one message per Action.
 // The pages never talk to the portal, the lab or Anthropic themselves.
 import { browser } from 'wxt/browser';
-import type { Action, ActionKind, ResultOf, Surface, SurfaceView } from '../core/model';
+import type { Action, ActionKind, ProtectOutcome, ResultOf, Surface, SurfaceView } from '../core/model';
 import { TICK_MS, unwrap, VIEW_PORT, type Answer, type ViewIn, type ViewOut } from '../core/messages';
+import type { Action12 } from './model12';
 
 export interface ViewSubscription {
   close(): void;
@@ -66,17 +67,55 @@ export async function act<A extends Action>(action: A): Promise<ResultOf<A['kind
   return unwrap(a);
 }
 
+/** what an action answers at once (model.ts ActionResults); the page-local "open-needs" answers nothing */
+export type Result12<K> = K extends ActionKind ? ResultOf<K> : { done?: boolean };
+
 /** how a page carries out an action: the real background, or the gallery's stand-in */
-export type Act = <A extends Action>(action: A) => Promise<ResultOf<A['kind']> | undefined>;
+export type Act = <A extends Action12>(action: A) => Promise<Result12<A['kind']> | undefined>;
 
 /** the real one; an error becomes undefined (the next view says what happened) */
 export const sendAction: Act = async (action) => {
   try {
-    return await act(action);
+    return (await act(action as Action)) as never;
   } catch {
     return undefined;
   }
 };
+
+/**
+ * D2: the opt-in protection of the browser's key needs a passkey step, and WebAuthn runs only in a
+ * document (never in the background's worker), inside the click that asked for it (model.ts PageAct
+ * 'protect-key', 'unprotect-key', 'unlock-key'; core/keyring.ts). The page calls these synchronously in
+ * the click, before any await, then sends what came of it (the actions "protect-key", "unlock-key").
+ * The core registers its keyring at page start (registerKeyGesture); until then the page says the
+ * protection is not available here, never that it was turned on.
+ */
+export interface KeyGesture {
+  /** on: keyring.protectKey (the passkey made, the key wrapped under it); off: keyring.unprotectKey */
+  protect(on: boolean): Promise<ProtectOutcome>;
+  /** the sheet's tick before the first sign-in: keyring.createProtectedKey */
+  createProtected(): Promise<ProtectOutcome>;
+  /** once per browser session while the protection is on: keyring.unlockKey */
+  unlock(): Promise<'unlocked' | 'cancelled' | 'failed'>;
+}
+
+const NO_GESTURE: KeyGesture = {
+  protect: () => Promise.resolve('unsupported'),
+  createProtected: () => Promise.resolve('unsupported'),
+  unlock: () => Promise.resolve('failed'),
+};
+
+let keyGesture: KeyGesture = NO_GESTURE;
+
+/** the core's ceremony (ext/): call once as the page starts */
+export function registerKeyGesture(g: KeyGesture): void {
+  keyGesture = g;
+}
+
+/** the ceremony the page runs inside a click */
+export function currentKeyGesture(): KeyGesture {
+  return keyGesture;
+}
 
 export type { ActionKind };
 

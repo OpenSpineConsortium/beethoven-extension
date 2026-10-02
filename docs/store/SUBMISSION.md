@@ -3,22 +3,18 @@
 For the maintainer. `PASTE.md` beside this file is the paste sheet: every dashboard field in the
 dashboard's order, with the text to paste or the file to upload. `LISTING.md` holds the texts and the
 reasons behind them; this file says what to do around the paste, in what order. Written 2026-09-29
-for 4.0.0 (the first version without licence keys), brought up to date for 6.0.0 and 7.0.0 the same
-night, rewritten on 2026-09-30 for 8.0.0, and brought up to date for 9.0.0 the same evening (the
-extension's pages in the site's theme with the typefaces bundled, a new icon, new store images and a
-short description; no change to permissions, requests, stored data or the agreement texts), and
-brought up to date for 10.0.0 on 2026-10-01. 9.0.0 was built on 2026-09-30 and replaced before any
-review because of two defects: it asked Chrome for a site permission on an Anthropic address before
-refusing that address as a portal, and its agreement's *Accept and Continue* button did not wait for
-the text to be scrolled to its end; 10.0.0 refuses an Anthropic address before any permission
-request and enables the button only once the text in its box has been scrolled to its end (or fits
-the box with nothing to scroll), or the agreement and the privacy statement have been opened in tabs,
-with the agreement texts at the same versions. Beethoven is offered in one place only: a
-**Private** item on the Chrome Web Store, visible to the trusted testers the maintainer names, a Google Group he keeps with his personal Google account and to which
-he adds each student he approves for Beethoven. No other store, no signed file, no download from the
-website: the website shows no install link at all, and the item's link goes to approved students
-only. Store dashboards move their fields around from time to time; the field names below are the
-ones in use at the time of writing, and the texts are what matter.
+for 4.0.0, rewritten on 2026-09-30 for 8.0.0, brought up to date for 9.0.0 and 10.0.0, and brought up
+to date for 12.0.0 on 2026-10-02. Neither 9.0.0, 10.0.0 nor 11.0.0 was submitted for review; 12.0.0
+carries 11.0.0's changes (the welcome page with one tick, the window-wide panel, no `activeTab`) and
+its own (the direct way over ssh through the helper inside the package, the `nativeMessaging`
+permission, the Authentication information data type, agreement version 9 and privacy statement
+version 10). Beethoven is offered in one place only: a **Private** item on the Chrome Web Store,
+visible to the trusted testers the maintainer names, a Google Group he keeps with his personal Google
+account and to which he adds each student he approves for Beethoven. No other store, no signed file,
+no download from the website: the website shows no install link at all, the helper's installers are
+files inside the package, and the item's link goes to approved students only. Store dashboards move
+their fields around from time to time; the field names below are the ones in use at the time of
+writing, and the texts are what matter.
 
 What one private listing does and does not do, so nobody is told more than is true: only the Google
 accounts in the group can open the listing and install from it, and the extension then works only
@@ -33,97 +29,72 @@ Have these in hand, and check each once:
 
 1. The package, built from a clean tree with Node 22 in `extension/`:
    `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The build writes
-   `.output/beethoven-10.0.0-chrome.zip`; the file to upload is its copy in the release folder,
-   `release/10.0.0/beethoven-10.0.0-chrome.zip`, whose SHA-256 must match
-   `release/10.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`). The same command also writes a
-   Firefox zip and a sources zip; neither is uploaded or sent to anyone: the sources zip holds the
-   extension's full source. A reviewer who asks for the mock portal gets
-   `release/10.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no extension code
-   (section 4). Confirm it is a release build: `unzip -p
-   release/10.0.0/beethoven-10.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
-   `"version":"10.0.0"`, the 128-character
-   `description` in `LISTING.md` ("Starts, watches and stops ..."),
+   `.output/beethoven-12.0.0-chrome.zip`; the file to upload is its copy in the release folder,
+   `release/12.0.0/beethoven-12.0.0-chrome.zip`, whose SHA-256 must match
+   `release/12.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`). The same command also writes a
+   Firefox zip and a sources zip; neither is uploaded or sent to anyone. A reviewer who asks for the
+   mock portal gets `release/12.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no
+   extension code (section 4). Confirm it is a release build: `unzip -p
+   release/12.0.0/beethoven-12.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
+   `"version":"12.0.0"`, the 128-character `description` in `LISTING.md`,
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
-   `"optional_host_permissions":["https://*/*"]` and no `localhost`,
-   `"permissions":["storage","alarms","scripting","activeTab","sidePanel"]`, and no
-   `host_permissions` key. No page of the built extension may show the product's old name (`grep
-   -ril` over the unpacked zip; the kill-list's format tag inside the bundle is the one allowed
-   exception). From 9.0.0 the zip also holds `fonts/`: five IBM Plex and two Newsreader `.woff2`
-   files and the two SIL Open Font License texts (`unzip -l` shows them), and nothing else new.
+   `"optional_host_permissions":["https://*/*"]` and no `localhost`, the permissions `storage`,
+   `alarms`, `scripting`, `nativeMessaging` and `sidePanel`, all under `permissions`, and nothing
+   else (no `activeTab` since 11.0.0), and no `host_permissions` key. `unzip -l` must list `fonts/` (eight
+   `.woff2` files and two `-OFL.txt` texts) and `bridge/` (`beethoven-bridge-windows.zip`,
+   `beethoven-bridge-mac.zip`, `beethoven-bridge-linux.zip` and `bridge/manifest.json`, whose SHA-256
+   values must match the files beside it). Unzip one: its `allowed_origins.json` holds the placeholder
+   `chrome-extension://REPLACE_WITH_EXTENSION_ID_SEE_HELPER_README/`, as it should: the page that offers
+   the download writes the extension's own ID into the copy it saves (`core/bridgeZip.ts`), so no
+   build needs the store item's ID. No page of the built extension may show the product's old name
+   (`grep -ril` over the unpacked zip; the kill-list's format tag inside the bundle is the one allowed
+   exception).
 2. The images named in `PASTE.md` (all under `extension/store-assets/`; its `manifest.txt` says how
-   each was made): the 128x128 store icon, five screenshots 1280x800, the 440x280 tile and the
-   1400x560 marquee, each PNG without alpha or JPEG at the exact size (`PASTE.md` has a one-line
-   check), and the promo video file, which goes to YouTube, not to the dashboard. Look at each one
-   before it is uploaded.
+   each was made). **The five screenshots must be captured again from the 12.0.0 build**
+   (`LISTING.md`, "Images and the promo video"); the promo video field stays empty until a 12.0.0
+   video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a one-line check).
+   Look at each one before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
-   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 8), `.../beethoven/terms.html`
-   (the text of `LICENSE.txt` version 7), `.../beethoven/support.html` and
+   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 10), `.../beethoven/terms.html`
+   (the text of `LICENSE.txt` version 9), `.../beethoven/support.html` and
    `.../beethoven/request.html` (which must fill its AccessID field from `?access_id=<account>`,
    since the panel's *Ask for access* button opens it that way, and which asks for the Google
    account the invitation goes to). The pages show one install card, "Private listing, by
    invitation", and no download and no other browser. Reviewers open the privacy URL; a 404 there is
    a rejection. `docs/PUBLISHING_SITE.md` builds and checks them.
 4. `https://openspineconsortium.com/beethoven/killlist.json`, the signed list of withdrawn
-   versions the extension fetches once a day, published with `Access-Control-Allow-Origin: *`. The
-   extension works without it (it keeps the last good list and refuses only on a verified
-   revocation), but a reviewer watching the network will see a 404 otherwise.
-5. The access service, with the one-installation rule.
+   versions the extension fetches once a day, published with `Access-Control-Allow-Origin: *`.
+5. The access service, with the one-installation rule, exactly as for 10.0.0:
    `https://openspineconsortium.com/beethoven/services.json` must carry the `access_check` address
-   on the service's second name,
    `https://beethoven-access.openspineconsortium.workers.dev/access_check`, and the mock's username
-   `st1234`, which the reviewer recipe in `LISTING.md` runs with, must answer yes **from any
-   installation**: every reviewer's installation is a new one, and a second installation of any
-   other account is refused. From WSL (Windows sockets flake), two checks with two different
-   installation identifiers:
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"10.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
+   `st1234` must answer yes **from any installation**, at portal `localhost` only. From WSL (Windows
+   sockets flake), two checks with two different installation identifiers:
+   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"12.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
    and the same with `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
    `access-control-allow-origin: *`. If the second answers `"reason":"other_installation"`, the
-   service does not exempt the reviewer account yet, and a reviewer would see "This account is
-   already set up on another computer."; do not submit until it does. The exemption is set with
-   `node tools/intake/admin.mjs seat-rule st1234 any` (clearing the seat with `reset-seat st1234`
-   only lets the next single installation in). It is set: on 2026-09-30, after the checks of run M in
-   `extension/store-assets/e2e/`, `admin.mjs seat st1234` answered `"any_installation": true` with no
-   seat and no conflict. Never run this check with a real student's
-   AccessID: the first identifier that asks binds that account. If it answers `approved:false`
-   without a reason, add the account in the admin console (or `node tools/intake/admin.mjs add
-   st1234 "Store reviewer (mock portal)" <the maintainer's own e-mail> "store-reviewer mock
-   username"` in the sibling repository of Beethoven for VS Code, Desktop folder `ashley`; token from
-   the vendor folder, never on the command line; never `st1234@wayne.edu`, a mailbox a real person may
-   own), and then run `node tools/intake/admin.mjs seat-rule st1234 any`: without that rule `st1234`
-   is an ordinary approval, valid at any portal and bound to the first installation that asks. The
-   `product` field stays `bridge`, the extension's name on the wire since 4.0.0.
-
-   **Deploy the access service of 2026-10-01 before submitting.** `tools/intake/worker.js` in that
-   repository approves `st1234` only when the portal is `localhost` (or a name under `.localhost`) and
-   answers it as an unknown account from any other portal, and its public `GET /allowlist` names
-   nobody (until then it gave every approved AccessID to anyone, which `PRIVACY.md` version 8 does not
-   allow: "The service answers yes or no, and nothing else about you or anyone else"). Until that
-   Worker is live, the live service approves `st1234` at any portal and binds the first installation
-   there, so the reviewer text "only when the portal is localhost" is not yet true: do not send the
-   fuller text in `PASTE.md` before it. In this order: (1) `node tools/intake/admin.mjs list`:
-   `st1234` must be the only record with `any_installation`; `admin.mjs seat st1234` must show no
-   seat (clear one with `reset-seat st1234`). (2) Publish the site with `/beethoven/services.json` and
-   `/ashley/services.json` without their `allowlist` key (the site repository's working tree has both;
-   its `tools/build_site.py` fails if either key comes back). (3) No sooner than an hour later (the VS
-   Code builds cache the services file for an hour; a day is safer), deploy the Worker under both
-   names (`bash tools/intake/deploy.sh`, then `WORKER_NAME=ashley-service bash tools/intake/deploy.sh`;
-   `deploy.sh` no longer writes an `allowlist` key). (4) The two checks above again: both still
-   `approved:true`, and `https://beethoven-access.openspineconsortium.workers.dev/allowlist` answers
-   `"accessIds":[]`.
+   exemption is missing: `node tools/intake/admin.mjs seat-rule st1234 any` in the repository of
+   Beethoven for VS Code (Desktop folder `ashley`; token from the vendor folder, never on the
+   command line). Never run this check with a real student's AccessID: the first identifier that
+   asks binds that account. The access service of 2026-10-01 (st1234 only at `localhost`, a public
+   `GET /allowlist` that names nobody) must be deployed under both names first, in the order the
+   10.0.0 text of this file gave (git history of this file, section 0, item 5). 12.0.0 changes
+   nothing in the check: no new field, and it is sent only after the cluster accepted a sign-in.
 6. The Google Group of testers, made once at `https://groups.google.com` with the personal Google
-   account that owns the developer account: *Create group*; the name "Beethoven-users" and an
-   address such as `beethoven-users@googlegroups.com` (whatever is free); who can search for
-   the group: only members; who can join: only invited users; who can view members and who can post:
-   group managers (nobody writes to it). Add each student approved for Beethoven by the Google
-   account they gave on the request form (*Members*, *Add members*; if the page offers only
-   *Invite*, the student accepts the invitation Google e-mails them). A student approved for lab
-   membership only is not added.
+   account that owns the developer account: the name "Beethoven-users"; who can search for the group:
+   only members; who can join: only invited users; who can view members and who can post: group
+   managers. Add each student approved for Beethoven by the Google account they gave on the request
+   form. A student approved for lab membership only is not added.
 7. The developer account, one person, with a hardware security key or an authenticator app as the
    second factor. Nothing else should hold an OAuth grant on it. No store API key goes into any CI.
 8. The name. Beethoven runs Claude Code and is not an Anthropic product; the name carries no
    Anthropic mark, and "Claude" and "Claude Code" appear in the listing only to say what it runs.
-   The listing's last paragraph, the landing page and the reviewer notes say so in the same words;
-   if a reviewer asks about the marks, answer with that sentence.
+9. **New in 12.0.0: the grid side.** Framework 11, with the gate and `browser-key`, deployed to the
+   lab's shared copy, and `hpcworker browser-key check` answering `ok` there
+   (`docs/guides/LAB_LEAD.md`, section 2: every folder above the copy too). A reviewer never reaches
+   the grid, but every student does: against framework 10 a student sees "The lab's copy of the tool on
+   the grid is older than this Beethoven", and a student whose key the framework refuses sees "The
+   grid's own tool said no:" with its reason. Send C&IT the note in `LAB_LEAD.md`, section 3, before
+   the listing goes live.
 
 ## 1. The Chrome Web Store item
 
@@ -137,67 +108,68 @@ Registration (once, about ten minutes):
    pay the one-time US$5 registration fee.
 3. In the dashboard, open **Account**: set the publisher display name (Gregory Schwing, trading as
    OpenSpineConsortium, or the LLC once it exists), verify the contact e-mail, and answer the trader
-   / non-trader question (asked of everyone for the EU Digital Services Act; the item is offered in
-   the United States only, but the field must be answered). The **Official URL** field lists only
-   sites verified in Google Search Console with the same Google account; `PASTE.md`, field 9, gives
-   the four steps (a URL-prefix property for `https://openspineconsortium.com/` with an HTML file at
-   the site root). The field can stay empty until then.
+   / non-trader question. The **Official URL** field lists only sites verified in Google Search
+   Console with the same Google account; `PASTE.md`, field 9, gives the four steps.
 
 The item (about thirty minutes):
 
-4. Dashboard, **Items**, **New item**. Drag `beethoven-10.0.0-chrome.zip` in. The item ID appears
-   in the URL and in the item header at once; note it: it is the link approved students get
-   (section 5), and it goes nowhere public. A draft left from the extension's earlier name can be
-   archived (it is hidden from the list and can be shown again; nobody ever saw it), or kept and
-   turned into Beethoven by uploading the 10.0.0 zip under its **Package** tab; either ends in the
-   same place.
-5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,203 characters);
-   Category Developer Tools; Language English (United States); the store icon; the promo video's
-   YouTube link (upload the file as Unlisted first, or leave the field empty); the small promo tile;
-   the five screenshots in the order given; the marquee; Official URL (empty until the site is
-   verified); Homepage URL `https://openspineconsortium.com/beethoven/`; Support URL
+4. Dashboard, **Items**, **New item**. Drag `beethoven-12.0.0-chrome.zip` in. The item ID appears in
+   the URL and in the item header at once; note it: it is the link approved students get (section 5),
+   and it goes nowhere public. It is also the ID the helper's registration names, and nothing has to
+   be rebuilt for it: the zips under `bridge/` carry a placeholder, and the page that offers the
+   download writes the running extension's own ID into the copy it saves (`core/bridgeZip.ts`). After
+   the item is live, install it from the listing once and download the helper from its panel: the
+   saved zip's `allowed_origins.json` must name `chrome-extension://<item-id>/`. A zip made out to
+   another extension installs cleanly but Chrome refuses to start it for Beethoven, and the panel says
+   "The helper is there but did not answer."
+5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,650 characters);
+   Category Developer Tools; Language English (United States); the store icon; the promo video field
+   empty; the small promo tile; the five screenshots captured from 12.0.0, in the order given; the
+   marquee; Official URL (empty until the site is verified); Homepage URL
+   `https://openspineconsortium.com/beethoven/`; Support URL
    `https://openspineconsortium.com/beethoven/support.html`; Mature content No. Save draft.
-6. **Privacy practices** tab, from `PASTE.md`: the single-purpose statement; one justification per permission
-   (`storage`, `alarms`, `scripting`, `activeTab`, `sidePanel`) and the host-permission
-   justification for `https://*/*`; "Are you using remote code?" No; Data usage: tick "Personally
-   identifiable information" only, with the sentence from `LISTING.md` (the institutional account
-   name the portal shows and the random installation identifier, sent in the approval check), and
-   leave every other category unticked; tick the three certifications; Privacy policy URL
-   `https://openspineconsortium.com/beethoven/privacy.html`. Save draft.
+6. **Privacy practices** tab, from `PASTE.md`: the single-purpose statement; one justification per
+   permission (`storage`, `alarms`, `scripting`, `sidePanel`, `nativeMessaging`) and the
+   host-permission justification for `https://*/*`; "Are you using remote code?" No; Data usage:
+   tick "Personally identifiable information" and "Authentication information", with the sentences
+   from `PASTE.md`, and leave every other category unticked; tick the three certifications; Privacy
+   policy URL `https://openspineconsortium.com/beethoven/privacy.html` (version 10 live). Save draft.
 7. **Distribution** tab: Payments Free; Visibility **Private**, and add the address of the
-   Beethoven-users group from section 0, item 6. Regions: United States only. Save draft. Chrome's documentation
-   (`https://developer.chrome.com/docs/webstore/cws-dashboard-distribution`, read 2026-09-30) says
-   that Private lets trusted testers install the item, that besides them "you can also include any
-   Google Groups that you own or manage", and that the members of those groups can install it; the
-   group must therefore be owned or managed by the Google account of the developer account. Single
-   trusted testers, if ever needed, are listed under **Account**, and that list covers every item of
-   the developer account, not this one only. The dashboard itself was not opened while this was
-   written, so the exact field names may differ. Never choose Unlisted or Public: either would let
-   anyone with the link install.
+   Beethoven-users group from section 0, item 6. Regions: United States only. Save draft. Chrome's
+   documentation (`https://developer.chrome.com/docs/webstore/cws-dashboard-distribution`, read
+   2026-09-30) says that Private lets trusted testers install the item and that "you can also include
+   any Google Groups that you own or manage". Never choose Unlisted or Public.
 8. **Test instructions** tab (under **Access** in the left menu), from `PASTE.md`: the username
-   sentence (Beethoven has no account of its own), the password box left empty, and the Additional
-   instructions (490 characters, within the box's 500). Save changes. Before pasting, see on the
-   10.0.0 build the two things these texts say it does differently from 9.0.0: the agreement's
-   button waits for the end of the text, and claude.ai typed into the setup page's *Connect* is
-   refused with no prompt (`TEST_BEFORE_UPLOAD.md`, steps 2 and 15). The fuller text below them in
-   `PASTE.md` is not pasted: it goes into a reply if a reviewer asks (section 4).
+   sentence, the password box left empty, and the Additional instructions (487 characters, within the
+   box's 500). Save changes. Before pasting, walk the instructions on the 12.0.0 build
+   (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"). The fuller text below them in `PASTE.md` is
+   not pasted: it goes into a reply if a reviewer asks (section 4).
 9. **Submit for review** (top right). A Private item is reviewed like a public one.
-10. Expected review time: most items are reviewed within a few days; a wildcard optional host
-   permission (`https://*/*`) puts the item into in-depth review, and a new developer account with a
-   first item adds to that, so allow up to a few weeks. The decision comes by e-mail; a rejection
-   names the policy and can be appealed from the dashboard with a written explanation (section 4).
+10. Expected review time: a wildcard optional host permission puts the item into in-depth review, a
+    native-messaging permission and executable scripts inside the package invite a closer look, and a
+    new developer account with a first item adds to that, so allow up to a few weeks. The decision
+    comes by e-mail; a rejection names the policy and can be appealed from the dashboard with a
+    written explanation (section 4).
 
 Updating later: **Package**, upload the new zip, submit. Every update is reviewed; students receive
-it through Chrome's own update mechanism within hours of publication, and nobody downloads anything.
+it through Chrome's own update mechanism within hours of publication. The helper installed on a
+student's computer is not updated by Chrome: a later version that needs a newer helper must say so
+and offer it from its own package (LICENSE section 17).
 
 ## 2. The deploy order with the access service
 
-Builds before 8.0.0 send no installation identifier, and the service refuses a check without one
-(`"reason":"update_required"`) unless its `REQUIRE_INSTALL_ID` variable is `"0"`. Keep it at `"0"`
-while any student, you included, still uses 7.0.0 or an older build, and turn it on (remove it, or
-set it to `"1"`, and deploy both service names) once 8.0.0 or later is live on the private listing and
-installed by everyone who needs it. Until then an old build keeps working and is not bound to an
-installation.
+Unchanged from 8.0.0: builds before 8.0.0 send no installation identifier, and the service refuses a
+check without one (`"reason":"update_required"`) unless its `REQUIRE_INSTALL_ID` variable is `"0"`.
+Keep it at `"0"` while anyone still uses 7.0.0 or older, and turn it on once 8.0.0 or later is live on
+the private listing and installed by everyone who needs it.
+
+The grid side has an order of its own: make every folder above the shared copy owner-only or sticky,
+deploy framework 11 to the shared copy, run `browser-key check`, and only then let the listing go
+live. A 12.0.0 extension that meets framework 10 on the grid cannot enrol a key: framework 10 answers
+`hpcworker: unknown command 'browser-key'`, which the core recognises (`contract.ts`
+`isUnknownVerb`) and shows as "The lab's copy of the tool on the grid is older than this Beethoven.
+Ask your lab lead to update it, or use GlobalProtect." Never point `current` back below version 11
+once students have keys: every key would then meet a copy with no gate.
 
 ## 3. Approving, moving and withdrawing, day to day
 
@@ -206,69 +178,61 @@ installation.
   confirmed, and three choices: *Approve for Beethoven*, *Lab membership only*, *Deny*. For
   *Approve for Beethoven*, add their Google account to the group (section 0, item 6) and send them
   the item's link (`https://chromewebstore.google.com/detail/<item-id>`) with one line: open it in
-  Chrome, signed in with that Google account, on the computer you will use; *Add to Chrome*.
-- **"... asked from a second installation; it was refused."** The e-mail comes at most once a day
-  per account, with *Move the approval to the new installation* and *Withdraw approval*. Move it
-  when the student changed computers, Chrome profiles or reinstalled; the new installation works at
-  its next check, and the old one stops at its own next check (within a day while it is online). If
-  the student does not know of a second installation, the account or the copy is being shared:
-  withdraw, and ask. `node tools/intake/admin.mjs seat <AccessID>` shows the binding; `reset-seat
-  <AccessID>` clears it so the next installation to ask binds.
-- **"This installation of Beethoven is already set up for another account."** A student sees this
-  when the installation they use was first used for another approved AccessID: one installation
-  serves one account. No e-mail comes for it; `admin.mjs seat <AccessID>` shows it among the
-  refusals. Two approved students who share one computer each need a Chrome profile of their own (a
-  new profile is a new installation, which binds at its first check); `reset-seat` the account that
-  holds this installation only if it should give it up. If neither expected it, one of them is
-  lending their installation.
+  Chrome, signed in with that Google account, on the computer you will use; *Add to Chrome*; then
+  follow `docs/guides/INSTALL.md` (send it, or the support page).
+- **"... asked from a second installation; it was refused."** As before: *Move the approval to the
+  new installation* when the student changed computers, Chrome profiles or reinstalled; withdraw and
+  ask if they do not know of one. `node tools/intake/admin.mjs seat <AccessID>` shows the binding;
+  `reset-seat <AccessID>` clears it. A student who moves computers also signs in directly once on the
+  new one, which replaces the old computer's key line on the grid.
+- **"This installation of Beethoven is already set up for another account."** One installation serves
+  one account; two approved students who share a computer each need a Chrome profile of their own.
 - **Withdrawing.** Withdraw in the admin console (or the e-mail link), and remove the Google account
-  from the group so the listing stops offering updates to it; the extension stops starting workers
-  at its next check.
+  from the group. The extension stops starting workers at its next check. **The browser's key line
+  stays in the student's grid account**, since the gate does not consult the access service: ask the
+  student to press *Forget this computer*, or see `docs/guides/LAB_LEAD.md`, section 5.
 
 ## 4. When a reviewer asks for test access
 
-A reviewer may ask for credentials to a live portal. None can be given, and the answer must say so
+A reviewer may ask for credentials to a live cluster. None can be given, and the answer must say so
 plainly and offer the next best thing. Reply with this:
 
 ```
-Thank you for reviewing Beethoven. The extension works only against a university's Open OnDemand portal, which requires a university account, a VPN and a second factor. We cannot issue such an account to a reviewer, and we cannot lend ours: one person, one account is a term of the portal and of Anthropic's Claude service the worker uses.
+Thank you for reviewing Beethoven. The extension works only against a university's cluster, which requires a university account with its password and a second factor (and, on its portal path, a VPN). We cannot issue such an account to a reviewer, and we cannot lend ours: one person, one account is a term of the university and of Anthropic's Claude service the worker uses.
 
 What we can offer:
-1. A mock portal, attached as beethoven-mock-portal.zip: a small Node 22 server that serves the same routes the extension uses, with a stand-in scheduler and a stand-in cluster tool; it contains no extension code. The recipe below runs it with the item you installed from the store; it needs Node 22, bash and openssl, and we have run it end to end only on Windows, with Git for Windows. The mock's username, st1234, is approved on our access service for a portal at localhost and accepted from any installation, so the extension works against it with no licence key.
-2. [Only if recorded by then: a walk-through of the same flow against the mock, and one against a live university portal with the hostname and the pasted code blurred, so you see exactly what a student sees. Delete this item if there is no recording.]
+1. A mock portal, attached as beethoven-mock-portal.zip: a small Node 22 server that serves the same routes the extension uses on its portal path, with a stand-in scheduler and a stand-in cluster tool; it contains no extension code. The recipe below runs it with the item you installed from the store; it needs Node 22, bash and openssl, and we have run it end to end only on Windows, with Git for Windows. The mock's username, st1234, is approved on our access service for a portal at localhost and accepted from any installation. The direct (ssh) way is not part of the mock; its helper is a plain script inside the package (bridge/) that you can read, and we ask you not to try it against the university's real server, where a test sign-in is a failed sign-in on a real account.
+2. [Only if recorded by then: a walk-through of the same flow against the mock, and one against the real cluster with the AccessID, the codes and the key fingerprint blurred. Delete this item if there is no recording.]
 3. A live screen-share at a time of your choosing, during which you may direct every click.
 
-What the extension does not do, which may be what you need to confirm: it has no host permission, content script or code on claude.ai, anthropic.com or claude.com and only opens those pages in a new tab; it never reads a Claude credential (the user signs in on Anthropic's page and pastes a one-time code that is relayed once to the user's own cluster shell and kept nowhere); it runs no remote code (its daily update check fetches one signed JSON list); it holds no install-time host permission, asks for one origin at a time and only from a click, and refuses an address on claude.ai, anthropic.com or claude.com before any permission request; the one thing it sends us is the approval check (the account name the portal shows, the portal hostname, the product, the version and a random identifier the extension made for this installation), answered yes or no; no analytics, no error reports, no activation.
+What the extension does not do, which may be what you need to confirm: it has no host permission, content script or code on claude.ai, anthropic.com or claude.com and only opens those pages in a new tab; it never reads a Claude credential (the user signs in on Anthropic's page and pastes a one-time code that is relayed once to the user's own cluster shell and kept nowhere); it never keeps the user's cluster password or verification code (on the direct way they are typed into its own page and sent only into the encrypted ssh session, after the cluster's host key matched the pinned one); its key's line in the user's cluster account runs a gate with eight fixed commands and can never sign a worker in to Claude; it uses nativeMessaging only to talk to its own helper, which connects only to the cluster's ssh port and holds no credential; it runs no remote code (its daily update check fetches one signed JSON list); it holds no install-time host permission, asks for one origin at a time and only inside a click, and refuses an address on claude.ai, anthropic.com or claude.com before any permission request; the one thing it sends us is the approval check (the account name the cluster accepted, the portal hostname, the product, the version and a random identifier the extension made for this installation), answered yes or no; no analytics, no error reports, no activation.
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher.
 ```
 
 Then paste under it the fuller text from `PASTE.md` (section "Test instructions tab", the block
-after "The fuller text, for a reply to a reviewer"), which carries the recipe for a reviewer who has
-the item installed from the store, and attach `release/10.0.0/reviewer/beethoven-mock-portal.zip`:
-the mock, its stand-in scheduler and cluster tool and its one dependency (`ws`), and no extension
-code. Never attach `.output/beethoven-<version>-sources.zip`: it holds the extension's full source,
-which is not handed out. The recipe in `LISTING.md` is the same flow at more length, for a follow-up
-question. The mock flow was run end to end only on Windows, with Git for Windows (on the 9.0.0
-package and again on the 10.0.0 build in `release/10.0.0/`, 2026-10-01, from the repository's
-`extension/mock-ood`; the zip's own copy was started and answered `/login`); say so if a reviewer names another system. The two recordings named in
-`../STORE_LISTING.md` ("Reviewer access", item 2) have not been made as of 2026-09-30; record them
-(under five minutes each, the mock one from the recipe in `LISTING.md`, the live one with the portal
-hostname and the pasted code blurred) if you want item 2 in the reply; otherwise leave item 2 out, as
-the draft says. The mock is not hosted publicly; the recipe runs it locally.
+after "The fuller text, for a reply to a reviewer"), and attach
+`release/12.0.0/reviewer/beethoven-mock-portal.zip`: the mock, its stand-in scheduler and cluster
+tool and its one dependency (`ws`), and no extension code. Never attach
+`.output/beethoven-<version>-sources.zip`: it holds the extension's full source, which is not handed
+out (the helper's scripts are in the package anyway, as the store requires of everything it runs).
+The recipe in `LISTING.md` is the same flow at more length, for a follow-up question. The mock flow
+of 11.0.0 (scenarios 0 to 12) was not run on a 12.0.0 build; the 12.0.0 harness ran the direct way's
+scenarios 13 to 16 against a local grid stand-in (`docs/V12_STATUS.md`). Walk the recipe once on the
+release build before quoting it, and say so if a reviewer names another system.
 
 ## 5. After publication: how students install
-
-No developer mode, no file, no download:
 
 - The student, approved for Beethoven and added to the group, opens
   `https://chromewebstore.google.com/detail/<item-id>` in Chrome while signed in to the Chrome Web
   Store with the Google account they gave, clicks **Add to Chrome**, then **Add extension** in the
   browser's own prompt. Anyone else who opens the link sees no item.
-- Updates come through Chrome; nothing is downloaded from us.
+- The first time, the panel offers the helper from inside the extension ("One small download,
+  once"); the student saves and opens it once (`docs/guides/INSTALL.md`, part 2). Nothing is
+  downloaded from the website. A student who cannot run it uses GlobalProtect.
+- Updates to the extension come through Chrome; nothing is downloaded from us.
 - The first installation that checks their AccessID is bound to it (section 3).
 
-The landing page `https://openspineconsortium.com/beethoven/` (generated by the site repository's
-`tools/build_site.py`; `docs/PUBLISHING_SITE.md`) shows one card, Chrome, "Private listing, by
-invitation: after approval you receive an invitation at the Google account you gave", with no link.
-It keeps that card after publication: the item's link is never put on the site.
+The landing page `https://openspineconsortium.com/beethoven/` shows one card, Chrome, "Private
+listing, by invitation: after approval you receive an invitation at the Google account you gave",
+with no link. It keeps that card after publication: the item's link is never put on the site.

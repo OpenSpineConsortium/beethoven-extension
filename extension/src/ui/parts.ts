@@ -1,12 +1,14 @@
 // The pieces every page draws from a view: a button from a ButtonView, the orb, the four-node track,
 // the self-ticking checklist, a problem, the tick, a fold, the ⋯ menu, the hero and the status card.
 // Each is a pure function of its view part and a few callbacks; nothing here keeps state.
-import { formatTimer, onlineFor, type Action, type ButtonView, type ChecklistRow, type HeroView, type Orb, type ProblemView, type StatusRows, type Timer, type TrackView } from '../core/model';
+import { formatTimer, onlineFor, type ButtonView, type ChecklistRow, type HeroView, type Orb, type ProblemView, type StatusRows, type Timer, type TrackView } from '../core/model';
 import { el, svg } from './dom';
 import { drawnCheck, icon, spinner, type IconName } from './icons';
 import { LABELS } from './labels';
+import type { Action12 } from './model12';
 
-export type OnAct = (a: Action) => void;
+/** a press: the core's actions, and the menu's page-local "What you need" (model12.ts Action12) */
+export type OnAct = (a: Action12) => void;
 
 /** a button drawn from the view; `pending` marks the press in flight (a spinner until the next view) */
 export function button(b: ButtonView, onAct: OnAct, opts: { block?: boolean; pending?: string; cls?: string; icon?: IconName; onClick?: (e: Event) => void } = {}): HTMLButtonElement {
@@ -112,10 +114,10 @@ export function foldToggle(controls: string, open: boolean, label: string, onTog
   return el('button', { type: 'button', class: `btn ${cls} fold-toggle`, 'aria-expanded': open ? 'true' : 'false', 'aria-controls': controls, onClick: onToggle }, el('span', { class: 'btn-label', text: label }), icon('chevronRight', 14, 'chev'));
 }
 
-const MENU_ICON: Partial<Record<Action['kind'], IconName>> = { tour: 'sparkle', 'open-files': 'folder', 'open-settings': 'sliders', 'open-details': 'doc', 'open-help': 'help' };
+const MENU_ICON: Partial<Record<Action12['kind'], IconName>> = { tour: 'sparkle', 'open-files': 'folder', 'open-settings': 'sliders', 'open-details': 'doc', 'open-help': 'help', 'open-needs': 'id' };
 
 /** the header: the wordmark, and "⋯" (aria-label "More") with its menu */
-export function header(wordmark: string, menu: Array<{ label: string; action: Action }> | undefined, open: boolean, onToggle: (open: boolean) => void, onPick: (a: Action) => void): HTMLElement {
+export function header(wordmark: string, menu: Array<{ label: string; action: Action12 }> | undefined, open: boolean, onToggle: (open: boolean) => void, onPick: (a: Action12) => void): HTMLElement {
   const items = menu ?? [];
   const menuEl = open
     ? el(
@@ -219,25 +221,52 @@ const DOT: Record<string, string> = {
   'as-of': 'off',
 };
 
+/**
+ * 12.0.0: under the Grid row's value, how the grid is reached: "Direct" or "Through GlobalProtect", and,
+ * while the protected key waits for this browser session, "Locked · Unlock" (the passkey step runs in
+ * the click: `unlock`).
+ */
+function via(v: NonNullable<StatusRows['grid']['via']>, unlock?: () => void, busy?: boolean): HTMLElement {
+  return el(
+    'span',
+    { class: `srow-via${v.locked ? ' locked' : ''}`, 'data-mode': v.mode },
+    icon(v.locked ? 'lock' : v.mode === 'direct' ? 'route' : 'shield', 13),
+    el('span', { text: v.text }),
+    v.locked ? el('span', { class: 'via-sep', 'aria-hidden': 'true', text: '·' }) : null,
+    v.locked ? el('span', { text: v.locked.text }) : null,
+    v.locked ? el('span', { class: 'via-sep', 'aria-hidden': 'true', text: '·' }) : null,
+    v.locked
+      ? el('button', { type: 'button', class: `btn btn-link via-unlock${busy ? ' busy' : ''}`, 'aria-busy': busy ? 'true' : undefined, onClick: () => !busy && unlock?.() }, busy ? spinner(12) : null, el('span', { class: 'btn-label', text: v.locked.unlock }))
+      : null,
+  );
+}
+
 /** the three-row status card: Grid, Claude, Worker; every dot has its word beside it */
-export function statusCard(rows: StatusRows, labels: { grid: string; claude: string; worker: string }, onAct: OnAct, pending?: string): HTMLElement {
-  const row = (key: string, label: string, state: string, text: string, link?: ButtonView) =>
+export function statusCard(rows: StatusRows, labels: { grid: string; claude: string; worker: string }, onAct: OnAct, pending?: string, opts: { unlock?: () => void; unlocking?: boolean } = {}): HTMLElement {
+  const row = (key: string, label: string, state: string, text: string, link?: ButtonView, under?: HTMLElement | null) =>
     el(
       'li',
-      { class: 'srow', key },
+      { class: `srow${under ? ' two' : ''}`, key },
       el('span', { class: 'srow-label', text: label }),
       el(
         'span',
-        { class: 'srow-value' },
-        state === 'checking' ? spinner(12) : el('span', { class: `dot ${DOT[state] ?? 'off'}`, 'aria-hidden': 'true' }),
-        el('span', { class: 'txt', text: link ? `${text.replace(new RegExp(` · ${link.label}$`), '')} ·` : text }),
-        link ? button({ ...link, tone: 'link' }, onAct, { block: false, pending, cls: 'row-link' }) : null,
+        { class: 'srow-stack' },
+        el(
+          'span',
+          { class: 'srow-value' },
+          state === 'checking' ? spinner(12) : el('span', { class: `dot ${DOT[state] ?? 'off'}`, 'aria-hidden': 'true' }),
+          el('span', { class: 'txt', text: link ? `${text.replace(new RegExp(` · ${link.label}$`), '')} ·` : text }),
+          link ? button({ ...link, tone: 'link' }, onAct, { block: false, pending, cls: 'row-link' }) : null,
+        ),
+        under ?? null,
       ),
     );
+  const g = rows.grid;
   return el(
     'ul',
     { class: 'card-status' },
-    row('grid', labels.grid, rows.grid.state, rows.grid.text, rows.grid.link),
+    // a protected key not unlocked this browser session: the account is known but nothing is read, so the dot is the quiet one
+    row('grid', labels.grid, g.via?.locked && g.state === 'signed-in' ? 'unknown' : g.state, g.text, g.link, g.via ? via(g.via, opts.unlock, opts.unlocking) : null),
     row('claude', labels.claude, rows.claude.state, rows.claude.text, rows.claude.link),
     row('worker', labels.worker, rows.worker.state, rows.worker.text),
   );

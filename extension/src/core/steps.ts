@@ -10,7 +10,8 @@
 // "probe", "heartbeat", a countdown for a wait Beethoven imposes on itself, "Failed to fetch", or raw
 // shell output. The words come from the state, the reason class and the failure code (D14).
 import type { ChannelNote, KnownState, LastKnown, OnceNotes, PendingPress, Prefs, TourSeen } from './keys';
-import { formatAgo, formatClock, LOG_WORDS, WORDS, type Action, type WelcomeMoment, type ButtonView, type ChecklistRow, type ConnectFailure, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
+import { DIRECT_LINKS, formatAgo, formatClock, LOG_WORDS, WORDS, type Action, type WelcomeMoment, type BridgeId, type BridgeState, type ButtonView, type ChecklistRow, type ConnectFailure, type DirectMoment, type HelperDownload, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type QrLink, type SheetPrompt, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
+import type { SheetState } from './signin';
 import { planWord, type ReasonClass, type StopReason } from './contract';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_BUTTON, STATEMENT_TICK } from './disclosure';
 import { SUMMARY, TERMS_REFUSAL, ticks } from './terms';
@@ -166,6 +167,78 @@ export interface Facts {
   tourFromMenu?: boolean;
   /** the welcome page's press as the background knows it: its state, and when "Agree and continue" was pressed (session WELCOME_PRESS_KEY, ms) */
   welcome?: { state: WelcomeView['state']; pressAt?: number };
+  /** 12.0.0: the direct way. Absent: the 11.0.0 way exactly (GlobalProtect and the portal) */
+  direct?: DirectFacts;
+}
+
+/** 12.0.0: what the direct way stands on (docs/V12_CONTRACT.md "Facts") */
+export interface DirectFacts {
+  /** Settings' "Connection": Direct when possible (direct) or GlobalProtect only (vpn) */
+  pref: 'direct' | 'vpn';
+  /** "Use GlobalProtect instead" was pressed (DIRECT_KEY vpn_chosen_at) */
+  vpnChosen: boolean;
+  /** the first bridge available in D3's order, none, or not probed yet */
+  bridge: BridgeId | 'none' | 'unknown';
+  /** the bundled helper: what its probe found, and its hello's version */
+  helper: { state: BridgeState; version?: string };
+  /** a probe of the bridges runs now */
+  probing: boolean;
+  /** that probe is the student's own Check again (only then the button turns) */
+  probingByHand?: boolean;
+  /** the student pressed Check again since the installer was saved ("Not found yet" only after that, or after ten minutes) */
+  checkedByHand?: boolean;
+  /** the page's last Unlock did not unlock ("That didn't unlock. Try again." on the unlock sheet) */
+  unlockFailed?: boolean;
+  /** the helper answered for the first time a moment ago ("Helper found." with the drawn check) */
+  foundAt?: number;
+  /** the student saved the installer (the background looks for the helper every few seconds) */
+  downloadedAt?: number;
+  /** this computer's installer, from public/bridge/manifest.json */
+  download?: HelperDownload;
+  /** this computer's key: present, protected (opt-in), locked this browser session, enrolled on the grid */
+  key: { present: boolean; wrapped: boolean; locked: boolean; enrolled: boolean; keyType?: string; fingerprint?: string };
+  /** the grid's ssh door through the bridge (or the last direct check could not reach it) */
+  unreachable: boolean;
+  /** the account the grid accepted on the direct way */
+  account?: string;
+  /** the sign-in sheet in flight (core/signin.ts), or the moment the student opened it */
+  sheet?: SheetState;
+  /** the sheet is wanted now (a press waits on a sign-in, or the first run reached it) */
+  sheetWanted: boolean;
+  /** the 2FA route: the choice, or the steps of one */
+  route?: 'choose' | 'laptop' | 'phone';
+  /** "This computer is set up." is shown until Continue, this long after enrolment */
+  enrolledAt?: number;
+  enrolledSeen: boolean;
+  /** the one-time protection card after enrolment is not answered yet */
+  protectOffer: boolean;
+  /** what the page's passkey step came to, for the card's last line */
+  protectOutcome?: 'on' | 'cancelled' | 'unsupported' | 'failed';
+  /** the student continued past the fallback moment into GlobalProtect */
+  fallbackSeen: boolean;
+  /** the university's pages the codes open (the site profile's, else Wayne State's own) */
+  links: { globalProtect: string; gridCode: string; gridSite: string };
+}
+
+/** how long "This computer is set up." holds when Continue is not pressed */
+export const ENROLLED_HOLD_MS = 4_000;
+/** how long "Helper found." holds before the sheet */
+export const FOUND_HOLD_MS = 1_200;
+/** how long the protection card holds "Protected." after Turn on, before the moment moves on */
+export const PROTECTED_HOLD_MS = 2_500;
+
+/**
+ * 12.0.0: which way the grid is reached now. "vpn": the 11.0.0 way (GlobalProtect and the portal),
+ * exactly; "direct": ssh with this computer's key, through the bridge; "setup": the direct way is being
+ * set up or needs the student (a bridge to install, a sign-in, a code to set up, an unlock).
+ */
+export function connectionMode(f: Pick<Facts, 'direct'>): 'direct' | 'vpn' | 'setup' {
+  const d = f.direct;
+  if (!d || d.pref === 'vpn' || d.vpnChosen) return 'vpn';
+  if (d.unreachable && d.fallbackSeen) return 'vpn';
+  if (d.bridge === 'none' || d.bridge === 'unknown') return 'setup';
+  if (!d.key.present || !d.key.enrolled || d.key.locked) return 'setup';
+  return 'direct';
 }
 
 // ---- small pieces ----------------------------------------------------------------------------------
@@ -228,6 +301,10 @@ export function endedWait(failure: ConnectFailure | undefined): ProblemView | un
     case 'restricted':
     case 'signin-code':
     case 'signin-timeout':
+    case 'limit-names':
+    case 'limit-hourly':
+    case 'limit-busy':
+    case 'old-copy':
       return connectProblem(failure);
     default:
       return { title: WORDS.connect.refused, body: WORDS.connect.refusedNext, button: button(WORDS.connect.tryAgain, 'ink', { kind: 'retry' }) };
@@ -296,6 +373,14 @@ export function connectProblem(failure: ConnectFailure | undefined): ProblemView
     case 'password':
       // the one-time key step takes over (AM2); nothing to say here
       return undefined;
+    case 'limit-names':
+      return { body: WORDS.direct.gate.names, button: button(WORDS.direct.signin.useVpn('GlobalProtect'), 'ink', { kind: 'use-vpn' }) };
+    case 'limit-hourly':
+      return { body: WORDS.direct.gate.hourly, button: button(WORDS.direct.signin.useVpn('GlobalProtect'), 'ink', { kind: 'use-vpn' }) };
+    case 'limit-busy':
+      return { body: WORDS.direct.gate.busy, button: button(WORDS.connect.tryAgain, 'ink', { kind: 'retry' }) };
+    case 'old-copy':
+      return { body: WORDS.direct.gate.oldCopy, button: button(WORDS.direct.signin.useVpn('GlobalProtect'), 'ink', { kind: 'use-vpn' }) };
     case 'refused':
     case 'signin':
     case 'usage':
@@ -311,8 +396,37 @@ const CLAUDE_FAILURES: ReadonlySet<ConnectFailure> = new Set(['signin-code', 'si
 
 // ---- which moment ----------------------------------------------------------------------------------
 
+/**
+ * 12.0.0: the direct way's moment, or undefined when the 11.0.0 moments carry on. `wanted`: the first
+ * run, or a press of the student's that waits on the grid; without it only what is already under way
+ * (a sign-in, the route choice, the hold after enrolment, the one-time protection card) is shown.
+ */
+export function directMoment(f: Facts, wanted = true): DirectMoment | undefined {
+  const d = f.direct;
+  if (!d || d.pref === 'vpn') return undefined;
+  const s = d.sheet;
+  if (d.route) return d.route === 'choose' ? 'choose-route' : 'code-setup';
+  if (s && s.phase !== 'account' && s.phase !== 'done') return 'sign-in-sheet';
+  if (d.enrolledAt !== undefined && !d.enrolledSeen && f.now - d.enrolledAt < ENROLLED_HOLD_MS) return 'enrolled';
+  // the card holds "Protected." a moment after Turn on (the key is wrapped by then)
+  if (d.protectOffer && d.key.present && d.key.enrolled && (!d.key.wrapped || d.protectOutcome === 'on')) return 'protect-key-optional';
+  // "Use GlobalProtect instead": the fallback moment once (Continue opens the grid's own sign-in box), then the 11.0.0 moments
+  if (d.vpnChosen) return d.fallbackSeen || (!wanted && !d.sheetWanted) ? undefined : 'fallback-to-vpn';
+  if (!wanted && !d.sheetWanted) return undefined;
+  if (d.unreachable) return d.fallbackSeen ? undefined : 'fallback-to-vpn';
+  if (d.bridge === 'none') return 'install-helper';
+  if (d.foundAt !== undefined && f.now - d.foundAt < FOUND_HOLD_MS) return 'install-helper';
+  if (d.bridge === 'unknown') return d.probing || !d.key.enrolled ? 'sign-in-sheet' : undefined;
+  if (!d.key.present || !d.key.enrolled || d.key.locked || d.sheetWanted) return 'sign-in-sheet';
+  return undefined;
+}
+
 /** the moment the student must act in now, outside the first run's order: grid sign-in for a press, the Claude sign-in, the key step */
 function studentMoment(f: Facts): JourneyView['moment'] | undefined {
+  const dm = directMoment(f, !!f.press);
+  if (dm) return dm;
+  // the direct way carries the grid: the portal's sign-in box is not this moment's
+  if (connectionMode(f) === 'direct' && f.press && needsGridSignin(f) && f.grid.session !== 'unreachable') return 'sign-in-sheet';
   if (f.loginSetup) return 'login-setup';
   if (f.signin.waiting || (f.press && needsGridSignin(f) && f.grid.session !== 'unreachable' && f.grid.reach !== 'no-route')) return 'grid';
   if (claudeNeedsStudent(f)) return 'claude';
@@ -345,6 +459,10 @@ function welcomeState(f: Facts): WelcomeMoment['state'] {
 /** the first run's moment */
 export function momentOf(f: Facts): JourneyView['moment'] {
   if (!f.portal || !f.granted) return 'welcome';
+  // 12.0.0: the direct way first (D3); its moments come where GlobalProtect's and the grid sign-in's came
+  const dm = directMoment(f);
+  if (dm) return dm;
+  if (connectionMode(f) === 'direct' && needsGridSignin(f)) return 'sign-in-sheet';
   if (f.loginSetup) return 'login-setup';
   if (needsGridSignin(f)) {
     // "Connected." is held 700 ms before the sign-in moment
@@ -501,6 +619,15 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
     case 'login-setup':
       return loginSetupMoment(f.loginSetup ?? { phase: 'offer', line: '' });
 
+    case 'choose-route':
+    case 'install-helper':
+    case 'sign-in-sheet':
+    case 'code-setup':
+    case 'enrolled':
+    case 'fallback-to-vpn':
+    case 'protect-key-optional':
+      return directJourney(f, moment);
+
     case 'queue': {
       const r = f.run;
       const hero = r.reason === 'share' ? WORDS.queue.shareHero : r.reason === 'maintenance' ? WORDS.queue.maintenanceHero : WORDS.queue.hero;
@@ -552,6 +679,249 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
         ...(pinTip ? { pinTip } : {}),
       };
     }
+  }
+}
+
+// ---- 12.0.0: the direct way's moments -------------------------------------------------------------
+
+const NO_DIRECT: DirectFacts = {
+  pref: 'direct',
+  vpnChosen: false,
+  bridge: 'unknown',
+  helper: { state: 'unknown' },
+  probing: false,
+  key: { present: false, wrapped: false, locked: false, enrolled: false },
+  unreachable: false,
+  sheetWanted: false,
+  enrolledSeen: true,
+  protectOffer: false,
+  fallbackSeen: false,
+  links: { globalProtect: DIRECT_LINKS.globalProtect, gridCode: DIRECT_LINKS.gridCode, gridSite: 'https://ondemand.grid.wayne.edu/pun/sys/dashboard/' },
+};
+
+/** one of the direct way's moments as the page draws it */
+export function directJourney(f: Facts, moment: DirectMoment): JourneyView {
+  const d = f.direct ?? NO_DIRECT;
+  const app = vpnApp(f);
+  const useVpn = button(WORDS.direct.signin.useVpn(app), 'text', { kind: 'use-vpn' });
+  switch (moment) {
+    case 'install-helper': {
+      const W = WORDS.direct.installHelper;
+      const dl = d.download;
+      const found = d.foundAt !== undefined && f.now - d.foundAt < FOUND_HOLD_MS;
+      // right after the download Beethoven looks by itself every few seconds: that is waiting, not a failure;
+      // "Not found yet" only once the student pressed Check again, or the eager ten minutes are over
+      const eager = d.downloadedAt !== undefined && f.now - d.downloadedAt < 10 * 60_000 && !d.checkedByHand;
+      const status: Extract<JourneyView, { moment: 'install-helper' }>['status'] = found
+        ? { state: 'found', text: W.found }
+        : d.probing && d.probingByHand
+          ? { state: 'looking', text: W.checking }
+          : d.helper.state === 'broken'
+            ? { state: 'broken', text: W.broken }
+            : d.downloadedAt !== undefined
+              ? eager
+                ? { state: 'waiting', text: W.waiting }
+                : { state: 'not-found', text: W.notFound }
+              : { state: 'idle' };
+      return {
+        moment: 'install-helper',
+        title: W.title,
+        body: dl ? W.body : `${W.body} ${W.noDownload}`,
+        ...(dl ? { download: { ...dl, label: W.download(dl.osLabel), fileLine: dl.size ? W.fileLine(dl.file, dl.size) : dl.file } } : {}),
+        steps: dl ? (dl.open ? W.stepsNamed[dl.os](dl.open) : [...W.steps[dl.os]]) : [],
+        ...(dl && W.osNote[dl.os] ? { osNote: W.osNote[dl.os]! } : {}),
+        unsignedNote: W.unsignedNote,
+        status,
+        checkAgain: button(W.checkAgain, 'outline', { kind: 'check-bridge' }, d.probing && d.probingByHand ? { busy: true } : {}),
+        useVpn: button(W.useVpn(app), 'text', { kind: 'use-vpn' }),
+      };
+    }
+
+    case 'sign-in-sheet':
+      return signInSheet(f, d, useVpn);
+
+    case 'choose-route': {
+      const W = WORDS.direct.chooseRoute;
+      return {
+        moment: 'choose-route',
+        title: W.title,
+        body: W.body,
+        options: [
+          { id: 'laptop', title: W.laptop.title, detail: W.laptop.detail, button: button(W.laptop.button, 'ink', { kind: 'choose-route', route: 'laptop' }) },
+          { id: 'phone', title: W.phone.title, detail: W.phone.detail, button: button(W.phone.button, 'outline', { kind: 'choose-route', route: 'phone' }) },
+        ],
+        useVpn,
+        warning: WORDS.direct.codeSetup.warning,
+      };
+    }
+
+    case 'code-setup': {
+      const W = WORDS.direct.codeSetup;
+      const route = d.route === 'phone' ? 'phone' : 'laptop';
+      const apps: QrLink[] = [
+        { id: 'authenticator-ios', label: `${W.qr.authenticator} · ${W.qr.iphone}`, url: DIRECT_LINKS.authenticatorIos },
+        { id: 'authenticator-android', label: `${W.qr.authenticator} · ${W.qr.android}`, url: DIRECT_LINKS.authenticatorAndroid },
+      ];
+      const qr: QrLink[] =
+        route === 'phone'
+          ? [
+              { id: 'globalprotect-ios', label: `${W.qr.globalprotect} · ${W.qr.iphone}`, url: DIRECT_LINKS.globalProtectIos },
+              { id: 'globalprotect-android', label: `${W.qr.globalprotect} · ${W.qr.android}`, url: DIRECT_LINKS.globalProtectAndroid },
+              ...apps,
+              { id: 'grid-code', label: W.qr.gridCode, url: d.links.gridCode },
+            ]
+          : [{ id: 'grid-code', label: W.qr.gridCode, url: d.links.gridCode }, ...apps, { id: 'grid-site', label: W.openSite, url: d.links.gridSite }];
+      return {
+        moment: 'code-setup',
+        route,
+        title: route === 'phone' ? W.phoneTitle : W.laptopTitle,
+        steps: [...(route === 'phone' ? W.phoneSteps : W.laptopSteps)],
+        qr,
+        warning: W.warning,
+        done: button(W.done, 'ink', { kind: 'grid-signin-retry' }),
+        back: button(W.back, 'text', { kind: 'route-back' }),
+        useVpn,
+      };
+    }
+
+    case 'enrolled': {
+      const W = WORDS.direct.enrolled;
+      return { moment: 'enrolled', title: W.title, body: W.body, ...(d.account ? { account: d.account } : {}), continue: button(W.continue, 'ink', { kind: 'grid-signin-continue' }) };
+    }
+
+    case 'protect-key-optional': {
+      const W = WORDS.direct.protectKey;
+      const outcome = d.protectOutcome === 'on' ? W.turnedOn : d.protectOutcome === 'cancelled' || d.protectOutcome === 'failed' ? W.cancelled : d.protectOutcome === 'unsupported' ? W.unsupported : undefined;
+      return {
+        moment: 'protect-key-optional',
+        title: d.protectOutcome === 'on' ? W.titleOn : W.title,
+        body: W.body,
+        on: { label: W.on, busyLabel: W.turningOn, available: d.protectOutcome !== 'unsupported' },
+        notNow: button(d.protectOutcome === 'on' ? WORDS.direct.enrolled.continue : W.notNow, 'text', { kind: 'protect-key-later' }),
+        ...(outcome ? { outcome } : {}),
+      };
+    }
+
+    case 'fallback-to-vpn': {
+      const W = WORDS.direct.fallback;
+      return {
+        moment: 'fallback-to-vpn',
+        title: W.title(app),
+        body: d.unreachable ? `${WORDS.direct.signin.unreachable} ${W.body(app)}` : W.body(app),
+        continue: button(W.continue, 'ink', { kind: 'fallback-continue' }),
+        tryDirect: button(W.tryDirect, 'text', { kind: 'try-direct' }),
+      };
+    }
+  }
+}
+
+/** the sign-in sheet: the AccessID, then the grid's own prompts as they arrive, then the work, or why it stopped */
+function signInSheet(f: Facts, d: DirectFacts, useVpn: ButtonView): JourneyView {
+  const W = WORDS.direct.signin;
+  const app = vpnApp(f);
+  const s = d.sheet;
+  const value = s?.account ?? d.account;
+  const account = { label: W.accountLabel, placeholder: W.accountPlaceholder, ...(value ? { value } : {}) };
+  const purpose = s?.purpose ?? 'enrol';
+  // the page sends grid-signin-account with the field's value (account phase), grid-signin-answer with each prompt's (prompt phase)
+  const submit = button(W.continue, 'ink');
+  const cancel = button(W.cancel, 'text', { kind: 'grid-signin-change' });
+  const base = { moment: 'sign-in-sheet' as const, title: W.title, account, privacy: W.privacy, submit, cancel, purpose };
+  const tryAgain = button(W.tryAgain, 'ink', { kind: 'grid-signin-retry' });
+  if (d.key.locked && (!s || s.phase === 'account')) {
+    // the page runs the unlock inside the click on its button (core/keyring.ts), then sends unlock-key; a
+    // passkey that is gone (Windows Hello reset, the passkey deleted) has its way out: forget this computer
+    // here (a new key replaces the grid's line at the next sign-in), or GlobalProtect
+    return {
+      ...base,
+      phase: 'unlock',
+      title: W.unlockTitle,
+      status: W.unlockBody,
+      submit: button(W.unlock, 'ink'),
+      useVpn,
+      ...(d.unlockFailed ? { problem: { body: W.unlockFailed } } : {}),
+      secondary: button(W.cantUnlock, 'text', { kind: 'forget-computer' }),
+    };
+  }
+  if (!s || s.phase === 'account') {
+    if (!s && connectionMode(f) === 'direct') return { ...base, phase: 'connecting', status: W.connecting };
+    if (!s && d.bridge === 'unknown') return { ...base, phase: 'connecting', status: W.connecting };
+    return {
+      ...base,
+      phase: 'account',
+      useVpn,
+      ...(d.key.present ? {} : { protect: { label: WORDS.direct.settings.protectKey, note: WORDS.direct.settings.protectKeyNote, available: d.protectOutcome !== 'unsupported' } }),
+    };
+  }
+  switch (s.phase) {
+    case 'connecting':
+      return { ...base, phase: 'connecting', status: W.connecting };
+    case 'prompt': {
+      const prompts: SheetPrompt[] = (s.prompts ?? []).map((p) => ({ text: p.text, echo: p.echo, kind: p.kind, ...(p.kind === 'code' ? { hint: W.codeHint } : {}) }));
+      return { ...base, phase: 'prompt', prompts, ...(s.instruction ? { instruction: s.instruction } : {}), ...(s.notAccepted ? { notice: W.notAccepted } : {}), useVpn };
+    }
+    case 'working': {
+      const status = s.work === 'setting-up' ? W.settingUp : s.work === 'checking' ? W.checking : s.work === 'claude' ? W.signingInClaude : W.working;
+      return { ...base, phase: 'working', status };
+    }
+    case 'stopped': {
+      // GlobalProtect is the way on now; Try again only once the cooldown has passed (the core refuses it before then too)
+      const waiting = s.retryAt !== undefined && f.now < s.retryAt;
+      const again = waiting ? button(W.tryAgainAt(formatClock(s.retryAt!, true)), 'text', undefined, { disabled: true }) : button(W.tryAgain, 'text', { kind: 'grid-signin-retry' });
+      return { ...base, phase: 'stopped', problem: { title: W.stoppedTitle, body: W.stoppedBody(app), button: button(W.useVpn(app), 'ink', { kind: 'use-vpn' }) }, secondary: again };
+    }
+    case 'code-refused': {
+      // the grid's text names both causes: type the code again (first), or say there is no grid code yet (then the route choice);
+      // the second time in a row, "I don't have a grid code yet" comes first
+      const again = button(W.codeAgain, 'ink', { kind: 'grid-signin-retry' });
+      const none = button(W.noCode, 'ink', { kind: 'no-grid-code' });
+      const twice = (s.codeRefusals ?? 0) >= 2;
+      return {
+        ...base,
+        phase: 'code-refused',
+        problem: { title: W.codeRefusedTitle, body: W.codeRefused, button: twice ? none : again },
+        secondary: { ...(twice ? again : none), tone: 'text' },
+        useVpn,
+      };
+    }
+    case 'failed': {
+      let problem: ProblemView;
+      switch (s.failure) {
+        case 'wrong-grid':
+          // nothing was sent; a quiet Try again checks the grid's identity once more
+          problem = { title: W.wrongGridTitle, body: W.wrongGrid, button: button(W.tryAgain, 'text', { kind: 'grid-signin-retry' }) };
+          break;
+        case 'key-not-taken':
+          problem = { title: W.keyNotTakenTitle, body: W.keyNotTaken, button: tryAgain };
+          break;
+        case 'key-refused':
+          problem = { title: W.keyNotTakenTitle, body: W.keyRefused(s.keyRefusal ?? ''), button: tryAgain };
+          break;
+        case 'key-store':
+          problem = { title: W.keyStoreTitle, body: W.keyStore, button: tryAgain };
+          break;
+        case 'old-copy':
+          problem = { title: W.keyNotTakenTitle, body: W.oldCopy };
+          break;
+        case 'no-shared':
+          problem = { body: WORDS.statement.noSharedCopy.body, button: button(WORDS.statement.noSharedCopy.button, 'ink', { kind: 'copy-details' }) };
+          break;
+        case 'locked':
+          problem = { body: W.unlockBody };
+          break;
+        case 'unreachable':
+        case 'no-bridge':
+        case 'unsupported':
+          problem = { title: W.unreachableTitle, body: W.unreachableBody, button: tryAgain };
+          break;
+        case 'dropped':
+        default:
+          problem = { title: W.droppedTitle, body: W.dropped, button: tryAgain };
+      }
+      return { ...base, phase: 'failed', problem, useVpn };
+    }
+    default:
+      return { ...base, phase: 'working', status: W.working };
   }
 }
 
@@ -726,6 +1096,8 @@ export function heroOf(f: Facts): HeroView & { live: boolean } {
     const k = f.lastKnown?.state;
     const asOfClock = f.lastKnown?.seen_at ? formatClock(f.lastKnown.seen_at, true) : undefined;
     if (f.grid.session === 'unreachable' || f.grid.reach === 'no-route') {
+      // 12.0.0: on the direct way the VPN is not the question
+      if (connectionMode(f) === 'direct') return { state: 'unreachable', orb: 'stopped', word: WORDS.home.unreachableHero, sub: WORDS.direct.unreachableSub, announce: WORDS.home.unreachableHero, live: false };
       if (k === 'online' || k === 'starting' || k === 'queued' || k === 'renewing' || k === 'needs-you') {
         return { state: 'unreachable', orb: 'stopped', word: WORDS.home.unreachableHero, sub: WORDS.home.unreachableSub(app), announce: WORDS.home.unreachableHero, live: false };
       }
@@ -862,6 +1234,13 @@ function rowsOf(f: Facts, hero: HeroView & { live: boolean }): StatusRows {
         : g.session === 'signed-out' || g.session === 'not-ood'
           ? { state: 'signed-out', text: H.gridSignedOut, link: button(H.gridSignIn, 'link', { kind: 'sign-in-grid' }) }
           : { state: 'checking', text: H.checking };
+  // 12.0.0: how the grid is reached, beside the account
+  if (f.direct) {
+    const mode = connectionMode(f);
+    const via: NonNullable<StatusRows['grid']['via']> = mode === 'vpn' ? { mode: 'vpn', text: WORDS.direct.rowVpn(vpnApp(f)) } : { mode: 'direct', text: WORDS.direct.rowDirect };
+    if (f.direct.key.locked && mode !== 'vpn') via.locked = { text: WORDS.direct.rowLocked, unlock: WORDS.direct.rowUnlock };
+    grid.via = via;
+  }
   const c = f.run.claude;
   const claude: StatusRows['claude'] =
     c && hero.live

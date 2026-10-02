@@ -15,6 +15,14 @@
 //     background, "terminal.shell-up" back. The page script reads the page title only and types the
 //     one login-setup line only (contract.ts isLoginSetupLine).
 //   - CONNECT_PORT: the connect sitting in tab mode, hosted by the page script; parsed events only.
+//
+// 12.0.0 adds no message of its own: the direct way's presses are model.ts Actions (grid-signin-account,
+// grid-signin-answer and the rest), and its moments arrive on VIEW_PORT like any other. An answer to the
+// grid's prompt travels in one { type: 'action' } message from the page to the background and is held in
+// memory only until the request it belongs to is sent; it is never stored or logged. The passkey steps
+// (WebAuthn needs a page) run in the page itself (ext/direct.ts) and the page then sends protect-key or
+// unlock-key with the outcome only. The bundled helper is reached with runtime.connectNative from the
+// background (core/bridge.ts), never through a page.
 import type { ConnectEvent, ConnectOptions } from './contract';
 import type { Action, ActionKind, ResultOf, Surface, SurfaceView, TerminalInput } from './model';
 import type { PortalOp } from './portal';

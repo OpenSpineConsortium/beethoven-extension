@@ -25,8 +25,8 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 8;
-export const TERMS_DATE = '2026-10-01';
+export const TERMS_VERSION = 9;
+export const TERMS_DATE = '2026-10-02';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Agree and continue';
@@ -240,7 +240,11 @@ export function bindAccount(r: TermsRecord, account: string, at = new Date().toI
   return { ...r, bound_account: account, bound_account_seen_at: at };
 }
 
-/** A record counts only if it is v2 for the terms in force, with every box this build shows ticked. */
+/**
+ * A record counts only if it is v2 for the terms in force, with every box this build shows ticked.
+ * 12.0.0 (LICENSE version 9, PRIVACY version 10): a version 8 acceptance is kept (TERMS_HISTORY_KEY
+ * when it is replaced) and is out of force: everyone accepts once more.
+ */
 export function recordInForce(r: unknown): r is TermsRecord {
   const x = r as TermsRecord | undefined;
   if (!x || typeof x !== 'object' || x.v !== 2 || x.terms_version !== TERMS_VERSION || x.edition !== EDITION) return false;

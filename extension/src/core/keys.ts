@@ -21,6 +21,10 @@ export const CHANNEL_KEY = 'bridge.channel'; //      ChannelNote: how this brows
 export const WAIT_HISTORY_KEY = 'bridge.waits'; //  WaitHistory: the last five waits for a computer, in whole minutes ("Last time: 6 min.")
 export const TOUR_SEEN_KEY = 'bridge.tourSeen'; //  TourSeen: that the tour was seen
 export const ONCE_KEY = 'bridge.once'; //            OnceNotes: which one-time tips were shown or dismissed (pin tip, Try asking, the tour card, the New session toast)
+// 12.0.0 (docs/V12_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 10:
+export const DIRECT_KEY = 'bridge.direct'; //          DirectNote: the direct way on this computer: the account the grid accepted, when this computer's key was enrolled, its fingerprint, the student's choice of GlobalProtect, the one-time protection card
+// The browser's key itself is NOT in storage.local: it lives in IndexedDB ('beethoven-key', core/keyring.ts KEY_DB), as a
+// key wrapped by a non-extractable browser key (the default) or by the student's passkey (opt-in), never in the clear.
 // TERMS_KEY ('bridge.terms') and TERMS_HISTORY_KEY ('bridge.termsHistory', the earlier acceptance records, kept out of force) are in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
@@ -39,6 +43,11 @@ export const ACTIVITY_KEY = 'bridge.activity'; //     ActivityEntry[]: Beethoven
 export const GRID_KEY = 'bridge.grid'; //             GridNote: whether the grid answers and whether the browser holds a grid sign-in, as last checked
 export const PRESS_KEY = 'bridge.press'; //           PendingPress: a press kept until the grid can carry it ("Connecting when ready…")
 export const WELCOME_PRESS_KEY = 'bridge.welcomePress'; // {at}: the welcome page's "Agree and continue" was pressed, written inside the click before Chrome asks, so the panel opening beside it can say "Almost there." instead of "not accepted yet"
+// 12.0.0:
+export const BRIDGE_KEY = 'bridge.bridges'; //        BridgeNote: what the last probe of the bridges found (which one is used, the helper's version) and whether the grid answered on its ssh port
+export const KEY_UNLOCK_KEY = 'bridge.keyUnlock'; //  {secret}: only while the key is protected by a passkey and was unlocked this browser session: the passkey's output that opens it (memory only, never on disk; never readable by a page script)
+export const ROUTE_KEY = 'bridge.route'; //           RouteNote: the 2FA route the student chose (laptop or phone) while the code setup is shown
+export const REFUSALS_KEY = 'bridge.refusals'; //     RefusalNote: per AccessID, how many sign-ins the grid refused in a row and when the last was (so three refusals stop the sheet for a cooldown, across Try again); never a password or code
 
 export interface PortalSettings {
   origin: string;
@@ -66,6 +75,8 @@ export interface Prefs {
   open_claude_on_connect: boolean;
   /** 11.0.0: Settings, "Appearance": "Cream" (cream, the default whatever the system says) / "Match system" (system). Optional so a 10.0.0 profile reads as cream. */
   appearance?: Appearance;
+  /** 12.0.0: Settings, "Connection": "Direct when possible" (direct, the default; absent reads as direct) / "GlobalProtect only" (vpn) */
+  connection?: 'direct' | 'vpn';
 }
 
 /** <html data-theme>: "cream" always light; "system" follows prefers-color-scheme */
@@ -241,7 +252,57 @@ export interface ClickNote {
   at: string;
 }
 
-export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true, appearance: 'cream' };
+// ---- 12.0.0 storage shapes ------------------------------------------------------------------------
+
+/**
+ * DIRECT_KEY (local). Nothing secret: no password, no code, no key material (the key is in IndexedDB,
+ * wrapped). The account is recorded only after the grid accepted a sign-in with it.
+ */
+export interface DirectNote {
+  /** the AccessID the grid accepted (the gate's `version` names it) */
+  account?: string;
+  account_recorded_at?: string;
+  /** this computer's key was added on the grid and a second connection with it worked */
+  enrolled_at?: string;
+  /** the key's SSH fingerprint (SHA256:…), for Details */
+  key_fp?: string;
+  /** "Use GlobalProtect instead" was pressed: the 11.0.0 way until "Try the direct way again" */
+  vpn_chosen_at?: string;
+  /** the one-time "Protect the key on this computer?" card was answered (turned on, or Not now) */
+  protect_offer_done_at?: string;
+  /** "Continue" on "This computer is set up." */
+  enrolled_seen_at?: string;
+  /** the student continued past the fallback moment into GlobalProtect */
+  fallback_seen_at?: string;
+}
+
+/** BRIDGE_KEY (session): the last probe of the bridges, in D3's order */
+export interface BridgeNote {
+  /** the first available, or none */
+  chosen: 'store' | 'relay' | 'helper' | 'none';
+  store: 'available' | 'not-available';
+  relay: 'available' | 'not-configured' | 'not-available';
+  helper: 'available' | 'not-installed' | 'broken' | 'not-available';
+  /** the helper's hello: its version, operating system, kind */
+  helper_version?: string;
+  helper_os?: 'windows' | 'mac' | 'linux';
+  helper_kind?: 'script' | 'binary';
+  /** the grid's ssh port through the chosen bridge: answered with the pinned identity, no route, or not asked */
+  reach22: 'answers' | 'no-route' | 'unknown';
+  checked_at: string;
+}
+
+/** REFUSALS_KEY (session): AccessID -> the refusals in a row and the time of the last (ms) */
+export type RefusalNote = Record<string, { count: number; at: number }>;
+
+/** ROUTE_KEY (session) */
+export interface RouteNote {
+  /** choose: the route choice is up; laptop/phone: that route's steps are up */
+  route: 'choose' | 'laptop' | 'phone';
+  at: string;
+}
+
+export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true, appearance: 'cream', connection: 'direct' };
 
 /**
  * 11.0.0: the portal the welcome page offers before anything is stored: the bundled site profile's

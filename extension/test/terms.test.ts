@@ -13,9 +13,9 @@ import { acceptanceComplete, AFFIRMATION, AFFIRMATIONS_TWO, AGREE_BUTTON, bindAc
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('the terms version', () => {
-  it('is 8, dated 2026-10-01 (AM6)', () => {
-    expect(TERMS_VERSION).toBe(8);
-    expect(TERMS_DATE).toBe('2026-10-01');
+  it('is 9, dated 2026-10-02 (12.0.0: the direct way, LICENSE version 9, PRIVACY version 10)', () => {
+    expect(TERMS_VERSION).toBe(9);
+    expect(TERMS_DATE).toBe('2026-10-02');
   });
 
   it('is an integer that names the LICENSE.txt line at the repository root, with its date', () => {
@@ -73,7 +73,7 @@ describe('the record (TermsRecord v2)', () => {
 
   it('says what was shown, what was ticked, whether the full text was opened, and from which installation', async () => {
     const r = await buildTermsRecord(input);
-    expect(r).toMatchObject({ v: 2, terms_version: 8, terms_date: '2026-10-01', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
+    expect(r).toMatchObject({ v: 2, terms_version: 9, terms_date: '2026-10-02', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
     expect(r.affirmations).toEqual([{ id: 'agree', label: tickLabel(AFFIRMATION), checked: true }]);
     expect(r.license_sha256).toBe(await sha256(input.license));
     // CRLF and LF hash alike: the text, not its line endings
@@ -88,12 +88,14 @@ describe('the record (TermsRecord v2)', () => {
     expect(openedSentence(opened)).toBe('The full text was opened before Agree.');
   });
 
-  it('is in force only as v2 for version 8 with the box ticked; a v1 record is kept, out of force', async () => {
+  it('is in force only as v2 for version 9 with the box ticked; a v1 record and a version 8 record are kept, out of force', async () => {
     const r = await buildTermsRecord(input);
+    expect(r.terms_version).toBe(9);
+    expect(recordInForce({ ...r, terms_version: 8 })).toBe(false);
     expect(recordInForce({ ...r, terms_version: 7 })).toBe(false);
     expect(recordInForce({ ...r, affirmations: [{ ...r.affirmations[0]!, checked: false }] })).toBe(false);
     expect(recordInForce(await buildTermsRecord({ ...input, checked: {} }))).toBe(false);
-    const v1: TermsRecordV1 = { v: 1, terms_version: 8, edition: 'trial', license_sha256: 'a', privacy_sha256: 'b', accepted_at: 'x', surface: 'extension', button_label: 'Accept and Continue', affirmations: [], signed_name: 'A. Student', scrolled_to_end: true, product_version: '10.0.0', host: 'Chrome', install_id: 'x' };
+    const v1: TermsRecordV1 = { v: 1, terms_version: 9, edition: 'trial', license_sha256: 'a', privacy_sha256: 'b', accepted_at: 'x', surface: 'extension', button_label: 'Accept and Continue', affirmations: [], signed_name: 'A. Student', scrolled_to_end: true, product_version: '10.0.0', host: 'Chrome', install_id: 'x' };
     expect(recordInForce(v1)).toBe(false);
     expect(recordInForce({ ...v1, terms_version: 7 })).toBe(false);
     // a v1 record with its box ticked and this version's number is still out of force: only a v2 record counts

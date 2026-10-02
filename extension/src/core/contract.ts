@@ -607,6 +607,12 @@ export interface SiteProfile {
   shared_state_dir?: string;
   submit_host?: string;
   worker_defaults?: { hours?: number; capacity?: number; permission_mode?: string };
+  /** 12.0.0 (framework 11): the grid's ssh door, its host key pin, a relay if the lab runs one, and the Google Authenticator help page */
+  ssh_host?: string;
+  ssh_port?: number;
+  ssh_host_key?: string;
+  ssh_relay?: { url?: string; ticket_url?: string } | null;
+  grid_2fa_help_url?: string;
 }
 
 /** a bundled or downloaded profile.json -> its keys, or undefined when it does not parse */
@@ -992,3 +998,221 @@ export function parseRegistration(text: string): Registration {
   }
   return out;
 }
+
+// ---- 12.0.0 (framework 11): the gate ------------------------------------------------------------------
+//
+// The browser's key is on the grid as ONE restricted line (framework 11, `hpcworker browser-key add`):
+//   restrict,command="<shared>/bin/hpcworker gate" <ssh-ed25519|ecdsa-sha2-nistp256> <base64> beethoven-browser <YYYY-MM-DD>
+// so a connection made with it runs nothing but the gate, which reads the command the client asked for
+// (SSH_ORIGINAL_COMMAND) and accepts exactly these verbs, words of [A-Za-z0-9._-] separated by one space,
+// at most 200 characters. connect through the gate is ALWAYS --login never: the gate can never sign a
+// worker in to Claude (a Claude sign-in needs the student's own password and code: core/signin.ts).
+// Answers: "HPCW-GATE refused" exit 126 for anything else; "HPCW-KEY expired" exit 125 when the lab's
+// browser_key_days has passed (the line is gone; the next direct sign-in enrols a key again).
+
+/**
+ * the four files of a run the gate reads (framework 11 gate_read). rc.log, the worker's raw terminal, is
+ * deliberately NOT one of them: a copied browser key must not read it, so on the direct way the link
+ * comes from connection.json and status.json only.
+ */
+export const GATE_FILES = ['status.json', 'connection.json', 'progress.log', 'node'] as const;
+export type GateFile = (typeof GATE_FILES)[number];
+
+/** the gate's worker-name rule (framework 11's WORKER_NAME_RE, never with a leading "-" or "_") */
+export const GATE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
+const GATE_SITE_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+
+/** the gate's verbs, each one line the gate accepts; each builder throws on a value the gate would refuse */
+export const gate = {
+  version: (): string => 'version',
+  status(name: string): string {
+    if (!GATE_NAME_RE.test(name)) throw new Error('bad worker name for the gate');
+    return `status ${name}`;
+  },
+  watch(name: string): string {
+    if (!GATE_NAME_RE.test(name)) throw new Error('bad worker name for the gate');
+    return `watch ${name}`;
+  },
+  stop(name: string): string {
+    if (!GATE_NAME_RE.test(name)) throw new Error('bad worker name for the gate');
+    return `stop ${name}`;
+  },
+  restrict(name: string): string {
+    if (!GATE_NAME_RE.test(name)) throw new Error('bad worker name for the gate');
+    return `restrict ${name}`;
+  },
+  read(name: string, file: GateFile): string {
+    if (!GATE_NAME_RE.test(name) || !GATE_FILES.includes(file)) throw new Error('bad read for the gate');
+    return `read ${name} ${file}`;
+  },
+  /** connect NAME SITE INSTALLID|- MODE chain|no-chain: the gate runs connect with --login never, always */
+  connect(o: { name: string; site: string; installId?: string; permissionMode: PermissionMode; chain: boolean }): string {
+    if (!GATE_NAME_RE.test(o.name)) throw new Error('bad worker name for the gate');
+    if (!GATE_SITE_RE.test(o.site)) throw new Error('bad site for the gate');
+    if (o.installId !== undefined && !INSTALL_RE.test(o.installId)) throw new Error('bad installation id');
+    if (!MODES.includes(o.permissionMode)) throw new Error('bad permission mode');
+    return `connect ${o.name} ${o.site} ${o.installId ?? '-'} ${o.permissionMode} ${o.chain ? 'chain' : 'no-chain'}`;
+  },
+  forget: (): string => 'forget',
+};
+
+/** the gate's own refusal and the key's expiry, as it prints them */
+export const GATE_REFUSED = 'HPCW-GATE refused';
+export const GATE_KEY_EXPIRED = 'HPCW-KEY expired';
+
+/** the line the gate carries in place of an 11.0.0 line, or undefined (the gate has no such verb, or the line asks for a Claude sign-in) */
+export function gateLineFor(line: string): string | undefined {
+  const l = String(line ?? '').trim();
+  let m: RegExpExecArray | null;
+  if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker status --name '([A-Za-z0-9_-]{1,32})' --json$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.status(m[1]!) : undefined;
+  if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker stop --name '([A-Za-z0-9_-]{1,32})'$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.stop(m[1]!) : undefined;
+  if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker restrict --name '([A-Za-z0-9_-]{1,32})'$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.restrict(m[1]!) : undefined;
+  m = /^exec bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' connect --name '([A-Za-z0-9_-]{1,32})' --profile '([a-z0-9-]{1,32})'(?: --consent '([0-9a-f]{32})')? --login '(auto|always|fresh|never)' --permission-mode '(default|acceptEdits|plan)'( --no-chain)?$/.exec(l);
+  if (m) {
+    if (m[4] !== 'never') return undefined;
+    try {
+      return gate.connect({ name: m[1]!, site: m[2]!, ...(m[3] ? { installId: m[3] } : {}), permissionMode: m[5] as PermissionMode, chain: !m[6] });
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/** what `version` through the gate says: "HPCW-GATE ok <framework> <due|never|-> <account> claude=<yes|no|unknown>" */
+export interface GateVersion {
+  framework: string;
+  /** the key's due date (YYYY-MM-DD), "never", or "-" */
+  due: string;
+  account: string;
+  claude: 'yes' | 'no' | 'unknown';
+}
+
+export function parseGateVersion(output: string): GateVersion | undefined {
+  for (const raw of String(output ?? '').split('\n')) {
+    const m = /^HPCW-GATE ok (\S+) (\S+) (\S+) claude=(yes|no|unknown)\s*$/.exec(raw.trim());
+    if (m) return { framework: m[1]!, due: m[2]!, account: m[3]!, claude: m[4] as GateVersion['claude'] };
+  }
+  return undefined;
+}
+
+/** forget through the gate: the browser line out ("forgotten"), none was there ("none"), or it could not be changed ("stuck") */
+export function parseForget(output: string): 'forgotten' | 'none' | 'stuck' | undefined {
+  const m = /^HPCW-KEY (forgotten|none|stuck)\b/m.exec(String(output ?? ''));
+  return m ? (m[1] as 'forgotten' | 'none' | 'stuck') : undefined;
+}
+
+/** one of the gate's caps was reached (framework 11, exit 123): "HPCW-GATE limit names|hourly|watch|busy" */
+export type GateLimit = 'names' | 'hourly' | 'watch' | 'busy';
+export function parseGateLimit(output: string): GateLimit | undefined {
+  const m = /^HPCW-GATE limit (names|hourly|watch|busy)\b/m.exec(String(output ?? '').replace(/\r/g, ''));
+  return m ? (m[1] as GateLimit) : undefined;
+}
+
+/** the lab's copy on the grid is older than framework 11: it has no `gate` (or `browser-key`) verb at all */
+export function isUnknownVerb(output: string): boolean {
+  return /hpcworker: unknown command '(?:gate|browser-key)'/.test(String(output ?? ''));
+}
+
+/**
+ * The bytes of one `read NAME FILE` through the gate. The account's own ~/.bashrc may print before the
+ * forced command (seen with Ubuntu's bash under sshd), so the output can carry lines that are not the
+ * file's. When the gate marks where the file starts ("HPCW-GATE read <bytes>" on a line of its own), the
+ * file is what follows that line; otherwise the output as it came.
+ */
+export function gateReadBody(output: string): string {
+  const t = String(output ?? '');
+  const m = /(?:^|\n)HPCW-GATE read (\d+)\r?\n/.exec(t);
+  if (!m) return t;
+  const rest = t.slice(m.index + m[0].length);
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n >= 0 && n <= rest.length ? rest.slice(0, n) : rest;
+}
+
+/**
+ * A JSON file read through the gate: the whole body when it parses; otherwise the first line-start "{"
+ * from which the rest parses (whatever the account's ~/.bashrc printed before it is skipped). Undefined
+ * when nothing parses.
+ */
+export function parseGateJson<T>(output: string | undefined): T | undefined {
+  if (output === undefined) return undefined;
+  const t = gateReadBody(output);
+  const tryParse = (x: string): T | undefined => {
+    try {
+      const v = JSON.parse(x) as unknown;
+      return v && typeof v === 'object' && !Array.isArray(v) ? (v as T) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const whole = tryParse(t);
+  if (whole !== undefined) return whole;
+  for (let i = t.indexOf('{'); i >= 0; i = t.indexOf('{', i + 1)) {
+    if (i > 0 && t[i - 1] !== '\n') continue;
+    const v = tryParse(t.slice(i));
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
+/** a text file read through the gate, without what the account's ~/.bashrc may have printed first (node: its last line) */
+export function gateText(output: string | undefined, file: 'progress.log' | 'node'): string | undefined {
+  if (output === undefined) return undefined;
+  const t = gateReadBody(output);
+  if (file === 'node') {
+    const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    return lines.length ? lines[lines.length - 1]! : '';
+  }
+  return t;
+}
+
+/**
+ * The enrolment line, run by Beethoven in the student's own password-and-code session right after the
+ * grid accepted it (framework 11): it writes the restricted line above for this public key. A key type
+ * and base64 that are not exactly an Ed25519 or P-256 public key are refused here, before anything is sent.
+ */
+export function browserKeyAddLine(sharedDir: string, keyType: string, base64Blob: string, comment = 'beethoven-browser'): string {
+  if (!sharedRootOf(sharedDir)) throw new Error('no usable shared copy');
+  if (keyType !== 'ssh-ed25519' && keyType !== 'ecdsa-sha2-nistp256') throw new Error('unsupported key type');
+  const len = keyType === 'ssh-ed25519' ? 68 : 140;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64Blob) || base64Blob.length !== len) throw new Error('not a public key of that type');
+  if (!/^[A-Za-z0-9._@-]{1,64}$/.test(comment)) throw new Error('bad comment');
+  return `bash '${toolPath(sharedDir)}' browser-key add ${keyType} ${base64Blob} ${comment}`;
+}
+
+/**
+ * the enrolment line's success: framework 11 (lib/browser_key.sh) prints "HPCW-KEY added SHA256:<fingerprint>"
+ * and exits 0, the same when the key is already there; a refusal is "HPCW-KEY refused <code> <sentence>" with
+ * a non-zero exit. (The account's ~/.bashrc may print first, so the line is found anywhere in the output.)
+ */
+export function browserKeyAdded(output: string, exitCode: number | null): boolean {
+  return browserKeyAddedFingerprint(output, exitCode) !== undefined;
+}
+
+/** the fingerprint the enrolment line says it added ("SHA256:<43>"), or undefined (not added) */
+export function browserKeyAddedFingerprint(output: string, exitCode: number | null): string | undefined {
+  if (exitCode !== 0) return undefined;
+  const m = /^HPCW-KEY added (SHA256:[A-Za-z0-9+/]{43})\s*$/m.exec(String(output ?? '').replace(/\r/g, ''));
+  return m ? m[1] : undefined;
+}
+
+/** the enrolment line's refusal: "HPCW-KEY refused <code> <sentence>" (codes key, agent, root, usage, home, ssh-dir, authorized-keys, copy) */
+export function parseKeyRefusal(output: string): { code: string; sentence: string } | undefined {
+  const m = /^HPCW-KEY refused ([a-z-]+)(?: (.*))?$/m.exec(String(output ?? '').replace(/\r/g, ''));
+  return m ? { code: m[1]!, sentence: (m[2] ?? '').trim().slice(0, 300) } : undefined;
+}
+
+/**
+ * The grid's refusal for a code it did not take (2026-10-01): "You either typed in the wrong code, or you
+ * do not have Google Authenticator 2FA setup. Please try again, or login to OnDemand and run the 2FA Setup
+ * app." It names BOTH causes, so it is never taken as proof that the account has no code: the sheet says
+ * the code was not accepted and lets the student type it again, or say they have no grid code yet (only
+ * then the route choice, whose 2FA Setup replaces an existing code). It is recognised in whatever part of
+ * the conversation it arrives (a prompt, an instruction, a banner, a disconnect); it is never shown to
+ * the student as it is.
+ */
+export const TWO_FA_REFUSAL_RE = /do not have Google Authenticator 2FA setup|run the 2FA Setup app/i;
+
+/** the grid's Google Authenticator prompt ("Your google authenticator one-time verification code: ") */
+export const CODE_PROMPT_RE = /verification code|one-time|authenticator|\bOTP\b|token code/i;
+export const PASSWORD_PROMPT_RE = /password/i;

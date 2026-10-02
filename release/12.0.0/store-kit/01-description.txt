@@ -1,0 +1,22 @@
+Your grid. From claude.ai.
+
+Beethoven starts a Claude Code worker in your own account on the Wayne State grid and opens it in claude.ai. Ask there or in the Claude app, and your worker does the work.
+
+HOW IT WORKS
+1. Accept the agreement on Beethoven's welcome page.
+2. Sign in to the grid once, in Beethoven's own sign-in sheet: your AccessID, password and Google Authenticator code. They go only to the grid, encrypted, and are never kept. This computer then has a key of its own: later you type nothing and need no VPN.
+3. Sign in to Claude once, on Anthropic's own page.
+4. Click Open my session. Your worker runs until you press Stop.
+
+The direct way uses a small helper that comes inside Beethoven. You install it once, with no administrator rights. Without it, Beethoven works through GlobalProtect, as before.
+
+YOU NEED
+A Wayne State AccessID with a grid account and Google Authenticator set up for it, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
+
+By approval only: ask at https://openspineconsortium.com/
+One approval covers one installation: one Chrome profile on one computer.
+
+YOUR DATA
+To check your approval, Beethoven sends our access service the account name the grid accepted and a random installation identifier, with your portal's address and the version. It sends nothing else about you, and your password and code go only to the grid. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
+
+Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.

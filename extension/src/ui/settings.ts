@@ -1,16 +1,22 @@
 // Settings: the options page once the agreement is accepted. The welcome page's column, titled
-// "Settings", with quiet cards: Your worker, Appearance, Your grid, The agreement, Activity, Google
-// Drive in Claude (optional), and, folded, For your lab lead. A student never needs it. Every control
-// sends one Action (core/model.ts); "Change" asks Chrome for the new origin inside its own click.
+// "Settings", with quiet cards: Your worker, Appearance, Your grid, Connection (12.0.0), The agreement,
+// Activity, Google Drive in Claude (optional), and, folded, For your lab lead. A student never needs it.
+// Every control sends one Action (core/model.ts); "Change" asks Chrome for the new origin inside its own
+// click, and the key's protection switch runs its passkey step inside its own click (rpc.ts KeyGesture),
+// on and off: it is off by default, and nothing is lost by leaving it off.
 import type { Appearance } from '../core/keys';
 import { WORDS, type Action, type SettingsView } from '../core/model';
 import { add, clear, copyText, downloadText, el, morph, toast } from './dom';
 import { icon } from './icons';
 import { LABELS } from './labels';
+import { saveHelper } from './helperFile';
 import { fold, foldToggle, tickBox } from './parts';
 import type { Act } from './rpc';
 import { checkPortal, fullText, loadTexts, portalField, termsRegion, type Texts } from './sections';
 import type { Gestures } from './welcome';
+import { currentKeyGesture } from './rpc';
+import { drawnCheck, spinner } from './icons';
+import type { ConnectionSettingsView } from '../core/model';
 
 export interface SettingsLocal {
   nameEditing: boolean;
@@ -23,6 +29,14 @@ export interface SettingsLocal {
   activityText?: string;
   labLeadOpen: boolean;
   confirmDisconnect: boolean;
+  /** 12.0.0: "Forget this computer?" [Forget] [Keep it] */
+  confirmForget: boolean;
+  /** the key's protection: its passkey step is up */
+  keyBusy: boolean;
+  /** what the last passkey step came to, until the next view says it */
+  keyNote?: string;
+  /** what came of Forget this computer (stays until the page closes) */
+  forgetNote?: string;
 }
 
 function seg<T extends string>(label: string, value: T, options: Array<{ value: T; label: string }>, onPick: (v: T) => void): HTMLElement {
@@ -48,18 +62,19 @@ function seg<T extends string>(label: string, value: T, options: Array<{ value: 
   );
 }
 
-function switchRow(id: string, label: string, on: boolean, onToggle: (on: boolean) => void): HTMLElement {
+function switchRow(id: string, label: string, on: boolean, onToggle: (on: boolean) => void, opts: { note?: string; disabled?: boolean; busy?: boolean } = {}): HTMLElement {
   return el(
     'div',
-    { class: 's-row' },
-    el('label', { class: 's-label', for: id, text: label }),
-    el('button', { type: 'button', class: 'switch', id, role: 'switch', 'aria-checked': on ? 'true' : 'false', onClick: () => onToggle(!on) }),
+    { class: `s-row${opts.note ? ' has-note' : ''}` },
+    el('label', { class: 's-label', for: id }, el('span', { text: label }), opts.note ? el('span', { class: 's-sub', id: `${id}-note`, text: opts.note }) : null),
+    opts.busy ? spinner(18) : null,
+    el('button', { type: 'button', class: 'switch', id, role: 'switch', 'aria-checked': on ? 'true' : 'false', 'aria-describedby': opts.note ? `${id}-note` : undefined, disabled: opts.disabled || opts.busy, onClick: () => onToggle(!on) }),
   );
 }
 
 export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<SettingsLocal>; onAppearance?: (a: Appearance) => void }): { show: (v: SettingsView) => void } {
   const g = opts.gestures;
-  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, ...(opts.local ?? {}) };
+  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmForget: false, keyBusy: false, ...(opts.local ?? {}) };
   let view: SettingsView | undefined;
   let texts: Texts | undefined;
   let page: HTMLElement | undefined;
@@ -89,6 +104,89 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
 
   function card(title: string, ...rows: Array<Node | null | false>): HTMLElement {
     return el('section', { class: 's-card' }, el('h2', { class: 'eyebrow', text: title }), ...rows);
+  }
+
+  /** the key's protection, on or off: the passkey step inside this click, then protect-key with what came of it */
+  const toggleProtect = (c: ConnectionSettingsView, on: boolean) => {
+    if (local.keyBusy || !c.protectKey.available) return;
+    if (!c.protectKey.present) {
+      // no key yet: the choice is remembered for the first sign-in, whose sheet carries the tick
+      void opts.act({ kind: 'protect-key', on, outcome: on ? 'on' : 'off' });
+      return;
+    }
+    const running = currentKeyGesture().protect(on);
+    set({ keyBusy: true, keyNote: undefined });
+    void running
+      .catch(() => 'failed' as const)
+      .then((outcome) => {
+        const P = WORDS.direct.protectKey;
+        // the outcome stays in view under the switch ("Protected." included) until the page closes
+        // turning it off that did not happen leaves it on, and says so (never "can't protect": it IS protected)
+        const off = !on && outcome !== 'off';
+        set({ keyBusy: false, keyNote: off ? P.notOff : outcome === 'on' ? P.turnedOn : outcome === 'cancelled' ? P.cancelled : outcome === 'unsupported' ? P.unsupported : outcome === 'failed' ? P.cancelled : undefined });
+        void opts.act({ kind: 'protect-key', on, outcome });
+      });
+  };
+
+  /** 12.0.0: "Connection": the mode, the key's protection (off by default), the helper, Forget this computer */
+  function connectionCard(c: ConnectionSettingsView): HTMLElement {
+    const pk = c.protectKey;
+    return card(
+      c.title,
+      // the mode's own label only when it says more than the card's title ("Connection" twice reads as a fault)
+      el('div', { class: 's-row stack' }, c.mode.label !== c.title ? el('span', { class: 's-sub', text: c.mode.label }) : null, seg(c.mode.label, c.mode.value, c.mode.options, (m) => void opts.act({ kind: 'set-connection', connection: m }))),
+      switchRow('protect-key', pk.label, pk.value, (on) => toggleProtect(c, on), { note: pk.available ? pk.note : WORDS.direct.protectKey.unsupported, disabled: !pk.available, busy: local.keyBusy }),
+      // said plainly: turned on after setup, an older unprotected copy can stay in the browser's files a while
+      pk.laterNote && pk.available ? el('p', { class: 's-note s-fine', text: pk.laterNote }) : null,
+      local.keyNote ? el('p', { class: 's-note', role: 'status', text: local.keyNote }) : null,
+      el(
+        'div',
+        { class: 's-row' },
+        el('span', { class: 's-label' }, el('span', { class: 's-sub', text: c.helper.label }), el('span', { class: 's-line' }, c.helper.installed ? drawnCheck(16, 0, 'plain') : null, el('span', { text: c.helper.text }))),
+        el(
+          'div',
+          { class: 'btns' },
+          !c.helper.installed && c.helper.download
+            ? el('a', { class: 'btn btn-outline', href: c.helper.download.url, download: c.helper.download.file, onClick: (e: Event) => saveHelper(e, c.helper.download!, () => void opts.act({ kind: 'bridge-downloaded', os: c.helper.download!.os })) }, icon('download', 14), el('span', { text: WORDS.direct.installHelper.download(c.helper.download.osLabel) }))
+            : null,
+          el('button', { type: 'button', class: 'btn btn-outline', text: c.helper.checkAgain.label, onClick: () => c.helper.checkAgain.action && void opts.act(c.helper.checkAgain.action) }),
+        ),
+      ),
+      el(
+        'div',
+        { class: 's-row has-note' },
+        // while confirming, the question takes the note's place, before its two buttons
+        el('span', { class: 's-label' }, el('span', { text: c.keyLine }), local.confirmForget ? el('span', { class: 's-sub s-ask', role: 'alert', text: c.forget.confirm }) : el('span', { class: 's-sub', text: c.forget.note })),
+        local.confirmForget
+          ? el(
+              'div',
+              { class: 'btns' },
+              el('button', { type: 'button', class: 'btn btn-text', text: WORDS.home.keep, onClick: () => set({ confirmForget: false }) }),
+              el('button', {
+                type: 'button',
+                class: 'btn btn-brick',
+                style: 'height:36px',
+                'aria-label': c.forget.confirm,
+                text: c.forget.button.label,
+                onClick: () => {
+                  set({ confirmForget: false, forgetNote: undefined });
+                  // a protected key not unlocked this session: unlocked first, inside this click, so the grid forgets it too
+                  const unlocked = c.forget.locked ? currentKeyGesture().unlock().catch(() => 'failed' as const) : Promise.resolve('unlocked' as const);
+                  void unlocked.then(async (u) => {
+                    if (c.forget.locked) await opts.act({ kind: 'unlock-key', outcome: u });
+                    const r = c.forget.button.action ? await opts.act(c.forget.button.action) : undefined;
+                    const S = WORDS.direct.settings;
+                    const onGrid = (r as { onGrid?: string } | undefined)?.onGrid;
+                    set({ forgetNote: onGrid === 'forgotten' || onGrid === 'none' ? S.forgotten : r ? S.forgottenHere : undefined });
+                  });
+                },
+              }),
+            )
+          : el('button', { type: 'button', class: 'btn btn-outline', text: c.forget.label, disabled: c.forget.disabled, onClick: () => set({ confirmForget: true, forgetNote: undefined }) }),
+      ),
+      local.confirmForget && c.forget.locked ? el('p', { class: 's-note', text: WORDS.direct.settings.forgetLocked }) : null,
+      local.forgetNote ? el('p', { class: 's-note', role: 'status', text: local.forgetNote }) : null,
+    );
   }
 
   function render(): void {
@@ -153,6 +251,7 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         ),
         portalField('change-fold', local.changeOpen, local.portalInput ?? v.grid.address ?? '', local.portalError, WORDS.welcome.usePortal, { input: (val) => { local.portalInput = val; }, use: changePortal }),
       ),
+      v.connection ? connectionCard(v.connection) : null,
       card(
         WORDS.settings.agreement,
         v.agreement.installId

@@ -10,7 +10,8 @@
 import { browser } from 'wxt/browser';
 import { PREFS_KEY, WELCOME_PRESS_KEY, type Prefs } from '../core/keys';
 import { applyAppearance, startTicker } from './dom';
-import { currentTabId, currentWindowId, manifestVersion, packaged } from './rpc';
+import { currentTabId, currentWindowId, manifestVersion, packaged, registerKeyGesture } from './rpc';
+import { pageCreateProtectedKey, pageProtectKey, pageUnlockKey, pageUnprotectKey } from '../ext/direct';
 import type { Gestures } from './welcome';
 import { requestOrigin } from '../ext/connectApi';
 import { browserName, installId, local } from '../ext/storage';
@@ -34,6 +35,13 @@ async function themeFromStorage(): Promise<void> {
 /** the page's common start; true when the development gallery took the page instead */
 export async function startPage(root: HTMLElement, page: 'panel' | 'options'): Promise<boolean> {
   document.body.classList.add(page === 'panel' ? 'panel' : 'page');
+  // 12.0.0 (D2): the opt-in protection's passkey steps, which WebAuthn lets run only in a page, inside
+  // the student's click (ext/direct.ts, core/keyring.ts); the gallery puts a stand-in over them
+  registerKeyGesture({
+    protect: (on) => (on ? pageProtectKey() : pageUnprotectKey()),
+    createProtected: () => pageCreateProtectedKey(),
+    unlock: () => pageUnlockKey(),
+  });
   startTicker();
   void themeFromStorage();
   if (import.meta.env.MODE !== 'development') return false;

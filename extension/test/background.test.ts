@@ -1,5 +1,5 @@
 // The background itself (src/entrypoints/background.ts), run whole under Node against a fake Chrome
-// and a fake portal (test/fakebrowser.ts): the defects the 11.0.0 review found by running it, each
+// and a fake portal (test/fakebrowser.ts), on the 11.0.0 way (Settings: GlobalProtect only): the defects the 11.0.0 review found by running it, each
 // checked here so they cannot come back. One Connect press types one connect line even when the panel's
 // tick carries the same press meanwhile; a welcome tab the student has used for something else is never
 // taken over; the run record keeps what only the Connect knows, so "You're online." and claude.ai's tab
@@ -12,7 +12,7 @@ import { EXT, install, openPort, ORIGIN, send, sleep, STATE, type World } from '
 const INSTALL = '0123456789abcdef0123456789abcdef';
 const LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
 
-async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRun?: boolean } = {}) {
+async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRun?: boolean; connection?: 'direct' | 'vpn' } = {}) {
   const terms = await import('../src/core/terms');
   const disclosure = await import('../src/core/disclosure');
   const audit = await import('../src/core/audit');
@@ -21,6 +21,9 @@ async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRu
   audit.FLOORS_MS.shell = 300;
   const now = new Date().toISOString();
   world.storage.local['bridge.install_id'] = INSTALL;
+  // these tests run the 11.0.0 way (GlobalProtect and the portal), which 12.0.0 keeps for "GlobalProtect only";
+  // test/background12.test.ts runs the direct way
+  world.storage.local['bridge.prefs'] = { connection: o.connection ?? 'vpn' };
   if (o.terms !== false) {
     world.storage.local['bridge.terms'] = await terms.buildTermsRecord({ license: 'L', privacy: 'P', checked: { agree: true }, termsEndReached: false, openedInTab: false, savedCopy: false, printed: false, productVersion: '11.0.0', host: 'Chrome 153', installId: INSTALL });
   }

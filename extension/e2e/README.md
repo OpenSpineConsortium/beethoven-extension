@@ -189,6 +189,54 @@ and the checks that name "Wayne State grid" or GlobalProtect do not apply. Every
 mock's stand-in (`--access …`), which is what every scenario uses by default: the harness answers
 `openspineconsortium.com/beethoven/services.json` itself, pointing the extension at the mock.
 
+## 12.0.0: the direct way (scenarios 13 to 16)
+
+Scenarios 13 to 16 walk the direct way (ssh through the bundled helper, no VPN) against a **local grid
+stand-in**, never the grid. They are not part of `all`. `lib/direct.mjs` holds what they share.
+
+- **The grid stand-in** (`E2E_FINAL/grid/gridd.py`, asyncssh in a WSL venv at `~/final12/venv`) listens on
+  `127.0.0.1:E2E_SSH_PORT` (22411) with the grid's algorithms (curve25519/ecdh, an RSA host key with rsa-sha2,
+  aes-ctr, hmac-sha1) and the grid's two prompts ("Password: ", then "Your google authenticator one-time
+  verification code: "); the account `nocode` gets the grid's 2FA refusal as an INFO_REQUEST with no prompt. A
+  password session runs the client's command in `bash -c`, with a pty when asked; a key session reads the test
+  HOME's `~/.ssh/authorized_keys` (written by the real `hpcworker browser-key add`) and applies it as OpenSSH
+  does (`command=` forced, `SSH_ORIGINAL_COMMAND`, `restrict` refuses a pty). The shared copy is framework 11
+  from this working tree (`grid/setup_grid.sh`: `~/final12/g/shared/current`, a test HOME, the fake
+  scheduler of `framework/tests/fakegrid.py`, an `srun` that plays the Claude sign-in and an `id` that names
+  the account st1234). A job clock in the stand-in runs a PENDING job after `queue_s` and brings it online
+  `start_s` later. Its log (`gridd-log.json` in each scenario folder) has every connection, method, account,
+  the key line's options, each command (forced or not, the original command, pty) and its exit code; nothing
+  typed into a prompt or a command's input is ever written.
+- **The test package** (`E2E_FINAL/ext`, made by `E2E_FINAL/prep_ext.mjs` from `.output/chrome-mv3`): a manifest
+  `key` (a fixed id) and `profiles/wayne.json` pointed at the stand-in (`ssh_host` 127.0.0.1, its port, its host
+  key's fingerprint as the pin, its shared copy). The bridge zips are kept exactly as the package carries them
+  (with the placeholder the installers refuse): the page writes this extension's id into the copy it saves
+  (`src/core/bridgeZip.ts`, `src/ui/helperFile.ts`), and scenario 13 checks the saved file is the packaged zip
+  with only `allowed_origins.json` changed, to exactly `["chrome-extension://<id>/"]`. Rebuilding the zips with
+  `helper/build.mjs --unpacked-id` now needs `--dev` as well, and is not needed.
+- **The helper** is installed the way a student does it, from the zip the panel's download link saved (CDP
+  `Browser.setDownloadBehavior` catches the side panel's download): `Expand-Archive`, an `allow.txt` naming the
+  stand-in (the helper's documented way to add a host), `install.cmd` by its full path with the test hooks that
+  register it for the TEST browser only (`HKCU\Software\Chromium\NativeMessagingHosts\<name>`) and install it
+  under `E2E_FINAL/hostinst`. A guard is then added to the INSTALLED `bridge.ps1` that refuses
+  `grid.wayne.edu` and logs any attempt, since the helper's built-in allowlist always holds it. Every scenario
+  removes the registry key at its end.
+- **Profiles** must sit on a short path (`E2E_PROFILES`, for instance the scratchpad's `p12`): IndexedDB, where
+  the browser's key lives, fails silently past Windows' 260 characters, and the sign-in then ends with "The grid
+  didn't take this computer's key".
+
+| # | Scenario | What it walks |
+|---|---|---|
+| 13 | direct-first-run | welcome (the four prerequisites as links; the phone route opened there and every QR code pictured and decoded, each iPhone / Android tab pressed), the helper moment (the saved zip is the package's own with this extension's id written in; "Waiting for the helper." right after the download; Check again before and after the install), the sheet: `nocode` (the grid's "wrong code, or no 2FA" refusal -> "The grid didn't accept the code" -> "I don't have a grid code yet" -> the route choice -> the phone route's QR codes decoded -> "I've set up my code"), st1234 with three wrong passwords (stopped: GlobalProtect first, "Try again at <time>" not pressable; a new sign-in for st1234 stops again without reaching the stand-in; the cooldown's end simulated by clearing storage.session `bridge.refusals`), then Cancel, st1234, the password and the code, "This computer is set up.", the restricted key line on the stand-in, the protection card (Not now), where your work goes, Connect (the Claude sitting in the held password session), in line, got a computer, online, the home's Grid "Direct", Stop, Connect again through the gate (no srun), a browser restart (no prompt), the door down and back, Forget this computer (the line gone from the stand-in) |
+| 14 | direct-passkey | the protection card's Turn on with a CDP virtual authenticator (PRF), the key re-wrapped and nothing changed on the stand-in, the unlock dropped and the background restarted ("Unlock Beethoven", nothing signs in while locked), Unlock (one assertion) and Connect, Settings' switch, a real browser restart ("Locked · Unlock", nothing signs in). A virtual authenticator gives an imported credential no PRF output (`E2E_FINAL/probe_prf.mjs`), so an unlock after a REAL restart cannot succeed under test |
+| 15 | direct-no-helper | no helper registered: the helper moment, "Use GlobalProtect instead", 11.0.0's way on the mock (Chrome's box, Connect, the Claude sign-in, online), Grid "Through GlobalProtect", Settings, then the helper installed and "Direct when possible" chosen again |
+| 16 | direct-door | reduced motion, the panel at 320 px: the door down ("Can't reach the grid directly", "Some networks block it…", nothing reached the stand-in), a wrong host key (refused before any user name; its own title and a quiet Try again), the stand-in back on the pinned key and that Try again reaching the grid's prompt, the sign-in, Settings' protection switch on and off on one page |
+
+```
+export PATH=/c/Users/grego/tools/node22:$PATH
+E2E_PROFILES=<short folder> E2E_OUT=<out> E2E_SHOTS=1 node e2e/run.mjs 13 --ext <E2E_FINAL>/ext
+```
+
 ## What waits for the build
 
 The mock and the self-test are complete and pass. The scenarios are written against the

@@ -1,5 +1,6 @@
 // The views the pages render and the actions they send (Beethoven 11.0.0; docs/V11_CONTRACT.md,
-// "Views and actions"). The pages are pure functions of a view: they hold no state of their own
+// "Views and actions"; 12.0.0 adds the direct way's moments, words, Settings and Details sections and
+// actions, marked "12.0.0" where they are). The pages are pure functions of a view: they hold no state of their own
 // beyond what is on screen (a tick being ticked, a fold being open, the text in the code box) and
 // never decide what the student sees next. The core computes every view from facts (core/facts.ts,
 // core/steps.ts) and the background pushes it to the open pages (messages.ts VIEW_PORT).
@@ -336,6 +337,244 @@ export const WORDS = {
     error: "Beethoven · Couldn't start",
   },
 
+  /**
+   * 12.0.0: the direct way to the grid (ssh, no VPN), docs/V12_CONTRACT.md. Beethoven tries it first,
+   * through the first bridge this browser has (a browser-only one when one exists, else the small helper
+   * that comes inside Beethoven), and only then the GlobalProtect way of 11.0.0. The first direct
+   * sign-in asks for the AccessID, the password and the Google Authenticator code in Beethoven's own
+   * sheet, exactly as the grid asks for them; then this computer has a key of its own and later
+   * connections ask for nothing. Windows Hello / Touch ID protection of that key is OPT-IN, off by default.
+   */
+  direct: {
+    /** the home's Grid row, beside the account */
+    rowDirect: 'Direct',
+    rowVpn: (app: string) => `Through ${app}`,
+    /** the Grid row while the protected key waits for Windows Hello / Touch ID this browser session */
+    rowLocked: 'Locked',
+    rowUnlock: 'Unlock',
+    /** a Connect through the gate stopped at one of its caps, or the lab's copy is too old for it */
+    gate: {
+      names: "The grid lets this computer's key use only a few worker names. Connect with a name you used before (Settings), or use GlobalProtect for this one.",
+      hourly: "This computer's key has started the worker as often as the grid allows in an hour. Try again later, or use GlobalProtect.",
+      busy: "The grid is busy with this computer's other requests. Try again in a minute.",
+      oldCopy: "The lab's copy of the tool on the grid is older than this Beethoven. Ask your lab lead to update it, or use GlobalProtect.",
+    },
+    /** the home's hero subline when the direct way cannot reach the grid */
+    unreachableSub: "Beethoven can't reach the grid directly right now. Your worker keeps running.",
+
+    /** moment "install-helper": no bridge is available yet */
+    installHelper: {
+      title: 'One small download, once',
+      body: "To reach the grid without GlobalProtect, Chrome needs a small helper on this computer. It comes inside Beethoven, needs no administrator, and only carries Beethoven's encrypted connection to the grid.",
+      download: (os: string) => `Download for ${os}`,
+      /** under the button: the file's name and size */
+      fileLine: (file: string, size: string) => `${file} · ${size}`,
+      /** the steps for this computer (the download is a zip holding the installer) */
+      steps: {
+        windows: [
+          'Open the zip you downloaded and choose Extract all.',
+          'In the folder it makes, double-click the install file. If Windows warns you, choose Run (or More info, then Run anyway).',
+          'Press Enter in the window. When it says the bridge is installed, come back here and press Check again.',
+        ],
+        mac: [
+          'Double-click the zip you downloaded. Your Mac unpacks it into a folder.',
+          'Double-click the install file in that folder. If your Mac says it was not opened, click Done, then open System Settings, Privacy & Security, and click Open Anyway (on macOS 14 or earlier: Control-click the file, choose Open, then Open).',
+          'Press Return in the window. When it says the bridge is installed, close it and press Check again here.',
+        ],
+        linux: ['Unpack the zip you downloaded.', 'In a terminal in that folder, type bash followed by the install file name, and press Enter.', 'Press Enter when it asks. When it says the bridge is installed, press Check again here.'],
+      },
+      /** the same steps naming the installer inside the zip (the manifest's "open": install.cmd, install.command, install.sh) */
+      stepsNamed: {
+        windows: (open: string) => [
+          'Open the zip you downloaded and choose Extract all.',
+          `In the folder it makes, double-click ${open}. If Windows warns you, choose Run (or More info, then Run anyway).`,
+          'Press Enter in the window. When it says the bridge is installed, come back here and press Check again.',
+        ],
+        mac: (open: string) => [
+          'Double-click the zip you downloaded. Your Mac unpacks it into a folder.',
+          `Double-click ${open} in that folder. If your Mac says it was not opened, click Done, then open System Settings, Privacy & Security, and click Open Anyway (on macOS 14 or earlier: Control-click the file, choose Open, then Open).`,
+          'Press Return in the window. When it says the bridge is installed, close it and press Check again here.',
+        ],
+        linux: (open: string) => ['Unpack the zip you downloaded.', `In a terminal in that folder, type bash ${open} and press Enter.`, 'Press Enter when it asks. When it says the bridge is installed, press Check again here.'],
+      },
+      /** under the steps, on Windows only: Smart App Control blocks a downloaded script with no Run button until the zip is unblocked */
+      osNote: {
+        windows: 'Blocked with no way to run it? Right-click the zip, choose Properties, tick Unblock, choose OK, then Extract all again.',
+      } as Partial<Record<'windows' | 'mac' | 'linux', string>>,
+      /** why the operating system warns: the helper is not signed (docs/store: the accounts guide says what signing costs) */
+      unsignedNote: "Your computer may warn you because the helper isn't signed by a company. It is a short script you can read.",
+      checkAgain: 'Check again',
+      checking: 'Looking for the helper…',
+      found: 'Helper found.',
+      notFound: 'Not found yet. Open the downloaded file, then Check again.',
+      /** right after the download, while Beethoven looks by itself every few seconds (not yet a failure) */
+      waiting: 'Waiting for the helper. Beethoven checks by itself every few seconds.',
+      /** the helper answered but is broken or blocked (a Chrome error the student can't act on) */
+      broken: 'The helper is there but did not answer. Download it again, open it, then Check again.',
+      useVpn: (app: string) => `Use ${app} instead`,
+      noDownload: "There's no helper for this computer yet.",
+    },
+
+    /** moment "sign-in-sheet": Beethoven's own sign-in sheet; the prompts are the grid's own, shown as they arrive */
+    signin: {
+      title: 'Sign in to the grid',
+      accountLabel: 'AccessID',
+      accountPlaceholder: 'ab1234',
+      continue: 'Continue',
+      /** under the fields, always */
+      privacy: 'Beethoven sends your password and code only to the grid, inside the encrypted connection, and never keeps them.',
+      /** beside the grid's own code prompt (the prompt itself is the grid's words, verbatim) */
+      codeHint: 'The 6-digit code for the grid in Google Authenticator (not Microsoft Authenticator).',
+      connecting: 'Connecting to the grid…',
+      working: 'Signing in…',
+      settingUp: 'Setting up this computer…',
+      checking: 'Checking the new key…',
+      signingInClaude: 'Getting your Claude sign-in ready…',
+      /** after a refusal the grid asks again: this sits above its prompt */
+      notAccepted: 'Not accepted. Try again.',
+      /** after three refusals Beethoven stops */
+      stoppedTitle: "That didn't work three times.",
+      stoppedBody: (app: string) => `Beethoven stopped so your account isn't locked. Use ${app} now, or try again later.`,
+      /** the stop's Try again while the cooldown runs (it cannot be pressed until then) */
+      tryAgainAt: (clock: string) => `Try again at ${clock}`,
+      tryAgain: 'Try again',
+      cancel: 'Cancel',
+      useVpn: (app: string) => `Use ${app} instead`,
+      /** the grid's identity did not match the one Beethoven carries: nothing was sent */
+      wrongGridTitle: "Stopped: the grid's identity didn't match",
+      wrongGrid: "The grid didn't prove who it is, so Beethoven sent nothing: no password, no code, no key. Tell your lab lead. GlobalProtect still works meanwhile.",
+      /** the bridge could not open a connection to the grid's port */
+      unreachable: "Can't reach the grid directly right now.",
+      unreachableTitle: "Can't reach the grid directly",
+      unreachableBody: 'Some networks block it. GlobalProtect works on any network.',
+      /** the connection ended for another reason */
+      droppedTitle: 'The connection ended',
+      dropped: 'The connection to the grid ended. Try again.',
+      accountBad: 'An AccessID is letters and digits, like ab1234.',
+      /** the key was added but the check with it failed */
+      keyNotTakenTitle: "The grid didn't take this computer's key",
+      keyNotTaken: "Your sign-in worked, but the check with this computer's key didn't. Try again. If it happens again, Details for your lab lead has the reason.",
+      /** the enrolment line refused, in the tool's own sentence */
+      keyRefused: (sentence: string) => `The grid's own tool said no: ${sentence}`,
+      /** this browser could not make or open the key: found before anything was sent */
+      keyStoreTitle: "This browser couldn't keep the key",
+      keyStore: "Beethoven couldn't save this computer's key in this browser, so it asked the grid for nothing. Try again, or use GlobalProtect.",
+      /** the lab's copy on the grid is older than this Beethoven */
+      oldCopy: "The lab's copy of the tool on the grid is older than this Beethoven. Ask your lab lead to update it, or use GlobalProtect.",
+      /** the grid's "wrong code, or no 2FA set up" refusal: it names both causes, so the student says which */
+      codeRefusedTitle: "The grid didn't accept the code",
+      codeRefused: 'Either the code was mistyped or had already changed, or your account has no grid code yet.',
+      codeAgain: 'Type the code again',
+      noCode: "I don't have a grid code yet",
+      /** above the grid's own banner or instruction on the sheet */
+      gridSays: 'The grid says',
+      /** the protected key waits for Windows Hello / Touch ID this browser session */
+      unlockTitle: 'Unlock Beethoven',
+      unlockBody: 'Use Windows Hello or Touch ID to unlock the key on this computer.',
+      unlock: 'Unlock',
+      unlockFailed: "That didn't unlock. Try again.",
+      /** under Unlock: the way out when the passkey is gone (Windows Hello reset, passkey deleted) */
+      cantUnlock: "Can't unlock? Forget this computer and sign in again",
+    },
+
+    /** moment "choose-route": the grid has no Google Authenticator code for this account yet */
+    chooseRoute: {
+      title: 'Set up your grid code first',
+      body: "The grid asks for a Google Authenticator code. You set it up once, on the grid's website, which needs GlobalProtect.",
+      laptop: { title: 'On this computer', detail: "Turn on GlobalProtect here, then set up the code on the grid's website.", button: 'Use this computer' },
+      phone: { title: 'With my phone', detail: "For when GlobalProtect won't install on this computer.", button: 'Use my phone' },
+    },
+
+    /** moment "code-setup": the chosen route's steps; the QR codes are drawn on the device from the links */
+    codeSetup: {
+      laptopTitle: 'Set up your grid code on this computer',
+      laptopSteps: [
+        'Install Google Authenticator on your phone.',
+        'Turn on GlobalProtect on this computer, and approve its sign-in in Microsoft Authenticator.',
+        "Open the grid's website, choose Interactive Apps, then 2FA Setup, and press Launch. Once it is running, click Launch 2FA Setup: a new tab shows a square code.",
+        'In Google Authenticator tap +, then Scan a QR code, and scan the square code the page shows.',
+        "Turn GlobalProtect off again if you like, and come back here.",
+      ],
+      phoneTitle: 'Set up your grid code with your phone',
+      phoneSteps: [
+        'Scan the first square code with your phone and install GlobalProtect. Open it, enter the portal protect.wayne.edu, sign in with your AccessID and password, and approve in Microsoft Authenticator.',
+        'Scan the second square code and install Google Authenticator.',
+        "Scan the third square code: it opens the grid's own instructions. On the grid's website choose Interactive Apps, then 2FA Setup, and press Launch. Once it is running, tap Launch 2FA Setup.",
+        "If the page shows a setup key under its square code, tap + in Google Authenticator, then Enter a setup key, and type it (your phone can't scan its own screen).",
+        'Turn GlobalProtect off on your phone, and come back here.',
+      ],
+      qr: {
+        globalprotect: 'GlobalProtect app',
+        authenticator: 'Google Authenticator',
+        gridCode: "The grid's code instructions",
+        iphone: 'iPhone',
+        android: 'Android',
+      },
+      /** the 2FA Setup notice, wherever a step could lead a student to run it twice */
+      warning: "Already have a grid code? Don't run 2FA Setup: it replaces your code, and the old one stops working.",
+      done: "I've set up my code",
+      back: 'Back',
+      openSite: "Open the grid's website",
+    },
+
+    /** moment "enrolled": the key works */
+    enrolled: {
+      title: 'This computer is set up.',
+      body: 'From now on Beethoven reaches the grid directly, with no VPN. It asks for your password and code again only when Claude needs signing in again, or if you sign in from another computer.',
+      continue: 'Continue',
+    },
+
+    /** moment "protect-key-optional": offered once after the key works, and always in Settings; off by default */
+    protectKey: {
+      title: 'Protect the key on this computer?',
+      body: 'Optional. Turned on, Beethoven asks for your fingerprint, face or PIN once each time you open the browser. Left off, it connects without asking.',
+      on: 'Turn on',
+      notNow: 'Not now',
+      turningOn: 'Waiting for Windows Hello or Touch ID…',
+      turnedOn: 'Protected.',
+      /** the card's title once it is on */
+      titleOn: 'The key is protected.',
+      cancelled: 'Not turned on. You can turn it on in Settings any time.',
+      /** Settings: turning it off needs the same passkey once; it did not answer */
+      notOff: 'Still protected: Windows Hello or Touch ID did not open the key. Try again.',
+      unsupported: "This browser can't protect the key with Windows Hello or Touch ID. It works without it.",
+    },
+
+    /** moment "fallback-to-vpn": the student chose GlobalProtect, or no direct way works on this computer */
+    fallback: {
+      title: (app: string) => `Using ${app}`,
+      body: (app: string) => `Turn ${app} on, then press Continue: the grid's own sign-in box opens. You can come back to the direct way here or in Settings.`,
+      tryDirect: 'Try the direct way again',
+      continue: 'Continue',
+    },
+
+    /** Settings, "Connection" */
+    settings: {
+      title: 'Connection',
+      modeLabel: 'Connection',
+      modes: { direct: 'Direct when possible', vpn: 'GlobalProtect only' },
+      protectKey: 'Protect my key with Windows Hello / Touch ID',
+      protectKeyNote: 'Off by default. Turned on, Beethoven asks for your fingerprint, face or PIN once each browser session.',
+      /** Settings only, under the switch: turning it on later leaves an older copy in the browser's files for a while */
+      protectLaterNote: "Turned on after setup, an older unprotected copy of the key can stay in this browser's files for a while. For the strongest protection, tick it when you first sign in.",
+      forget: 'Forget this computer',
+      forgetNote: "Removes this computer's key from Beethoven and from your grid account. The next direct sign-in asks for your password and code again.",
+      forgetConfirm: 'Forget this computer?',
+      forgetButton: 'Forget',
+      forgotten: 'This computer is forgotten.',
+      /** Forget when the grid could not be told (the key locked, or the grid not reached): the line goes at the next sign-in */
+      forgottenHere: "Forgotten on this computer. The grid wasn't told, so its line for this key stays until your next sign-in from here replaces it.",
+      /** Forget while the protected key is locked: the page unlocks it in the click so the grid's line goes too */
+      forgetLocked: 'Unlock first, so the grid forgets the key too.',
+      helper: 'Helper',
+      helperInstalled: (version: string) => `Installed · version ${version}`,
+      helperMissing: 'Not installed',
+      keyNone: 'No key on this computer yet',
+      keyPlain: 'Key on this computer',
+      keyProtected: 'Key on this computer, protected',
+    },
+  },
+
   /** Details for your lab lead (exempt from the hygiene test) */
   details: {
     title: 'Details for your lab lead',
@@ -348,6 +587,8 @@ export const WORDS = {
     footer: "Reads the worker's files every 5 seconds while it starts and once a minute after; asks the scheduler for its place in line at most once a minute, and starts or stops it, at most once a minute, only when you press.",
     onlineLag: 'Online is read from Claude Code\'s registration line and a heartbeat under 90 s old; it can lag a network loss on Anthropic\'s side by up to about 10 minutes.',
     loginSetupUnproven: "The one-time grid key step (AM2) has not yet been tried on the grid by a student without a key: it is unproven there.",
+    /** 12.0.0 */
+    directUnproven: 'The direct way (ssh to the login node through a bridge, a browser key restricted to the gate) has not yet been tried on the grid with a key: it is unproven there.',
   },
 
   /** Settings */
@@ -403,6 +644,13 @@ export const LOG_WORDS = {
   signinAbandoned: 'Stopped: waiting for your Claude sign-in timed out',
   error: "Couldn't start",
   keyStepDone: "Done. You won't need this again.",
+  /** 12.0.0 */
+  directSignedIn: (account: string) => `Signed in to the grid directly as ${account}`,
+  computerSetUp: 'This computer is set up for the grid',
+  keyProtected: 'Key protected with Windows Hello / Touch ID',
+  keyUnprotected: 'Key protection turned off',
+  computerForgotten: 'This computer was forgotten',
+  usingVpn: (app: string) => `Using ${app}`,
 } as const;
 
 // ---- shared pieces ---------------------------------------------------------------------------------
@@ -470,7 +718,14 @@ export interface Overlays {
 }
 
 /** the journey's moments, in order. "login-setup" (AM2) appears only when the shell asked for a password while a press waits. */
-export type Moment = 'welcome' | 'globalprotect' | 'grid' | 'statement' | 'connect' | 'claude' | 'login-setup' | 'queue' | 'starting' | 'online';
+export type Moment = 'welcome' | 'globalprotect' | 'grid' | 'statement' | 'connect' | 'claude' | 'login-setup' | 'queue' | 'starting' | 'online' | DirectMoment;
+
+/**
+ * 12.0.0: the direct way's moments (docs/V12_CONTRACT.md). They come where the 11.0.0 GlobalProtect and
+ * grid sign-in moments came, while the direct way is being set up or needs the student; once the key
+ * works, the 11.0.0 moments from the statement on run unchanged.
+ */
+export type DirectMoment = 'choose-route' | 'install-helper' | 'sign-in-sheet' | 'code-setup' | 'enrolled' | 'fallback-to-vpn' | 'protect-key-optional';
 
 /** one moment of the first run (or of a later run that needs the student: grid sign-in, Claude sign-in, the key step) */
 export type JourneyView =
@@ -483,7 +738,14 @@ export type JourneyView =
   | LoginSetupMoment
   | QueueMoment
   | StartingMoment
-  | OnlineMoment;
+  | OnlineMoment
+  | ChooseRouteMoment
+  | InstallHelperMoment
+  | SignInSheetMoment
+  | CodeSetupMoment
+  | EnrolledMoment
+  | FallbackMoment
+  | ProtectKeyMoment;
 
 /**
  * The panel while the welcome page carries the first moment: "Almost there." while Chrome's box is up
@@ -653,6 +915,202 @@ export interface OnlineMoment {
   pinTip?: { text: string; done: boolean };
 }
 
+// ---- 12.0.0: the direct way's moments --------------------------------------------------------------
+
+/** the operating systems the bundled helper is offered for */
+export type HelperOs = 'windows' | 'mac' | 'linux';
+
+/**
+ * The public pages the square codes open (each drawn on the device with its address printed under it;
+ * nothing is fetched). The university's pages are Wayne State's own knowledge-base articles (a site
+ * profile may name others: vpn_help_url, grid_code_help_url); the app stores' are Google
+ * Authenticator's own listings.
+ */
+export const DIRECT_LINKS = {
+  /** Wayne State KB 20314: the VPN and the GlobalProtect client, with the phone apps */
+  globalProtect: 'https://services.wayne.edu/TDClient/277/Portal/KB/Article/20314/Wayne-State-VPN-and-the-Global-Protect-client',
+  /** Wayne State KB 20242: Google Authenticator for the grid (Greg's link) */
+  gridCode: 'https://services.wayne.edu/TDClient/277/Portal/KB/Article/20242/How-do-I-set-up-and-use-Google-Authenticator-for-the-Grid',
+  /** Google Authenticator in Apple's App Store */
+  authenticatorIos: 'https://apps.apple.com/app/google-authenticator/id388497605',
+  /** Google Authenticator in Google Play */
+  authenticatorAndroid: 'https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2',
+  /** GlobalProtect (Palo Alto Networks) in Apple's App Store: the phone route's first code (KB 20314 covers computers only) */
+  globalProtectIos: 'https://apps.apple.com/app/globalprotect/id1400555706',
+  /** GlobalProtect in Google Play */
+  globalProtectAndroid: 'https://play.google.com/store/apps/details?id=com.paloaltonetworks.globalprotect',
+} as const;
+
+/**
+ * The bundled helper's file for this computer, from public/bridge/manifest.json (core/bridge.ts
+ * helperDownloadFor). The page offers it as an <a download> of the packaged file: nothing comes from
+ * the website. `url` is the extension's own address of the file (chrome-extension://<id>/bridge/<file>).
+ */
+export interface HelperDownload {
+  os: HelperOs;
+  /** "Windows", "macOS", "Linux" */
+  osLabel: string;
+  url: string;
+  /** the file name the browser saves */
+  file: string;
+  /** the installer inside it, when the file is a zip ("install.cmd", "install.command", "install.sh") */
+  open?: string;
+  /** "3 KB" (absent when the manifest gives no size) */
+  size?: string;
+  bytes?: number;
+  /** hex, for the student who checks (Details shows it too) */
+  sha256?: string;
+  /** "script" (a script every operating system already runs) or "binary" (a compiled variant, later) */
+  kind?: 'script' | 'binary';
+  /** the helper version this file installs */
+  version?: string;
+}
+
+/** moment "install-helper": no bridge is available; the bundled helper is offered, with GlobalProtect beside it */
+export interface InstallHelperMoment {
+  moment: 'install-helper';
+  /** "One small download, once" */
+  title: string;
+  body: string;
+  /** absent when the manifest has no file for this computer (then only "Use GlobalProtect instead") */
+  download?: HelperDownload & { label: string; fileLine: string };
+  /** the three steps for this operating system */
+  steps: string[];
+  /** under the steps for this system (Windows: Smart App Control's Unblock) */
+  osNote?: string;
+  unsignedNote: string;
+  /** the probe: waiting (Beethoven looks by itself after the download), looking (the student's Check again), found (drawn check, held a moment, then the sign-in sheet), not-found, broken */
+  status: { state: 'idle' | 'waiting' | 'looking' | 'found' | 'not-found' | 'broken'; text?: string };
+  /** "Check again": re-probes the bridges */
+  checkAgain: ButtonView;
+  /** "Use GlobalProtect instead" */
+  useVpn: ButtonView;
+}
+
+/** one prompt of the grid's, exactly as it arrived (keyboard-interactive): the sheet never invents one */
+export interface SheetPrompt {
+  /** the grid's own words, verbatim ("Password: ", "Your google authenticator one-time verification code: ") */
+  text: string;
+  /** the grid says whether the answer may be shown as it is typed (false: a password field) */
+  echo: boolean;
+  /** Beethoven's reading of it, for the field's type and the hint only: a password, the 6-digit code, or something else */
+  kind: 'password' | 'code' | 'other';
+  /** "The 6-digit code from Google Authenticator." beside a code prompt */
+  hint?: string;
+}
+
+/**
+ * moment "sign-in-sheet": Beethoven's own sign-in sheet (an extension page, never a web page). The
+ * AccessID first; then each set of the grid's prompts as it arrives, answered in one press. The
+ * answers go to the background in one action, then into the encrypted session after the grid's
+ * identity matched the pin, and are never stored, logged or offered to be remembered.
+ */
+export interface SignInSheetMoment {
+  moment: 'sign-in-sheet';
+  /**
+   * account: the AccessID field (prefilled when this browser knows the account)
+   * connecting: the bridge is opening the connection and checking the grid's identity
+   * prompt: the grid's prompts are up (`prompts`)
+   * working: answers sent, the grid is deciding ("Signing in…"), or the key is being added, set up, checked
+   * stopped: three refusals ("That didn't work three times.") [Try again] [Use GlobalProtect instead]
+   * failed: the grid's identity did not match, the grid could not be reached, or the connection ended
+   * unlock: the key is protected and locked this browser session: [Unlock] (page-local: keyring.unlockKey, then the action unlock-key)
+   * code-refused: the grid's "wrong code, or no 2FA set up" refusal: [Type the code again] [I don't have a grid code yet]
+   */
+  phase: 'account' | 'connecting' | 'prompt' | 'working' | 'stopped' | 'failed' | 'unlock' | 'code-refused';
+  title: string;
+  /** the AccessID field */
+  account: { label: string; placeholder: string; value?: string; error?: string };
+  /** the grid's banner or instruction above its prompts, verbatim, when it sent one */
+  instruction?: string;
+  prompts?: SheetPrompt[];
+  /** "Not accepted. Try again." after a refusal the grid follows with new prompts */
+  notice?: string;
+  /** "Signing in…", "Setting up this computer…", "Checking the new key…", "Getting your Claude sign-in ready…" */
+  status?: string;
+  /** the always-present line about where the answers go */
+  privacy: string;
+  /** "Continue": sends grid-signin-account (account phase) or grid-signin-answer (prompt phase) */
+  submit: ButtonView;
+  cancel: ButtonView;
+  useVpn?: ButtonView;
+  problem?: ProblemView;
+  /** a second way on under the problem: "I don't have a grid code yet" (code-refused), "Can't unlock? Forget this computer…" (unlock) */
+  secondary?: ButtonView;
+  /** the opt-in, before the first sign-in: "Protect my key with Windows Hello / Touch ID", unticked by default (page-local until the press; keyring.createProtectedKey runs in the click) */
+  protect?: { label: string; note: string; available: boolean };
+  /** what this sign-in is for: setting this computer up (enrol), or a Claude sign-in through the grid (claude) */
+  purpose: 'enrol' | 'claude';
+}
+
+/** one square code the page draws (src/ui/qr.ts), with its link printed under it */
+export interface QrLink {
+  id: 'globalprotect-ios' | 'globalprotect-android' | 'authenticator-ios' | 'authenticator-android' | 'grid-code' | 'grid-site';
+  label: string;
+  url: string;
+}
+
+/** moment "choose-route": the grid refused because the account has no Google Authenticator code yet */
+export interface ChooseRouteMoment {
+  moment: 'choose-route';
+  title: string;
+  body: string;
+  options: Array<{ id: 'laptop' | 'phone'; title: string; detail: string; button: ButtonView }>;
+  useVpn: ButtonView;
+  /** the 2FA Setup notice */
+  warning: string;
+}
+
+/** moment "code-setup": the steps of the chosen route; the phone route carries the square codes */
+export interface CodeSetupMoment {
+  moment: 'code-setup';
+  route: 'laptop' | 'phone';
+  title: string;
+  steps: string[];
+  /** phone route: GlobalProtect (iPhone, Android), Google Authenticator (iPhone, Android), the grid's own instructions (KB 20242); laptop route: the grid's own instructions and the grid's website */
+  qr: QrLink[];
+  /** the 2FA Setup notice, shown with the step that could lead to it */
+  warning: string;
+  /** "I've set up my code": back to the sign-in sheet */
+  done: ButtonView;
+  back: ButtonView;
+  useVpn: ButtonView;
+}
+
+/** moment "enrolled": the key works ("This computer is set up."), held a moment, or until Continue */
+export interface EnrolledMoment {
+  moment: 'enrolled';
+  title: string;
+  body: string;
+  /** the account the grid confirmed */
+  account?: string;
+  continue: ButtonView;
+}
+
+/** moment "protect-key-optional": once, after enrolment; Settings carries the same switch for always */
+export interface ProtectKeyMoment {
+  moment: 'protect-key-optional';
+  title: string;
+  body: string;
+  /** "Turn on": page-local (keyring.protectKey inside the click: WebAuthn needs the page), then the page sends protect-key */
+  on: { label: string; busyLabel: string; available: boolean };
+  /** "Not now": protect-key-later */
+  notNow: ButtonView;
+  /** after the press: "Protected." or "Not turned on. …" or the unsupported sentence */
+  outcome?: string;
+}
+
+/** moment "fallback-to-vpn": the direct way is not used; the 11.0.0 moments follow unchanged */
+export interface FallbackMoment {
+  moment: 'fallback-to-vpn';
+  title: string;
+  body: string;
+  /** "Continue": carries on into the GlobalProtect moments */
+  continue: ButtonView;
+  /** "Try the direct way again" */
+  tryDirect: ButtonView;
+}
+
 // ---- the home --------------------------------------------------------------------------------------
 
 /**
@@ -716,7 +1174,17 @@ export type HomePrimary =
 /** the three status rows; a coloured dot always has a word beside it */
 export interface StatusRows {
   /** "Signed in as st1234" / "Signed out · Sign in" (link) / "Can't reach · Is GlobalProtect on?" / "Checking…" */
-  grid: { state: 'signed-in' | 'signed-out' | 'unreachable' | 'checking'; text: string; link?: ButtonView };
+  grid: {
+    state: 'signed-in' | 'signed-out' | 'unreachable' | 'checking';
+    text: string;
+    link?: ButtonView;
+    /**
+     * 12.0.0: how the grid is reached: "Direct" (ssh through a bridge) or "Through GlobalProtect" (the
+     * portal, 11.0.0). `locked`: the protected key waits for Windows Hello / Touch ID ("Locked · Unlock";
+     * the Unlock link is page-local: keyring.unlockKey in the click, then the action unlock-key).
+     */
+    via?: { mode: 'direct' | 'vpn'; text: string; locked?: { text: string; unlock: string } };
+  };
   /** "Signed in · Max" / "Needs sign-in · Sign in" (link) / "—"; from status.json claude_login no older than 5 minutes */
   claude: { state: 'signed-in' | 'needs' | 'unknown'; text: string; link?: ButtonView };
   /** "Online · checked 20 s ago" / "In line · 3 min" / "Asking…" / "Starting" / "Renewing" / "Stopped" / "Needs you" / "Couldn't start" / "As of 9:02 · online" */
@@ -869,6 +1337,49 @@ export interface DetailsView {
   /** "Reads the worker's files every 5 seconds while it starts and once a minute after; asks the scheduler at most once a minute." */
   footer: string;
   onlineLag: string;
+  /** 12.0.0: the direct way, for the lab lead (internal words allowed); filled by the background */
+  direct?: DirectDetails;
+}
+
+/** 12.0.0: Details' direct-way section */
+export interface DirectDetails {
+  /** "direct" or "vpn", and why */
+  mode: string;
+  /** each bridge in D3's order: "store: not available", "relay: not configured", "helper: available (1, script, windows)" */
+  bridges: string[];
+  /** the grid's host key pin (SHA256:…) and its host:port */
+  pin: string;
+  host: string;
+  /** "ecdsa-sha2-nistp256 SHA256:…, protected: no, enrolled 2026-10-02" or "none" */
+  key: string;
+  /** "grid.wayne.edu:22 answered at …" / "no route" / "not checked" */
+  reach: string;
+  /** the account recorded after the grid accepted a sign-in */
+  account?: string;
+  /** the helper's file for this computer (name, size, sha256) */
+  helperFile?: string;
+  /** "unproven on the grid" */
+  unproven: string;
+}
+
+/** 12.0.0: Settings' "Connection" section (filled by the background beside settingsView) */
+export interface ConnectionSettingsView {
+  title: string;
+  /** "Connection": "Direct when possible" (direct, the default) or "GlobalProtect only" (vpn): set-pref {connection} */
+  mode: { label: string; value: 'direct' | 'vpn'; options: Array<{ value: 'direct' | 'vpn'; label: string }> };
+  /**
+   * "Protect my key with Windows Hello / Touch ID": OFF BY DEFAULT. The switch is page-local (WebAuthn
+   * runs in the page: keyring.protectKey / keyring.unprotectKey inside the click), then the page sends
+   * protect-key with the outcome. `available` false: the browser cannot (the switch is disabled with
+   * the unsupported sentence); `present` false: no key yet (the switch is remembered for the first sign-in).
+   */
+  protectKey: { label: string; note: string; value: boolean; available: boolean; present: boolean; laterNote?: string };
+  /** "Key on this computer" / "…, protected" / "No key on this computer yet" */
+  keyLine: string;
+  /** "Forget this computer" with its confirm row; disabled when there is no key */
+  forget: { label: string; note: string; confirm: string; button: ButtonView; disabled: boolean; locked?: boolean };
+  /** "Helper": "Installed · version 1" or "Not installed", with the download for this computer */
+  helper: { label: string; text: string; installed: boolean; download?: HelperDownload; checkAgain: ButtonView };
 }
 
 export interface SettingsView {
@@ -888,6 +1399,8 @@ export interface SettingsView {
   drive: { title: string; connected: boolean };
   /** folded: shell host, site profile, hashes */
   labLead: { title: string; shellHost: string; siteProfile: string; hashes: string[] };
+  /** 12.0.0: "Connection" (direct or GlobalProtect only, the optional key protection, Forget this computer, the helper) */
+  connection?: ConnectionSettingsView;
 }
 
 // ---- actions ---------------------------------------------------------------------------------------
@@ -967,14 +1480,60 @@ export type Action =
   /** "Check a compute node": the probe, Details only */
   | { kind: 'check-compute-node' }
   // Settings
-  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance }> }
+  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance; connection: 'direct' | 'vpn' }> }
   /** "Change" (Your grid): the welcome page's portal field, in Settings */
   | { kind: 'change-portal'; origin: string; granted: boolean }
   /** "Disconnect": forgets the portal and removes the origin grant */
   | { kind: 'disconnect' }
   | { kind: 'audit'; op: 'export' | 'clear' }
   /** "Google Drive in Claude (optional)": the student's own tick */
-  | { kind: 'drive-connected'; done: boolean };
+  | { kind: 'drive-connected'; done: boolean }
+  // ---- 12.0.0: the direct way (docs/V12_CONTRACT.md). The names follow the pages stream's draft
+  // (src/ui/model12.ts Action12) wherever the meaning is the same. ----
+  /** the sheet's AccessID: opens the connection through the bridge and asks the grid what it wants */
+  | { kind: 'grid-signin-account'; account: string }
+  /**
+   * The answer to the grid's prompt now shown (the first prompt of the grid's request not answered yet):
+   * held in memory only until every prompt of that request has its answer, then sent once into the
+   * encrypted session and dropped. Never stored, logged or offered to be remembered.
+   */
+  | { kind: 'grid-signin-answer'; text: string }
+  /** "Try again" after the stop or a failure, "I've set up my code" after the 2FA refusal: a new sign-in from the AccessID */
+  | { kind: 'grid-signin-retry' }
+  /** "Change" beside the AccessID, and the sheet's Cancel: back to the field; the connection in flight is closed */
+  | { kind: 'grid-signin-change' }
+  /** "Continue" on "This computer is set up.": the press that was waiting for the grid carries on */
+  | { kind: 'grid-signin-continue' }
+  /** "Use GlobalProtect instead": the 11.0.0 way for this computer until the student tries the direct way again (or Settings says otherwise) */
+  | { kind: 'use-vpn' }
+  /** "Try the direct way again" on the fallback moment */
+  | { kind: 'try-direct' }
+  /** "Continue" on the fallback moment: on into the GlobalProtect moments */
+  | { kind: 'fallback-continue' }
+  /** "Use this computer" / "Use my phone" on the route choice */
+  | { kind: 'choose-route'; route: 'laptop' | 'phone' }
+  /** "Back" on the code setup: the route choice again */
+  | { kind: 'route-back' }
+  /** "I don't have a grid code yet" after the grid's "wrong code, or no 2FA" refusal: the route choice */
+  | { kind: 'no-grid-code' }
+  /** the bundled installer was saved from the page (an <a download> of the packaged file); the background looks for the helper every few seconds */
+  | { kind: 'bridge-downloaded'; os: HelperOs }
+  /** "Check again" (install-helper, Settings' helper row): the bridges are probed again now */
+  | { kind: 'check-bridge' }
+  /** Settings, "Connection" (also accepted as set-pref {connection}) */
+  | { kind: 'set-connection'; connection: 'direct' | 'vpn' }
+  /**
+   * After the page ran the passkey step itself (WebAuthn needs the page; core/keyring.ts protectKey,
+   * unprotectKey or createProtectedKey inside the click): what came of it. The background re-reads the
+   * key and drops any copy of it in memory. Nothing secret travels in this message.
+   */
+  | { kind: 'protect-key'; on: boolean; outcome: ProtectOutcome }
+  /** "Not now" on the optional protection card (once; Settings keeps the switch) */
+  | { kind: 'protect-key-later' }
+  /** after the page ran the once-per-session unlock (core/keyring.ts unlockKey inside the click on "Unlock") */
+  | { kind: 'unlock-key'; outcome: 'unlocked' | 'cancelled' | 'failed' }
+  /** "Forget this computer": forget through the gate (the grid's line goes), then the key here */
+  | { kind: 'forget-computer' };
 
 export type ActionKind = Action['kind'];
 
@@ -1015,6 +1574,24 @@ export interface ActionResults {
   disconnect: { disconnected: boolean };
   audit: { text?: string; cleared?: boolean };
   'drive-connected': { recorded: boolean };
+  'grid-signin-account': { started: boolean; error?: 'account' | 'busy' | 'no-bridge' };
+  'grid-signin-answer': { sent: boolean; waiting?: number };
+  'grid-signin-retry': { started: boolean };
+  'grid-signin-change': { closed: boolean };
+  'grid-signin-continue': { recorded: boolean };
+  'use-vpn': { recorded: boolean };
+  'try-direct': { bridge: 'store' | 'relay' | 'helper' | 'none' };
+  'fallback-continue': { recorded: boolean };
+  'choose-route': { recorded: boolean };
+  'route-back': { recorded: boolean };
+  'no-grid-code': { recorded: boolean };
+  'bridge-downloaded': { looking: boolean };
+  'check-bridge': { bridge: 'store' | 'relay' | 'helper' | 'none'; helperVersion?: string };
+  'set-connection': { saved: boolean };
+  'protect-key': { protected: boolean };
+  'protect-key-later': { recorded: boolean };
+  'unlock-key': { unlocked: boolean };
+  'forget-computer': { forgotten: boolean; onGrid: 'forgotten' | 'none' | 'not-reached' };
 }
 
 export type ResultOf<K extends ActionKind> = ActionResults[K];
@@ -1026,13 +1603,24 @@ export type ResultOf<K extends ActionKind> = ActionResults[K];
  * copy-log uses the lines Show log already holds; the login-setup line is copied from
  * LoginSetupMoment.line in the same click that sends "open-terminal-for-login-setup".
  */
-export type PageAct = 'copy-link' | 'show-phone' | 'hide-phone' | 'copy-prompt' | 'copy-vpn' | 'copy-log' | 'copy-login-setup-line' | 'show-terms' | 'hide-terms' | 'save-terms' | 'print-terms' | 'open-terms-in-tab' | 'tick' | 'show-more' | 'confirm-stop' | 'keep-it' | 'open-menu';
+export type PageAct = 'copy-link' | 'show-phone' | 'hide-phone' | 'copy-prompt' | 'copy-vpn' | 'copy-log' | 'copy-login-setup-line' | 'show-terms' | 'hide-terms' | 'save-terms' | 'print-terms' | 'open-terms-in-tab' | 'tick' | 'show-more' | 'confirm-stop' | 'keep-it' | 'open-menu'
+  // 12.0.0: the helper's download is an <a download> of the packaged file (HelperDownload.url); the
+  // passkey steps run in the page inside the click (core/keyring.ts), then the page sends
+  // protect-key or unlock-key; the square codes are drawn by the page from QrLink.url
+  | 'download-helper' | 'protect-key' | 'unprotect-key' | 'unlock-key' | 'show-qr' | 'confirm-forget';
 
 /** how the page script typed into the terminal (AM2): xterm.js's helper textarea, or not at all ("unsupported": an older terminal; the student pastes) */
 export type TerminalInput = 'xterm' | 'unsupported';
 
 /** the failure code of the connect line, for a view that says why (contract.ts StepFailCode) */
-export type ConnectFailure = StepFailCode | 'closed' | 'password';
+export type ConnectFailure = StepFailCode | 'closed' | 'password' | 'limit-names' | 'limit-hourly' | 'limit-busy' | 'old-copy';
+
+/** 12.0.0: what the page's passkey step came to (on: turned on; off: turned off) */
+export type ProtectOutcome = 'on' | 'off' | 'cancelled' | 'unsupported' | 'failed';
+
+/** 12.0.0: the bridges in D3's order, and what a probe found (core/bridge.ts) */
+export type BridgeId = 'store' | 'relay' | 'helper';
+export type BridgeState = 'available' | 'not-available' | 'not-configured' | 'not-installed' | 'broken' | 'unknown';
 
 // ---- formatting shared by the core and the pages ---------------------------------------------------
 

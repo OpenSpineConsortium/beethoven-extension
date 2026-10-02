@@ -1,0 +1,27 @@
+WHAT IT IS
+Beethoven starts, watches and stops a Claude Code worker (a batch job) in the user's own account on a university cluster and hands the user the claude.ai link the worker prints. It reaches the cluster directly over ssh, through a small helper the user installs from inside the extension, or through the university's Open OnDemand portal. It is not an Anthropic product ("Claude" and "Claude Code" are Anthropic's marks) and not provided by or on behalf of any university.
+
+WHY THERE IS NO TEST ACCOUNT
+It has no account, password or licence key of its own; the user's own cluster sign-in identifies them. A worker needs a Wayne State AccessID with its password and Google Authenticator code (and, on the portal path, the VPN), the user's own Claude Pro or Max, and our approval of that account. We cannot issue or lend accounts: one person per account is a term of the university and of Anthropic's service.
+
+WITHOUT A CLUSTER
+1. Install: the welcome page opens ("Claude, on your grid."). Tick the box and press "Agree and continue". Chrome asks to allow https://ondemand.grid.wayne.edu, that one site only. The panel opens at the side of the window.
+2. The panel tries the direct way. With no helper installed it shows "One small download, once" and a "Download for ..." button for your system, with the file's name and size: the file is inside the package (bridge/), served from the extension's own address; nothing is fetched from the web. bridge/manifest.json lists each file with its SHA-256. The helper is a plain script (PowerShell on Windows, Perl on macOS and Linux) that opens TCP only to grid.wayne.edu:22, carries bytes and exits when Chrome closes it; you can read it in the package.
+3. Please do not type an AccessID into "Sign in to the grid": the direct way talks to the university's real server, and a test sign-in there is a failed sign-in on a real account.
+4. "Use GlobalProtect instead" leaves the direct way: the panel says "Using GlobalProtect" and then waits for the university's VPN ("Turn on GlobalProtect."), which a reviewer cannot reach.
+
+FULL FLOW ON A LOCAL MOCK PORTAL (the portal path; the direct way is not part of the mock)
+The attached beethoven-mock-portal.zip holds a Node stand-in for the portal, scheduler and cluster tool, plus ws; no extension code. Needs Node 22, bash and openssl; tested end to end only on Windows (Git for Windows).
+1. Make a localhost certificate in the unzipped folder (Git Bash: prefix MSYS_NO_PATHCONV=1):
+openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30 -addext subjectAltName=DNS:localhost
+2. In bash (use no other --user):
+MOCK_LOGGED_IN=false node server.mjs --port 8443 --host localhost --user st1234 --cert cert.pem --key key.pem
+3. Open https://localhost:8443/login, choose Advanced, "Proceed to localhost (unsafe)", then "Sign in as st1234". No password. Our access service approves st1234 from any installation only when the portal is localhost.
+4. In a fresh profile with the item installed: on the welcome page press "Not at Wayne State? Use another portal", type https://localhost:8443, "Use this portal", tick, "Agree and continue", and Allow Chrome's prompt.
+5. If the panel first shows "One small download, once" (the direct way), press "Use GlobalProtect instead" (and "Continue" if it asks). The panel then works by itself. At the data statement tick and press Connect. A sign-in tab opens at the stand-in's dummy Anthropic link (client_id=mock-client); close it, type ABC123 in the panel's code box, press Continue. After a short wait in line the panel says "You're online." with "Open my session" (a made-up claude.ai/code link; no real session).
+
+WHAT IT NEVER DOES
+No host permission at install; one site at a time, only inside a click. An Anthropic address is refused before any permission request. It runs no script on, reads nothing from and sends nothing to Anthropic's sites; it only opens their pages in a new tab. It never keeps the cluster password or code: on the direct way they go only into the encrypted ssh session after the cluster's host key matched the pinned one. Its key's line in the cluster account runs a gate with eight fixed commands and can never sign a worker in to Claude. nativeMessaging reaches only its own helper. No remote code, analytics, error reports or usage data.
+
+WHAT IT SENDS US
+Nothing before acceptance. Then, without cookies: daily GETs of services.json and killlist.json (signed list of withdrawn versions); and, once the cluster has accepted a sign-in, the approval check to https://beethoven-access.openspineconsortium.workers.dev/access_check with the account name, the portal hostname, the product ("bridge"), the version and a random installation id made at acceptance. The answer is yes or no.

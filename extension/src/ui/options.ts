@@ -9,6 +9,7 @@ import { realGestures, startPage } from './boot';
 import { packaged, sendAction, subscribe } from './rpc';
 import { mountSettings } from './settings';
 import { mountWelcome } from './welcome';
+import { browser } from 'wxt/browser';
 import { local } from '../ext/storage';
 
 export async function mountOptions(root: HTMLElement): Promise<void> {
@@ -35,5 +36,23 @@ export async function mountOptions(root: HTMLElement): Promise<void> {
       settings.show(sv.view);
     }
   };
-  subscribe(accepted ? 'settings' : 'welcome', show, gestures.windowId);
+  // once the agreement is in force this tab is Settings: when the panel's ⋯ > Settings focuses it (the
+  // background says so), or when it comes back into view. The direct way never navigates the welcome tab
+  // away (11.0.0's portal sign-in did), so without this it would go on drawing the welcome page.
+  let current: 'welcome' | 'settings' = accepted ? 'settings' : 'welcome';
+  let sub = subscribe(current, show, gestures.windowId);
+  const toSettings = async () => {
+    if (current === 'settings') return;
+    if (!recordInForce(await local.get(TERMS_KEY).catch(() => undefined))) return;
+    if ((current as string) === 'settings') return; // another event switched it during the read
+    current = 'settings';
+    sub.close();
+    sub = subscribe('settings', show, gestures.windowId);
+  };
+  browser.runtime.onMessage.addListener((m: unknown) => {
+    if ((m as { type?: string } | undefined)?.type === 'show-settings') void toSettings();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void toSettings();
+  });
 }

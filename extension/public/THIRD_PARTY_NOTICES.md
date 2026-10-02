@@ -34,9 +34,11 @@ third-party material, each under its own licence, which governs it in place of t
 4. QR Code generator library, TypeScript edition, by Project Nayuki
    (https://www.nayuki.io/page/qr-code-generator-library; source at
    https://github.com/nayuki/QR-Code-generator), in a shortened port (byte mode and error correction
-   level M only) kept in the extension's source. It draws the QR code of your session's link on the
-   panel's Phone card, on your device. It is compiled into the panel's script, from which the build
-   removes every comment, so its notice is kept here. MIT License.
+   level M only) kept in the extension's source. It draws, on your device, the QR code of your
+   session's link on the panel's Phone card and the QR codes of the phone route's pages (your
+   university's instructions, and the app stores' pages for GlobalProtect and Google Authenticator).
+   It is compiled into the panel's script, from which the build removes every comment, so its notice
+   is kept here. MIT License.
 
    Copyright (c) Project Nayuki. (MIT License)
    https://www.nayuki.io/page/qr-code-generator-library
@@ -59,6 +61,14 @@ website, https://openspineconsortium.com/: its drawing and its style sheet, copi
 for the tour, with the label "H200 GPU" shortened to "GPU". It is Licensor's own work, not
 third-party material, and is part of Beethoven under the Beethoven agreement; the website's source,
 where the figure first appeared, is also published under the Apache License, Version 2.0.
+
+The ssh client of the ssh path, the code that protects its key with a passkey, and the Bridge (its
+installers, uninstallers and helper scripts for Windows, macOS and Linux) are Licensor's own work,
+written for Beethoven without third-party code, and are part of Beethoven under the Beethoven
+agreement. The ssh client uses only your browser's own cryptography (WebCrypto). The Bridge runs on
+programs your computer already has, which are not part of this package and are provided under their
+publishers' own terms: Windows PowerShell on Windows, and Perl on macOS and Linux (or Python 3 where
+Perl is absent).
 
 Claude Code is not part of this package. It is Anthropic's software, installed and run on the cluster
 under Anthropic's own terms; "Claude" and "Claude Code" are Anthropic's marks.

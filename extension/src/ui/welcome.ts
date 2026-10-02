@@ -1,6 +1,8 @@
 // The welcome page (moment 2): the options page in a full tab until the agreement is accepted. Greg's
-// three prerequisites in his order, the agreement in four lines, "Show terms" expanding in place (never
-// required), one tick, and "Agree and continue". Before the press nothing is sent to anyone.
+// prerequisites in his order (12.0.0: four, with QR codes for the grid's sign-in code and GlobalProtect,
+// each drawn on the device with its address under it, then the grid code's two routes), the agreement in
+// four lines, "Show terms" expanding in place (never required), one tick, and "Agree and continue".
+// Before the press nothing is sent to anyone.
 //
 // The press is one gesture: inside the click and before any await, the page calls sidePanel.open with the
 // window id it read when it loaded and permissions.request for the portal's one origin; then it writes the
@@ -14,6 +16,8 @@ import { drawnCheck, icon, spinner, type IconName } from './icons';
 import { foldToggle, hero, tickBox } from './parts';
 import type { Act } from './rpc';
 import { checkPortal, fullText, loadTexts, portalField, termsRegion, type Texts } from './sections';
+import { PUBLIC_PAGES, needsList, routesView, type WelcomeView12 } from './model12';
+import { needsBlock, routeChoice } from './routes';
 
 export interface WelcomeLocal {
   ticked: Partial<Record<'agree' | 'specific', boolean>>;
@@ -34,6 +38,9 @@ export interface WelcomeLocal {
   localState?: WelcomeView['state'];
   localProblem?: string;
   recorded: boolean;
+  /** 12.0.0: which QR code of each group is shown, and the route open under the prerequisites */
+  qrPick: Record<string, number>;
+  route?: 'laptop' | 'phone';
 }
 
 /** what only a real extension page can do; the gallery passes stand-ins */
@@ -61,10 +68,13 @@ export interface Gestures {
 
 const SUMMARY_ICONS: IconName[] = ['tag', 'id', 'alert', 'scale'];
 
-export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<WelcomeLocal>; onAccepted?: () => void }): { show: (v: WelcomeView) => void } {
+/** the welcome view as the core sends it (three needs) or with 12.0.0's four and the route choice (model12.ts WelcomeView12) */
+type AnyWelcome = WelcomeView | WelcomeView12;
+
+export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<WelcomeLocal>; onAccepted?: () => void }): { show: (v: AnyWelcome) => void } {
   const g = opts.gestures;
-  const local: WelcomeLocal = { ticked: {}, termsOpen: false, termsEnd: false, openedInTab: false, savedCopy: false, printed: false, portalOpen: false, pressing: false, recorded: false, ...(opts.local ?? {}) };
-  let view: WelcomeView | undefined;
+  const local: WelcomeLocal = { ticked: {}, termsOpen: false, termsEnd: false, openedInTab: false, savedCopy: false, printed: false, portalOpen: false, pressing: false, recorded: false, qrPick: {}, ...(opts.local ?? {}) };
+  let view: AnyWelcome | undefined;
   let texts: Texts | undefined;
   let page: HTMLElement | undefined;
   void loadTexts(g.url).then((t) => {
@@ -77,10 +87,10 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     render();
   };
 
-  const allTicked = (v: WelcomeView) => v.ticks.every((t) => local.ticked[t.id]);
+  const allTicked = (v: AnyWelcome) => v.ticks.every((t) => local.ticked[t.id]);
 
   /** the portal the press asks Chrome for: the one chosen under "Use another portal", else the view's (the site profile's) */
-  const portalOf = (v: WelcomeView) => local.portalChosen ?? { origin: v.portal.origin, hostname: v.portal.hostname };
+  const portalOf = (v: AnyWelcome) => local.portalChosen ?? { origin: v.portal.origin, hostname: v.portal.hostname };
 
   /** the one gesture: panel and permission first, synchronously, then the record and "agree" */
   const press = () => {
@@ -155,24 +165,36 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     },
   };
 
-  function needs(v: WelcomeView): HTMLElement {
+  // read at render time: set() replaces local.qrPick with a new object, so a copy taken at mount would keep the first pick forever
+  const qr = {
+    get qrPick() {
+      return local.qrPick;
+    },
+    setQrPick: (grp: string, i: number) => set({ qrPick: { ...local.qrPick, [grp]: i } }),
+  };
+
+  /**
+   * 12.0.0's four prerequisites and the route choice. A view from a core that still sends 11.0.0's three
+   * needs is drawn in the 12.0.0 form when it is Wayne State's (its account link is the university's own
+   * page), with the university's addresses taken from that view; any other portal keeps what it sent.
+   */
+  function upgraded(v: AnyWelcome): { needs: WelcomeView12['needs']; routes?: WelcomeView12['routes'] } {
+    if ('routes' in v && v.routes) return { needs: v.needs, routes: v.routes };
+    const account = v.needs[0] && 'link' in v.needs[0] ? v.needs[0].link?.url : undefined;
+    const vpn = v.needs[1] && 'link' in v.needs[1] ? v.needs[1].link?.url : undefined;
+    if (v.needs.length !== 3 || !account || !vpn || new URL(account).hostname !== 'services.wayne.edu') return { needs: v.needs };
+    const pages = { gridAccount: account, globalProtect: vpn, gridCode: PUBLIC_PAGES.gridCode, gridSite: PUBLIC_PAGES.gridSite };
+    return { needs: needsList(pages), routes: routesView(pages) };
+  }
+
+  /** the prerequisites (with their QR codes), then the grid code's two routes */
+  function needs(v: AnyWelcome): HTMLElement {
+    const { needs: list, routes } = upgraded(v);
     return el(
-      'section',
-      { class: 'w-needs', 'aria-labelledby': 'needs-title' },
-      el('h2', { class: 'eyebrow', id: 'needs-title', text: v.needsTitle }),
-      el(
-        'ol',
-        {},
-        ...v.needs.map((n, i) =>
-          el(
-            'li',
-            { class: 'need' },
-            el('span', { class: 'need-num', 'aria-hidden': 'true', text: String(i + 1) }),
-            el('div', {}, el('div', { class: 'need-title', text: n.title }), el('div', { class: 'need-detail', text: n.detail })),
-            el('a', { class: 'need-link', href: n.link.url, target: '_blank', rel: 'noopener noreferrer' }, el('span', { text: n.link.label }), icon('external', 13)),
-          ),
-        ),
-      ),
+      'div',
+      { class: 'w-prereq' },
+      needsBlock(list, qr, { title: v.needsTitle, titleId: 'needs-title' }),
+      routes ? routeChoice(routes, { qrPick: local.qrPick, setQrPick: qr.setQrPick, route: local.route, setRoute: (r) => set({ route: r }) }, { heading: 'h2' }) : null,
     );
   }
 
@@ -186,7 +208,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     return el('section', { class: 'handoff', role: 'status' }, el('p', { class: 'handoff-head' }, drawnCheck(28), el('span', { text })), h ? hero(h) : null);
   }
 
-  function agreement(v: WelcomeView): HTMLElement {
+  function agreement(v: AnyWelcome): HTMLElement {
     const state = local.localState && (v.state === 'idle' || v.state === 'opening') ? local.localState : v.state;
     const problemText = v.problem ?? (state === local.localState ? local.localProblem : undefined);
     const opening = local.pressing || state === 'opening';
@@ -238,7 +260,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     );
   }
 
-  function footer(v: WelcomeView): HTMLElement {
+  function footer(v: AnyWelcome): HTMLElement {
     return el(
       'footer',
       { class: 'w-foot' },
@@ -295,7 +317,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
 
   render();
   return {
-    show(v: WelcomeView) {
+    show(v: AnyWelcome) {
       view = v;
       render();
     },

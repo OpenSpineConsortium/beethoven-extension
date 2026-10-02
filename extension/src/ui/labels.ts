@@ -30,6 +30,18 @@ export const LABELS = {
   driveOpen: 'Open claude.ai connectors',
   driveTick: 'Google Drive is connected in claude.ai',
   driveUrl: 'https://claude.ai/settings/connectors',
+  // 12.0.0: the sign-in sheet's fields (the grid's own prompt is the caption under each, verbatim)
+  sheetPassword: 'AccessID password',
+  sheetCode: 'Code',
+  showPassword: 'Show password',
+  hidePassword: 'Hide password',
+  /** before the grid's prompt, verbatim: "The grid asks  Password:" */
+  gridAsks: 'The grid asks',
+  /** the field's label for a grid prompt that is neither a password nor a code (its words are the caption) */
+  gridQuestion: "The grid's question",
+  change: 'Change',
+  /** the home's Grid row while the protected key waits for this browser session */
+  unlock: 'Unlock',
 } as const;
 
 /** Details for your lab lead: section names and field labels (exempt from the hygiene rule) */
@@ -66,4 +78,14 @@ export const DETAILS_LABELS = {
   unproven: 'unproven on the grid',
   nothing: 'nothing yet',
   loading: 'Reading…',
+  // 12.0.0: the direct way (DirectDetails)
+  direct: 'The direct way (ssh)',
+  directMode: 'Mode',
+  bridges: 'Bridges, in order',
+  host: 'Host',
+  pin: 'Host key pin',
+  key: 'Browser key',
+  reach: 'Port 22',
+  account: 'Account the grid accepted',
+  helperFile: 'Helper file',
 } as const;

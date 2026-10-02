@@ -1,179 +1,173 @@
-# Testing Beethoven 10.0.0 by hand before the store upload
+# Testing Beethoven 12.0.0 by hand before the store upload
 
-One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in from 8.0.0 (a
-private listing on the Chrome Web Store; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up
-to date for 6.0.0 and 7.0.0 the same night, for 8.0.0 on 2026-09-30, and for 9.0.0 the same evening
-(the pages in the site's theme with its typefaces bundled, and a new icon; nothing else in the code
-changed: same permissions, same requests, same agreement version 7 and privacy statement version 8),
-and for 10.0.0 on 2026-10-01. 9.0.0 was built on 2026-09-30 and replaced before any review because
-of two defects: it asked Chrome for a site permission on an Anthropic address before refusing that
-address as a portal, and its agreement's *Accept and Continue* button did not wait for the text to
-be scrolled to its end. Step 2 and step 15 check both on the 10.0.0 build; the agreement and privacy
-statement stay at versions 7 and 8. The build is in
-`extension/.output/chrome-mv3/`; the zip beside it is what the store gets. To rebuild: Node 22, `npm
-ci`, `npm run build`, `npm run zip` in `extension/` (the Firefox build those commands also write is
-not tested here and not submitted).
+One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in (a private
+listing on the Chrome Web Store; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up to date
+through 10.0.0, and rewritten on 2026-10-02 for 12.0.0, which carries 11.0.0's first run (the welcome
+page, the window-wide panel) and adds the direct way: ssh to the grid through the helper inside the
+package, a sign-in sheet for the AccessID, password and Google Authenticator code, the browser's own
+key with its one restricted line on the grid, the optional Windows Hello / Touch ID protection, and
+Forget this computer. The agreement is version 9 and the privacy statement version 10. The build is
+in `extension/.output/chrome-mv3/`; the zip beside it is what the store gets. To rebuild: Node 22,
+`npm ci`, `npm run build`, `npm run zip` in `extension/`.
+
+This is the pass only you can make: it signs in to the real grid with your own account. Nothing in
+it was run by the streams that wrote it. Do `docs/V12_STATUS.md`'s tests G1 to G3 first: they are
+this pass's riskiest parts, cut small.
 
 ## Before you start (once)
 
 - Your AccessID is approved for Beethoven (`node tools/intake/admin.mjs list` in the repository of
   Beethoven for VS Code, Desktop folder `ashley`, shows it).
-- One approved account, one installation. The first installation of 8.0.0 or later that checks your AccessID
-  binds it, and this afternoon's unpacked build is an installation. Before you test, clear your seat
-  (`node tools/intake/admin.mjs reset-seat <your AccessID>`) so the unpacked build binds; after the
-  test, clear it again before you install from the private listing, or use *Move the approval* in
-  the e-mail the listing's installation triggers. Never run a `curl` check with your own AccessID:
-  the first identifier that asks binds the account.
-- The service's `REQUIRE_INSTALL_ID` is `"0"` while 7.0.0 builds are still in use (`SUBMISSION.md`,
-  section 2); with it at `"0"` an old build is approved and binds nothing, and 8.0.0 and later
-  bind as described.
-- Your Claude sign-in on the grid is current: `hpcworker claude status` over ssh says the sign-in
-  folder is present and consent is recorded.
-- Know the state of the worker chain: `hpcworker worker status --name worker`. If a worker is
-  online, the extension will find it and say so ("found running"); to test a cold start, stop it
-  first (`hpcworker worker stop --name worker`, or the panel's Stop later).
-- If an older build (9.0.0 or earlier, including one under the old name) is loaded in the browser,
-  remove it first: the pass below starts from a fresh install (an older build's storage may carry an
-  older agreement record), and two builds would both answer the icon on the portal tab. If you
-  rebuild into a folder Chrome already has loaded unpacked, press *Reload* on the Beethoven card in
-  `chrome://extensions` afterwards: Chrome otherwise goes on running the old background script under
-  the new version number (seen on 2026-10-01, with 9.0.0's files swapped for 10.0.0's in place).
-- The lab's shared copy is published: over ssh, `bash -lc 'hpcworker version'` prints the version of
-  the shared copy at `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`.
-- Have the phone with the Claude app signed in to the same Claude account.
+- One approved account, one installation. The unpacked build is an installation: clear your seat
+  first (`node tools/intake/admin.mjs reset-seat <your AccessID>`), and again after the test, before
+  you install from the private listing.
+- Every folder above the lab's shared copy is owner-only or sticky, framework 11 is deployed to the
+  copy, and `hpcworker browser-key check` there answers `HPCW-KEY check ok` (`docs/guides/LAB_LEAD.md`,
+  section 2). C&IT has answered the note in `LAB_LEAD.md`, section 3.
+- You know your grid password and have Google Authenticator with a working grid code on your phone.
+  Do **not** run 2FA Setup for this test: it replaces your code.
+- Write down what `~/.ssh/authorized_keys` holds now (through the OnDemand shell, with GlobalProtect:
+  `grep -c . ~/.ssh/authorized_keys` and `grep beethoven ~/.ssh/authorized_keys`), so you can see what
+  the test adds and removes.
+- Your Claude sign-in on the grid is current, or you are ready to sign in once.
+- Know the state of the worker chain; to test a cold start, stop it first.
+- Remove any older unpacked build. If you rebuild into a folder Chrome already has loaded unpacked,
+  press *Reload* on the Beethoven card in `chrome://extensions` afterwards.
+- **The helper and the unpacked ID.** The helper's registration names the extension's ID. The page
+  that offers the download writes the running extension's own ID into the zip it saves
+  (`core/bridgeZip.ts`), so the unpacked copy gets a helper made out to the unpacked copy, and the store
+  item to the store item; nothing is rebuilt. A zip saved by one installs a helper the other cannot
+  use: after this test, uninstall the helper before you install from the listing. An installer given
+  the packaged zip itself stops with "This copy of the bridge was built without Beethoven's extension
+  identifier".
+- GlobalProtect **off** for the direct-way steps (that is the point of them).
 
 ## What a full pass looks like
 
-1. **Install** the unpacked build: `chrome://extensions`, turn on *Developer mode* (top right),
-   *Load unpacked*, choose `extension/.output/chrome-mv3`. The setup page opens by itself. (Unpacked
-   loading is for this test only; students install from the private listing.)
-2. **Setup page.** Before scrolling, tick the four statements and type your name: *Accept and
-   Continue* must stay grey while the text sits at its top, and the line under the text must still
-   ask you to read it to its end (9.0.0 enabled the button at once). Then scroll the agreement to its
-   end: the button turns active. (*Open in tabs* instead of scrolling, which opens the agreement and the privacy
-   statement in two tabs, must also turn it active; try it in the second profile of step 13, where
-   the agreement is accepted afresh.) Press *Accept and
-   Continue*. The agreement is version 7 and the privacy
-   statement version 8. The page wears the site's theme: the cream ground, ink text, headings in
-   Newsreader, body text in IBM Plex Sans, the teal accent. The Access card says it has not checked yet, and says what is sent, the
-   installation's identifier included; there is no key box and no username box anywhere.
+1. **Install** the unpacked build: `chrome://extensions`, *Developer mode*, *Load unpacked*, choose
+   `extension/.output/chrome-mv3`. The welcome page opens by itself.
+2. **Welcome page.** "Claude, on your grid." with **You'll need**: a Wayne State grid account, the
+   grid's sign-in code, GlobalProtect (once), Claude Pro or Max, each with its link and, where given,
+   its QR code with the address printed under it. **Show terms** opens version 9 and the privacy
+   statement version 10. Tick the box and press **Agree and continue**. Chrome asks to let Beethoven
+   reach `ondemand.grid.wayne.edu`, that one site only: choose **Allow** (as in 11.0.0; the welcome
+   page's request was unchanged in the working tree of 2026-10-02).
 3. **Pin the icon**: puzzle-piece icon, pin *Beethoven*.
-4. **Portal.** Open `https://ondemand.grid.wayne.edu` (VPN first off campus), sign in, wait for the
-   dashboard.
-5. **Click the icon on that tab.** Chrome asks to allow that one site: allow. The side panel opens
-   (if it does not, the same strip opens in a tab; both are fine) and the strip runs by itself, one
-   line at a time: portal, warm-up, *Checking your access...* then approved, install (your account
-   already uses the lab's shared copy: nothing to do; an account that has never been set up gets one
-   line, `hpcworker install --shared`, and nothing uploaded), probe (reuses today's, or submits a
-   short job: minutes on `reqp`), sign-in (skipped: already signed in), the data statement (tick
-   it), start (finds the running worker or submits one), online, and the green *Open in Claude*
-   button. A claude.ai tab opens by itself unless you turned that off.
-6. **Details, Run the checks:** 17 OK. Check 1 must read `Access approved for go2432 at
-   ondemand.grid.wayne.edu (checked <time>); kill-list of <the date of the list at
-   /beethoven/killlist.json>`. Check 6 says the tool is set up from the lab's shared copy, and the
-   line above the buttons under *Your worker* reads "the lab's shared copy, version N". Neither may
-   show a cluster path, a folder name or the tool's command name (a check that does is a defect;
-   write down its words).
-7. **Open in Claude.** The environment appears under Code on claude.ai; send a message; get a reply.
-8. **Laptop-off test.** Close the claude.ai tab, the panel, the portal tab and the browser. On the
-   phone: Claude app, *Code*, the same environment, continue the conversation. Later, reopen the
-   browser, open a fresh portal tab, click the icon: the strip says online at once, nothing
-   restarts.
-9. **Stop and cold start.** Details, *Stop*: the status becomes "stopped by request; the chain
-   ended" and `hpcworker worker status` agrees (no successor). Click the icon again: a new worker is
-   submitted, and the strip walks to online again.
-10. **Audit log.** Setup page (or Details): export it and read it: one line per portal request,
-    nothing you typed, no credential, no key.
-11. **The name, everywhere.** Every screen says Beethoven and nothing says the old name: the toolbar
-    tooltip, the panel and its strip, *Details*, the checks, the options page, the data statement,
-    the agreement dialog (its title is "Beethoven Trial Edition License Agreement", version 7), the
-    privacy statement (version 8) and the audit export (its file name and its header line). In the
-    browser's developer tools, the page script's marker on the portal tab reads
-    `beethovenPortalScriptLoaded`.
-12. **The theme, the fonts and the icon (new in 9.0.0).** The setup page, the panel, *Details* and
-    the options page all show the cream ground, Newsreader headings, IBM Plex text and the teal
-    *Open in Claude* button; nothing falls back to a system font (Times or Arial where Newsreader or
-    Plex should be is a defect). In the developer tools of the setup page and of the panel, *Network*,
-    filter *Font*, reload: every font comes from `chrome-extension://<id>/fonts/`, and nothing goes to
-    `fonts.googleapis.com`, `fonts.gstatic.com` or any other address. The toolbar icon is the rack
-    with one teal unit; look at it at 16 px on a light and on a dark toolbar (*Customize Chrome*, a
-    dark colour) and write down if it turns to a grey smudge.
-13. **A second installation.** Make a second Chrome profile (*Add* in the profile menu), load the
-    same unpacked build there, accept the agreement, open the portal, click the icon. The strip must
-    stop at the access step with exactly "This account is already set up on another computer. Ask
-    your lab lead to move it here." and no button; *Details* shows the same sentence. Within a
-    minute the service e-mails you once ("... asked from a second installation; it was refused").
-    Press *Move the approval to the new installation*, then click the icon in the second profile
-    again: it goes on to approved. The first profile keeps its approval until its day is up (an
-    approval under a day old is not asked again), then shows the same sentence. Move it back, or
-    `reset-seat`, before you go on. Remove the second profile afterwards.
-14. **Not approved (optional).** Your own account is approved, so this path needs either a colleague
-    who is not on the list (one click: the strip must read *Ask for access* and open the request
-    page with their AccessID filled in) or the mock recipe in `LISTING.md` run with `--user zz9999`.
-    That run sends a check for zz9999 to the live access service, which refuses it and keeps a
-    record under that name; use a name that is certainly nobody's AccessID. (The recipe sent to
-    reviewers tells them to use st1234 only.)
-15. **Anthropic addresses are refused before any prompt (new in 10.0.0).** Do this in a profile
-    with no portal connected: a fresh Chrome profile with the unpacked build loaded, or after
-    *Disconnect*. With a portal connected the setup page has no address field, and the panel shows
-    your portal's step instead. On the setup page, under *3. Your portal*, type `claude.ai` and press
-    *Connect*: the line under the field says it is an
-    Anthropic address, not a portal, and Chrome shows no *Allow*/*Deny* prompt. The same for
-    `anthropic.com` and `www.claude.com`. Then open `https://claude.ai/pun/x` in a tab (claude.ai
-    answers with a page of its own; a path under `/pun/` is what made 9.0.0 ask) and click the
-    Beethoven button there: the panel opens, says the tab is an Anthropic address and not a portal,
-    and Chrome shows no prompt. If the panel offers to connect
-    that tab as your portal, that is a defect: write it down, press it once, and there must still be
-    no prompt. The same for `ftp://claude.ai` and `https:/claude.ai` typed into *Connect*. Last,
-    `chrome://extensions`, Beethoven, *Details*, *Site access*: no claude.ai, claude.com or
-    anthropic.com. This is what the Test instructions and the host-permission justification in
-    `PASTE.md` say; do not paste them before it is seen.
-16. **One notice (new in 10.0.0).** On the setup page, press *Check my access now* while your
-    approval is under a day old: the notice says once that the service was not asked again ("Not
-    asked: ..."), never "Not asked: not asked: ...".
+4. **The helper, Windows.** The panel shows **One small download, once** with **Download for
+   Windows** and `beethoven-bridge-windows.zip` with its size under it. Download it. Note what
+   Chrome's download list says about it (a warning, or none). In Downloads, right-click the zip,
+   **Extract All**, then double-click `install.cmd` in the folder, and note what Windows says
+   (**Windows protected your PC** with **More info** and **Run anyway**; **Open File - Security
+   Warning**; or nothing). Write the exact words down: `docs/guides/INSTALL.md` quotes them. The
+   window asks **Press Enter to install, or close this window to cancel**, then says **The Beethoven
+   bridge 1.0.0 is installed for Chrome and Edge. Go back to Beethoven and press Check again.** Then:
+   - `reg query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge"`
+     shows one key whose default value is the path of a manifest file in your own user folder; that
+     file's `allowed_origins` names this extension's ID only, and its `path` is the helper's launcher
+     beside it. Nothing was written under `HKLM` and nothing under `Program Files`.
+   - The panel says **Waiting for the helper. Beethoven checks by itself every few seconds.**, then
+     **Helper found.** within a few seconds (or after **Check again**). Note what Windows' file
+     properties say about the saved zip's origin (right-click, **Properties**: the **Unblock** box
+     means it carries the Mark of the Web; a zip Beethoven made in memory may name a `blob:` address
+     there, which was not seen before).
+   - **Settings**, **Connection**, **Helper**: **Installed · version 1.0.0**.
+5. **The helper, Mac** (if you have one at hand; nobody has tried this on a Mac yet). The same,
+   with **Download for macOS**: double-click `beethoven-bridge-mac.zip`, then open `install.command`
+   in the folder that appears. Write down exactly what macOS says, and which path you took: on
+   macOS 15 or later, **System Settings**, **Privacy & Security**, **Open Anyway**; on macOS 14,
+   Control-click, **Open**; or `bash` and the file in Terminal. Then
+   `ls ~/Library/Application\ Support/Google/Chrome/NativeMessagingHosts/` shows
+   `com.openspineconsortium.beethoven.bridge.json`, and the helper is in
+   `~/Library/Application Support/Beethoven/bridge`.
+6. **The direct sign-in, on the real grid, GlobalProtect off.** **Sign in to the grid**: type your
+   AccessID, **Continue**. **Connecting to the grid…**. Then the grid's own password prompt, then
+   **Your google authenticator one-time verification code:** with "The 6-digit code for the grid in
+   Google Authenticator (not Microsoft Authenticator)." beside it. Anything the grid prints first is
+   marked **The grid says**. Type both. **Signing in…**, **Setting up this computer…**, **Checking
+   the new key…**, **This computer is set up.** Record the time from **Continue** to **This computer
+   is set up.**
+   - In the OnDemand shell afterwards (GlobalProtect on for that): `grep beethoven-browser
+     ~/.ssh/authorized_keys` shows exactly one line, beginning
+     `restrict,command="/rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker gate"`
+     and ending `beethoven-browser <today's date>`; every line you wrote down before is still there;
+     `~/.ssh/authorized_keys.beethoven-prev` holds the file as it was, without any `beethoven-browser`
+     line.
+   - **Details for your lab lead** shows the key's type and fingerprint, "protected: no", and the
+     host key `SHA256:kLTz1xK6anQ1denM+31kDEryQtgan2P76r9aLno+K3s`.
+7. **Protect the key? Not now.** On **Protect the key on this computer?** press **Not now**. The
+   panel goes on; the **Grid** line says **Direct**.
+8. **The first worker.** **Where your work goes**: tick, **Connect**. If Claude is not signed in on
+   the grid: within ten minutes of step 6, Beethoven uses step 6's sign-in, still held, and asks for
+   nothing; later, the sheet asks for your password and code once more. Either way it says **Getting
+   your Claude sign-in ready…**, then the Claude tab and **Paste code** follow (the core's order:
+   `core/signin.ts`, the held session; seen only against the local grid stand-in). Then **In line for
+   a computer**, **You're online.**, **Open my session**: send a message in claude.ai and get a
+   reply.
+9. **Daily use, no VPN, nothing typed.** Close the browser. Reopen it, open the panel: the **Grid**
+   line says **Signed in as** your AccessID and **Direct** with no prompt. **Stop**, then
+   **Connect**: both work with GlobalProtect off.
+10. **Windows Hello on, then off.** **Settings**, **Connection**, turn on **Protect my key with
+    Windows Hello / Touch ID**. Chrome asks where to save a passkey: choose Windows Hello, then your
+    PIN or fingerprint. **Protected.** Restart the browser: the **Grid** line says **Locked** with
+    **Unlock**; **Unlock** asks Windows Hello once, and not again until the next browser start. Turn
+    it off again in Settings. Write down what Windows asked at each step.
+11. **Still one line.** In the OnDemand shell, `grep -c beethoven-browser ~/.ssh/authorized_keys`
+    still answers 1, with the same key as in step 6: turning the protection on and off re-wraps the
+    same key in the browser and does not touch the grid (`core/keyring.ts`). Settings says, under the
+    switch, that an older unprotected copy can stay in the browser's files for a while when it is
+    turned on after setup. (What a copied key can and cannot do through the gate was tested against a
+    local sshd by the framework stream; it is not tested on the grid here.)
+12. **Forget this computer.** **Settings**, **Connection**, **Forget this computer**, **Forget**:
+    **This computer is forgotten.** In the OnDemand shell, `grep -c beethoven-browser
+    ~/.ssh/authorized_keys` is 0, `grep -c beethoven-browser ~/.ssh/authorized_keys.beethoven-prev`
+    is 0 too, and your own lines are still there. (With the key protected and locked, Forget asks
+    you to unlock it first, so the grid forgets it too.) The next panel opening asks
+    for the sheet again. Delete the passkey of step 10 in Windows' **Settings**, **Accounts**,
+    **Passkeys** if it is still listed.
+13. **The GlobalProtect way.** **Settings**, **Connection**, **GlobalProtect only**. The panel says
+    **Using GlobalProtect**: "Turn GlobalProtect on, then press Continue: the grid's own sign-in box
+    opens."; turn it on and press **Continue**: the 11.0.0 moments follow (Chrome's own sign-in box,
+    the data statement, online). Then **Direct when possible** again: the direct way comes back.
+14. **No helper.** Remove the helper with its uninstaller (`INSTALL.md`, "Remove the helper"). The
+    `reg query` of step 4 finds nothing. The panel offers **One small download, once** again;
+    **Use GlobalProtect instead** works.
+15. **Details, Run the checks.** All OK (the checks are 11.0.0's; the direct way has a section of its
+    own in Details: the bridge, the helper's version, the host key, the key's type, fingerprint and
+    whether it is protected). No check shows a password, a code or a private key.
+16. **Audit log and Show log.** Export the audit log and read it: no password, no code, no key
+    material. **Show log** says "Signed in to the grid directly as <AccessID>" and "This computer is
+    set up for the grid".
+17. **A second installation.** As in 10.0.0: a second Chrome profile with the unpacked build stops
+    at "<AccessID> is set up on another computer. Your lab lead can move it here." Signing in
+    directly there (after you moved the approval) replaces the first profile's key line: the first
+    profile then asks for the sheet again.
+18. **Anthropic addresses are refused before any prompt** (10.0.0's step 15, on the welcome page's
+    **Use another portal** field): `claude.ai`, `anthropic.com`, `www.claude.com` each answer
+    "That's a Claude address, not your grid." and Chrome shows no prompt; `chrome://extensions`,
+    Beethoven, *Details*, *Site access* lists no Anthropic site.
 
-If the strip stalls: a first-visit "Server Error" from the portal clears on a second click; "sign in
-to your portal" means the portal session expired, sign in in the tab; a probe waiting in the queue
-is normal.
-
-Chrome-specific things to look at: the permission prompt names only the portal origin;
-`chrome://extensions` shows no host permission under *Site access* until you allowed the portal, and
-then only that site. When done, remove the unpacked copy; the store installation has a different id,
-starts empty (the agreement is accepted once more) and is a new installation for the service.
+Chrome-specific things to look at: the install prompt and the permission prompt name only what the
+manifest asks for; `chrome://extensions` shows no host permission under *Site access* until you
+allowed the portal, and then only that site.
 
 ## Just before uploading
 
-- `unzip -p release/10.0.0/beethoven-10.0.0-chrome.zip manifest.json` (the file you upload; its SHA-256
-  matches `release/10.0.0/SHA256SUMS.txt`) shows version 10.0.0, the
-  name Beethoven, the 128-character `description` in `LISTING.md` and the permissions `storage,
-  alarms, scripting, activeTab, sidePanel`, optional host `https://*/*`, nothing else. `unzip -l` on
-  the same zip lists `fonts/` with seven `.woff2` files and the two `-OFL.txt` licence texts.
-- The five public pages open: `https://openspineconsortium.com/beethoven/`, `privacy.html`,
-  `terms.html`, `support.html` and `request.html` beside it; none offers a download or names another
-  browser; `https://openspineconsortium.com/beethoven/services.json` carries `access_check` on
-  `beethoven-access.openspineconsortium.workers.dev` and no `allowlist`;
-  `https://openspineconsortium.com/beethoven/killlist.json` answers 200 and verifies; the old
-  address `https://openspineconsortium.com/ashley/bridge/` sends you to the new landing page.
-- The access service of 2026-10-01 is deployed under both names, in the order `SUBMISSION.md`,
-  section 0, item 5 gives, and the reviewer account `st1234` answers yes from two different
-  installation identifiers at portal `localhost` (the same item).
-- Reviewer note: Beethoven runs Claude Code and is not an Anthropic product. The listing's last
-  paragraph, the reviewer recipe in `LISTING.md` and the landing page's last line carry that
-  sentence; read it once in each before pasting.
-- The access service saw your checks: `node tools/intake/admin.mjs list` (the `checks` array, and
-  your seat).
-- Look at each file `PASTE.md` names, once yourself, and run the one-line check at the top of
-  `PASTE.md`: every image the exact size its field asks for and `RGB` (no alpha). Every product
-  screen in them is a real capture of the 9.0.0 build, whose screens they show 10.0.0 does not
-  change (`LISTING.md`, "Images and the promo video"); compare each with what this build shows
-  you, and every image or video frame that names Claude or claude.ai carries, small, "Not an
-  Anthropic product." Watch the promo video to its end before it goes to YouTube.
-- The description in `PASTE.md` is 1,203 characters; paste it whole. (This file said 1,049 until
-  2026-10-01; 1,203 is the count of the text in the sheet.)
-- Before pasting the Test instructions in `PASTE.md`, see each of their steps on this 10.0.0 build:
-  steps 2 and 15 above, and, in a profile with no portal connected (a fresh Chrome profile with the
-  unpacked build loaded; step 13's second profile is gone by then), the button on `https://example.com` opening the panel at "step 1 of
-  11" with no prompt, *Run the checks* showing 2 to fix and 15 blocked, and *Connect* with
-  `example.com` on the setup page asking for that one site. If a step count or a check count
-  differs, correct the text and its character count in `PASTE.md` before pasting.
+- `unzip -p release/12.0.0/beethoven-12.0.0-chrome.zip manifest.json` (the file you upload; its
+  SHA-256 matches `release/12.0.0/SHA256SUMS.txt`) shows version 12.0.0, the name Beethoven, the
+  128-character `description` in `LISTING.md`, the permissions `storage`, `alarms`, `scripting`,
+  `sidePanel` and `nativeMessaging`, optional host `https://*/*`, nothing else. `unzip -l` lists
+  `fonts/` and `bridge/`; the SHA-256 of each file under `bridge/` matches `bridge/manifest.json`.
+- The five public pages open; `privacy.html` says version 10 and `terms.html` version 9; none offers
+  a download or names another browser; `services.json` carries `access_check` and no `allowlist`;
+  `killlist.json` answers 200 and verifies.
+- The access service answers `st1234` yes from two installation identifiers at portal `localhost`
+  (`SUBMISSION.md`, section 0, item 5).
+- The screenshots are new captures of 12.0.0 (`PASTE.md`, field 7), and none shows a real AccessID,
+  password, code or key fingerprint.
+- The description in `PASTE.md` is 1,650 characters; paste it whole.
+- Before pasting the Test instructions in `PASTE.md`, see each of their steps on this build in a
+  fresh profile with no portal granted and GlobalProtect off: the welcome page, **Agree and
+  continue** and what Chrome asks; the panel's **One small download, once** with the file under the
+  button; **Use GlobalProtect instead** leading to **Using GlobalProtect** and **Turn on
+  GlobalProtect.** If a word differs, correct the text and its character count in `PASTE.md`.
 - Then follow `SUBMISSION.md`.

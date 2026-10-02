@@ -60,8 +60,11 @@ Extension:
   pin it with Chrome's `ExtensionSettings.runtime_allowed_hosts` and `runtime_blocked_hosts`; the exact
   host and permission list is in `docs/STORE_LISTING.md`.
 - Never requests `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `nativeMessaging`, `debugger` or `identity`. The portal cookie is carried by the network stack and
-  never read. No automated login; the MFA step is never touched.
+  `debugger` or `identity`. Since 12.0.0 it requests `nativeMessaging` for one host, its bundled
+  bridge, which opens TCP only to the grid's ssh port from a built-in allowlist and holds no credential.
+  The portal cookie is carried by the network stack and never read. No automated login of the portal;
+  on the direct way the student types the grid password and one-time code into Beethoven's sign-in
+  sheet, which sends them only to the grid inside the encrypted ssh session and never keeps them.
 - No remote code: no `eval`, no fetched scripts, MV3 default CSP. The kill-list is JSON verified with
   `crypto.subtle.verify` (Ed25519; ECDSA P-256 fallback below Chrome 137, Firefox 130, Safari 17)
   against a public key compiled into the bundle; a revoked version refuses to send commands and says

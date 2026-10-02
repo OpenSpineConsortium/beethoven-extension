@@ -5,6 +5,10 @@
 import { encodeText } from '../vendor/qrcodegen';
 import { svg } from './dom';
 
+/**
+ * 12.0.0: the same drawing serves the public pages of the prerequisites (Wayne State's guides and the
+ * two app stores' pages for Google Authenticator), each with its address printed under it (routes.ts).
+ */
 export function qrSvg(text: string, px = 180, label?: string): SVGElement {
   const q = encodeText(text);
   const border = 4;

@@ -1,0 +1,16 @@
+THE SCREENSHOTS IN THIS KIT ARE 9.0.0'S (unchanged through 11.0.0; 12.0.0 changes the screens).
+
+07-screenshot-1-your-grid.png      still true: a drawing (the site's home page diagram), no screen in it.
+07-screenshot-2-click-once.png     OUT OF DATE: 9.0.0's strip ("Open in Claude"); 12.0.0's panel says
+                                   "You're online." with "Open my session".
+07-screenshot-3-sign-in-once.png   OUT OF DATE: 9.0.0's strip with the portal's shell; 12.0.0 signs in to
+                                   Claude in the panel, and to the grid in its own sign-in sheet.
+07-screenshot-4-seventeen-checks.png OUT OF DATE: 9.0.0's Details > Checks page.
+07-screenshot-5-by-approval-only.png OUT OF DATE: 9.0.0's setup page Access card; 12.0.0 has a welcome
+                                   page and Settings instead.
+05-promo-video-1280x720.mp4 and its thumbnail: OUT OF DATE (9.0.0's toolbar-button start). Leave the
+                                   promo video field empty (PASTE.md, field 5).
+04, 06, 08 (icon, small tile, marquee): drawings, still true.
+
+Capture five new screenshots from the 12.0.0 build before submitting (PASTE.md, field 7, lists them),
+on the mock account st1234 only, with no real AccessID, code or key fingerprint on screen.

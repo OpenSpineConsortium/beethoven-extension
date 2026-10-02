@@ -2,7 +2,7 @@
 // internal words live here and only here (job, node, partition, Slurm, shell host, the audit log):
 // a student never needs this sheet, and the hygiene rule exempts it. Everything comes from DetailsView;
 // "Running the checks…" clears when they finish because it is the view's own `running` flag.
-import type { Action, DetailsView } from '../core/model';
+import type { DetailsView } from '../core/model';
 import { el } from './dom';
 import { spinner } from './icons';
 import { DETAILS_LABELS as L } from './labels';
@@ -29,7 +29,7 @@ export function renderDetails(d: DetailsView | undefined, cb: { onAct: OnAct; pe
     el('button', { type: 'button', class: 'btn btn-text', text: doneLabel, onClick: cb.close }),
   );
   if (!d) return el('div', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'sheet-title' }, head, el('div', { class: 'sheet-body' }, el('p', { class: 'd-running' }, spinner(14), el('span', { text: L.loading }))));
-  const onAct: OnAct = (a: Action) => cb.onAct(a);
+  const onAct: OnAct = (a) => cb.onAct(a);
   const r = d.run;
   const checks = d.checks;
   return el(
@@ -81,6 +81,27 @@ export function renderDetails(d: DetailsView | undefined, cb: { onAct: OnAct; pe
       section(L.progress, pre(d.progressTail.join('\n'))),
       section(L.rc, pre(d.rcTail)),
       section(L.audit, pre(d.audit.join('\n'))),
+      // 12.0.0: the direct way, for the lab lead: the mode, each bridge in order, the grid's pinned
+      // identity, this browser's key (fingerprint, protected or not), the port, the account the grid
+      // accepted, the helper's file, and the plain statement that it is unproven on the grid
+      d.direct
+        ? section(
+            L.direct,
+            el(
+              'dl',
+              { class: 'd-card', style: 'margin:0' },
+              kv(L.directMode, d.direct.mode),
+              kv(L.bridges, d.direct.bridges.join('\n')),
+              kv(L.host, d.direct.host),
+              kv(L.pin, d.direct.pin),
+              kv(L.key, d.direct.key),
+              kv(L.reach, d.direct.reach),
+              kv(L.account, d.direct.account),
+              kv(L.helperFile, d.direct.helperFile),
+            ),
+            el('p', { class: 'd-note', text: d.direct.unproven }),
+          )
+        : null,
       section(
         L.connection,
         el('dl', { class: 'd-card', style: 'margin:0' }, kv(L.shellHost, d.shellHost), kv(L.siteProfile, d.siteProfile), kv(L.channel, d.channel), kv(L.loginSetup, `${d.loginSetup.proven ? L.proven : L.unproven}`)),

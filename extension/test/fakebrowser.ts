@@ -3,6 +3,7 @@
 // helper). Nothing here reaches the network: every fetch is answered in-process, and any address that
 // is not the fake portal or the extension's own files is recorded and refused.
 import { readFileSync } from 'node:fs';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 export const EXT = 'chrome-extension://ext';
@@ -54,6 +55,94 @@ export interface World {
   openTab(url: string, windowId?: number, active?: boolean): Tab;
   navigate(id: number, url: string): void;
   closeTab(id: number): void;
+  /** 12.0.0: the native messaging host Chrome would start (none: "Specified native messaging host not found.") */
+  native?: (name: string) => any;
+  /** 12.0.0: extension files served in place of public/ (a site profile with the stand-in's host key, a bridge manifest) */
+  files: Map<string, string>;
+}
+
+/**
+ * 12.0.0: a minimal IndexedDB (one database, object stores of keyed values) for the background's key ring
+ * under Node, which has none; values are kept as they are (a CryptoKey too), as the browser's
+ * structured clone would keep them.
+ */
+export function fakeIndexedDB() {
+  const dbs = new Map<string, Map<string, Map<unknown, unknown>>>();
+  const req = (result?: unknown) => ({ result, error: null as unknown });
+  return {
+    open(name: string) {
+      const r: any = { result: undefined, error: null, onsuccess: null, onerror: null, onupgradeneeded: null };
+      setTimeout(() => {
+        let db = dbs.get(name);
+        const fresh = !db;
+        if (!db) {
+          db = new Map();
+          dbs.set(name, db);
+        }
+        const d = db;
+        r.result = {
+          createObjectStore: (n: string) => d.set(n, new Map()),
+          transaction: (n: string) => {
+            const st = d.get(n)!;
+            const tx: any = { oncomplete: null, onerror: null, onabort: null, error: null };
+            tx.objectStore = () => ({
+              get: (k: unknown) => req(st.get(k)),
+              put: (v: unknown, k: unknown) => (st.set(k, v), req(k)),
+              delete: (k: unknown) => (st.delete(k), req(undefined)),
+            });
+            setTimeout(() => tx.oncomplete?.(), 0);
+            return tx;
+          },
+          close: () => undefined,
+        };
+        if (fresh) r.onupgradeneeded?.();
+        r.onsuccess?.();
+      }, 0);
+      return r;
+    },
+  };
+}
+
+/**
+ * 12.0.0: the bundled helper as Chrome would run it, in-process: the wire contract (hello, open, data,
+ * close; opened, data, closed, error), its allowlist, and TCP to `port` on 127.0.0.1 (the grid stand-in)
+ * for a stream it opens to an allowed host:port. Every port it made is in `ports`.
+ */
+export function nativeHelperToTcp(world: World, port: number, allow: string[] = ['grid.wayne.edu:22']) {
+  const ports: any[] = [];
+  world.native = (name: string) => {
+    const msgL: Array<(m: unknown) => void> = [];
+    const discL: Array<() => void> = [];
+    const socks = new Map<string, net.Socket>();
+    let open = true;
+    const out = (m: unknown) => setTimeout(() => open && msgL.forEach((f) => f(m)), 0);
+    const p = {
+      name,
+      postMessage(m: any) {
+        if (!open) throw new Error('Attempting to use a disconnected port object');
+        if (m.t === 'hello') out({ t: 'hello', v: 1, helper: '1', os: 'windows', kind: 'script', allow });
+        else if (m.t === 'open') {
+          if (!allow.includes(`${m.host}:${m.port}`)) return out({ t: 'error', id: m.id, reason: 'not in the allowlist' });
+          const s = net.connect({ host: '127.0.0.1', port });
+          socks.set(m.id, s);
+          s.on('connect', () => out({ t: 'opened', id: m.id }));
+          s.on('data', (b: Buffer) => out({ t: 'data', id: m.id, b64: b.toString('base64') }));
+          s.on('close', () => out({ t: 'closed', id: m.id, reason: 'eof' }));
+          s.on('error', () => undefined);
+        } else if (m.t === 'data') socks.get(m.id)?.write(Buffer.from(m.b64, 'base64'));
+        else if (m.t === 'close') socks.get(m.id)?.destroy();
+      },
+      disconnect() {
+        open = false;
+        for (const s of socks.values()) s.destroy();
+      },
+      onMessage: { addListener: (f: (m: unknown) => void) => msgL.push(f) },
+      onDisconnect: { addListener: (f: () => void) => discL.push(f) },
+    };
+    ports.push(p);
+    return p;
+  };
+  return ports;
 }
 
 let current: any = {};
@@ -81,6 +170,7 @@ export function install(): World {
     openTab: (url, windowId = 1, active = true) => openTabImpl(url, windowId, active),
     navigate: (id, url) => navigateImpl(id, url),
     closeTab: (id) => removeImpl(id),
+    files: new Map(),
   };
   const L = (s: string) => world.log.push(`${String(world.now()).padStart(6)} ${s}`);
   let nextTab = 10;
@@ -170,6 +260,20 @@ export function install(): World {
       L('runtime.openOptionsPage');
     },
     sendMessage: async () => undefined,
+    // 12.0.0
+    getPlatformInfo: async () => ({ os: 'win', arch: 'x86-64' }),
+    connectNative: (name: string) => {
+      L(`runtime.connectNative ${name}`);
+      if (world.native) return world.native(name);
+      // Chrome with no host registered under that name: the port ends at once with this sentence
+      const discL: Array<() => void> = [];
+      setTimeout(() => {
+        (runtime as any).lastError = { message: 'Specified native messaging host not found.' };
+        for (const f of discL) f();
+        (runtime as any).lastError = undefined;
+      }, 1);
+      return { postMessage: () => undefined, disconnect: () => undefined, onMessage: { addListener: () => undefined }, onDisconnect: { addListener: (f: () => void) => discL.push(f) } };
+    },
   };
   world.chrome = {
     runtime,
@@ -258,6 +362,7 @@ export function install(): World {
   current = world.chrome;
   (globalThis as any).chrome = STABLE;
   (globalThis as any).browser = STABLE;
+  (globalThis as any).indexedDB = fakeIndexedDB();
 
   // ---- the fake portal: fetch ----
   const mkRes = (body: string, status: number, url: string, type = 'basic', contentType = 'text/html') => {
@@ -271,6 +376,7 @@ export function install(): World {
     const url = String(input);
     if (url.startsWith(EXT)) {
       const p = url.slice(EXT.length).split('?')[0]!;
+      if (world.files.has(p)) return mkRes(world.files.get(p)!, 200, url);
       try {
         return mkRes(readFileSync(PUBLIC + p, 'utf8'), 200, url);
       } catch {

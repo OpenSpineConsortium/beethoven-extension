@@ -4,7 +4,11 @@
 // four-node track sits above the moments and stays put while they slide. The tour plays below the queue
 // once, or over the home from ⋯. Details is a sheet from the right. Show log is closed every time the
 // panel opens. The page keeps only what is on screen: a tick, a fold, the confirm row, the phone view.
-import { WORDS, type Action, type DetailsView, type JourneyView, type LogLine, type LoginSetupMoment, type PanelView, type SurfaceView, type TourView, type TrackView } from '../core/model';
+//
+// 12.0.0: the direct way's moments (direct.ts), the "What you need" screen from ⋯ (the prerequisites
+// with their QR codes and the grid code's two routes), and the three passkey steps that must run inside
+// the click (rpc.ts KeyGesture): the sheet's opt-in tick, "Turn on", and "Unlock".
+import { WORDS, type DetailsView, type HelperDownload, type JourneyView, type LogLine, type LoginSetupMoment, type PanelView, type SignInSheetMoment, type SurfaceView, type TourView, type TrackView } from '../core/model';
 import { announce, copyText, el, morph, reducedMotion, slideSwap, toast } from './dom';
 import { requestOrigin } from '../ext/connectApi';
 import { renderDetails } from './details';
@@ -13,8 +17,11 @@ import { renderMoment } from './journey';
 import { LABELS } from './labels';
 import { button, header, track } from './parts';
 import { startPage } from './boot';
-import { currentWindowId, panelOpened, sendAction, subscribe, type Act } from './rpc';
+import { currentKeyGesture, currentWindowId, panelOpened, sendAction, subscribe, type Act } from './rpc';
 import { TourPlayer } from './tour';
+import type { DirectCtx } from './direct';
+import { needsView, WORDS12, type Action12 } from './model12';
+import { needsBlock, routeChoice } from './routes';
 
 export interface PanelLocal {
   menuOpen: boolean;
@@ -34,6 +41,20 @@ export interface PanelLocal {
   codeTyped: boolean;
   codeBad: boolean;
   tryIndex: number;
+  // 12.0.0
+  /** the sign-in sheet's opt-in "Protect my key with Windows Hello / Touch ID" (unticked by default) */
+  protectTicked: boolean;
+  /** a passkey step is up (the system's own prompt) */
+  keyBusy?: 'protect' | 'unlock' | 'create';
+  /** the sheet's AccessID was not one */
+  accountError?: string;
+  /** the helper's installer was saved from this panel */
+  helperDownloaded: boolean;
+  /** which QR code of each group is shown */
+  qrPick: Record<string, number>;
+  /** "What you need" (from ⋯) is open, and the route open in it */
+  needsOpen: boolean;
+  route?: 'laptop' | 'phone';
 }
 
 export interface PanelOptions {
@@ -45,7 +66,31 @@ export interface PanelOptions {
   details?: (onView: (v: SurfaceView) => void) => { close(): void };
 }
 
-const ORDER: Record<string, number> = { terms: 0, 'j:welcome': 1, 'j:globalprotect': 2, 'j:grid': 3, 'j:statement': 4, 'j:wait': 5, 'j:claude': 6, 'j:login-setup': 6, 'j:queue-tour': 7, 'j:online': 9, home: 10, tour: 11 };
+const ORDER: Record<string, number> = {
+  terms: 0,
+  'j:welcome': 1,
+  'j:fallback-to-vpn': 1.5,
+  'j:globalprotect': 2,
+  'j:install-helper': 2.2,
+  'j:sign-in-sheet': 2.4,
+  'j:choose-route': 2.5,
+  'j:code-setup': 2.6,
+  'j:enrolled': 2.8,
+  'j:protect-key-optional': 2.9,
+  'j:grid': 3,
+  'j:statement': 4,
+  'j:wait': 5,
+  'j:claude': 6,
+  'j:login-setup': 6,
+  'j:queue-tour': 7,
+  'j:online': 9,
+  home: 10,
+  needs: 11,
+  tour: 11,
+};
+
+/** an AccessID: letters and digits (the core's sentence says so; the grid decides the rest) */
+const ACCESS_ID = /^[A-Za-z0-9]{2,16}$/;
 
 /**
  * The screen's key: a change of key slides, a change inside one key morphs (crossfading what changed).
@@ -86,7 +131,7 @@ function trackOf(v: PanelView): { t: TrackView; waiting: boolean } | undefined {
 }
 
 export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: PanelView) => void; setDetails: (d: DetailsView) => void } {
-  const local: PanelLocal = { menuOpen: false, statementTicked: false, moreOpen: false, loginFoldOpen: false, confirmStop: false, phone: false, logOpen: false, detailsOpen: false, tourAutoClosed: false, codeTyped: false, codeBad: false, tryIndex: 0, ...(opts.fixture?.local ?? {}) };
+  const local: PanelLocal = { menuOpen: false, statementTicked: false, moreOpen: false, loginFoldOpen: false, confirmStop: false, phone: false, logOpen: false, detailsOpen: false, tourAutoClosed: false, codeTyped: false, codeBad: false, tryIndex: 0, protectTicked: false, helperDownloaded: false, qrPick: {}, needsOpen: false, ...(opts.fixture?.local ?? {}) };
   if (opts.fixture?.log) local.logLines = opts.fixture.log;
   let view: PanelView | undefined;
   let details: DetailsView | undefined = opts.fixture?.details;
@@ -95,6 +140,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
   let curScreen: HTMLElement | undefined;
   let lastToast: string | undefined;
   let player: { source: 'auto' | 'menu'; p: TourPlayer } | undefined;
+  let focusKey = '';
 
   root.classList.add('panel-root');
   const hdrSlot = el('div', { class: 'hdr-slot' });
@@ -129,7 +175,11 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
   };
 
   /** a press: shows its spinner until the next view, and handles what an answer asks of the page */
-  const onAct = (a: Action): void => {
+  const onAct = (a: Action12): void => {
+    if (a.kind === 'open-needs') {
+      set({ needsOpen: true, menuOpen: false, phone: false });
+      return;
+    }
     if (a.kind === 'open-details') {
       openDetails();
       return;
@@ -143,7 +193,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       if (a.open !== local.logOpen) toggleLog();
       return;
     }
-    const action: Action = a.kind === 'sign-in-grid' && a.windowId === undefined && opts.windowId !== undefined ? { ...a, windowId: opts.windowId } : a;
+    const action: Action12 = a.kind === 'sign-in-grid' && a.windowId === undefined && opts.windowId !== undefined ? { ...a, windowId: opts.windowId } : a;
     set({ pending: action.kind });
     const clear = setTimeout(() => {
       if (local.pending === action.kind) set({ pending: undefined });
@@ -160,6 +210,112 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       }, 1200);
     });
   };
+
+  // ---- 12.0.0: the passkey steps run here, inside the click, before any await (rpc.ts KeyGesture) ----
+
+  /** "Turn on" (protect-key-optional) */
+  const protectNow = () => {
+    if (local.keyBusy) return;
+    const running = currentKeyGesture().protect(true);
+    set({ keyBusy: 'protect' });
+    void running.then(
+      (outcome) => {
+        set({ keyBusy: undefined });
+        void opts.act({ kind: 'protect-key', on: true, outcome });
+      },
+      () => {
+        set({ keyBusy: undefined });
+        void opts.act({ kind: 'protect-key', on: true, outcome: 'failed' });
+      },
+    );
+  };
+
+  /** "Unlock" (the sheet's unlock phase, the Grid row's Unlock) */
+  const unlockNow = () => {
+    if (local.keyBusy) return;
+    const running = currentKeyGesture().unlock();
+    set({ keyBusy: 'unlock' });
+    void running.then(
+      (outcome) => {
+        set({ keyBusy: undefined });
+        void opts.act({ kind: 'unlock-key', outcome });
+      },
+      () => {
+        set({ keyBusy: undefined });
+        void opts.act({ kind: 'unlock-key', outcome: 'failed' });
+      },
+    );
+  };
+
+  /**
+   * The sheet's Continue. The AccessID: checked here, then (when the opt-in is ticked) the passkey step
+   * for the new key inside this click, then grid-signin-account. The grid's prompts: each field's answer
+   * in order, one grid-signin-answer each; the fields are emptied as they are read, and the answers are
+   * held nowhere but in this call until they are sent.
+   */
+  const submitSheet = (m: SignInSheetMoment) => {
+    if (m.phase === 'account') {
+      const input = document.getElementById('sheet-account') as HTMLInputElement | null;
+      const account = (input?.value ?? '').trim();
+      if (!ACCESS_ID.test(account)) {
+        set({ accountError: WORDS.direct.signin.accountBad });
+        input?.focus();
+        return;
+      }
+      if (local.keyBusy) return;
+      set({ accountError: undefined });
+      if (local.protectTicked && m.protect?.available) {
+        const creating = currentKeyGesture().createProtected();
+        set({ keyBusy: 'create' });
+        void creating
+          .catch(() => 'failed' as const)
+          .then((outcome) => {
+            set({ keyBusy: undefined });
+            void opts.act({ kind: 'protect-key', on: true, outcome });
+            onAct({ kind: 'grid-signin-account', account });
+          });
+        return;
+      }
+      onAct({ kind: 'grid-signin-account', account });
+      return;
+    }
+    if (m.phase === 'prompt') {
+      const fields = Array.from(document.querySelectorAll<HTMLInputElement>('input[data-prompt]')).filter((f) => !f.closest('.leaving'));
+      fields.sort((a, b) => Number(a.dataset.prompt) - Number(b.dataset.prompt));
+      const empty = fields.find((f) => !f.value);
+      if (empty) {
+        empty.focus();
+        return;
+      }
+      const answers = fields.map((f) => f.value);
+      for (const f of fields) f.value = '';
+      set({ pending: 'grid-signin-answer' });
+      void answers.reduce<Promise<unknown>>((p, text) => p.then(() => opts.act({ kind: 'grid-signin-answer', text })), Promise.resolve());
+      return;
+    }
+    if (m.submit.action) onAct(m.submit.action);
+  };
+
+  const downloadHelper = (d: HelperDownload) => {
+    // the browser saves the packaged file (the <a download> of this click); the background starts looking
+    set({ helperDownloaded: true });
+    void opts.act({ kind: 'bridge-downloaded', os: d.os });
+  };
+
+  const directCtx = (): DirectCtx => ({
+    onAct,
+    pending: local.pending,
+    qr: { qrPick: local.qrPick, setQrPick: (g, i) => set({ qrPick: { ...local.qrPick, [g]: i } }) },
+    protectTicked: local.protectTicked,
+    setProtectTicked: (on) => set({ protectTicked: on }),
+    keyBusy: local.keyBusy,
+    accountError: local.accountError,
+    submitSheet,
+    protect: protectNow,
+    unlock: unlockNow,
+    downloaded: local.helperDownloaded,
+    download: downloadHelper,
+  });
 
   const openTerminal = (m: LoginSetupMoment) => {
     // inside the click: the line goes on the clipboard first (the click's own user activation)
@@ -191,11 +347,38 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
     (document.getElementById('more-btn') as HTMLElement | null)?.focus();
   };
 
-  const journeyMenu = (): Array<{ label: string; action: Action }> => [
-    { label: WORDS.home.menu.settings, action: { kind: 'open-settings' } },
-    { label: WORDS.home.menu.details, action: { kind: 'open-details' } },
-    { label: WORDS.home.menu.help, action: { kind: 'open-help' } },
-  ];
+  /** "What you need" sits in every ⋯ menu, before Help (page-local: the screen is drawn here) */
+  const NEEDS_ITEM = { label: WORDS12.needs.menu, action: { kind: 'open-needs' } as Action12 };
+  const withNeeds = (menu: Array<{ label: string; action: Action12 }>): Array<{ label: string; action: Action12 }> => {
+    if (menu.some((m) => m.action.kind === 'open-needs')) return menu;
+    const help = menu.findIndex((m) => m.action.kind === 'open-help');
+    return help < 0 ? [...menu, NEEDS_ITEM] : [...menu.slice(0, help), NEEDS_ITEM, ...menu.slice(help)];
+  };
+
+  const journeyMenu = (): Array<{ label: string; action: Action12 }> =>
+    withNeeds([
+      { label: WORDS.home.menu.settings, action: { kind: 'open-settings' } },
+      { label: WORDS.home.menu.details, action: { kind: 'open-details' } },
+      { label: WORDS.home.menu.help, action: { kind: 'open-help' } },
+    ]);
+
+  /** the panel's "What you need": the four prerequisites with their QR codes, then the grid code's two routes */
+  const needsScreen = (): HTMLElement => {
+    const nv = needsView();
+    const qr = { qrPick: local.qrPick, setQrPick: (g: string, i: number) => set({ qrPick: { ...local.qrPick, [g]: i } }) };
+    return el(
+      'section',
+      { class: 'screen needs-screen', 'data-screen': 'needs' },
+      el(
+        'div',
+        { class: 'needs-head' },
+        el('h1', { class: 'm-title', text: WORDS12.needs.menu, tabindex: '-1', 'data-autofocus': '' }),
+        el('button', { type: 'button', class: 'btn btn-text needs-done', text: WORDS12.needs.done, onClick: () => set({ needsOpen: false }) }),
+      ),
+      needsBlock(nv.needs, qr, { compact: true }),
+      routeChoice(nv.routes, { ...qr, route: local.route, setRoute: (r) => set({ route: r }) }, { heading: 'h2' }),
+    );
+  };
 
   const tourDone = (source: 'auto' | 'menu', event: 'skip' | 'done' | 'failed') => {
     player = undefined;
@@ -207,6 +390,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
   const screenFor = (v: PanelView): { key: string; node: HTMLElement } => {
     const working = v.kind !== 'terms-needed' && v.overlays.workingInTab ? LABELS.workingInTab : undefined;
     const logCtx = { open: local.logOpen, lines: local.logLines, words: { show: WORDS.home.showLog, hide: WORDS.home.hideLog, copy: WORDS.home.copyLog }, toggle: toggleLog, copy: (t: string) => copy(t, WORDS.globalprotect.copied) };
+    if (local.needsOpen && !local.tourMenu) return { key: 'needs', node: needsScreen() };
     if (local.tourMenu && v.kind !== 'terms-needed') {
       return { key: 'tour', node: el('section', { class: 'screen tour-screen', style: 'display:flex;flex-direction:column' }, el('div', { 'data-keep': 'tour:menu', class: 'tour-slot', style: 'display:flex;flex-direction:column;flex:1;min-height:0' })) };
     }
@@ -231,6 +415,8 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
           tryIndex: local.tryIndex,
           setTryIndex: (i) => set({ tryIndex: i }),
           working,
+          unlock: unlockNow,
+          keyBusy: local.keyBusy,
         }),
       };
     }
@@ -270,6 +456,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
           set({ pending: 'use-portal' });
           void granting.then((granted) => opts.act({ kind: 'use-portal', origin, granted })).finally(() => set({ pending: undefined }));
         },
+        direct: directCtx(),
       }),
     };
   };
@@ -312,22 +499,23 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
     const v = view;
     if (!v) return;
     // the header: the wordmark, and ⋯ with its menu
-    const menu = v.kind === 'home' ? v.home.header.menu : v.kind === 'journey' ? journeyMenu() : undefined;
+    const menu = v.kind === 'home' ? withNeeds(v.home.header.menu) : v.kind === 'journey' ? journeyMenu() : undefined;
     morphSlot(
       hdrSlot,
-      header(v.kind === 'home' ? v.home.header.wordmark : WORDS.product, local.tourMenu ? undefined : menu, local.menuOpen, (open) => {
+      header(v.kind === 'home' ? v.home.header.wordmark : WORDS.product, local.tourMenu || local.needsOpen ? undefined : menu, local.menuOpen, (open) => {
         set({ menuOpen: open });
         if (open) setTimeout(() => (hdrSlot.querySelector('.menu-item') as HTMLElement | null)?.focus(), 0);
       }, onAct),
     );
     // the track, above the moments
-    const tr = local.tourMenu ? undefined : trackOf(v);
+    const tr = local.tourMenu || local.needsOpen ? undefined : trackOf(v);
     trackSlot.classList.toggle('open', !!tr);
     trackSlot.setAttribute('aria-hidden', tr ? 'false' : 'true');
     if (tr) morphSlot(trackInner, el('div', { class: 'trackbar' }, track(tr.t, { waiting: tr.waiting })));
     // the screen
     const { key, node } = screenFor(v);
-    if (key === curKey && curScreen && curScreen.isConnected) morph(curScreen, node);
+    const slid = !(key === curKey && curScreen && curScreen.isConnected);
+    if (!slid) morph(curScreen!, node);
     else {
       const back = (ORDER[key] ?? 0) < (ORDER[curKey] ?? 0) && key !== 'home';
       const fade = !curKey || key === 'home' || curKey === 'tour' || key === 'tour';
@@ -338,6 +526,14 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       if (!first) setTimeout(() => (node.querySelector('[data-autofocus]') as HTMLElement | null)?.focus({ preventScroll: true }), 340);
       else (node.querySelector('[data-autofocus]') as HTMLElement | null)?.focus({ preventScroll: true });
       if (local.phone && key !== 'home') local.phone = false;
+    }
+    // 12.0.0: a field the moment asks for next (the sheet's AccessID, then each prompt of the grid's)
+    // takes the caret when it arrives, also within one moment, once per field
+    const fk = Array.from(stage.querySelectorAll<HTMLElement>('[data-focus-key]')).find((e) => !e.closest('.leaving'));
+    const fkv = fk?.getAttribute('data-focus-key') ?? '';
+    if (fk && fkv !== focusKey) {
+      focusKey = fkv;
+      setTimeout(() => fk.isConnected && fk.focus({ preventScroll: true }), slid ? 340 : 0);
     }
     placeTour(v);
     // Details
@@ -368,6 +564,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       (document.getElementById('more-btn') as HTMLElement | null)?.focus();
     } else if (e.key === 'Escape' && local.detailsOpen) closeDetails();
     else if (e.key === 'Escape' && local.phone) set({ phone: false });
+    else if (e.key === 'Escape' && local.needsOpen) set({ needsOpen: false });
     else if (e.key === 'Escape' && local.confirmStop) set({ confirmStop: false });
   });
 
@@ -377,7 +574,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       // a new moment starts with its own page-local state
       const prevKey = view ? (view.kind === 'journey' ? `j:${view.journey.moment}` : view.kind) : '';
       const nextKey = v.kind === 'journey' ? `j:${v.journey.moment}` : v.kind;
-      if (prevKey && prevKey !== nextKey) Object.assign(local, { confirmStop: false, codeBad: false, codeTyped: false, loginFoldOpen: false });
+      if (prevKey && prevKey !== nextKey) Object.assign(local, { confirmStop: false, codeBad: false, codeTyped: false, loginFoldOpen: false, accountError: undefined, helperDownloaded: false, protectTicked: false });
       view = v;
       render();
     },

@@ -12,10 +12,12 @@ import { SUMMARY, TERMS_DATE, ticks } from '../core/terms';
 import type { PanelLocal } from './panel';
 import type { SettingsLocal } from './settings';
 import type { WelcomeLocal } from './welcome';
+import { needsList, routeQr, routesView, type WelcomeView12 } from './model12';
+import type { ConnectionSettingsView, DirectDetails, HelperDownload, HelperOs, SheetPrompt, SignInSheetMoment, StatusRows as Rows12 } from '../core/model';
 
 export type Fixture =
   | { name: string; surface: 'panel'; note: string; view: PanelView; local?: Partial<PanelLocal>; details?: DetailsView; log?: LogLine[] }
-  | { name: string; surface: 'welcome'; note: string; view: WelcomeView; local?: Partial<WelcomeLocal> }
+  | { name: string; surface: 'welcome'; note: string; view: WelcomeView | WelcomeView12; local?: Partial<WelcomeLocal> }
   | { name: string; surface: 'settings'; note: string; view: SettingsView; local?: Partial<SettingsLocal> };
 
 // ---- the sample student ------------------------------------------------------------------------------
@@ -200,15 +202,13 @@ const onlineMoment = (extra: Partial<Extract<JourneyView, { moment: 'online' }>>
 });
 
 // ---- the welcome page -----------------------------------------------------------------------------------
-const welcomeView = (extra: Partial<WelcomeView> = {}): WelcomeView => ({
+const welcomeView = (extra: Partial<WelcomeView12> = {}): WelcomeView12 => ({
   headline: WORDS.welcome.headline,
   subline: WORDS.welcome.subline,
   needsTitle: WORDS.welcome.needsTitle,
-  needs: [
-    { ...WORDS.welcome.needs[0], link: { label: WORDS.welcome.needs[0].link, url: 'https://services.wayne.edu/TDClient/277/Portal/KB/ArticleDet?ID=20199' } },
-    { ...WORDS.welcome.needs[1], link: { label: WORDS.welcome.needs[1].link, url: 'https://services.wayne.edu/TDClient/277/Portal/KB/Article/20314/Wayne-State-VPN-and-the-Global-Protect-client' } },
-    { ...WORDS.welcome.needs[2], link: { label: WORDS.welcome.needs[2].link, url: 'https://claude.ai/upgrade' } },
-  ],
+  // 12.0.0: the four prerequisites with their QR codes, and the grid code's two routes (model12.ts)
+  needs: needsList(),
+  routes: routesView(),
   summaryTitle: WORDS.welcome.summaryTitle,
   summary: [...SUMMARY],
   ticks: ticks().map((t) => ({ ...t })),
@@ -265,6 +265,116 @@ const settingsView = (appearance: 'cream' | 'system' = 'cream'): SettingsView =>
   activity: { show: WORDS.settings.show, export: WORDS.settings.export, clear: WORDS.settings.clear, count: 128 },
   drive: { title: WORDS.settings.drive, connected: false },
   labLead: { title: WORDS.settings.labLead, shellHost: 'Shell host: default', siteProfile: 'Site profile: wayne', hashes: ['LICENSE.txt sha256 3f1c…a9e2', 'PRIVACY.md sha256 77b0…41cd'] },
+  connection: connectionView(),
+});
+
+// ---- 12.0.0: the direct way ----------------------------------------------------------------------------------
+const D = WORDS.direct;
+const APP = VPN_APP;
+const textBtn = (label: string, action?: Action, extra: Partial<ButtonView> = {}): ButtonView => ({ label, tone: 'text', action, ...extra });
+
+/** the helper stream's public/bridge/manifest.json as of 2026-10-02: each zip, its size and the installer inside it */
+const BRIDGE_FILES: Record<HelperOs, { bytes: number; open: string }> = {
+  windows: { bytes: 12_660, open: 'install.cmd' },
+  mac: { bytes: 9_171, open: 'install.command' },
+  linux: { bytes: 13_198, open: 'install.sh' },
+};
+
+const download = (os: HelperOs): HelperDownload & { label: string; fileLine: string } => {
+  const osLabel = os === 'windows' ? 'Windows' : os === 'mac' ? 'macOS' : 'Linux';
+  const file = `beethoven-bridge-${os}.zip`;
+  const { bytes, open } = BRIDGE_FILES[os];
+  const size = `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return { os, osLabel, url: `/bridge/${file}`, file, open, size, bytes, kind: 'script', version: '1.0.0', label: D.installHelper.download(osLabel), fileLine: D.installHelper.fileLine(file, size) };
+};
+
+const helperMoment = (os: HelperOs, status: Extract<JourneyView, { moment: 'install-helper' }>['status'], extra: Partial<Extract<JourneyView, { moment: 'install-helper' }>> = {}): JourneyView => ({
+  moment: 'install-helper',
+  title: D.installHelper.title,
+  body: D.installHelper.body,
+  download: download(os),
+  steps: [...D.installHelper.stepsNamed[os](BRIDGE_FILES[os].open)],
+  ...(D.installHelper.osNote[os] ? { osNote: D.installHelper.osNote[os]! } : {}),
+  unsignedNote: D.installHelper.unsignedNote,
+  status,
+  checkAgain: ink(D.installHelper.checkAgain, { kind: 'check-bridge' }),
+  useVpn: textBtn(D.installHelper.useVpn(APP), { kind: 'use-vpn' }),
+  ...extra,
+});
+
+const PASSWORD: SheetPrompt = { text: 'Password: ', echo: false, kind: 'password' };
+const CODE: SheetPrompt = { text: 'Your google authenticator one-time verification code: ', echo: true, kind: 'code', hint: D.signin.codeHint };
+
+const sheet = (phase: SignInSheetMoment['phase'], extra: Partial<SignInSheetMoment> = {}): JourneyView => ({
+  moment: 'sign-in-sheet',
+  phase,
+  title: D.signin.title,
+  account: { label: D.signin.accountLabel, placeholder: D.signin.accountPlaceholder, ...(phase === 'account' ? {} : { value: ACCOUNT }) },
+  privacy: D.signin.privacy,
+  submit: ink(D.signin.continue, phase === 'account' ? { kind: 'grid-signin-account', account: '' } : { kind: 'grid-signin-answer', text: '' }),
+  cancel: textBtn(D.signin.cancel, { kind: 'grid-signin-change' }),
+  useVpn: textBtn(D.signin.useVpn(APP), { kind: 'use-vpn' }),
+  purpose: 'enrol',
+  ...(phase === 'account' ? { protect: { label: D.settings.protectKey, note: D.settings.protectKeyNote, available: true } } : {}),
+  ...extra,
+});
+
+const routeChoiceMoment: JourneyView = {
+  moment: 'choose-route',
+  title: D.chooseRoute.title,
+  body: D.chooseRoute.body,
+  options: [
+    { id: 'laptop', title: D.chooseRoute.laptop.title, detail: D.chooseRoute.laptop.detail, button: ink(D.chooseRoute.laptop.button, { kind: 'choose-route', route: 'laptop' }) },
+    { id: 'phone', title: D.chooseRoute.phone.title, detail: D.chooseRoute.phone.detail, button: ink(D.chooseRoute.phone.button, { kind: 'choose-route', route: 'phone' }) },
+  ],
+  useVpn: textBtn(D.signin.useVpn(APP), { kind: 'use-vpn' }),
+  warning: D.codeSetup.warning,
+};
+
+const codeSetupMoment = (route: 'laptop' | 'phone'): JourneyView => ({
+  moment: 'code-setup',
+  route,
+  title: route === 'laptop' ? D.codeSetup.laptopTitle : D.codeSetup.phoneTitle,
+  steps: [...(route === 'laptop' ? D.codeSetup.laptopSteps : D.codeSetup.phoneSteps)],
+  // the laptop route: the Authenticator's two store pages (for the phone) and the grid's own pages (links here)
+  qr: route === 'laptop' ? [...routeQr('laptop'), { id: 'grid-site', label: D.codeSetup.openSite, url: 'https://ondemand.grid.wayne.edu' }] : routeQr('phone'),
+  warning: D.codeSetup.warning,
+  done: ink(D.codeSetup.done, { kind: 'grid-signin-retry' }),
+  back: textBtn(D.codeSetup.back, { kind: 'route-back' }),
+  useVpn: textBtn(D.signin.useVpn(APP), { kind: 'use-vpn' }),
+});
+
+const protectMoment = (extra: Partial<Extract<JourneyView, { moment: 'protect-key-optional' }>> = {}): JourneyView => ({
+  moment: 'protect-key-optional',
+  title: D.protectKey.title,
+  body: D.protectKey.body,
+  on: { label: D.protectKey.on, busyLabel: D.protectKey.turningOn, available: true },
+  notNow: ink(D.protectKey.notNow, { kind: 'protect-key-later' }),
+  ...extra,
+});
+
+const via = (mode: 'direct' | 'vpn', locked = false): Rows12['grid']['via'] => ({ mode, text: mode === 'direct' ? D.rowDirect : D.rowVpn(APP), ...(locked ? { locked: { text: D.rowLocked, unlock: D.rowUnlock } } : {}) });
+
+const directDetails = (protectedKey: boolean): DirectDetails => ({
+  mode: 'direct (Connection: Direct when possible; a bridge answered)',
+  bridges: ['store: not available (no allowlisted extension offers a port to others)', 'relay: not configured (the site profile names none)', 'helper: available (1.0.0, script, windows)'],
+  host: 'grid.wayne.edu:22',
+  pin: 'ssh-rsa SHA256:kLTz1xK6anQ1denM+31kDEryQtgan2P76r9aLno+K3s',
+  key: `ecdsa-sha2-nistp256 SHA256:Xq3v0yF1m7Qd4WkR2b9cT8nJ5hL6pA1sE0uZ3gV7iYo, protected: ${protectedKey ? 'yes' : 'no'}, enrolled 2026-10-02`,
+  reach: 'grid.wayne.edu:22 answered at 2026-10-02T14:05:11Z with the pinned identity',
+  account: ACCOUNT,
+  helperFile: 'beethoven-bridge-windows.zip, 12660 bytes, sha256 9249bf47…7c497a95',
+  unproven: WORDS.details.directUnproven,
+});
+
+const connectionView = (extra: Partial<ConnectionSettingsView> = {}, protectKey: Partial<ConnectionSettingsView['protectKey']> = {}): ConnectionSettingsView => ({
+  title: D.settings.title,
+  mode: { label: D.settings.modeLabel, value: 'direct', options: [{ value: 'direct', label: D.settings.modes.direct }, { value: 'vpn', label: D.settings.modes.vpn }] },
+  protectKey: { label: D.settings.protectKey, note: D.settings.protectKeyNote, value: false, available: true, present: true, ...protectKey },
+  keyLine: protectKey.value ? D.settings.keyProtected : D.settings.keyPlain,
+  forget: { label: D.settings.forget, note: D.settings.forgetNote, confirm: D.settings.forgetConfirm, button: { label: D.settings.forgetButton, tone: 'ink', action: { kind: 'forget-computer' } }, disabled: false },
+  helper: { label: D.settings.helper, text: D.settings.helperInstalled('1.0.0'), installed: true, checkAgain: { label: D.installHelper.checkAgain, tone: 'outline', action: { kind: 'check-bridge' } } },
+  ...extra,
 });
 
 // ---- the list ----------------------------------------------------------------------------------------------
@@ -279,6 +389,23 @@ export const FIXTURES: Fixture[] = [
   { name: 'welcome-save-failed', surface: 'welcome', note: 'the record could not be saved', view: welcomeView({ state: 'save-failed', problem: WORDS.welcome.saveFailed }), local: { ticked: { agree: true } } },
   { name: 'welcome-other-portal', surface: 'welcome', note: 'Use another portal: the field slid open', view: welcomeView(), local: { portalOpen: true, portalInput: HOST } },
   { name: 'welcome-claude-address', surface: 'welcome', note: 'an Anthropic address refused before any prompt', view: welcomeView(), local: { portalOpen: true, portalInput: 'claude.ai', portalError: WORDS.welcome.anthropicRefused } },
+  // the core's welcome view as it is sent today (11.0.0's three needs, no route choice): the page draws Wayne State's in the 12.0.0 form
+  {
+    name: 'welcome-core-view',
+    surface: 'welcome',
+    note: "12.0.0: the core's three-need view, drawn in the 12.0.0 form by the page",
+    view: welcomeView({
+      needs: [
+        { ...WORDS.welcome.needs[0], link: { label: WORDS.welcome.needs[0].link, url: 'https://services.wayne.edu/TDClient/277/Portal/KB/ArticleDet?ID=20199' } },
+        { ...WORDS.welcome.needs[1], link: { label: WORDS.welcome.needs[1].link, url: 'https://services.wayne.edu/TDClient/277/Portal/KB/Article/20314/Wayne-State-VPN-and-the-Global-Protect-client' } },
+        { ...WORDS.welcome.needs[2], link: { label: WORDS.welcome.needs[2].link, url: 'https://claude.ai/upgrade' } },
+      ],
+      routes: undefined,
+    }),
+  },
+  { name: 'welcome-route-laptop', surface: 'welcome', note: '12.0.0: No grid code yet? On this computer', view: welcomeView(), local: { route: 'laptop' } },
+  { name: 'welcome-route-phone', surface: 'welcome', note: '12.0.0: No grid code yet? With my phone (the square codes under their steps)', view: welcomeView(), local: { route: 'phone', qrPick: { 'route-phone-q1-0': 1 } } },
+  { name: 'welcome-qr-android', surface: 'welcome', note: '12.0.0: the Authenticator code switched to Android', view: welcomeView(), local: { qrPick: { 'need-code-1': 1 } } },
   { name: 'welcome-handoff', surface: 'welcome', note: 'after the press: the panel carries on', view: welcomeView({ state: 'handoff', handoff: { text: WORDS.welcome.handoff, hero: { state: 'asked', orb: 'starting', word: WORDS.connect.hero, sub: WORDS.connect.gettingSignin, announce: WORDS.connect.hero } } }) },
 
   // the panel before the agreement, and while the welcome page carries moment 2
@@ -287,6 +414,58 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-welcome-waiting', surface: 'panel', note: 'the panel opened by the press, Chrome asking', view: journey({ moment: 'welcome', state: 'waiting', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.almostBody, status: WORDS.welcomeMoment.waiting }) },
   { name: 'j-welcome-denied', surface: 'panel', note: 'after Deny in Chrome\u2019s box', view: journey({ moment: 'welcome', state: 'denied', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.deniedBody }) },
   { name: 'j-welcome-revoked', surface: 'panel', note: 'the portal\u2019s grant taken away after the first run', view: journey({ moment: 'welcome', state: 'revoked', title: WORDS.welcomeMoment.revokedTitle, body: WORDS.welcomeMoment.revokedBody(HOST), button: ink(WORDS.welcomeMoment.revokedButton, { kind: 'use-portal', origin: `https://${HOST}`, granted: false }), origin: `https://${HOST}` }) },
+
+  // 12.0.0: the direct way. The helper's one-time download (D1)
+  { name: 'j-helper', surface: 'panel', note: '12.0.0: One small download, once (Windows): before the download', view: journey(helperMoment('windows', { state: 'idle' })) },
+  { name: 'j-helper-waiting', surface: 'panel', note: '12.0.0: downloaded; the steps, the warning, Beethoven looks by itself (not a failure)', view: journey(helperMoment('windows', { state: 'waiting', text: D.installHelper.waiting })) },
+  { name: 'j-helper-looking', surface: 'panel', note: "12.0.0: the student's own Check again", view: journey(helperMoment('windows', { state: 'looking', text: D.installHelper.checking }, { checkAgain: ink(D.installHelper.checkAgain, { kind: 'check-bridge' }, { busy: true }) })) },
+  { name: 'j-helper-mac', surface: 'panel', note: '12.0.0: the steps on a Mac (Gatekeeper)', view: journey(helperMoment('mac', { state: 'looking', text: D.installHelper.checking })) },
+  { name: 'j-helper-linux', surface: 'panel', note: '12.0.0: the steps on Linux', view: journey(helperMoment('linux', { state: 'looking', text: D.installHelper.checking })) },
+  { name: 'j-helper-not-found', surface: 'panel', note: '12.0.0: Check again found nothing yet', view: journey(helperMoment('windows', { state: 'not-found', text: D.installHelper.notFound })) },
+  { name: 'j-helper-broken', surface: 'panel', note: '12.0.0: the helper is there but did not answer', view: journey(helperMoment('windows', { state: 'broken', text: D.installHelper.broken })) },
+  { name: 'j-helper-found', surface: 'panel', note: '12.0.0: the helper answered (drawn check)', view: journey(helperMoment('windows', { state: 'found', text: D.installHelper.found })) },
+  { name: 'j-helper-none', surface: 'panel', note: '12.0.0: no helper for this computer (ChromeOS)', view: journey(helperMoment('windows', { state: 'idle' }, { download: undefined, steps: [] })) },
+
+  // 12.0.0: Beethoven's own sign-in sheet (R2)
+  { name: 'j-sheet-account', surface: 'panel', note: '12.0.0: Sign in to the grid: the AccessID, the opt-in tick unticked', view: journey(sheet('account')) },
+  { name: 'j-sheet-account-ticked', surface: 'panel', note: '12.0.0: the opt-in ticked (Windows Hello runs in the press)', view: journey(sheet('account', { account: { label: D.signin.accountLabel, placeholder: D.signin.accountPlaceholder, value: ACCOUNT } })), local: { protectTicked: true } },
+  { name: 'j-sheet-account-bad', surface: 'panel', note: '12.0.0: not an AccessID', view: journey(sheet('account', { account: { label: D.signin.accountLabel, placeholder: D.signin.accountPlaceholder, error: D.signin.accountBad } })) },
+  { name: 'j-sheet-connecting', surface: 'panel', note: '12.0.0: the bridge opens the connection and checks the grid', view: journey(sheet('connecting', { status: D.signin.connecting })) },
+  { name: 'j-sheet-password', surface: 'panel', note: "12.0.0: the grid's own password prompt", view: journey(sheet('prompt', { prompts: [PASSWORD] })) },
+  { name: 'j-sheet-code', surface: 'panel', note: "12.0.0: the grid's own code prompt", view: journey(sheet('prompt', { prompts: [CODE] })) },
+  { name: 'j-sheet-both', surface: 'panel', note: '12.0.0: a grid that asks for both at once', view: journey(sheet('prompt', { prompts: [PASSWORD, CODE] })) },
+  { name: 'j-sheet-not-accepted', surface: 'panel', note: '12.0.0: refused once; the grid asks again', view: journey(sheet('prompt', { prompts: [PASSWORD], notice: D.signin.notAccepted })) },
+  { name: 'j-sheet-working', surface: 'panel', note: '12.0.0: Signing in…', view: journey(sheet('working', { status: D.signin.working })) },
+  { name: 'j-sheet-setting-up', surface: 'panel', note: '12.0.0: accepted; Setting up this computer…', view: journey(sheet('working', { status: D.signin.settingUp })) },
+  { name: 'j-sheet-checking-key', surface: 'panel', note: '12.0.0: Checking the new key…', view: journey(sheet('working', { status: D.signin.checking })) },
+  { name: 'j-sheet-stopped', surface: 'panel', note: '12.0.0: three refusals: GlobalProtect now, Try again after the cooldown', view: journey(sheet('stopped', { problem: { title: D.signin.stoppedTitle, body: D.signin.stoppedBody(APP), button: ink(D.signin.useVpn(APP), { kind: 'use-vpn' }) }, secondary: textBtn(D.signin.tryAgainAt('3:42 PM'), undefined, { disabled: true }), useVpn: undefined })) },
+  { name: 'j-sheet-stopped-later', surface: 'panel', note: '12.0.0: three refusals, the cooldown over: Try again is back', view: journey(sheet('stopped', { problem: { title: D.signin.stoppedTitle, body: D.signin.stoppedBody(APP), button: ink(D.signin.useVpn(APP), { kind: 'use-vpn' }) }, secondary: textBtn(D.signin.tryAgain, { kind: 'grid-signin-retry' }), useVpn: undefined })) },
+  { name: 'j-sheet-code-refused', surface: 'panel', note: "12.0.0: the grid's \"wrong code, or no 2FA\": type it again, or no code yet", view: journey(sheet('code-refused', { problem: { title: D.signin.codeRefusedTitle, body: D.signin.codeRefused, button: ink(D.signin.codeAgain, { kind: 'grid-signin-retry' }) }, secondary: textBtn(D.signin.noCode, { kind: 'no-grid-code' }) })) },
+  { name: 'j-sheet-code-refused-twice', surface: 'panel', note: '12.0.0: the same refusal twice in a row: no code yet first', view: journey(sheet('code-refused', { problem: { title: D.signin.codeRefusedTitle, body: D.signin.codeRefused, button: ink(D.signin.noCode, { kind: 'no-grid-code' }) }, secondary: textBtn(D.signin.codeAgain, { kind: 'grid-signin-retry' }) })) },
+  { name: 'j-sheet-wrong-grid', surface: 'panel', note: "12.0.0: the grid's identity did not match: nothing sent", view: journey(sheet('failed', { problem: { title: D.signin.wrongGridTitle, body: D.signin.wrongGrid, button: textBtn(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-unreachable', surface: 'panel', note: "12.0.0: the grid's port did not answer", view: journey(sheet('failed', { problem: { title: D.signin.unreachableTitle, body: D.signin.unreachableBody, button: ink(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-dropped', surface: 'panel', note: '12.0.0: the connection ended', view: journey(sheet('failed', { problem: { title: D.signin.droppedTitle, body: D.signin.dropped, button: ink(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-key-not-taken', surface: 'panel', note: "12.0.0: the grid didn't take the key", view: journey(sheet('failed', { problem: { title: D.signin.keyNotTakenTitle, body: D.signin.keyNotTaken, button: ink(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-key-refused', surface: 'panel', note: "12.0.0: the grid's tool refused the key, in its own sentence", view: journey(sheet('failed', { problem: { title: D.signin.keyNotTakenTitle, body: D.signin.keyRefused('your home folder can be changed by others; ask your lab lead.'), button: ink(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-key-store', surface: 'panel', note: "12.0.0: this browser couldn't keep the key (nothing was asked of the grid)", view: journey(sheet('failed', { problem: { title: D.signin.keyStoreTitle, body: D.signin.keyStore, button: ink(D.signin.tryAgain, { kind: 'grid-signin-retry' }) } })) },
+  { name: 'j-sheet-old-copy', surface: 'panel', note: "12.0.0: the lab's copy on the grid is older than framework 11", view: journey(sheet('failed', { problem: { title: D.signin.keyNotTakenTitle, body: D.signin.oldCopy } })) },
+  { name: 'j-sheet-unlock', surface: 'panel', note: '12.0.0: the protected key, once this browser session', view: journey(sheet('unlock', { title: D.signin.unlockTitle, instruction: D.signin.unlockBody, submit: ink(D.signin.unlock, { kind: 'unlock-key', outcome: 'unlocked' }), secondary: textBtn(D.signin.cantUnlock, { kind: 'forget-computer' }) })) },
+  { name: 'j-sheet-unlock-failed', surface: 'panel', note: "12.0.0: That didn't unlock, with the ways out", view: journey(sheet('unlock', { title: D.signin.unlockTitle, instruction: D.signin.unlockBody, problem: { body: D.signin.unlockFailed }, submit: ink(D.signin.unlock, { kind: 'unlock-key', outcome: 'unlocked' }), secondary: textBtn(D.signin.cantUnlock, { kind: 'forget-computer' }) })) },
+  { name: 'j-sheet-unlock-busy', surface: 'panel', note: '12.0.0: Windows Hello is up', view: journey(sheet('unlock', { title: D.signin.unlockTitle, instruction: D.signin.unlockBody, submit: ink(D.signin.unlock, { kind: 'unlock-key', outcome: 'unlocked' }), secondary: textBtn(D.signin.cantUnlock, { kind: 'forget-computer' }) })), local: { keyBusy: 'unlock' } },
+
+  // 12.0.0: the grid has no code for this account yet
+  { name: 'j-choose-route', surface: 'panel', note: '12.0.0: Set up your grid code first', view: journey(routeChoiceMoment) },
+  { name: 'j-code-setup-laptop', surface: 'panel', note: '12.0.0: the code on this computer', view: journey(codeSetupMoment('laptop')) },
+  { name: 'j-code-setup-phone', surface: 'panel', note: '12.0.0: the code with my phone (square codes under their steps)', view: journey(codeSetupMoment('phone')) },
+
+  // 12.0.0: after the sign-in
+  { name: 'j-enrolled', surface: 'panel', note: '12.0.0: This computer is set up.', view: journey({ moment: 'enrolled', title: D.enrolled.title, body: D.enrolled.body, account: ACCOUNT, continue: ink(D.enrolled.continue, { kind: 'grid-signin-continue' }) }) },
+  { name: 'j-protect', surface: 'panel', note: '12.0.0: the optional protection (Not now is the default)', view: journey(protectMoment()) },
+  { name: 'j-protect-busy', surface: 'panel', note: '12.0.0: Windows Hello is up', view: journey(protectMoment()), local: { keyBusy: 'protect' } },
+  { name: 'j-protect-on', surface: 'panel', note: '12.0.0: Protected.', view: journey(protectMoment({ title: D.protectKey.titleOn, outcome: D.protectKey.turnedOn, notNow: ink(D.enrolled.continue, { kind: 'protect-key-later' }) })) },
+  { name: 'j-protect-cancelled', surface: 'panel', note: '12.0.0: cancelled at the system prompt', view: journey(protectMoment({ outcome: D.protectKey.cancelled })) },
+  { name: 'j-protect-unsupported', surface: 'panel', note: '12.0.0: a computer with no Windows Hello or Touch ID', view: journey(protectMoment({ on: { label: D.protectKey.on, busyLabel: D.protectKey.turningOn, available: false } })) },
+  { name: 'j-fallback', surface: 'panel', note: '12.0.0: Using GlobalProtect', view: journey({ moment: 'fallback-to-vpn', title: D.fallback.title(APP), body: D.fallback.body(APP), continue: ink(D.fallback.continue, { kind: 'fallback-continue' }), tryDirect: textBtn(D.fallback.tryDirect, { kind: 'try-direct' }) }) },
 
   // moment 4
   { name: 'j-gp-looking', surface: 'panel', note: 'GlobalProtect: looking for the grid', view: journey(gp('looking', WORDS.globalprotect.looking)) },
@@ -397,12 +576,26 @@ export const FIXTURES: Fixture[] = [
   { name: 'h-signed-out', surface: 'panel', note: 'after a browser restart: As of', view: onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'signed-out', text: WORDS.home.gridSignedOut, link: link(WORDS.home.gridSignIn, { kind: 'sign-in-grid' }) }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }, { asOf: WORDS.home.asOf('9:02 AM'), sub: WORDS.home.onlineSub(TITLE, 14 * 3600_000 + 3 * 60_000), timer: undefined }) },
   { name: 'h-unreachable', surface: 'panel', note: 'Can’t reach the grid (worker last seen online)', view: onlineHome({ hero: hero('unreachable', 'stopped', WORDS.home.unreachableHero, WORDS.home.unreachableSub(VPN_APP)), rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'unreachable', text: WORDS.home.gridUnreachable }, claude: { state: 'unknown', text: WORDS.home.unknown } }), foot: FOOT_NONE }) },
   { name: 'h-checking', surface: 'panel', note: 'the first check of a browser session (D22)', view: onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'checking', text: WORDS.home.checking }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }) },
+  // 12.0.0: the home's Grid row, What you need, Details' direct section
+  { name: 'h-online-direct', surface: 'panel', note: '12.0.0: Grid row: Direct', view: onlineHome({ rows: { ...ROWS_ONLINE, grid: { ...ROWS_ONLINE.grid, via: via('direct') } } }) },
+  { name: 'h-online-vpn', surface: 'panel', note: '12.0.0: Grid row: Through GlobalProtect', view: onlineHome({ rows: { ...ROWS_ONLINE, grid: { ...ROWS_ONLINE.grid, via: via('vpn') } } }) },
+  { name: 'h-online-locked', surface: 'panel', note: '12.0.0: Grid row: Locked · Unlock (protected key, new session)', view: onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'signed-in', text: WORDS.home.gridSignedIn(ACCOUNT), via: via('direct', true) }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }) },
+  { name: 'h-stopped-direct', surface: 'panel', note: '12.0.0: Stopped, Direct', view: home({ hero: hero('stopped', 'stopped', WORDS.home.stoppedHero, WORDS.home.stoppedSub), primary: { kind: 'connect', button: ink(WORDS.home.connect, { kind: 'connect' }), reminder: WORDS.home.connectReminder }, rows: rows({ state: 'stopped', text: WORDS.home.workerStopped }, { grid: { state: 'signed-in', text: WORDS.home.gridSignedIn(ACCOUNT), via: via('direct') }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }) },
+  { name: 'h-needs', surface: 'panel', note: '12.0.0: ⋯ > What you need', view: onlineHome(), local: { needsOpen: true } },
+  { name: 'h-needs-phone', surface: 'panel', note: '12.0.0: What you need, with my phone', view: onlineHome(), local: { needsOpen: true, route: 'phone' } },
+  { name: 'h-menu-needs', surface: 'panel', note: '12.0.0: the ⋯ menu with What you need', view: onlineHome({ rows: { ...ROWS_ONLINE, grid: { ...ROWS_ONLINE.grid, via: via('direct') } } }), local: { menuOpen: true } },
+  { name: 'h-online-details-direct', surface: 'panel', note: '12.0.0: Details: the direct way', view: onlineHome(), local: { detailsOpen: true }, details: { ...detailsView(), direct: directDetails(false) } },
   { name: 'h-working-in-tab', surface: 'panel', note: 'tab mode: Working on the grid…', view: { ...queuedHome(WORDS.queue.hero, WORDS.queue.homeSub, 1), overlays: overlays({ workingInTab: true }) } as PanelView },
 
   // Settings
   { name: 'settings', surface: 'settings', note: 'Settings', view: settingsView() },
   { name: 'settings-system', surface: 'settings', note: 'Appearance: Match system', view: settingsView('system') },
   { name: 'settings-open', surface: 'settings', note: 'Change, terms and the lab lead fold open', view: settingsView(), local: { changeOpen: true, portalInput: HOST, termsOpen: true, labLeadOpen: true } },
+  { name: 'settings-protected', surface: 'settings', note: '12.0.0: the key protected (turned on)', view: { ...settingsView(), connection: connectionView({ keyLine: D.settings.keyProtected }, { value: true }) } },
+  { name: 'settings-protect-busy', surface: 'settings', note: '12.0.0: the protection switch, Windows Hello up', view: settingsView(), local: { keyBusy: true } },
+  { name: 'settings-forget', surface: 'settings', note: '12.0.0: Forget this computer? [Forget] [Keep it]', view: settingsView(), local: { confirmForget: true } },
+  { name: 'settings-no-key', surface: 'settings', note: '12.0.0: no key yet, no helper (its download offered)', view: { ...settingsView(), connection: connectionView({ keyLine: D.settings.keyNone, forget: { label: D.settings.forget, note: D.settings.forgetNote, confirm: D.settings.forgetConfirm, button: { label: D.settings.forgetButton, tone: 'ink', action: { kind: 'forget-computer' } }, disabled: true }, helper: { label: D.settings.helper, text: D.settings.helperMissing, installed: false, download: download('windows'), checkAgain: { label: D.installHelper.checkAgain, tone: 'outline', action: { kind: 'check-bridge' } } } }, { present: false }) } },
+  { name: 'settings-vpn-only', surface: 'settings', note: '12.0.0: GlobalProtect only; no Windows Hello here', view: { ...settingsView(), connection: connectionView({ mode: { label: D.settings.modeLabel, value: 'vpn', options: [{ value: 'direct', label: D.settings.modes.direct }, { value: 'vpn', label: D.settings.modes.vpn }] } }, { available: false }) } },
 ];
 
 export function fixture(name: string): Fixture | undefined {
@@ -415,10 +608,10 @@ export function fixtureStrings(f: Fixture): string[] {
   const walk = (v: unknown, key = '') => {
     if (typeof v === 'string') {
       // addresses, times and the line the student pastes are not sentences
-      if (/^(https?:|\/|bash |exec )/.test(v) || /^\d{4}-\d{2}-\d{2}T/.test(v) || ['since', 'at', 'url', 'origin', 'line', 'link', 'licenseUrl', 'privacyUrl', 'script', 'style', 'portalInput', 'termsOpenedAt'].includes(key)) return;
+      if (/^(https?:|\/|bash |exec )/.test(v) || /^\d{4}-\d{2}-\d{2}T/.test(v) || ['since', 'at', 'url', 'origin', 'line', 'link', 'licenseUrl', 'privacyUrl', 'script', 'style', 'portalInput', 'termsOpenedAt', 'file', 'fileLine', 'moment', 'sha256', 'version', 'os', 'kind', 'id', 'mode', 'route', 'phase', 'purpose', 'state', 'tone'].includes(key)) return;
       out.push(v);
     } else if (Array.isArray(v)) v.forEach((x) => walk(x, key));
-    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) if (k !== 'details' && k !== 'labLead' && k !== 'action' && k !== 'dismiss' && k !== 'open') walk(x, k);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) if (k !== 'details' && k !== 'labLead' && k !== 'action' && k !== 'dismiss' && k !== 'open' && k !== 'direct') walk(x, k);
   };
   walk(f.view);
   if (f.surface === 'panel' && f.log) walk(f.log);

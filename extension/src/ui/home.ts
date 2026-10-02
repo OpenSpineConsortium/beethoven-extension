@@ -3,7 +3,7 @@
 // Stop or Cancel and its confirmation, Try asking, the one-time cards and Show log, folded. Everything
 // fits the 360 × 658 panel without scrolling while the log is closed. Pure function of HomeView and the
 // page-local state the panel keeps (the confirm row, the phone view, the log fold).
-import { WORDS, type Action, type HomeView, type LogLine } from '../core/model';
+import { WORDS, type HomeView, type LogLine } from '../core/model';
 import { el } from './dom';
 import { drawnCheck, icon, spinner } from './icons';
 import { LABELS } from './labels';
@@ -23,6 +23,9 @@ export interface HomeCtx {
   tryIndex: number;
   setTryIndex: (i: number) => void;
   working?: string;
+  /** 12.0.0: the Grid row's "Unlock" (the passkey step inside the click) */
+  unlock?: () => void;
+  keyBusy?: 'protect' | 'unlock' | 'create';
 }
 
 function primary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
@@ -124,7 +127,7 @@ function cards(h: HomeView, ctx: HomeCtx): Array<HTMLElement> {
         { class: 'once', key: c.id },
         icon('sparkle', 18),
         el('p', { text: c.text }),
-        c.open ? el('button', { type: 'button', class: 'btn btn-outline', 'aria-label': c.text, onClick: () => ctx.onAct(c.open as Action) }, icon('play', 14)) : null,
+        c.open ? el('button', { type: 'button', class: 'btn btn-outline', 'aria-label': c.text, onClick: () => c.open && ctx.onAct(c.open) }, icon('play', 14)) : null,
         el('button', { type: 'button', class: 'btn btn-icon bare', 'aria-label': LABELS.dismiss, onClick: () => ctx.onAct(c.dismiss) }, icon('close', 15)),
       );
     return el(
@@ -146,7 +149,7 @@ export function renderHome(h: HomeView, ctx: HomeCtx): HTMLElement {
     'section',
     { class: 'screen home', 'data-screen': 'home' },
     top,
-    statusCard(h.rows, WORDS.home.rows, ctx.onAct, ctx.pending),
+    statusCard(h.rows, WORDS.home.rows, ctx.onAct, ctx.pending, { unlock: ctx.unlock, unlocking: ctx.keyBusy === 'unlock' }),
     footRow(h, ctx),
     ctx.working ? el('p', { class: 'status', style: 'margin-top:8px' }, spinner(16), el('span', { text: ctx.working })) : null,
     tryAsking(h, ctx),

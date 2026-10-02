@@ -57,9 +57,14 @@ name and identifier carry no university name.
   `sbatch --export`.** Never echo one. The per-job token is a mode-0600 file.
 - **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's only
   content script runs on the one Open OnDemand origin the student grants at click time. Never request
-  `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`,
-  `debugger` or `identity`, and never any `claude.ai`, `anthropic.com` or `claude.com` origin. No
-  automated login; the MFA step is never touched.
+  `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger` or
+  `identity`, and never any `claude.ai`, `anthropic.com` or `claude.com` origin. Since 12.0.0 the
+  extension requests `nativeMessaging` for one host only, its own bundled bridge
+  (`com.openspineconsortium.beethoven.bridge`), which carries bytes to the grid's ssh port and nothing
+  else (Greg's decision, 2026-10-02). On the direct way the student types the grid password and
+  one-time code into Beethoven's own sign-in sheet; they go only to the grid inside the encrypted ssh
+  session, are never stored or logged, and the sheet never offers to remember them. No automated
+  login of the portal; the university's sign-in pages are never filled in.
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
   refuses only on a verified revocation. Since 4.0.0 the list withdraws versions only.

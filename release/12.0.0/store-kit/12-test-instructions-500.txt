@@ -1,0 +1,4 @@
+Beethoven runs Claude Code in a Wayne State grid account. Needs the user's AccessID, password, 2FA code, Claude Pro/Max and our approval; we cannot lend accounts.
+1. Install: welcome page. Tick, Agree and continue. Chrome asks for ondemand.grid.wayne.edu only.
+2. Panel: One small download, once offers the helper inside the package (bridge/), a script relaying only to grid.wayne.edu:22. Please don't sign in to the real grid. Use GlobalProtect instead skips it.
+Mock portal on request.

@@ -1,5 +1,7 @@
 # Beethoven for testers
 
+**12.0.0 (2026-10-02).** For 12.0.0, follow `guides/INSTALL.md` and `guides/USE.md`, which replace this page for installing the helper, the first direct sign-in, the grid code, the key and Forget this computer. The steps below, from asking for access to the invitation, still hold.
+
 What you do, in order, from asking for access to your first worker. There is no key and nothing to
 paste anywhere: your own sign-in to your university's Open OnDemand portal identifies you, and the
 extension confirms with the maintainer's access service that your account is approved. If an

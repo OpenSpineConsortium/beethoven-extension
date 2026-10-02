@@ -1,5 +1,7 @@
 # Store listing and compliance
 
+**12.0.0 (2026-10-02).** Superseded for 12.0.0 by `store/LISTING.md`, `store/PASTE.md`, `store/SUBMISSION.md` and `store/TEST_BEFORE_UPLOAD.md`, which add the `nativeMessaging` permission, the helper inside the package and the Authentication information data type. Kept for its history.
+
 What the Chrome Web Store will be told, in the words it will be told it, and the checklist that has
 to be green before submission. Sources: the report's "Extension architecture and permission
 manifest", "Store-compliance checklist", "Stores and universities accept one origin, no credential,

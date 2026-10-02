@@ -11,9 +11,16 @@
 // one-time grid terminal step (AM2), where it reads the page title and types one line after the
 // student signs in there. No page script is registered.
 //
+// 12.0.0 adds nativeMessaging (Chrome and Edge builds only), and nothing else: the direct way to the grid (ssh with no VPN) needs a
+// byte stream to grid.wayne.edu:22, and a browser extension has no socket; the helper that comes inside
+// Beethoven (public/bridge/, installed once by the student, no administrator) is the native messaging
+// host com.openspineconsortium.beethoven.bridge, which opens TCP only to its own allowlist
+// (grid.wayne.edu:22), carries bytes both ways, holds no credential and has no shell. The ssh session
+// itself (the pinned host key, the sign-in) is end to end between this extension and the grid.
+//
 // What is deliberately absent, and must stay absent: any host_permissions at install time (Decision 2),
-// the cookies, tabs, notifications, webRequest, offscreen, nativeMessaging, tabGroups, debugger and
-// identity permissions, and any origin on claude.ai, anthropic.com or claude.com. The only other
+// the cookies, tabs, notifications, webRequest, offscreen, tabGroups, debugger and identity
+// permissions, and any origin on claude.ai, anthropic.com or claude.com. The only other
 // addresses it fetches are the maintainer's (the approval check, the services file and the
 // withdrawn-versions list), with plain cross-origin fetches and no host permission.
 import { defineConfig } from 'wxt';
@@ -54,7 +61,10 @@ export default defineConfig({
       description: SINGLE_PURPOSE,
       author: 'OpenSpineConsortium',
       homepage_url: 'https://openspineconsortium.com/beethoven/',
-      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['sidePanel'] : [])],
+      // nativeMessaging on the Chromium builds only: the helper's installers register it for Chrome and
+      // Edge (and Chromium and Brave), never for Firefox or Safari, so those builds would carry the
+      // permission's install warning for a host they can never reach (they take the GlobalProtect way)
+      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['nativeMessaging', 'sidePanel'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
       // no default_popup: the toolbar button toggles the window-wide panel (the background sets
       // openPanelOnActionClick); its badge, tooltip and lit icon report while the panel is closed.
