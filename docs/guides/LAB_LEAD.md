@@ -3,7 +3,9 @@
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it stands in the working
 tree (`framework/lib/browser_key.sh`, `framework/lib/profile.awk`, `framework/README.md`). The exact
-tests still to run on the real grid are in `docs/V12_STATUS.md`, section 4.
+tests still to run on the real grid are in `docs/V12_STATUS.md`, section 4. Section 9, who can read the
+lab's folders on the grid, was added later the same day with `tools/grid_access.sh`, and revised that
+evening after its review (section 2, step 1 and section 3, question 6 with it).
 
 ## 1. What changes for you
 
@@ -29,11 +31,17 @@ tests still to run on the real grid are in `docs/V12_STATUS.md`, section 4.
   and every folder from `/` down to it, can be changed by its owner alone or is sticky (section 2).
 - **No python3 on the login node for anything Beethoven types.** Framework 11 reads the site profile
   and fills the job file and the workspace guide with awk and bash (section 6).
-- **Nothing changes in approvals.** One approved account, one installation; the helper and the
-  browser's key belong to that installation and never talk to the access service. Moving a student
-  to a new computer is still `admin.mjs` (or the e-mail's link); on the new computer they sign in
-  directly once, and that replaces the old computer's line (one line per account). Withdrawing an
-  approval does **not** remove a student's line on the grid (section 5).
+- **An approval for the extension also opens the lab's folders on the grid.** The AccessIDs approved
+  with the extension grant (`admin.mjs approve`, or `grant <id> extension`) are the list of accounts
+  that may enter the lab's volume, kept on the grid by `tools/grid_access.sh`, every fifteen minutes
+  from your PC (section 9). An approval for the lab only (`approve-lab`) does not put anyone on it, and
+  neither does the store reviewers' mock account. Until a newly approved student is on it, their setup
+  ends in `Permission denied`. Otherwise approvals are as before: one approved account, one installation;
+  the helper and the browser's key belong to that installation and never talk to the access service.
+  Moving a student to a new computer is still `admin.mjs` (or the e-mail's link); on the new computer
+  they sign in directly once, and that replaces the old computer's line (one line per account).
+  Withdrawing an approval does **not** remove a student's line on the grid (section 5), but it takes
+  their AccessID off the list at the next run, and the line's command then cannot start (section 9).
 
 ## 2. Before the first student uses the direct way
 
@@ -42,19 +50,26 @@ Framework 10 has no `gate` and no `browser-key`: a 12.0.0 student's first direct
 ends with **The lab's copy of the tool on the grid is older than this Beethoven** (or, in an older
 build, a key that is not taken). So, in this order:
 
-1. **Look at the folders above the copy** (read only, on warrior, as yourself):
+1. **Look at the folders above the copy** (read only, on warrior, as yourself; the trailing `/` on the
+   first names the folder behind the link):
 
    ```
-   stat -c '%A %U:%G %n' /rs /rs/rs_grp_oschome /rs/rs_grp_oschome/shared /rs/rs_grp_oschome/shared/beethoven /rs/rs_grp_oschome/shared/beethoven/hpcworker
+   stat -c '%A %U:%G %n' /rs/rs_grp_oschome/ /rs/rs_grp_oschome/shared /rs/rs_grp_oschome/shared/beethoven /rs/rs_grp_oschome/shared/beethoven/hpcworker
    ```
 
-   Every folder there must be writable by its owner alone (no `w` in the group or other places), or
-   sticky (a `t` or `T` in the last place). `framework/README.md` records `/rs/rs_grp_oschome` as
-   `drwxrws---` (group-writable, not sticky); if that is still so, any member of `oschome` could
-   rename `shared` and put another tool in its place. For a folder you own: `chmod g-w` (or `chmod
-   +t`). For `/rs/rs_grp_oschome` itself, owned by root: ask C&IT (section 3, question 6). Until
-   then `browser-key add` refuses every student with "other people can rename things in ..., which
-   holds the lab's copy of the grid tool your key would run. Ask your lab lead."
+   The first is the volume's root, your own folder, `drwxrws--T go2432 oschome`: writable by the
+   group and by the students on the list (section 9), and sticky, the `T` in the last place, which you
+   set on 2026-10-02. Sticky means that whoever may write there can make a folder of their own but
+   cannot rename or remove `shared` or anything else that is not theirs, so the root passes. Keep it
+   so: `chmod +t` again if the `T` ever goes. Each of the other three must be writable by its owner
+   alone (no `w` in the group or other places) or sticky: on one of yours that is not, `chmod g-w` (or
+   `chmod +t`). (Until 2026-10-02 this step recorded the root as `drwxrws---`, not sticky, and took it
+   for C&IT's to fix; it is yours.) Above the root sit the CephFS scaffold folders, owned by root or by
+   other labs' accounts and writable by everyone; they are C&IT's (section 3, question 6), and
+   framework 12 reports them as a note for the university without refusing a key
+   (`framework/README.md`, "Folders above the copy"). Until every folder of yours passes,
+   `browser-key add` refuses every student with "other people can rename things in ..., which holds
+   the lab's copy of the grid tool your key would run. Ask your lab lead."
 2. **Publish framework 11**, from the laptop's checkout, as for framework 10:
 
    ```
@@ -64,7 +79,8 @@ build, a key that is not taken). So, in this order:
 
    It checks `VERSION` (11) against the tool, LF line endings and `bash -n`, tars exactly the files
    it lists with a SHA-256 manifest, and on the login node extracts them to `.../hpcworker/v11`,
-   sets group read and no write, and switches `current` in one rename; `v10` is kept for workers
+   sets read for the group and for others and no write (who gets in at all is the list, section 9),
+   and switches `current` in one rename; `v10` is kept for workers
    that started on it. Its last check now runs `hpcworker profile check` on each site profile (awk,
    the same verdict `profile.py validate` gives) instead of `python3`, which warrior's banner bans;
    and it refuses to point `current` from version 11 or later back at a version before 11, because
@@ -138,9 +154,10 @@ write. A draft:
 >    different key and sends nothing.
 > 5. Students without a Google Authenticator code set one up themselves with Open OnDemand's
 >    2FA Setup app, as KB 20242 describes. Is that the route you want them to use?
-> 6. /rs/rs_grp_oschome is group-writable and not sticky. Could you set the sticky bit on it (or
->    remove group write), so that one group member cannot rename another's folders? Our scripts
->    refuse to add any key while it is not.
+> 6. The CephFS folders above our volume's root, owned by root or by other labs' accounts, are
+>    writable by everyone and not sticky. Could you set the sticky bit on them, so that no account
+>    can rename another's folder there? (Our own root is sticky since 2026-10-02; our scripts report
+>    these folders and do not refuse over them.)
 
 ## 4. The gate, in one paragraph
 
@@ -173,7 +190,7 @@ their prefix (`README.md`, "The gate").
 | The student, in a terminal on the grid (OnDemand's shell, on the VPN) | `bash /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker browser-key remove` | `HPCW-KEY removed` (or `none`). Refused under Claude Code, another agent or a batch job. |
 | The student, by hand | delete the line ending `beethoven-browser <date>` from `~/.ssh/authorized_keys` | Same. The copy framework 11 keeps, `authorized_keys.beethoven-prev`, never holds a Beethoven line, so putting it back cannot bring a key back. |
 | A new direct sign-in from another browser | automatic | Replaces the line: the old browser's key stops working. |
-| You, for one student | You cannot edit another account's `authorized_keys`. Ask the student, or ask C&IT. Withdrawing the approval (admin console, or `admin.mjs`) stops the extension starting workers at its next check, but **does not remove the line**: the gate does not consult the access service. | |
+| You, for one student | You cannot edit another account's `authorized_keys`. Ask the student, or ask C&IT. Withdrawing the approval (admin console, or `admin.mjs`) stops the extension starting workers at its next check, but **does not remove the line**: the gate does not consult the access service. The next run of the list (section 9) does take the AccessID off the volume root, and the line's forced command lives under that root, so from then on it cannot start (not tried on the grid). | |
 | You, for everyone | Set `browser_key_days` in `framework/profiles/wayne.json` and publish the copy: from then on the gate removes any line older than that many days the next time it is used (`HPCW-KEY expired`), and the student signs in with the password and code again. Wayne State's profile sets none today, so lines never lapse. | |
 | You, in an emergency | Every line runs your `current` copy, so a copy whose gate refuses everything would stop every browser key at once without touching students' files. Framework 11 has no ready switch for this; building one is a decision for you (`V12_STATUS.md`, section 7). | |
 
@@ -236,8 +253,191 @@ Beethoven says which in plain words and offers GlobalProtect for that action.
 - **"The grid lets this computer's key use only a few worker names."** The names cap (section 7).
   Signing in again with the password and code clears it; so does waiting a week.
 - **"I lost my laptop."** Section 5.
+- **"Your grid account can't use the lab's copy yet."** and **Copy details** shows `setup: failed (the
+  setup line ended with exit 126: bash: /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker:
+  Permission denied)`. Their AccessID is not on the list yet (section 9).
 
-## 9. Not proven
+## 9. Who can read the lab's folders
+
+The lab's volume on the grid, `/rs/rs_grp_oschome`, is a link (owned by ab5188) to the volume's own
+root, a folder you own: `drwxrws--T go2432 oschome`. Two facts about that folder decide who gets in,
+and everything below rests on them:
+
+- **`other::---`.** An account that is not you, not in the group and not on the list cannot even
+  look inside, let alone reach anything under it.
+- **The sticky bit** (the `T` in the last place, set 2026-10-02). Whoever may write in the folder can
+  make their own folder there, but cannot rename or remove anyone else's.
+
+**The list.** Each approved student's AccessID has one named entry on that folder,
+`user:<AccessID>:rwx`. That is enough to reach the lab's copy of the tool, the worker image and Claude
+Code under `shared/beethoven`, and to make their own folder, `/rs/rs_grp_oschome/<AccessID>`, where
+their runs live (rwx, because they make it themselves). That set of entries *is* the list; nothing else
+is. The group `oschome` is not the list: it belongs to C&IT, only they add members, it holds you and
+ab5188, and students are not in it.
+
+**Who is on it.** Exactly the accounts the access service has approved with the extension grant
+(`admin.mjs approve <id>`, or `admin.mjs grant <id> extension`): `admin.mjs roster` prints those and
+nothing else. Not the store reviewers' mock account, and not an account approved for the lab only
+(`admin.mjs approve-lab <id>`, or `grant <id> lab`): a lab-only approval never opens the grid's
+folders. That is meant: what students reach on the grid is the extension's worker, its image and Claude
+Code. To let a lab-only student in, grant them the extension too.
+
+Below the folder, everything students use is readable by any account that got in: `shared/`,
+`shared/beethoven` and everything under it (folders `r-x` for others, files `r--`, or `r-x` where the
+file runs, and every folder under `shared/beethoven` carries a default `o::r-x`, so new files inherit
+it). Others never get write. Two folders stay closed by their own modes and are never opened:
+`shared/access` (`drwx--s---`) and your own `go2432/` (`drwxr-s---`). `tools/deploy_shared.sh`
+publishes each new version that way, open to others for reading, never for writing, and never touches
+the root's ACL.
+
+**The tool.** `tools/grid_access.sh` keeps the list equal to those accounts
+(`node ../ashley/tools/intake/admin.mjs roster`, which prints them one per line). It runs in WSL, and
+both it and `admin.mjs` find the vendor folder through `BEETHOVEN_VENDOR_DIR` (else
+`~/.beethoven-vendor`, which in WSL is not your Windows folder). The easy way, from PowerShell in the
+checkout, sets that for you:
+
+```
+powershell -NoProfile -File tools\grid_access_task.ps1 -Run -ToolArgs '--dry-run --force'   # the grid's entries now, and what it would add and remove; changes nothing
+powershell -NoProfile -File tools\grid_access_task.ps1 -Run                                 # adds and removes, then checks what students need
+```
+
+or, in a WSL shell in the checkout:
+
+```
+BEETHOVEN_VENDOR_DIR=/mnt/c/Users/grego/.beethoven-vendor tools/grid_access.sh --dry-run --force
+BEETHOVEN_VENDOR_DIR=/mnt/c/Users/grego/.beethoven-vendor tools/grid_access.sh
+```
+
+`--dry-run --force` is the way to see the grid's entries as they are: a dry run alone does not connect
+when the list has not changed since the last apply, and `--force` makes it connect. It prints `grid
+access list on /rs/rs_grp_oschome now: ...`, then the list as the run would leave it. Give
+`-ToolArgs` its options in one string, separated by spaces or commas (`'--dry-run --force'`,
+`'--force,--open-tree'`).
+
+It gives every approved AccessID that the grid knows its entry, and takes away every named entry that
+is not approved. It never changes your own entry, the group's, the mask or other's, and without
+`--open-tree` (below) it opens nothing. It then prints one line per check, `ok` or `FAILED`: the
+folder still yours, sticky and closed to others, and its mask still `rwx`; the list read back the
+list applied; every entry in the folder a student's own folder, named for the account that owns it
+and not a link, or yours (below, "A folder in another student's place"); `shared`,
+`shared/beethoven`, the lab's copy of the tool, the image and Claude Code readable by others, with
+every folder on the way enterable; `shared/access` and `go2432` closed. Those checks are cheap and run
+every time. The full sweep, that nothing at all under `shared/beethoven` is closed to others, reads
+tens of thousands of entries on the login node, so it runs only with `--check-tree` or `--open-tree`
+and never from the scheduled task; run `--check-tree` by hand after a publish or after changing
+anything under `shared/beethoven`. It ends with the list itself: `grid access list on
+/rs/rs_grp_oschome: hy9698 ...`.
+
+Exit 0: done. Exit 1: refused or failed. Exit 2: the list is in place but a check failed; the check's
+line says the fix. For a closed `shared/beethoven`, the fix is `tools/grid_access.sh --open-tree`,
+which does exactly what was done by hand on 2026-10-02 and nothing else: `chmod o+rx` on `shared`,
+`o+rX` on everything under `shared/beethoven` (links left alone), and the default `o::r-x` on every
+folder under it. It never touches `shared/access` or `go2432`, nor a publish's staging folder
+(`hpcworker/.incoming-v<N>.*`, closed while `tools/deploy_shared.sh` runs and left behind when a publish
+fails; the sweep leaves those out too, and you remove a stale one by hand). `deploy_shared.sh` itself
+now writes `hpcworker/deploy.log` readable by others (it holds a date, your account, the version and
+the commit), so a publish and `--open-tree` no longer undo each other.
+
+It refuses, and changes nothing, when a line of the approved list is not an AccessID (it names the
+line), when the list is empty (`--force` if you really mean to shut everyone out), when the folder is
+not yours, or when the folder has lost `other::---` or its sticky bit (it prints `chmod o-rwx` or
+`chmod +t`).
+
+It connects to the grid only when the list differs from the one it last applied. That one is kept in
+the vendor folder on your PC, `state\grid_access.wayne.ids`, with one line per run in
+`state\grid_access.log` beside it. So a run with nothing new costs no ssh connection. `--force`,
+`--check-tree` and `--open-tree` connect anyway. An approved AccessID that has no grid account yet is
+skipped ("no such account on this system yet") and recorded in that file with the day, as `# unknown
+zz0000 2026-10-02`; a list that differs from the last one only by such ids counts as unchanged, so the
+id is tried again once a day (the first run on a later day connects for it), or at once with `--force`,
+until the account exists and it gets its entry. If an id the grid knew stops resolving for a moment,
+its entry is left as it is and the read-back allows for it. On the grid it is file work only, with
+bash, coreutils, sed, awk, `getfacl` and `setfacl`: nothing on warrior's banned list, no scheduler
+call, no temp file.
+
+**A folder in another student's place.** The root is sticky, so no one can rename or remove a folder
+that is not theirs; but anyone on the list may make a new one, and a student could make
+`/rs/rs_grp_oschome/<someone else's AccessID>` before that student's first run. Their runs would then
+go into a folder another account owns and can change (the framework does not refuse that yet:
+`docs/OPEN_QUESTIONS.md`). So every run that connects (the list changed, `--force`, `--check-tree` or `--open-tree`) checks each entry in the root: one named like an AccessID must
+belong to that very account and not be a link, and any other name must be yours. Each entry that is
+not is a `FAILED` line of its own, exit 2, for example
+
+```
+  FAILED  the root's entries: cd5678 (directory) belongs to hy9698, not to cd5678, so it has taken the place of cd5678's own folder (LAB_LEAD.md, section 9)
+```
+
+An entry the system cannot name at that moment (getfacl shows a bare number) is left alone and reported as `left`; remove it by hand with `setfacl -x u:<number> /rs/rs_grp_oschome` only when that account is really gone. Run `-Run -ToolArgs '--force'` just before telling a newly approved student to start, so the root is checked at that moment.
+
+The list is still applied. Then, on warrior as yourself (the root is yours, and in a sticky folder its
+owner may remove or rename any entry):
+
+```
+rm /rs/rs_grp_oschome/cd5678                                    # a link or a file
+rmdir /rs/rs_grp_oschome/cd5678                                 # an empty folder
+mv /rs/rs_grp_oschome/cd5678 /rs/rs_grp_oschome/cd5678.taken    # a folder with something in it
+```
+
+You cannot remove what is inside someone else's folder, so a full one is renamed out of the way: the
+name is free again for its student, and the check keeps naming the renamed folder until the account
+that made it removes it. Tell that student what was removed or renamed and why, and tell the student
+whose name it took; if that student had already run, ask them to stop their worker first, since its
+files were in that folder. Not tried on the grid.
+
+**Every fifteen minutes, by itself.** In PowerShell on your PC, no administrator rights:
+
+```
+powershell -NoProfile -File tools\grid_access_task.ps1 -Install
+```
+
+registers a Windows Scheduled Task, **Beethoven grid access**, that runs the tool with `--quiet` in
+WSL every fifteen minutes while you are signed in to Windows, in a hidden window. It refuses until
+`-Run` has applied the list once while you watched (until `state\grid_access.wayne.ids` exists), so the
+task never makes the first change unseen. `-Run` runs it once in front of you (`-Run -ToolArgs
+'--dry-run --force'` to look first), `-Remove` takes the task away, and the script with no option says
+what the task runs, whether the list has been applied once, and when the task last ran. The task never
+sweeps the whole tree. While your PC is off or you are signed out, nothing runs: a student approved
+then waits until it is on again.
+
+**By hand**, on warrior as yourself (the trailing `/` names the folder behind the link):
+
+```
+getfacl -p /rs/rs_grp_oschome/                    # look
+setfacl -m u:ab1234:rwx /rs/rs_grp_oschome/       # add ab1234
+setfacl -x u:ab1234 /rs/rs_grp_oschome/           # remove ab1234
+```
+
+The tool's next run that changes something keeps only approved AccessIDs, so an entry you add by hand
+for someone the service has not approved lasts only until then. To let someone in for good, approve
+them in the service.
+
+**What a student sees before their AccessID is on the list.** Signing in to the grid works (the home
+folder is not on the volume), but the first command that runs the lab's copy is refused. Beethoven
+says **Your grid account can't use the lab's copy yet. Ask your lab lead.**, and **Copy details**
+gives:
+
+```
+setup: failed (the setup line ended with exit 126: bash: /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker: Permission denied)
+```
+
+That is this list, not the student's computer. Run the tool (or wait for the task); then the student
+closes Chrome completely, opens it again and clicks **Connect** (`USE.md`, part 7).
+
+**Taking an AccessID off.** Withdrawing an approval takes the entry away at the next run. That
+account then cannot reach anything under `/rs/rs_grp_oschome`: its own folder there included (the
+files stay), and the forced command of its browser key, which lives under the folder, so the key can no
+longer start anything. A worker of theirs that is still running loses its way to the lab's copy and
+to its folder; what it does then was not tried.
+
+Not proven: the tool has been run only in WSL, against a temporary folder standing for the volume,
+with `setfacl` and `getfacl` emulated (WSL has no acl package), the owners of the root's entries
+stood in for by a `stat` that answers another account for the paths a test names (only root could
+chown to accounts that do not exist), ssh replaced by a stand-in that runs the grid side locally, and
+`tools/deploy_shared.sh`'s cluster side publishing into that folder (`tools/tests/test_grid_access.sh`).
+On the grid, only the entry for hy9698 that you set by hand on 2026-10-02 has been seen to work. Run
+`--dry-run --force` first.
+
+## 10. Not proven
 
 Everything about the direct way was run only against ssh servers the lab ran itself, set up like the
 grid, and the framework only against a fake scheduler; no key or password has been sent to

@@ -105,6 +105,12 @@ name and identifier carry no university name.
   published policy; the 60 s floor and the wall-time rule are this product's own etiquette, taken
   from the strictest published rules in the sample and the licence of the VS Code edition (then
   Ashley's), and C&IT never stated them.
+- **The grid's approved list is the named-user ACL on the volume root, kept by
+  `tools/grid_access.sh` equal to `admin.mjs roster` (extension grant only; lab-only approvals and the
+  reviewers' mock are not on it, by design); `deploy_shared` never closes the tree to other below the
+  gate (its `deploy.log` is 0644); `shared/access` and the owner's folder stay closed.** The scheduled
+  run makes only cheap checks (the full sweep is `--check-tree`) and reports any root entry in another
+  student's place.
 - **Nothing is deleted outside the framework's own run directories and node-local temp.** On
   2026-09-28 at 22:34 local the student's whole `~/.ashley` folder on the grid was deleted while a
   Remote Control session spawned from the phone was open, and the Claude login inside it was lost;
@@ -215,10 +221,12 @@ image at `/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22` with `mo
 apptainer/1.2.2`; the student's Claude Code login in `$HOME/.beethoven/claude` (the profile's
 `claude_config_dir`, the `CLAUDE_CONFIG_DIR` of Beethoven for VS Code); the framework's shared copy
 at `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current` (the profile's `shared_install`; group
-read and execute, no group write; until 2026-09-30 the lab folder was `shared/ashley` and the
-sign-in folder `~/.ashley/claude`, both now links). Everything under `/rs/rs_grp_oschome` is group
-`oschome` with `other::---`, so every student must be in that group before a first run, in either
-install mode (two members on 2026-09-29; `docs/OPEN_QUESTIONS.md`). `#SBATCH --output` resolves
+and others read and execute, no write; until 2026-09-30 the lab folder was `shared/ashley` and the
+sign-in folder `~/.ashley/claude`, both now links). The volume's root behind `/rs/rs_grp_oschome`
+is `drwxrws--T go2432 oschome` with `other::---`; a student reaches anything under it only through
+the approved list, the root's `user:<AccessID>:rwx` entries kept by `tools/grid_access.sh`
+(`docs/guides/LAB_LEAD.md`, section 9). Group `oschome` is C&IT's (two members) and is not the list.
+`#SBATCH --output` resolves
 against the submit directory (use `-D`); chain with `afterany`, never `afterok`; `/tmp` is swept
 while jobs run.
 

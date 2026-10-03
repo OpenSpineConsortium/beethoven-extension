@@ -312,6 +312,7 @@ in **Settings**, **Connection**.
 | **The grid's own tool said no:** followed by its reason | Tell your lab lead the reason; it is about the grid, not your computer. Use GlobalProtect meanwhile. |
 | **This browser couldn't keep the key** | Nothing was sent to the grid. Try again, or use GlobalProtect. |
 | **The lab's copy of the tool on the grid is older than this Beethoven.** | Tell your lab lead. Use GlobalProtect meanwhile. |
+| **Your grid account can't use the lab's copy yet. Ask your lab lead.** (**Copy details** gives a line ending in `Permission denied`) | Your approval hasn't reached the grid yet. Your lab lead's computer adds each approved student to the list of accounts that may open the lab's folders on the grid, by itself, about every fifteen minutes while it is on. Wait a quarter of an hour, then close Chrome completely, open it again and click **Connect**. If it still says this after an hour, click **Copy details** and send your lab lead what it gives. |
 | **The grid lets this computer's key use only a few worker names.** | Connect with a worker name you used before (Settings), or use GlobalProtect for this one. Signing in again with your password and code also clears it. |
 | **This computer's key has started the worker as often as the grid allows in an hour.** | Try again later, or use GlobalProtect. |
 | **Locked** · **Unlock** | Click **Unlock**, then your fingerprint, face or PIN. |

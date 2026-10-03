@@ -175,9 +175,11 @@ exactly the files it lists (`bin/`, `lib/`, `jobs/`, `profiles/`, `VERSION`, `RE
 with a SHA-256 manifest; and runs its own publishing part over ssh on the login node, which is file
 work only (tar, chmod, setfacl, one link): no scheduler call, no container, nothing under `/tmp`. The
 files are unpacked into a staging directory beside the versions, checked against the manifest and
-renamed to `v<N>/`, with group read and traverse, no group write, nothing for others and read-only for
-the owner too, and the ACL's group, mask and default entries set to match (Wayne State's volume
-carries a group-writable default ACL). `current` is switched in one rename (`ln -s` to a new name,
+renamed to `v<N>/`, with read and traverse for the group and for others, write for neither, and
+read-only for the owner too, and the ACL's group, mask, other and default entries set to match (Wayne
+State's volume carries a group-writable default ACL). Who may reach the copy at all is decided above
+it, by the list on the volume's root ("Who can read the shared copy", below), which the script never
+touches. `current` is switched in one rename (`ln -s` to a new name,
 then `mv -T`; coreutils 8.22's `ln -sfn` removes the old link first, leaving a moment with none). A
 version already published with the same files is not unpacked again; when only its `README.md`
 differs, that file is updated in place (no job reads it); one published with different code is
@@ -237,15 +239,32 @@ worker still runs from the own copy, the step asks the student to stop the worke
 statement, start, stop, status) calls `~/.hpcworker/bin/hpcworker` as before and does not know which
 copy answers.
 
-**Who can read the shared copy.** At Wayne State the lab's volume root `/rs/rs_grp_oschome` is mode
-2770 for group `oschome` with `other::---`, so an account outside the group cannot traverse it at
-all; on 2026-09-29 the group had two members (`OPEN_QUESTIONS.md`, "The lab's shared copy of the
-framework"). That held before the shared copy existed, since the image, `claude_bin` and every
-student's `shared_state_dir` sit under the same root: every student must be in `oschome` before
-their first run, in either mode, and a per-user copy (the fallback of extension builds before 8.0.0)
-does not help a student outside the group there. The published tree gives the group read and execute and no write, so a member can run the
-lab's code and cannot change it; the directory above it, `shared/beethoven`, stays group-writable,
-so a member could still rename `hpcworker/` itself (`OPEN_QUESTIONS.md`).
+**Who can read the shared copy.** At Wayne State `/rs/rs_grp_oschome` is a link to the volume's
+physical root, a folder the lab lead owns, `drwxrws--T` for group `oschome` with `other::---`: an
+account that is not its owner, not in the group and not named in its ACL cannot traverse it at all,
+and the sticky bit stops anyone who may write there renaming another's folder. The group is C&IT's to
+change (two members on 2026-09-29, `OPEN_QUESTIONS.md`, "The lab's shared copy of the framework");
+students are not in it, and it is not the list. **The approved list is the root's named-user ACL
+entries**, `user:<AccessID>:rwx` (rwx, because each student makes their own `shared_state_dir` folder
+there), which `tools/grid_access.sh` keeps equal to the accounts the access service approved with the
+extension grant (`admin.mjs roster`: not the store reviewers' mock account, and not an approval for the
+lab only, which by design never opens the grid's folders), run every fifteen minutes from the lab
+lead's PC by a Windows Scheduled Task (`tools/grid_access_task.ps1`, which is installed only after one
+run the lab lead watched). It connects to the grid only when the list has changed (an approved
+AccessID the grid does not know yet is recorded with the day and tried again once a day), refuses a
+root that has lost `other::---` or its sticky bit, reports every entry of the root that sits in
+another student's place (named like an AccessID but owned by another account, or a link) or belongs
+to no student and not to the lab lead, and sweeps the whole tree below the gate only when asked
+(`--check-tree`, `--open-tree`). Until a newly approved student is on the list, the
+student's setup line ends `Permission denied` (exit 126). The image, `claude_bin` and every student's
+`shared_state_dir` sit under the same root, so this holds in either install mode, and a per-user copy
+(the fallback of extension builds before 8.0.0) does not help an account that is not on the list.
+Below the gate, `shared/` and everything under `shared/beethoven` is readable by others (folders
+`r-x`, files `r--` or `r-x` where they run, a default `o::r-x` on every folder so new files inherit
+it), and the published tree gives the group and others read and execute and no write, so a student
+can run the lab's code and cannot change it; `shared/access` and the lab lead's own folder stay
+closed by their own modes. The directory above the copy, `shared/beethoven`, stays group-writable, so
+a member of the group could still rename `hpcworker/` itself (`OPEN_QUESTIONS.md`).
 
 **Where workflow-engine templates would go.** Not built now. A site profile already holds what a
 workflow engine's configuration for a cluster needs (partitions and QoS, account, runtime and image,
