@@ -14,9 +14,10 @@ get Beethoven through the private listing, the one real one-click install. For p
 repository is shared with, two developer paths, closest-to-one-click first:
 
 **No terminal at all.** Your GitHub sign-in in the browser is the authorization.
-1. Open this repository's **Actions** tab and the newest green **ci** run.
-2. Under **Artifacts**, download **chrome-mv3** and extract the zip (Windows Explorer and macOS
-   Finder do this themselves).
+1. Open [the newest green **ci** run](https://github.com/OpenSpineConsortium/beethoven-extension/actions/workflows/ci.yml?query=branch%3Amain+is%3Asuccess)
+   (the top entry) — its page opens with a **direct download link** for the zip and these same
+   steps.
+2. Download the zip and extract it (Windows Explorer and macOS Finder do this themselves).
 3. In Chrome: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick the
    extracted folder.
 To update later, repeat with a newer run's artifact into the same folder and press the reload

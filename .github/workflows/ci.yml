@@ -42,12 +42,18 @@ jobs:
         run: PLAYWRIGHT_DIR="$PWD/node_modules/playwright" node e2e/mock-selftest.mjs
       - name: build (chrome)
         run: npm run build:chrome
-      - name: install steps beside the download (the run page is where the artifact is fetched, and the zip keeps a copy)
-        run: |
-          cp ../.github/artifact-install.md .output/chrome-mv3/INSTALL.md
-          cat ../.github/artifact-install.md >> "$GITHUB_STEP_SUMMARY"
+      - name: the install steps travel inside the zip, beside manifest.json
+        run: cp ../.github/artifact-install.md .output/chrome-mv3/INSTALL.md
       - uses: actions/upload-artifact@v4
+        id: upload
         with:
           name: chrome-mv3
           path: extension/.output/chrome-mv3
           retention-days: 90
+      - name: the download link and the same steps on the run page itself
+        run: |
+          V=$(node -p "require('./package.json').version")
+          { echo "## Beethoven $V — [⬇️ download the extension (one zip, Mac and Windows alike)](${{ steps.upload.outputs.artifact-url }})"
+            echo
+            cat ../.github/artifact-install.md
+          } >> "$GITHUB_STEP_SUMMARY"
