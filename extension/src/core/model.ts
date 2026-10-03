@@ -78,6 +78,11 @@ export const WORDS = {
     waiting: 'Waiting for Chrome…',
     deniedBody: 'Choose Try again on the welcome page.',
     finishTitle: 'Finish on the welcome page',
+    /** terms accepted, no portal connected yet: the truthful body (the refusal is for unaccepted terms
+     * only), worded for where the button lands — the options page shows Settings once the agreement is
+     * in force, and its Change field offers the portal */
+    finishBody: "Your portal isn't connected. Open Settings and connect it under Your grid.",
+    finishButton: 'Open Settings',
     revokedTitle: 'Allow Beethoven again',
     revokedBody: (host: string) => `Chrome no longer lets Beethoven reach ${host}. Your worker on the grid is not affected.`,
     revokedButton: 'Allow again',
@@ -624,6 +629,10 @@ export const WORDS = {
     export: 'Export',
     clear: 'Clear',
     drive: 'Google Drive in Claude (optional)',
+    startOver: 'Start over',
+    startOverNote: "Returns the side panel to its first screen and forgets this journey's progress on this computer. Your agreement, your grid sign-in, your portal and your worker on the grid all stay.",
+    startOverConfirm: 'Start over?',
+    startOverButton: 'Start over',
     labLead: 'For your lab lead',
   },
 } as const;
@@ -1405,7 +1414,7 @@ export interface SettingsView {
     openClaude: boolean;
   };
   appearance: { value: Appearance; options: Array<{ value: Appearance; label: string }> };
-  grid: { address?: string; change: string; disconnect: string };
+  grid: { address?: string; suggested?: string; change: string; disconnect: string };
   /** the acceptance: its date, the installation id a notice names (LICENSE 19(a)), the record as text to save, and the texts */
   agreement: { acceptedOn?: string; installId?: string; installIdLabel: string; record?: string; saveRecord: string; showTerms: string; save: string; print: string };
   activity: { show: string; export: string; clear: string; count: number };
@@ -1548,7 +1557,8 @@ export type Action =
   /** after the page ran the once-per-session unlock (core/keyring.ts unlockKey inside the click on "Unlock") */
   | { kind: 'unlock-key'; outcome: 'unlocked' | 'cancelled' | 'failed' }
   /** "Forget this computer": forget through the gate (the grid's line goes), then the key here */
-  | { kind: 'forget-computer' };
+  | { kind: 'forget-computer' }
+  | { kind: 'start-over' };
 
 export type ActionKind = Action['kind'];
 
@@ -1608,6 +1618,7 @@ export interface ActionResults {
   'protect-key-later': { recorded: boolean };
   'unlock-key': { unlocked: boolean };
   'forget-computer': { forgotten: boolean; onGrid: 'forgotten' | 'none' | 'not-reached' };
+  'start-over': { restarted: boolean };
 }
 
 export type ResultOf<K extends ActionKind> = ActionResults[K];

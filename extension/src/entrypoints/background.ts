@@ -576,11 +576,14 @@ async function channelNow(): Promise<ChannelNote | undefined> {
  */
 async function sharedDirNow(): Promise<string | undefined> {
   const s = await settingsNow();
-  if (!s) return undefined;
-  const key = `${s.origin}|${s.site}`;
+  // the site: the portal's, else the one this build is for. The direct way has no portal to name
+  // one — and losing the stored portal (Disconnect) must not lose the site: the sheet signed hy9698
+  // in to the grid, then failed "no-shared" only because the portal record was gone (2026-10-03)
+  const site = s?.site ?? DEFAULT_SITE;
+  const key = `${s?.origin ?? '-'}|${site}`;
   if (mem.sharedDir?.key === key && mem.sharedDir.dir) return mem.sharedDir.dir;
-  let dir = sharedRootOf((await siteProfile(s.site))?.shared_install);
-  if (!dir && (await modeNow()) === 'vpn') {
+  let dir = sharedRootOf((await siteProfile(site))?.shared_install);
+  if (!dir && s && (await modeNow()) === 'vpn') {
     try {
       const c = await directClient();
       const home = c ? await c.home() : undefined;
@@ -739,7 +742,10 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       const audit = (await local.get<{ records?: unknown[] }>(AUDIT_KEY))?.records ?? [];
       const drive = !!(await local.get<Checklist>(CHECKLIST_KEY))?.drive_connected_at;
       const settings = await settingsNow();
-      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId() });
+      // the same default the welcome page shows: with no stored portal (after Disconnect) the
+      // Change field must refill from the bundled profile, not come back empty (hy9698, 2026-10-03)
+      const settingsDef = settings ? undefined : defaultPortalFrom(await siteProfile(DEFAULT_SITE));
+      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId() });
       return { surface: 'settings', view: { ...sv, connection: await connectionSettings(f.prefs) } };
     }
   }
@@ -1151,6 +1157,24 @@ async function actInner(a: Action): Promise<unknown> {
       mem.sharedDir = undefined;
       mem.setup = { state: 'unknown' };
       return { disconnected: true } satisfies ActionResults['disconnect'];
+    case 'start-over':
+      // back to the panel's first screen: the journey's progress on this computer goes, nothing
+      // durable does — the agreement, the portal, the key, the worker's run record and the
+      // preferences all stay (asked for after a student's sheet dead-ended, 2026-10-03)
+      await cancelPress();
+      await session.remove(ROUTE_KEY);
+      await session.remove(WELCOME_PRESS_KEY).catch(() => undefined);
+      mem.welcome = { state: 'idle', problem: undefined };
+      mem.direct.sheet?.dispose();
+      mem.direct.sheet = undefined;
+      mem.direct.sheetWanted = false;
+      mem.direct.claudeWanted = false;
+      mem.setup = { state: 'unknown' };
+      mem.signin = { waiting: false } as SigninFacts;
+      await directAgain();
+      await local.remove(ONCE_KEY);
+      schedulePush();
+      return { restarted: true } satisfies ActionResults['start-over'];
     case 'audit': {
       if (a.op === 'clear') {
         await clearRecordsKeepingClocks(local);

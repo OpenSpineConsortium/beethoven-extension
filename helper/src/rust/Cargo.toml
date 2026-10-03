@@ -1,0 +1,19 @@
+[package]
+name = "beethoven-bridge"
+version = "1.0.0"
+edition = "2021"
+
+# No dependencies, on purpose: the bridge carries bytes between Chrome and the grid's ssh port and
+# nothing else, and its supply chain should be the Rust standard library alone — the same reasoning
+# that keeps the script hosts on the system's own perl and PowerShell (helper/README.md).
+[dependencies]
+
+[[bin]]
+name = "beethoven-bridge"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+panic = "abort"

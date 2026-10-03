@@ -37,6 +37,8 @@ export interface SettingsLocal {
   keyNote?: string;
   /** what came of Forget this computer (stays until the page closes) */
   forgetNote?: string;
+  /** "Start over?" [Start over] [Keep going] */
+  confirmStartOver: boolean;
 }
 
 function seg<T extends string>(label: string, value: T, options: Array<{ value: T; label: string }>, onPick: (v: T) => void): HTMLElement {
@@ -74,7 +76,7 @@ function switchRow(id: string, label: string, on: boolean, onToggle: (on: boolea
 
 export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<SettingsLocal>; onAppearance?: (a: Appearance) => void }): { show: (v: SettingsView) => void } {
   const g = opts.gestures;
-  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmForget: false, keyBusy: false, ...(opts.local ?? {}) };
+  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmForget: false, confirmStartOver: false, keyBusy: false, ...(opts.local ?? {}) };
   let view: SettingsView | undefined;
   let texts: Texts | undefined;
   let page: HTMLElement | undefined;
@@ -243,13 +245,13 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
           { class: 's-row' },
           el('span', { class: 's-label mono', text: v.grid.address ?? '—' }),
           el('div', { class: 'btns' },
-            el('button', { type: 'button', class: 'btn btn-outline', 'aria-expanded': local.changeOpen ? 'true' : 'false', 'aria-controls': 'change-fold', text: v.grid.change, onClick: () => set({ changeOpen: !local.changeOpen, portalInput: local.portalInput ?? v.grid.address ?? '' }) }),
+            el('button', { type: 'button', class: 'btn btn-outline', 'aria-expanded': local.changeOpen ? 'true' : 'false', 'aria-controls': 'change-fold', text: v.grid.change, onClick: () => set({ changeOpen: !local.changeOpen, portalInput: local.portalInput ?? v.grid.address ?? v.grid.suggested ?? '' }) }),
             local.confirmDisconnect
               ? el('button', { type: 'button', class: 'btn btn-brick', style: 'height:36px', text: v.grid.disconnect, onClick: () => { set({ confirmDisconnect: false }); void opts.act({ kind: 'disconnect' }); } })
               : el('button', { type: 'button', class: 'btn btn-outline', text: v.grid.disconnect, disabled: !v.grid.address, onClick: () => set({ confirmDisconnect: true }) }),
           ),
         ),
-        portalField('change-fold', local.changeOpen, local.portalInput ?? v.grid.address ?? '', local.portalError, WORDS.welcome.usePortal, { input: (val) => { local.portalInput = val; }, use: changePortal }),
+        portalField('change-fold', local.changeOpen, local.portalInput ?? v.grid.address ?? v.grid.suggested ?? '', local.portalError, WORDS.welcome.usePortal, { input: (val) => { local.portalInput = val; }, use: changePortal }),
       ),
       v.connection ? connectionCard(v.connection) : null,
       card(
@@ -299,6 +301,23 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         WORDS.settings.drive,
         el('div', { class: 's-row stack' }, el('p', { class: 'fine', text: LABELS.driveBody }), el('a', { class: 'btn btn-link', href: LABELS.driveUrl, target: '_blank', rel: 'noopener noreferrer', style: 'align-self:flex-start' }, el('span', { text: LABELS.driveOpen }), icon('external', 13))),
         el('div', { class: 's-row' }, tickBox('drive-tick', LABELS.driveTick, undefined, v.drive.connected, (on) => void opts.act({ kind: 'drive-connected', done: on }))),
+      ),
+      card(
+        WORDS.settings.startOver,
+        el(
+          'div',
+          { class: 's-row has-note' },
+          // while confirming, the question takes the note's place, announced, as the Forget row does
+          el('span', { class: 's-label' }, local.confirmStartOver ? el('span', { class: 's-sub s-ask', role: 'alert', text: WORDS.settings.startOverConfirm }) : el('span', { class: 's-sub', text: WORDS.settings.startOverNote })),
+          local.confirmStartOver
+            ? el(
+                'div',
+                { class: 'btns' },
+                el('button', { type: 'button', class: 'btn btn-text', text: WORDS.home.keep, onClick: () => set({ confirmStartOver: false }) }),
+                el('button', { type: 'button', class: 'btn btn-brick', style: 'height:36px', 'aria-label': WORDS.settings.startOverConfirm, text: WORDS.settings.startOverButton, onClick: () => { set({ confirmStartOver: false }); void opts.act({ kind: 'start-over' }); } }),
+              )
+            : el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.startOverButton, onClick: () => set({ confirmStartOver: true }) }),
+        ),
       ),
       el(
         'section',

@@ -54,7 +54,7 @@ browser at most 1 MiB (Chrome's cap, observed exact); data payloads at most 64 K
 | | `{"t":"open","id":"<id>","host":"grid.wayne.edu","port":22}` |
 | | `{"t":"data","id":"<id>","b64":"<base64>"}` |
 | | `{"t":"close","id":"<id>"}` |
-| helper to extension | `{"t":"hello","v":1,"helper":"1.0.0","os":"windows\|mac\|linux","kind":"script","allow":["grid.wayne.edu:22"],"runtime":"powershell\|perl\|python"}` |
+| helper to extension | `{"t":"hello","v":1,"helper":"1.0.0","os":"windows\|mac\|linux","kind":"script|binary","allow":["grid.wayne.edu:22"],"runtime":"powershell\|perl\|python"}` |
 | | `{"t":"opened","id":"<id>"}` |
 | | `{"t":"data","id":"<id>","b64":"..."}` |
 | | `{"t":"closed","id":"<id>","reason":"eof\|reset\|local"}` |

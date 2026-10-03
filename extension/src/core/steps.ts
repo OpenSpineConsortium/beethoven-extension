@@ -538,7 +538,9 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
           return { moment: 'welcome', state: st, title: W.revokedTitle, body: W.revokedBody(f.portal!.hostname), button: button(W.revokedButton, 'ink', { kind: 'use-portal', origin: f.portal!.origin, granted: false }), origin: f.portal!.origin };
         case 'finish':
         default:
-          return { moment: 'welcome', state: 'finish', title: W.finishTitle, body: TERMS_REFUSAL, button: button(WORDS.termsNeeded.button, 'ink', { kind: 'open-settings' }) };
+          // the refusal sentence only when the terms really are unaccepted: with them accepted and no
+          // portal yet, the old body wrongly said they were not (hy9698's panel, 2026-10-03)
+          return { moment: 'welcome', state: 'finish', title: W.finishTitle, body: f.terms ? W.finishBody : TERMS_REFUSAL, button: button(f.terms ? W.finishButton : WORDS.termsNeeded.button, 'ink', { kind: 'open-settings' }) };
       }
     }
 

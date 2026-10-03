@@ -46,7 +46,7 @@ Extension to bridge:
 Bridge to extension:
 
 ```
-{"t":"hello","v":1,"helper":"1.0.0","os":"windows|mac|linux","kind":"script","runtime":"powershell|perl|python","allow":["grid.wayne.edu:22", ...]}
+{"t":"hello","v":1,"helper":"1.0.0","os":"windows|mac|linux","kind":"script|binary","runtime":"powershell|perl|python|rust","allow":["grid.wayne.edu:22", ...]}
 {"t":"opened","id":"<id>"}
 {"t":"data","id":"<id>","b64":"<base64>"}
 {"t":"closed","id":"<id>","reason":"local|eof|reset"}
@@ -244,3 +244,20 @@ build them), these are the commands; none of them has been run for this project.
 #    xcrun stapler staple beethoven-bridge.dmg)
 #   spctl --assess --type execute -vv beethoven-bridge
 ```
+
+## The binary edition (rust)
+
+`src/rust/` builds the same bridge as a single static-ish binary: protocol 1, the same 17 suite
+checks, `kind: "binary"`, `runtime: "rust"`, no dependencies beyond the Rust standard library.
+CI builds it for Linux, macOS and Windows and runs the suite against each build; the binaries land
+as run artifacts beside the extension's.
+
+It is not offered to students, for two honest reasons: the download picker prefers a script host
+while one is listed (`helperDownloadFor`), and an **unsigned** binary draws exactly the warnings
+the script hosts avoid — macOS quarantines it ("the developer cannot be verified") and Windows
+SmartScreen flags it, while the scripts run on the system's own perl and PowerShell with nothing
+unsigned executed from a download. Flipping that requires identities no repository may hold: an
+Apple Developer ID with notarization and a Windows code-signing certificate. With those in hand,
+sign and notarize the CI artifacts, add the binary to `extension/public/bridge/manifest.json`, and
+the picker's preference is the one line left to change. Until then the binary edition is for
+maintainers and collaborators, verified by checksum from the CI run that built it.

@@ -428,6 +428,7 @@ export const FIXTURES: Fixture[] = [
 
   // the panel before the agreement, and while the welcome page carries moment 2
   { name: 'terms-needed', surface: 'panel', note: 'the panel before the agreement (D19)', view: { kind: 'terms-needed', body: WORDS.termsNeeded.body, button: ink(WORDS.termsNeeded.button, { kind: 'open-settings' }) } },
+  { name: 'j-welcome-connect', surface: 'panel', note: 'terms accepted, no portal connected: finish by connecting it in Settings', view: journey({ moment: 'welcome', state: 'finish', title: WORDS.welcomeMoment.finishTitle, body: WORDS.welcomeMoment.finishBody, button: ink(WORDS.welcomeMoment.finishButton, { kind: 'open-settings' }) }) },
   { name: 'j-welcome', surface: 'panel', note: 'the panel before the agreement, nothing pressed: finish on the welcome page', view: journey({ moment: 'welcome', state: 'finish', title: WORDS.welcomeMoment.finishTitle, body: WORDS.termsNeeded.body, button: ink(WORDS.termsNeeded.button, { kind: 'open-settings' }) }) },
   { name: 'j-welcome-waiting', surface: 'panel', note: 'the panel opened by the press, Chrome asking', view: journey({ moment: 'welcome', state: 'waiting', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.almostBody, status: WORDS.welcomeMoment.waiting }) },
   { name: 'j-welcome-denied', surface: 'panel', note: 'after Deny in Chrome\u2019s box', view: journey({ moment: 'welcome', state: 'denied', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.deniedBody }) },

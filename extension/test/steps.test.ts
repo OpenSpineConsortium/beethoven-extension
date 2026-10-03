@@ -440,6 +440,9 @@ describe('the panel', () => {
     const v = panelView(facts({ terms: false }));
     expect(v).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'finish', title: 'Finish on the welcome page', body: TERMS_REFUSAL, button: { label: 'Open the welcome page', tone: 'ink', action: { kind: 'open-settings' } } } });
     expect(TERMS_REFUSAL).toBe("The Beethoven terms haven't been accepted in this browser yet. Open Beethoven's welcome page to accept them.");
+    // terms accepted, no portal yet: the body never claims the terms are unaccepted (hy9698, 2026-10-03)
+    const accepted = panelView(facts({ portal: undefined, granted: false, once: {} }));
+    expect(accepted).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'finish', body: "Your portal isn't connected. Open Settings and connect it under Your grid.", button: { label: 'Open Settings' } } });
     // the panel opened by the press itself, Chrome's box up: "Almost there."
     const pressed = panelView(facts({ terms: false, welcome: { state: 'idle', pressAt: NOW - 2_000 } }));
     expect(pressed).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'waiting', title: 'Almost there.', body: "Choose Allow in Chrome's box. Beethoven carries on here.", status: 'Waiting for Chrome…' } });

@@ -109,7 +109,7 @@ await test('hello: protocol, version, os, kind and allowlist', async () => {
   assert(m.v === 1, `v=${m.v}`);
   assert(m.helper === EXPECT_VERSION, `helper=${m.helper}, expected ${EXPECT_VERSION}`);
   assert(['windows', 'mac', 'linux'].includes(m.os), `os=${m.os}`);
-  assert(m.kind === 'script', `kind=${m.kind}`);
+  assert(['script', 'binary'].includes(m.kind), `kind=${m.kind}`); // 'binary': the rust edition, same contract
   assert(Array.isArray(m.allow) && m.allow[0] === 'grid.wayne.edu:22', `allow[0]=${m.allow?.[0]}`);
   assert(m.allow.includes(`127.0.0.1:${echo.port}`), 'allow.txt entries missing from hello');
   metrics.os = m.os;

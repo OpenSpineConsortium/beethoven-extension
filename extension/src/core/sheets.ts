@@ -83,6 +83,8 @@ export interface SettingsInput {
   hashes: string[];
   /** this installation's id (ext/storage.ts installId), shown with the record */
   installId?: string;
+  /** the bundled default portal's hostname, for the Change field when no portal is stored */
+  defaultHostname?: string;
 }
 
 export function settingsView(i: SettingsInput): SettingsView {
@@ -98,7 +100,9 @@ export function settingsView(i: SettingsInput): SettingsView {
       openClaude: i.prefs.open_claude_on_connect,
     },
     appearance: { value: appearance, options: (['cream', 'system'] as const).map((value) => ({ value, label: S.appearances[value] })) },
-    grid: { ...(i.settings ? { address: i.settings.hostname } : {}), change: S.change, disconnect: S.disconnect },
+    // address says a portal IS stored (the label, and Disconnect's enabled state); the bundled
+    // default travels apart, only as the Change field's suggestion
+    grid: { ...(i.settings ? { address: i.settings.hostname } : {}), ...(!i.settings && i.defaultHostname ? { suggested: i.defaultHostname } : {}), change: S.change, disconnect: S.disconnect },
     agreement: {
       ...(i.terms ? { acceptedOn: S.acceptedOn(i.terms.accepted_at.slice(0, 10)), record: recordText(i.terms) } : {}),
       ...(i.installId || i.terms?.install_id ? { installId: i.installId || i.terms!.install_id } : {}),

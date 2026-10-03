@@ -10,6 +10,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  bridge-binary:
+    # the bridge's binary edition: built per platform and held to the same wire contract the script
+    # hosts answer to (helper/test/suite.mjs, host-agnostic). Unsigned on purpose — signing needs
+    # identities no repository may hold — so these artifacts are for maintainers and collaborators;
+    # students' bridge stays the script zips inside the extension.
+    name: bridge (rust, ${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # host spelled per platform: on Windows the suite launches it through cmd.exe, which
+          # splits an unquoted forward-slash path at its switches
+          - { os: ubuntu-latest, bin: beethoven-bridge, out: beethoven-bridge-linux-x86_64, host: helper/src/rust/target/release/beethoven-bridge }
+          - { os: macos-latest, bin: beethoven-bridge, out: beethoven-bridge-mac-arm64, host: helper/src/rust/target/release/beethoven-bridge }
+          - { os: windows-latest, bin: beethoven-bridge.exe, out: beethoven-bridge-windows-x86_64.exe, host: helper\src\rust\target\release\beethoven-bridge.exe }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: build
+        working-directory: helper/src/rust
+        run: cargo build --release
+      - name: the wire contract, the same 17 checks every host answers
+        run: node helper/test/suite.mjs --host "${{ matrix.host }}" --label rust-${{ runner.os }}
+      - name: name the artifact for its platform
+        shell: bash
+        run: cp "helper/src/rust/target/release/${{ matrix.bin }}" "${{ matrix.out }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.out }}
+          path: ${{ matrix.out }}
+          retention-days: 90
+
   suite:
     name: typecheck, vitest, mock selftest, build
     runs-on: ubuntu-latest
