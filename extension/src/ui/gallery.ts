@@ -26,6 +26,8 @@ const stubAct: Act = async (action: Action12) => {
       return { text: 'Beethoven 11.0.0: the shared copy at /rs/rs_grp_oschome/shared/beethoven/hpcworker/current cannot be used from this account.' } as never;
     case 'audit':
       return { text: '{"ts":"2026-10-01T12:44:01Z","method":"GET","endpoint":"/pun/sys/dashboard/","outcome":"200"}\n' } as never;
+    case 'copy-debug-log':
+      return { text: 'Beethoven 14.0.0 debug log · mode direct · portal ondemand.grid.wayne.edu · account st1234 · worker worker · 2026-10-03T12:00:00.000Z · 1 line, newest last\n2026-10-03T11:59:58.000Z sw service worker started: Beethoven 14.0.0\n' } as never;
     default:
       return undefined;
   }

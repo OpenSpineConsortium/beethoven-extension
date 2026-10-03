@@ -6,7 +6,7 @@
 // The defects these rules fix, observed in 10.0.0 (worker-start-status/states.out): a status.json from
 // an earlier job showed the wrong state; nothing on disk said "queued", so a fresh submit looked dead
 // and the strip fell back to "Starting your worker…"; and the wait was counted from the browser.
-import { isEnvironmentUrl, parseProgressLine, reasonClass, type ConnectionFile, type ProgressKind, type Registration, type StatusFile, type StatusJson } from './contract';
+import { isClaudeCodeLink, isEnvironmentUrl, parseProgressLine, parseRegistration, reasonClass, type ConnectionFile, type ProgressKind, type Registration, type StatusFile, type StatusJson } from './contract';
 import type { ActivityEntry } from './keys';
 import { formatClock, LOG_WORDS, type LogLine } from './model';
 import type { DirEntry } from './portal';
@@ -62,7 +62,7 @@ export interface RunState {
   status_json_at?: string;
   /** the student pressed Stop: the run stays stopped until they connect again */
   stopped_by_student?: boolean;
-  /** the environment link opened once for this press */
+  /** the link opened once for this press (14.0.0: either form; the name is kept for the stored record) */
   opened_env?: string;
   /** the job whose wait went into WAIT_HISTORY_KEY */
   wait_recorded_job?: string;
@@ -94,17 +94,43 @@ const t = (iso: string | undefined): number | undefined => {
   return Number.isFinite(v) ? v : undefined;
 };
 
-/** the environment link of a run, only when it is Claude's own Code page for an environment */
-export function environmentLinkOf(run: Pick<RunState, 'connection' | 'status' | 'registration'> | undefined): string | undefined {
-  if (!run) return undefined;
-  const raw = run.connection?.environment_url ?? run.status?.environment_url ?? run.registration?.environment_url ?? run.connection?.session_url ?? run.status?.session_url;
-  return isEnvironmentUrl(raw) ? raw : undefined;
+/**
+ * Every link the run's files report, in the order they are trusted: connection.json, then status.json, then what rc.log's
+ * registration block said; in each, session_url first (framework 14: the link Claude Code printed last, an environment link
+ * or a resumed session's own; framework 13 and older wrote it equal to environment_url), then environment_url. Empty values
+ * are left out: a framework 13 status.json of a resumed session carried both as "" (2026-10-03).
+ */
+function reportedLinks(run: Pick<RunState, 'connection' | 'status' | 'registration'>): string[] {
+  const all = [run.connection?.session_url, run.connection?.environment_url, run.status?.session_url, run.status?.environment_url, run.registration?.session_url, run.registration?.environment_url];
+  return all.filter((v): v is string => typeof v === 'string' && v !== '');
 }
 
-/** some link was reported and it is not a claude.ai/code environment link */
+/**
+ * The link of a run (14.0.0): the first one reported that is a Claude Code link, either form (contract.ts isClaudeCodeLink):
+ * an environment link, or the session link Claude Code prints when it resumes a session. 13.0.0 took only the environment
+ * form, and with `??` an empty environment_url hid any other: a worker online on a resumed session read as "Connecting to
+ * Claude…" for good (2026-10-03, go2432's job 40554211).
+ */
+export function claudeLinkOf(run: Pick<RunState, 'connection' | 'status' | 'registration'> | undefined): string | undefined {
+  if (!run) return undefined;
+  return reportedLinks(run).find((u) => isClaudeCodeLink(u));
+}
+
+/**
+ * 14.0.0: the first environment link reported (contract.ts isEnvironmentUrl), in the same order of trust, whichever link
+ * claudeLinkOf chose. That is where a new session can start (New session). Framework 14 writes the link printed last as
+ * session_url and the environment link, when one was printed, as environment_url: a worker that printed both offers its
+ * session's own link first and still has an environment for New session.
+ */
+export function environmentLinkOf(run: Pick<RunState, 'connection' | 'status' | 'registration'> | undefined): string | undefined {
+  if (!run) return undefined;
+  return reportedLinks(run).find((u) => isEnvironmentUrl(u));
+}
+
+/** some link was reported and none of them is a Claude Code link (either form) */
 function badLinkOf(run: RunState): boolean {
-  const raw = run.connection?.environment_url ?? run.status?.environment_url ?? run.registration?.environment_url;
-  return !!raw && !isEnvironmentUrl(raw);
+  const all = reportedLinks(run);
+  return all.length > 0 && !all.some((u) => isClaudeCodeLink(u));
 }
 
 /**
@@ -112,12 +138,17 @@ function badLinkOf(run: RunState): boolean {
  * the run's job or the run's next job (which then becomes the run's job: a renewal); a "queued" file
  * for a job already seen further along is ignored. Returns the run to store, and whether the file was
  * taken.
+ *
+ * 14.0.0: a renewal also forgets what rc.log said (registration, rc_tail, rc_mtime). rc.log is the worker's terminal and
+ * the successor starts its own, so the predecessor's link must never stand in for the successor's: a successor online
+ * before its own link is read is "Connecting to Claude…" until it is, and rc.log is downloaded again at the next
+ * listing that wants it, whatever its modified time.
  */
 export function applyStatus(run: RunState, status: StatusFile, mtime?: number): { run: RunState; taken: boolean } {
   const job = status.job ? String(status.job) : '';
   let next = run;
   if (job && job !== run.job) {
-    if (run.next_job && job === run.next_job) next = { ...run, job, next_job: undefined, connection: undefined, connection_mtime: undefined };
+    if (run.next_job && job === run.next_job) next = forJob(run, job);
     else return { run: { ...run, ...(mtime !== undefined ? { status_mtime: mtime } : {}) }, taken: false };
   }
   const past = new Set(next.past_queued ?? []);
@@ -130,6 +161,16 @@ export function applyStatus(run: RunState, status: StatusFile, mtime?: number): 
     run: { ...next, status, ...(mtime !== undefined ? { status_mtime: mtime } : {}), past_queued: [...past].slice(-10), ...(nextJob && nextJob !== next.job ? { next_job: nextJob } : {}), ...(wrote ? { alive_seen: true } : {}) },
     taken: true,
   };
+}
+
+/**
+ * The run moved to another job (a renewal, R1): nothing the previous job's files said is kept. connection.json and
+ * rc.log are that job's (14.0.0: rc.log's registration, its tail and its modified time too), so they are read afresh.
+ */
+export function forJob(run: RunState, job: string): RunState {
+  if (job === run.job) return run;
+  const { connection: _c, connection_mtime: _cm, registration: _r, rc_tail: _rt, rc_mtime: _rm, next_job: _n, ...rest } = run;
+  return { ...rest, job };
 }
 
 /**
@@ -153,6 +194,30 @@ export function applyStatusRead(run: RunState, status: StatusFile, readAt: numbe
   const sameJob = !!before && String(before.job ?? '') === String(status.job ?? '') && run.job === r.run.job;
   if (!sameJob) return { run: { ...r.run, ...seen, status_mtime: undefined }, taken: true };
   return changed ? { run: { ...r.run, ...seen, status_mtime: readAt }, taken: true } : r;
+}
+
+/**
+ * 14.0.0, R1 and R4 for rc.log (the GlobalProtect way): a download of the worker's terminal, applied to the run. The file
+ * names no job, so it counts as this job's only when it was modified at or after the job got its computer
+ * (got_computer_at, else started_at), as the node file does (R4). A renewal's successor writes its first status.json
+ * before it moves its predecessor's rc.log aside. A download taken in that window (Details open, or a last write of the
+ * old job) is passed over: the modified time is kept, so it is not downloaded again until the file changes. A file taken
+ * replaces the registration whole, so a registration the current file no longer holds is not kept either.
+ */
+export function applyRcLog(run: RunState, text: string, mtime: number | undefined): { run: RunState; taken: boolean } {
+  const s = run.status && (!run.status.job || String(run.status.job) === run.job) ? run.status : undefined;
+  const start = t(s?.got_computer_at) ?? t(s?.started_at);
+  // this job's start unknown (no status of its own yet, or a queued record, which carries neither
+  // got_computer_at nor started_at): a job without a computer has written no transcript, so a file
+  // found now is the previous job's, left until the new job moves it aside; it is passed over
+  if (start === undefined) return { run: { ...run, ...(mtime !== undefined ? { rc_mtime: mtime } : {}) }, taken: false };
+  if (mtime !== undefined && mtime * 1000 < start - 1000) return { run: { ...run, rc_mtime: mtime }, taken: false };
+  const reg = parseRegistration(text);
+  const { registration: _old, ...rest } = run;
+  return {
+    run: { ...rest, rc_tail: text.slice(-4000), ...(mtime !== undefined ? { rc_mtime: mtime } : {}), ...(reg.session_name || reg.environment_url || reg.session_url ? { registration: reg } : {}) },
+    taken: true,
+  };
 }
 
 /** R1 for connection.json: taken only for the run's job */
@@ -225,8 +290,10 @@ export function runFacts(run: RunState | undefined, now: number): RunFacts {
   if (!run) return none;
   const s = run.status && (!run.status.job || String(run.status.job) === run.job) ? run.status : undefined;
   const checkedAt = t(run.listed_at);
-  // R1: the link only from this job's files (a status of another job, should one be on the record, says nothing)
-  const link = environmentLinkOf({ connection: run.connection, status: s, registration: run.registration });
+  // R1: the link only from this job's files (a status of another job, should one be on the record, says nothing); 14.0.0: either form
+  const link = claudeLinkOf({ connection: run.connection, status: s, registration: run.registration });
+  // 14.0.0: an environment link reported by any of them, for New session, whichever link is the run's own
+  const environmentLink = environmentLinkOf({ connection: run.connection, status: s, registration: run.registration });
   const title = s?.title || run.connection?.title || undefined;
   const renewal = !!s?.renewal;
   const base: RunFacts = {
@@ -239,6 +306,7 @@ export function runFacts(run: RunState | undefined, now: number): RunFacts {
     ...(run.started_by === 'found' && !run.alive_seen ? { neverSeenAlive: true } : {}),
     ...(checkedAt !== undefined ? { checkedAt } : {}),
     ...(link ? { link } : {}),
+    ...(environmentLink ? { environmentLink } : {}),
     ...(title ? { title } : {}),
   };
   if (!s) {
@@ -298,7 +366,8 @@ export function runFacts(run: RunState | undefined, now: number): RunFacts {
       phase = 'needs-consent';
       break;
     case 'online': {
-      // R5: online with a claude.ai/code link and a heartbeat under 90 s old when the file was read
+      // R5: online with a Claude Code link (14.0.0: an environment link or a resumed session's own) and a heartbeat
+      // under 90 s old when the file was read
       const fresh = beat === undefined || checkedAt === undefined || checkedAt - beat < ONLINE_HEARTBEAT_MS;
       if (badLinkOf({ ...run, status: s }) && !link) {
         phase = 'online';

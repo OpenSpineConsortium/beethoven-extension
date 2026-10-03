@@ -90,7 +90,7 @@ export type KnownState = 'asked' | 'queued' | 'starting' | 'needs-you' | 'online
 /**
  * LAST_KNOWN_KEY (local). What the panel shows the moment it opens, before any live check, and what
  * "Open my session" needs with no grid and no VPN. Written on every state change the background sees.
- * Nothing secret: the environment link is the student's own claude.ai address.
+ * Nothing secret: the link is the student's own claude.ai address.
  */
 export interface LastKnown {
   /** the worker's name this belongs to */
@@ -98,8 +98,18 @@ export interface LastKnown {
   state: KnownState;
   /** the session title ("Wayne State grid") */
   title?: string;
-  /** https://claude.ai/code?environment=env_… (checked with isEnvironmentUrl before it is stored) */
+  /**
+   * the worker's link, either form since 14.0.0: https://claude.ai/code?environment=env_…, or the session link
+   * https://claude.ai/code/session_… Claude Code prints when it resumes a session (claude.com for either). Only a link
+   * contract.ts isClaudeCodeLink takes is stored (it comes from facts.ts claudeLinkOf), and it is checked again before it
+   * is opened. The name is 11.0.0's, kept so a record stored by 13.0.0 still reads.
+   */
   environment_url?: string;
+  /**
+   * 14.0.0: an environment link the run reported with it (steps.ts newSessionLinkOf), where New session opens; absent when
+   * only a resumed session's own link was reported. It may differ from environment_url, which holds the run's own link.
+   */
+  new_session_url?: string;
   /** when this state was seen (ISO): "As of 9:02 AM" */
   seen_at: string;
   /** status.json online_at of the job last seen online: "up 2 h 14 min" */

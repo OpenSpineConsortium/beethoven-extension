@@ -1,6 +1,17 @@
 # Use Beethoven
 
-For Beethoven 13.0.0. Written 2026-10-02.
+For Beethoven 14.0.0. Written 2026-10-02, updated 2026-10-03.
+
+**New in 14.0.0.** When your worker picks up a conversation you had earlier, Claude gives it a link of
+another kind, the link to that conversation itself. Beethoven 13.0.0 knew only the usual link, so it
+stayed on **Starting · Connecting to Claude…** while your worker was in fact ready, and it never opened
+claude.ai. 14.0.0 knows both links: it shows **Online** with **Open my session**, and opens claude.ai if
+you asked it to. If your browser is not signed in to claude.ai, claude.ai asks you to sign in there:
+use the Claude account your worker uses. A worker on such a link runs that one conversation, so the home
+offers **Copy link** and **Phone** but not **New session**. Your lab lead must also publish the new grid
+side (framework 14) for this to work without GlobalProtect. And when something seems stuck, open **⋯**
+(More), click **Copy debug log**, and paste it to your lab lead ([part 7](#7-if-something-goes-wrong)).
+Install 14.0.0 in place of 13.0.0 ([Install Beethoven](INSTALL.md)).
 
 **New in 13.0.0.** Sometimes your worker's next job is cancelled on the grid. Beethoven used to wait on
 **Connecting to Claude…** with no button. Once framework 13 is published on the grid (your lab lead does
@@ -201,7 +212,8 @@ try anything else.
    Click **Unlock**, then use your fingerprint, face or PIN. Beethoven asks once each time you open
    the browser.
 4. Use the panel as before: **Connect**, **Open my session**, **New session**, **Copy link**,
-   **Phone**, **Stop**.
+   **Phone**, **Stop**. **New session** is there only when your worker can start a new conversation;
+   a worker that picked up an earlier conversation runs that one, and **Open my session** opens it.
 
 Your worker keeps running when you close the panel, the browser or the laptop.
 
@@ -323,6 +335,17 @@ in **Settings**, **Connection**.
 | **This computer's key has started the worker as often as the grid allows in an hour.** | Try again later, or use GlobalProtect. |
 | **Locked** · **Unlock** | Click **Unlock**, then your fingerprint, face or PIN. |
 | **That didn't unlock. Try again.** | Try again. If Windows Hello or Touch ID no longer works, click **Can't unlock? Forget this computer and sign in again**. |
+| **Starting · Connecting to Claude…** for more than five minutes | Open **⋯** (More), click **Copy debug log**, and paste it to your lab lead. Keep the panel open while you do. |
+
+**If something is stuck: More, Copy debug log, paste it to your lab lead.** Open **⋯** (More) and click
+**Copy debug log**. Beethoven puts on your clipboard a list of what it did, step by step, with the time
+of each step: how it reached the grid, what it asked there and what came back, what it read about your
+worker and what it showed you. Paste it into an e-mail or a message to your lab lead. Do it while the
+panel still shows the problem: the list lives only in Beethoven's memory in this browser, it is never
+sent anywhere by itself, and it starts empty again when you restart the browser (and sometimes after
+the panel has been closed for a while). It never contains your password, your grid code, the code you
+paste from Claude's page, your key, or the full sign-in link.
 
 For anything else, open **⋯** (More), **Details for your lab lead**, and send your lab lead what it
-shows. It never contains your password or your code.
+shows. It never contains your password or your code. Its last part is the newest 200 lines of the same
+debug log.

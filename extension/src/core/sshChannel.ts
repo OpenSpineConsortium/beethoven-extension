@@ -14,9 +14,10 @@
 // Every verb goes through the audit chokepoint (core/audit.ts), with the 11.0.0 floors: connect, stop
 // and status are scheduler-class (60 s), restrict and forget shell-class (15 s), version and the reads
 // have none.
-import { Audit, type EndpointClass } from './audit';
+import { Audit, FloorError, type EndpointClass } from './audit';
 import { BridgeError, GRID_HOST, GRID_HOST_KEY_PIN, GRID_PORT, type BridgeProvider } from './bridge';
 import { gate, gateLineFor, gateReadBody, GATE_FILES, GATE_KEY_EXPIRED, GATE_REFUSED, isUnknownVerb, parseForget, parseGateLimit, parseGateVersion, type GateFile, type GateLimit, type GateVersion } from './contract';
+import { debugOutput } from './debuglog';
 import { KeyringError } from './keyring';
 import type { ActiveJobs, DirEntry, DirListing, PortalApi, RnodeState, RouteProbe, SessionInfo, WarmResult } from './portal';
 import type { ShellResult, ShellTestResult } from './shell';
@@ -82,9 +83,24 @@ export interface SshPortalDeps {
   host?: string;
   port?: number;
   log?: (line: string) => void;
+  /**
+   * 14.0.0, the debug log (core/debuglog.ts): each connection opened and closed, with the reason and how long it
+   * lived, and each gate verb, by its verb and name only, with its exit status, how long it took and the first
+   * characters of its output. Never the key, never a command's other words.
+   */
+  debug?: (tag: string, line: string) => void;
   now?: () => number;
   /** how long a held connection may sit unused (2 min) */
   holdIdleMs?: number;
+}
+
+/** a gate line as the debug log names it: the verb and the worker's name (and, for read, which of the four files) */
+export function gateWords(line: string): string {
+  const w = String(line ?? '').split(' ');
+  const verb = w[0] ?? '';
+  if (verb === 'read') return `read ${w[1] ?? ''} ${w[2] ?? ''}`.trim();
+  if (verb === 'version' || verb === 'forget') return verb;
+  return `${verb} ${w[1] ?? ''}`.trim();
 }
 
 const FILES_OF = new Set<string>(GATE_FILES);
@@ -124,6 +140,8 @@ export class SshPortal implements PortalApi {
   private held: Held | undefined;
   private holding = false;
   private opening: Promise<SshConnection> | undefined;
+  /** when each live connection was opened, for the debug log's "closed after" */
+  private readonly openedAt = new WeakMap<SshConnection, number>();
   /** the last version through the gate: the account, the framework, whether Claude Code is signed in */
   lastVersion: GateVersion | undefined;
   private readonly pin: string;
@@ -138,39 +156,61 @@ export class SshPortal implements PortalApi {
     this.now = d.now ?? (() => Date.now());
   }
 
+  private debug(tag: string, line: string): void {
+    try {
+      this.d.debug?.(tag, line);
+    } catch {
+      /* the debug log never stops an action */
+    }
+  }
+
+  /** close a connection, with the reason and its age in the debug log */
+  private closeConn(conn: SshConnection, reason: string): void {
+    const at = this.openedAt.get(conn);
+    this.openedAt.delete(conn);
+    this.debug('ssh', `close ${this.host}:${this.port}: ${reason}${at !== undefined ? ` after ${this.now() - at} ms` : ''}${conn.endedWith ? ` (it had ended: ${conn.endedWith.message})` : ''}`);
+    void conn.close().catch(() => undefined);
+  }
+
   // ---- connections -----------------------------------------------------------------------------------
 
   /** one signed-in connection with the key */
-  private async openConnection(): Promise<SshConnection> {
-    const account = await this.d.account();
-    if (!account) throw new DirectError('key-refused', 'no account recorded for the direct way');
-    const identity = await this.d.identity();
-    const bridge = await this.d.bridge();
-    const stream = await bridge.open(this.host, this.port);
-    const conn = new SshConnection({ stream, username: account, pinnedFingerprint: this.pin, ...(this.d.log ? { log: this.d.log } : {}) });
+  private async openConnection(why: string): Promise<SshConnection> {
+    const t0 = this.now();
+    let conn: SshConnection | undefined;
     try {
+      const account = await this.d.account();
+      if (!account) throw new DirectError('key-refused', 'no account recorded for the direct way');
+      const identity = await this.d.identity();
+      const bridge = await this.d.bridge();
+      const stream = await bridge.open(this.host, this.port);
+      conn = new SshConnection({ stream, username: account, pinnedFingerprint: this.pin, ...(this.d.log ? { log: this.d.log } : {}) });
       await conn.connect();
       const r = await conn.authPublicKey(identity);
       if (!r.success) throw new DirectError('key-refused', `the grid did not accept this computer's key (methods: ${r.methods.join(',')})`);
+      this.openedAt.set(conn, this.now());
+      this.debug('ssh', `open ${this.host}:${this.port} as ${account} through the ${bridge.id} bridge (${why}) in ${this.now() - t0} ms`);
       return conn;
     } catch (e) {
-      await conn.close().catch(() => undefined);
+      this.debug('ssh', `open ${this.host}:${this.port} failed after ${this.now() - t0} ms (${why}): ${directFailureOf(e)}: ${(e as Error)?.message ?? String(e)}`);
+      if (conn) await conn.close().catch(() => undefined);
       throw e;
     }
   }
 
   /** keep one connection open for the reads while the panel is open (the watch connection), or let it go */
   hold(on: boolean): void {
+    if (on !== this.holding) this.debug('ssh', on ? 'hold: the panel is open, reads share one connection' : 'hold off: the panel closed');
     this.holding = on;
-    if (!on) this.dropHeld();
+    if (!on) this.dropHeld('the panel closed');
   }
 
-  private dropHeld(): void {
+  private dropHeld(reason: string): void {
     const h = this.held;
     this.held = undefined;
     if (h) {
       clearInterval(h.timer);
-      void h.conn.close().catch(() => undefined);
+      this.closeConn(h.conn, reason);
     }
   }
 
@@ -180,21 +220,21 @@ export class SshPortal implements PortalApi {
       let conn = this.held && !this.held.conn.endedWith ? this.held.conn : undefined;
       if (!conn) {
         if (!this.opening) {
-          this.dropHeld();
-          this.opening = this.openConnection().finally(() => (this.opening = undefined));
+          if (this.held) this.dropHeld('the held connection had ended');
+          this.opening = this.openConnection('held while the panel is open').finally(() => (this.opening = undefined));
         }
         conn = await this.opening;
         // two callers may wait on one opening: the first to come back keeps it, once
         if (this.held?.conn !== conn) {
           if (this.holding) {
             const idle = this.d.holdIdleMs ?? 120_000;
-            const h: Held = { conn, lastUsed: this.now(), timer: setInterval(() => (this.held === h && this.now() - h.lastUsed > idle ? this.dropHeld() : undefined), Math.min(idle, 30_000)) };
+            const h: Held = { conn, lastUsed: this.now(), timer: setInterval(() => (this.held === h && this.now() - h.lastUsed > idle ? this.dropHeld(`unused for ${Math.round(idle / 1000)} s`) : undefined), Math.min(idle, 30_000)) };
             this.held = h;
           } else {
             try {
               return await fn(conn);
             } finally {
-              void conn.close().catch(() => undefined);
+              this.closeConn(conn, 'the action ended (the panel closed meanwhile)');
             }
           }
         }
@@ -203,35 +243,45 @@ export class SshPortal implements PortalApi {
       try {
         return await fn(conn);
       } catch (e) {
-        if (conn.endedWith) this.dropHeld();
+        if (conn.endedWith) this.dropHeld('it ended during an action');
         throw e;
       }
     }
-    const conn = await this.openConnection();
+    const conn = await this.openConnection('one action');
     try {
       return await fn(conn);
     } finally {
-      void conn.close().catch(() => undefined);
+      this.closeConn(conn, 'the action ended');
     }
   }
 
   /** one gate verb, through the chokepoint; a refusal and an expiry are typed errors */
   private async run(line: string, o: { timeoutMs?: number; job?: string } = {}): Promise<ExecResult> {
     const verb = line.split(' ')[0] ?? '';
-    return this.d.audit.request(
-      { method: 'SSH', endpoint: `ssh://${this.host}/gate/${verb}`, cls: classOf(verb), mutates: verb !== 'version' && verb !== 'read' && verb !== 'status', via: 'extension', ...(o.job ? { job: o.job } : {}) },
-      async () => {
-        const r = await this.withConnection((c) => c.exec(line, { timeoutMs: o.timeoutMs ?? 45_000, maxOutput: 512 * 1024 }));
-        const text = r.stdoutText;
-        const both = text + r.stderrText;
-        if (r.exitStatus === 125 || text.includes(GATE_KEY_EXPIRED)) throw new DirectError('key-expired', 'the lab key lifetime has passed: the gate removed the line');
-        if (r.exitStatus === 126 && text.includes(GATE_REFUSED)) throw new DirectError('refused', `the gate refused "${verb}"`);
-        const limit = parseGateLimit(both);
-        if (limit) throw new DirectError('limit', `the gate's ${limit} limit was reached`, limit);
-        if (isUnknownVerb(both)) throw new DirectError('old-copy', "the lab's copy on the grid has no gate (older than framework 11)");
-        return { result: r, bytes: r.stdout.length + r.stderr.length + line.length, outcome: `exit ${r.exitStatus ?? '-'}${r.timedOut ? ' (timed out)' : ''}` };
-      },
-    );
+    const words = gateWords(line);
+    const t0 = this.now();
+    try {
+      const r = await this.d.audit.request(
+        { method: 'SSH', endpoint: `ssh://${this.host}/gate/${verb}`, cls: classOf(verb), mutates: verb !== 'version' && verb !== 'read' && verb !== 'status', via: 'extension', ...(o.job ? { job: o.job } : {}) },
+        async () => {
+          const r = await this.withConnection((c) => c.exec(line, { timeoutMs: o.timeoutMs ?? 45_000, maxOutput: 512 * 1024 }));
+          const text = r.stdoutText;
+          const both = text + r.stderrText;
+          if (r.exitStatus === 125 || text.includes(GATE_KEY_EXPIRED)) throw new DirectError('key-expired', 'the lab key lifetime has passed: the gate removed the line');
+          if (r.exitStatus === 126 && text.includes(GATE_REFUSED)) throw new DirectError('refused', `the gate refused "${verb}"`);
+          const limit = parseGateLimit(both);
+          if (limit) throw new DirectError('limit', `the gate's ${limit} limit was reached`, limit);
+          if (isUnknownVerb(both)) throw new DirectError('old-copy', "the lab's copy on the grid has no gate (older than framework 11)");
+          return { result: r, bytes: r.stdout.length + r.stderr.length + line.length, outcome: `exit ${r.exitStatus ?? '-'}${r.timedOut ? ' (timed out)' : ''}` };
+        },
+      );
+      this.debug('gate', `${words}: exit ${r.exitStatus ?? '-'}${r.timedOut ? ' (timed out)' : ''} in ${this.now() - t0} ms: ${debugOutput(r.stdoutText + (r.stderrText ? ` | stderr: ${r.stderrText}` : '')) || '(no output)'}`);
+      return r;
+    } catch (e) {
+      const why = e instanceof FloorError ? `not sent: ${e.message}` : `${directFailureOf(e)}: ${(e as Error)?.message ?? String(e)}`;
+      this.debug('gate', `${words}: failed in ${this.now() - t0} ms: ${why}`);
+      throw e;
+    }
   }
 
   // ---- the gate's verbs (what the background calls directly) ------------------------------------------

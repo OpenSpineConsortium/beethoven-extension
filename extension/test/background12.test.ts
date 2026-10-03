@@ -132,6 +132,45 @@ describe.skipIf(!PY)('the direct way, through the background', () => {
     // nothing the student typed is anywhere
     const everything = JSON.stringify(world.storage) + world.log.join('\n');
     for (const secret of ['pw-correct', '864209', 'goodcode-abcdef']) expect(everything).not.toContain(secret);
+    // 14.0.0: the debug log says what happened under the hood, and holds none of it either
+    const dl = (await send(world, { type: 'action', action: { kind: 'copy-debug-log' } })) as { ok: boolean; value: { text: string } };
+    expect(dl.ok).toBe(true);
+    const text = dl.value.text;
+    const lines = text.trimEnd().split('\n');
+    expect(lines[0]).toMatch(/^Beethoven \S+ debug log · mode direct · portal ondemand\.grid\.wayne\.edu · account st1234 · worker worker · \d{4}-\d\d-\d\dT[\d:.]+Z · \d+ lines, newest last$/);
+    for (const re of [
+      / sw service worker started: Beethoven /,
+      / mode setup \(preference direct; bridge /,
+      / mode direct \(preference direct; bridge helper; key enrolled\)/,
+      / bridge probe in \d+ ms: chosen helper/,
+      / sheet enrol: prompt, the grid asks for password/,
+      / sheet enrol: prompt, the grid asks for code/,
+      / ssh open grid\.wayne\.edu:22 as st1234 through the helper bridge \(.+\) in \d+ ms/,
+      / gate version: exit 0 in \d+ ms: /,
+      / access signin: /,
+      / press connect$/m,
+      / ready connect: go \(mode direct\)/,
+      / connect start \d+: login auto, worker worker, site wayne/,
+      / connect start \d+: the direct way, in a sign-in sitting/,
+      / sitting \d+ open: ssh in the held sign-in session, login auto/,
+      / sitting \d+ auth-url: claude\.ai\/oauth\/authorize \(the link itself is not logged\)/,
+      / sitting \d+ pasted code typed \(the code itself is never logged\)/,
+      / sitting \d+ step queued: job 40509876 \(new\)/,
+      / read direct: status\.json: job 40509876, state queued, updated_at .* -> phase queued/,
+      / gate read worker status\.json: exit 0 in \d+ ms/,
+      / panel journey /,
+    ])
+      expect(text, String(re)).toMatch(re);
+    for (const secret of ['pw-correct', '864209', 'goodcode-abcdef', 'client_id', 'code=true']) expect(text, secret).not.toContain(secret);
+    // Details for your lab lead has the last 200 lines under their heading
+    const details = openPort(world, 'details');
+    await until(details, () => !!(details.last()?.view as { debugLog?: unknown } | undefined)?.debugLog);
+    const dv = details.last()!.view as unknown as { debugLog: { title: string; lines: string[]; copy: { action: { kind: string } } } };
+    expect(dv.debugLog.title).toBe('Debug log');
+    expect(dv.debugLog.copy.action).toEqual({ kind: 'copy-debug-log' });
+    expect(dv.debugLog.lines.length).toBeGreaterThan(10);
+    expect(dv.debugLog.lines.length).toBeLessThanOrEqual(200);
+    expect(dv.debugLog.lines.join('\n')).not.toContain('pw-correct');
     // the Grid row says how the grid is reached
     await send(world, { type: 'action', action: { kind: 'tour', event: 'skip' } });
   }, 120_000);
@@ -374,6 +413,54 @@ describe.skipIf(!PY)('the direct way, a fresh copy, a worker in the folder that 
     expect(view(panel)?.journey?.moment).toBe('starting');
     expect(offersConnect(panel)).toBe(false);
     expect((await grid.state()).state.commands.filter((c) => c.startsWith('gate connect'))).toEqual([]);
+  }, 120_000);
+});
+
+// 14.0.0 (framework 14): a worker that resumed an earlier session prints that session's own link, and framework 14
+// writes it as session_url with environment_url "". 13.0.0 knew only the environment link: on 2026-10-03 it showed
+// "Starting · Connecting to Claude…" for go2432's worker (job 40554211), online all along.
+describe.skipIf(!PY)("framework 14, the direct way: a live worker online on a resumed session's own link", () => {
+  let grid: Grid;
+  let world: World;
+  beforeAll(async () => {
+    grid = await startGrid({ claude: 'yes', job: '40554211', run_state: 'online', run_age_s: 0, run_live: true, run_link: 'session' });
+  }, 60_000);
+  afterAll(() => grid?.stop());
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+  });
+  afterEach(() => {
+    for (const s of [...world.sockets]) s.close(1000);
+  });
+
+  it('is online, with Open my session opening the session link; never "Connecting to Claude…", no Connect, nothing started', async () => {
+    nativeHelperToTcp(world, grid.port);
+    await boot(world);
+    const panel = openPort(world, 'panel');
+    await firstSignIn(world, panel);
+    await until(panel, () => runRecord(world)?.job === '40554211' && runRecord(world)?.status?.state === 'online', 30_000);
+    const seen: string[] = [];
+    const online = () => {
+      const v = view(panel);
+      const j = v?.journey;
+      const h = v?.home as { hero?: { state?: string } } | undefined;
+      const b = j ? `${j.moment}${j.sub ? ` ${JSON.stringify(j.sub)}` : ''}` : `home ${h?.hero?.state ?? ''}`;
+      if (seen[seen.length - 1] !== b) seen.push(b);
+      return j?.moment === 'online' || h?.hero?.state === 'online' || h?.hero?.state === 'online-new';
+    };
+    await until(panel, online, 30_000);
+    expect(/"kind":"open-session"/.test(JSON.stringify(view(panel)))).toBe(true);
+    expect(offersConnect(panel)).toBe(false);
+    expect(seen.filter((x) => /Connecting to Claude/.test(x))).toEqual([]);
+    expect(await send(world, { type: 'action', action: { kind: 'open-session' } })).toMatchObject({ ok: true, value: { opened: true } });
+    expect(world.log.some((l) => /tabs\.create #\d+ https:\/\/claude\.ai\/code\/session_01TestResumedSession000000 /.test(l))).toBe(true);
+    expect((await grid.state()).state.commands.filter((c) => c.startsWith('gate connect'))).toEqual([]);
+    // the debug log says what it read and what the panel made of it
+    const dl = (await send(world, { type: 'action', action: { kind: 'copy-debug-log' } })) as { ok: boolean; value: { text: string } };
+    expect(dl.value.text).toMatch(/ read direct: status\.json: job 40554211, state online, updated_at .* -> phase online, stale no, alive_seen (yes|no), link present \(session link\)/);
+    expect(dl.value.text).toMatch(/ open session tab: opened \(link present \(session link\)\)/);
   }, 120_000);
 });
 

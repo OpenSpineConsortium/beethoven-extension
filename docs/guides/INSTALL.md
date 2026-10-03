@@ -1,6 +1,15 @@
 # Install Beethoven
 
-For Beethoven 13.0.0. Written 2026-10-02.
+For Beethoven 14.0.0. Written 2026-10-02, updated 2026-10-03.
+
+**Updating from 13.0.0.** First remove every older copy: click the puzzle icon, then **⋮** next to each
+Beethoven, then **Remove from Chrome** (or remove each Beethoven card in `chrome://extensions`). Then
+install 14.0.0 as in Part 1, and sign in to the grid once more. Keep only one copy: two copies side by
+side sign each other out of the grid. Your helper, your worker and your files on the grid stay as they
+are. What changes: a worker that picked up an earlier conversation now shows **Online** with **Open my
+session**, where 13.0.0 waited on **Starting · Connecting to Claude…** (your lab lead also publishes
+framework 14 on the grid); and **⋯** (More) has **Copy debug log**, for your lab lead when something is
+stuck ([Use Beethoven](USE.md), part 7).
 
 **Updating from 12.0.0.** First remove the 12.0.0 copy: click the puzzle icon, then **⋮** next to
 Beethoven, then **Remove from Chrome**. Then install 13.0.0 as in Part 1. Keep only one copy, because two

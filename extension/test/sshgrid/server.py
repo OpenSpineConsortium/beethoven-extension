@@ -21,7 +21,7 @@ makes the gate's connect answer framework 11's cap.
 {"run_state": s} (online, running, starting, need_login, preempted, stopped) and {"run_age_s": n} that file is
 written as framework 11's worker writes it: its heartbeat updated_at n seconds old, got_computer_at and
 claude_login (signed in); {"run_next": id} names a successor; {"run_link": true} carries an environment
-link; {"run_live": true} keeps it heartbeating as the worker's main loop does: updated_at moves once a
+link, and {"run_link": "session"} framework 14's resumed session: session_url a session link, environment_url ""; {"run_live": true} keeps it heartbeating as the worker's main loop does: updated_at moves once a
 heartbeat, every {"run_beat_s": s} seconds (30 by default, the worker's HEARTBEAT_S), never with a read, and stays
 n seconds behind (a grid clock that lags this computer's); the run's other times stay where they were. Without
 run_live the run is dead: its file never changes again.
@@ -73,7 +73,13 @@ def status_doc():
         doc["claude_login"] = {"loggedIn": True, "email": "st1234@wayne.edu", "subscriptionType": "max", "checked_at": iso(beat)}
     if CFG.get("run_next") and STATE["stop_reason"] != "successor_gone":
         doc["next_job"] = CFG["run_next"]
-    if CFG.get("run_link"):
+    if CFG.get("run_link") == "session":
+        # framework 14: Claude Code resumed an earlier session and printed only that session's link
+        doc["session_url"] = "https://claude.ai/code/session_01TestResumedSession000000"
+        doc["environment_url"] = ""
+        doc["environment_id"] = ""
+        doc["online_at"] = iso(base - 200)
+    elif CFG.get("run_link"):
         doc["environment_url"] = "https://claude.ai/code?environment=env_01TestDeadRun000000000000"
         doc["online_at"] = iso(base - 200)
     if doc["state"] == "stopped":

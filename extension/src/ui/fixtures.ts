@@ -28,6 +28,8 @@ const EMAIL = 'alex@wayne.edu';
 const PLAN = 'Max';
 const TITLE = 'Wayne State grid';
 const LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
+/** 14.0.0: the link Claude Code prints when it resumes a session (the worker serves that one session) */
+const SESSION_LINK = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
 const HOST = 'ondemand.grid.wayne.edu';
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
 const VPN_APP = 'GlobalProtect';
@@ -52,6 +54,7 @@ const MENU: HomeView['header']['menu'] = [
   { label: WORDS.home.menu.files, action: { kind: 'open-files' } },
   { label: WORDS.home.menu.settings, action: { kind: 'open-settings' } },
   { label: WORDS.home.menu.details, action: { kind: 'open-details' } },
+  { label: WORDS.home.menu.debugLog, action: { kind: 'copy-debug-log' } },
   { label: WORDS.home.menu.help, action: { kind: 'open-help' } },
 ];
 
@@ -244,6 +247,21 @@ const detailsView = (running = false): DetailsView => ({
   probe: { label: WORDS.details.probe, tone: 'outline', action: { kind: 'check-compute-node' } },
   footer: WORDS.details.footer,
   onlineLag: WORDS.details.onlineLag,
+  debugLog: {
+    title: WORDS.details.debugLogTitle,
+    note: WORDS.details.debugLogNote(200),
+    copy: { label: WORDS.details.debugLogCopy, tone: 'outline', action: { kind: 'copy-debug-log' } },
+    lines: [
+      '2026-10-01T12:43:58.120Z sw service worker started: Beethoven 14.0.0',
+      '2026-10-01T12:43:58.300Z mode direct (preference direct; bridge helper; key enrolled)',
+      '2026-10-01T12:44:01.050Z ssh open grid.wayne.edu:22 as st1234 through the helper bridge (held while the panel is open) in 812 ms',
+      '2026-10-01T12:44:01.400Z gate version: exit 0 in 340 ms: HPCW-GATE version account st1234 framework 14 claude yes',
+      '2026-10-01T12:44:03.000Z press connect',
+      '2026-10-01T12:44:03.010Z ready connect: go (mode direct)',
+      '2026-10-01T12:50:41.200Z read direct: status.json: job 4419310, state online, updated_at 2026-10-01T12:50:40Z -> phase online, stale no, alive_seen yes, link present (session link)',
+      '2026-10-01T12:50:41.210Z panel journey online: You’re online. [Open my session] | run online, link present (session link)',
+    ],
+  },
 });
 
 const settingsView = (appearance: 'cream' | 'system' = 'cream'): SettingsView => ({
@@ -560,6 +578,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'h-needs-consent', surface: 'panel', note: 'need_consent (D21)', view: home({ hero: hero('needs-consent', 'needs', WORDS.home.needsHero, WORDS.home.needsConsentSub), primary: { kind: 'connect', button: ink(WORDS.home.connect, { kind: 'connect' }), reminder: WORDS.home.connectReminder }, rows: rows({ state: 'needs-you', text: WORDS.home.workerNeeds }) }) },
   { name: 'h-online-new', surface: 'panel', note: 'You’re online. (the burst), then Online', view: onlineHome({}, { state: 'online-new', word: WORDS.online.hero, sub: WORDS.online.ready(7, TITLE), burst: true, timer: undefined, announce: WORDS.online.hero }) },
   { name: 'h-online', surface: 'panel', note: 'Online: the home', view: onlineHome() },
+  { name: 'h-online-session-link', surface: 'panel', note: "14.0.0: online on a resumed session's own link: Copy link and Phone, no New session", view: onlineHome({ secondary: { copyLink: WORDS.home.copyLink, phone: WORDS.home.phone }, link: SESSION_LINK }) },
   { name: 'h-online-try', surface: 'panel', note: 'Online, first 3 days: Try asking', view: onlineHome({ tryAsking: TRY }) },
   { name: 'h-online-cards', surface: 'panel', note: 'the one-time cards', view: onlineHome({ cards: [{ id: 'pin-tip', text: WORDS.online.pinTip, dismiss: { kind: 'dismiss', card: 'pin-tip' } }, { id: 'tour-card', text: WORDS.home.tourCard, open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } }] }) },
   { name: 'h-online-confirm', surface: 'panel', note: 'Stop, then its confirmation', view: onlineHome({ tryAsking: TRY }), local: { confirmStop: true } },

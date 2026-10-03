@@ -91,6 +91,64 @@ describe('the background, run whole', () => {
     expect(world.storage.local['bridge.once']).toMatchObject({ first_online_at: expect.any(String) });
   }, 40_000);
 
+  // 14.0.0: framework 13 wrote a worker that resumed an earlier session as online with both links empty (2026-10-03);
+  // on this way rc.log is read, and Claude Code's own line there carries the session's link
+  it("framework 13's file of a resumed session (online, both links empty): the session link from rc.log, online, and its tab once", async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    const at = new Date().toISOString();
+    world.fs.set(`${STATE}/worker/rc.log`, `\x1b[2J\x1b[HResuming session session_01N4R9mLRJ5wFbf1oaDe5pyj (43m ago)\r\n·✔︎· Connected · phone · HEAD\r\n    Single session · exits when complete\r\nContinue coding in the Claude mobile app or ${SES}\r\n`);
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, resumed: true, session_url: '', environment_url: '', environment_id: '' }));
+    // two listings, 5 s apart while it starts: the first takes the online file, the second reads rc.log for its link
+    await sleep(13_000);
+    clearInterval(ticker);
+    const run = world.storage.session['bridge.run'] as { registration?: { session_url?: string } };
+    expect(run.registration?.session_url).toBe(SES);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(SES))).toHaveLength(1);
+    const h = panel.last()?.view;
+    expect(JSON.stringify(h)).toContain(SES);
+    expect(JSON.stringify(h)).not.toContain('Connecting to Claude');
+    // the session's own link alone: no New session, and the action opens nothing
+    expect(JSON.stringify(h)).not.toContain('"kind":"new-session"');
+    expect(await send(world, { type: 'action', action: { kind: 'new-session' } })).toMatchObject({ ok: true, value: { opened: false } });
+  }, 40_000);
+
+  // 14.0.0: framework 14 writes the link printed last as session_url and the environment link as environment_url; a worker that
+  // printed both opens its session first, and New session (offered whichever link is the run's own) opens the environment link
+  it('a worker that printed both links: its session tab opens with the session link, and New session opens the environment link', async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    const at = new Date().toISOString();
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, resumed: true, session_url: SES, environment_url: LINK, environment_id: 'env_01XzAN32jsbL8W1PAFSvitBt' }));
+    await sleep(8_000);
+    clearInterval(ticker);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(SES))).toHaveLength(1);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(0);
+    const h = JSON.stringify(panel.last()?.view);
+    expect(h).toContain(SES);
+    expect(h).toContain('"kind":"new-session"');
+    expect(await send(world, { type: 'action', action: { kind: 'new-session' } })).toMatchObject({ ok: true, value: { opened: true } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
+  }, 40_000);
+
   it("the scheduler's reason is never asked while a Stop waits: the Stop goes first", async () => {
     await boot(world);
     world.opts.claudeSignedIn = true;

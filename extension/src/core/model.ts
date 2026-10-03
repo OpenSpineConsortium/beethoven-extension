@@ -253,7 +253,9 @@ export const WORDS = {
   /** the home panel */
   home: {
     more: 'More',
-    menu: { tour: 'See what it can do', files: 'Your files', settings: 'Settings', details: 'Details for your lab lead', help: 'Help' },
+    menu: { tour: 'See what it can do', files: 'Your files', settings: 'Settings', details: 'Details for your lab lead', debugLog: 'Copy debug log', help: 'Help' },
+    /** 14.0.0: More, Copy debug log: the toast once the log is on the clipboard */
+    debugLogCopied: 'Debug log copied. Paste it to your lab lead.',
     onlineHero: 'Online',
     /** "Wayne State grid · up 2 h 14 min"; in its first minute "Wayne State grid · online just now" (onlineFor) */
     onlineSub: (title: string, upMs: number) => `${title} · ${onlineFor(upMs)}`,
@@ -591,6 +593,10 @@ export const WORDS = {
     loginSetupUnproven: "The one-time grid key step (AM2) has not yet been tried on the grid by a student without a key: it is unproven there.",
     /** 12.0.0 */
     directUnproven: 'The direct way (ssh to the login node through a bridge, a browser key restricted to the gate) has not yet been tried on the grid with a key: it is unproven there.',
+    /** 14.0.0: the debug log's section (core/debuglog.ts) */
+    debugLogTitle: 'Debug log',
+    debugLogNote: (n: number) => `the last ${n} lines, newest last; in this browser's memory only, never sent anywhere, empty again after the browser restarts`,
+    debugLogCopy: 'Copy debug log',
   },
 
   /** Settings */
@@ -1212,9 +1218,12 @@ export interface HomeView {
   /** shown in the waiting states, as in the table */
   track?: TrackView;
   primary?: HomePrimary;
-  /** online only: "New session", "Copy link", "Phone" */
-  secondary?: { newSession: ButtonView; copyLink: string; phone: string };
-  /** the environment link (Copy link and Phone are page-local, from this): https://claude.ai/code?environment=env_… */
+  /** online only: "New session" (14.0.0: only with an environment link), "Copy link", "Phone" */
+  secondary?: { newSession?: ButtonView; copyLink: string; phone: string };
+  /**
+   * the worker's link (Copy link and Phone are page-local, from this), either form (14.0.0): the environment link
+   * https://claude.ai/code?environment=env_…, or a resumed session's own https://claude.ai/code/session_…
+   */
   link?: string;
   /** the session title, "Wayne State grid" */
   title: string;
@@ -1341,6 +1350,8 @@ export interface DetailsView {
   onlineLag: string;
   /** 12.0.0: the direct way, for the lab lead (internal words allowed); filled by the background */
   direct?: DirectDetails;
+  /** 14.0.0: the debug log's last lines (core/debuglog.ts), newest last, with its heading and the copy button */
+  debugLog: { title: string; note: string; lines: string[]; copy: ButtonView };
 }
 
 /** 12.0.0: Details' direct-way section */
@@ -1433,6 +1444,8 @@ export type Action =
   | { kind: 'update' }
   /** "Copy details": returns the text the page copies (the reason for the lab lead) */
   | { kind: 'copy-details' }
+  /** 14.0.0: More, "Copy debug log": returns the debug log as text, the page copies it (core/debuglog.ts) */
+  | { kind: 'copy-debug-log' }
   /** "Mark this workspace restricted": worker restrict, through the shell */
   | { kind: 'restrict'; workerName: string }
   // the worker
@@ -1549,6 +1562,7 @@ export interface ActionResults {
   'retry-access': { approved?: boolean };
   update: { opened: boolean };
   'copy-details': { text: string };
+  'copy-debug-log': { text: string };
   restrict: { marked: boolean };
   connect: { started: boolean; kept?: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup' };
   cancel: { cancelled: boolean };

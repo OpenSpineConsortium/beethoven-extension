@@ -12,7 +12,7 @@
 import type { ChannelNote, KnownState, LastKnown, OnceNotes, PendingPress, Prefs, TourSeen } from './keys';
 import { DIRECT_LINKS, formatAgo, formatClock, LOG_WORDS, WORDS, type Action, type WelcomeMoment, type BridgeId, type BridgeState, type ButtonView, type ChecklistRow, type ConnectFailure, type DirectMoment, type HelperDownload, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type QrLink, type SheetPrompt, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
 import type { SheetState } from './signin';
-import { planWord, type ReasonClass, type StopReason } from './contract';
+import { isEnvironmentUrl, planWord, type ReasonClass, type StopReason } from './contract';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_BUTTON, STATEMENT_TICK } from './disclosure';
 import { SUMMARY, TERMS_REFUSAL, ticks } from './terms';
 import type { AccessFact } from '../licensing/access';
@@ -114,8 +114,13 @@ export interface RunFacts {
   reason: ReasonClass;
   /** a real future time from the scheduler (D12) */
   expectedStart?: string;
-  /** the environment link, checked */
+  /** the run's link, checked (14.0.0: either form, facts.ts claudeLinkOf) */
   link?: string;
+  /**
+   * 14.0.0: an environment link reported by connection.json, status.json or rc.log's registration (facts.ts
+   * environmentLinkOf), whichever link is `link`: where New session starts a new session
+   */
+  environmentLink?: string;
   /** state online with a link that is not a claude.ai/code environment link */
   badLink?: boolean;
   title?: string;
@@ -1321,6 +1326,19 @@ function workerWord(k: KnownState, f: Facts, hero?: HeroState): string {
   }
 }
 
+/**
+ * 14.0.0: where New session opens, or undefined when there is nowhere: an environment link (contract.ts isEnvironmentUrl)
+ * reported for the run, whichever link is the run's own (a worker that printed a resumed session's link and an
+ * environment link opens its session first and still offers New session). With no live link the last known state's
+ * environment link, kept with it (new_session_url), or its link when that is one. Never a session's own link: Claude Code
+ * serves that one session and exits when it is complete. The home's button and the background's new-session both ask this.
+ */
+export function newSessionLinkOf(f: Pick<Facts, 'run' | 'lastKnown'>): string | undefined {
+  const env = (u: string | undefined): u is string => isEnvironmentUrl(u);
+  if (f.run.link) return [f.run.environmentLink, f.run.link].find(env);
+  return [f.lastKnown?.new_session_url, f.lastKnown?.environment_url].find(env);
+}
+
 /** the home panel */
 export function home(f: Facts): HomeView {
   const H = WORDS.home;
@@ -1360,6 +1378,7 @@ export function home(f: Facts): HomeView {
         { label: H.menu.files, action: { kind: 'open-files' } },
         { label: H.menu.settings, action: { kind: 'open-settings' } },
         { label: H.menu.details, action: { kind: 'open-details' } },
+        { label: H.menu.debugLog, action: { kind: 'copy-debug-log' } },
         { label: H.menu.help, action: { kind: 'open-help' } },
       ],
     },
@@ -1369,7 +1388,10 @@ export function home(f: Facts): HomeView {
       const p = primaryOf(f, hero);
       return p ? { primary: p } : {};
     })(),
-    ...((onlineNow || lastOnline) && link ? { secondary: { newSession: button(H.newSession, 'outline', { kind: 'new-session' }), copyLink: H.copyLink, phone: H.phone } } : {}),
+    // 14.0.0: "New session" whenever an environment link was reported, where a new session can start, whichever link
+    // is the run's own (newSessionLinkOf); a resumed session's own link alone (Claude Code serves that one session there
+    // and exits when it is complete) keeps Copy link and Phone
+    ...((onlineNow || lastOnline) && link ? { secondary: { ...(newSessionLinkOf(f) ? { newSession: button(H.newSession, 'outline', { kind: 'new-session' }) } : {}), copyLink: H.copyLink, phone: H.phone } } : {}),
     ...(link ? { link } : {}),
     title,
     rows: rowsOf(f, hero),
@@ -1473,6 +1495,11 @@ export function lastKnownOf(f: Facts): Omit<LastKnown, 'seen_at'> | undefined {
     state,
     title: f.run.title ?? f.site.title,
     ...(f.run.link ? { environment_url: f.run.link } : f.lastKnown?.environment_url ? { environment_url: f.lastKnown.environment_url } : {}),
+    // 14.0.0: the environment link kept with the link, from the same place (New session on the last known state)
+    ...(() => {
+      const env = newSessionLinkOf(f);
+      return env ? { new_session_url: env } : {};
+    })(),
     ...(state === 'online' && f.run.onlineAt ? { online_since: f.run.onlineAt } : state === 'online' && f.lastKnown?.online_since ? { online_since: f.lastKnown.online_since } : {}),
     ...(f.run.endsAt && f.run.chain ? { ends_at: f.run.endsAt } : {}),
     ...(f.grid.account ? { account: f.grid.account } : {}),

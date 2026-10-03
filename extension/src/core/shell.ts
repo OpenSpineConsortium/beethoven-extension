@@ -20,7 +20,12 @@
 // typed ends the run with nothing typed, as a distinct outcome: the one-time key step follows (AM2).
 import type { PortalNet, WsLike } from './net';
 
-/** control sequences and carriage returns, as the vendor's phone host (phone.js) strips them */
+/**
+ * control sequences and carriage returns, as the vendor's phone host (phone.js) strips them. In a JavaScript class
+ * `\/` is the slash itself, so the CSI intermediates [ -\/] are space to slash (0x20-0x2F), as they should be; the
+ * same text in a sed bracket expression is space to backslash, the framework's defect fixed in framework 14
+ * (test/shell.test.ts pins it: ESC[K right before a link takes nothing with it)
+ */
 export const ANSI = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b[()][A-Za-z0-9]|\r/g;
 
 export function clean(s: string): string {

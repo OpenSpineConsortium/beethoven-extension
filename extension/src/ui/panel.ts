@@ -201,6 +201,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
     void opts.act(action).then((r) => {
       const res = r as Record<string, unknown> | undefined;
       if (action.kind === 'copy-details' && typeof res?.text === 'string') copy(res.text, WORDS.globalprotect.copied);
+      if (action.kind === 'copy-debug-log' && typeof res?.text === 'string') copy(res.text, WORDS.home.debugLogCopied);
       if (action.kind === 'copy-report' && typeof res?.text === 'string') copy(res.text, WORDS.globalprotect.copied);
       if (action.kind === 'new-session' && res?.firstTime) toast(WORDS.home.newSessionTip);
       if (action.kind === 'paste-code' && res && res.typed === false) set({ codeBad: true });
@@ -359,6 +360,7 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
     withNeeds([
       { label: WORDS.home.menu.settings, action: { kind: 'open-settings' } },
       { label: WORDS.home.menu.details, action: { kind: 'open-details' } },
+      { label: WORDS.home.menu.debugLog, action: { kind: 'copy-debug-log' } },
       { label: WORDS.home.menu.help, action: { kind: 'open-help' } },
     ]);
 

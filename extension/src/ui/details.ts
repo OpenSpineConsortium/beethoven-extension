@@ -81,6 +81,15 @@ export function renderDetails(d: DetailsView | undefined, cb: { onAct: OnAct; pe
       section(L.progress, pre(d.progressTail.join('\n'))),
       section(L.rc, pre(d.rcTail)),
       section(L.audit, pre(d.audit.join('\n'))),
+      // 14.0.0: the debug log's last lines, under their heading, with the copy of the whole log
+      d.debugLog
+        ? section(
+            d.debugLog.title,
+            el('p', { class: 'd-note', text: d.debugLog.note }),
+            el('div', { class: 'd-actions' }, button({ ...d.debugLog.copy, tone: 'outline' }, onAct, { pending: cb.pending, block: false })),
+            pre(d.debugLog.lines.join('\n')),
+          )
+        : null,
       // 12.0.0: the direct way, for the lab lead: the mode, each bridge in order, the grid's pinned
       // identity, this browser's key (fingerprint, protected or not), the port, the account the grid
       // accepted, the helper's file, and the plain statement that it is unproven on the grid

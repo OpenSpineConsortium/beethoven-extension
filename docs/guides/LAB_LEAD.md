@@ -7,6 +7,12 @@ tests still to run on the real grid are in `docs/V12_STATUS.md`, section 4. Sect
 lab's folders on the grid, was added later the same day with `tools/grid_access.sh`, and revised that
 evening after its review (section 2, step 1 and section 3, question 6 with it).
 
+**14.0.0 and framework 14 (2026-10-03).** Two changes, both in sections 11 and 12 below: a worker that
+resumed an earlier session (Claude Code prints that session's own link, `https://claude.ai/code/session_…`,
+and no environment link) is read as online, which needs framework 14 on the grid for the direct way; and
+the panel keeps a debug log in memory that a student copies for you with **⋯** (More), **Copy debug log**.
+Publish framework 14 with the two commands of section 2 (`--dry-run` first), as for 11 and 13.
+
 ## 1. What changes for you
 
 - **Students reach the grid's login node directly**, over ssh, from their own computers, with no VPN:
@@ -444,3 +450,59 @@ grid, and the framework only against a fake scheduler; no key or password has be
 grid.wayne.edu. `V12_STATUS.md` lists what that leaves open and the three tests that settle it (G1:
 your own key sign-in with the VPN off; G2: the phone route's paste; G3: real Windows Hello and Touch
 ID).
+
+## 11. A resumed session's link (14.0.0, framework 14)
+
+When a worker's job resumes an earlier session (`claude remote-control --continue`: a successor, or a
+restart within four hours of the last session), Claude Code 2.1.283 prints "Resuming session session_…
+(43m ago)", "Single session · exits when complete" and that session's own link,
+`https://claude.ai/code/session_…`, and no environment link. Framework 13's job knew only the
+environment link: on 2026-10-03 go2432's job 40554211 wrote `status.json` as `online` with
+`environment_url` and `session_url` both empty, and 13.0.0 showed "Starting · Connecting to Claude…" for
+a worker that was online. Framework 14 writes `session_url` = the link printed (either form) and
+`environment_url` = the environment link when one was printed, else "". 14.0.0 opens either.
+
+- **Publish framework 14** before students rely on it on the direct way (section 2's two commands). The
+  browser's key cannot read `rc.log` through the gate, so on the direct way 14.0.0 learns a resumed
+  session's link only from framework 14's `status.json` and `connection.json`. On the GlobalProtect way
+  14.0.0 also reads the link out of `rc.log`, so there it works with framework 13 too.
+- **No New session on such a link.** On a resumed session's link Claude Code serves that one session and exits
+  when it is complete (the worker then starts it again), so the home offers **Open my session**, **Copy link** and **Phone**, and not
+  **New session** (which opens an environment's page, where a new session can start).
+- `hpcworker worker status`, `worker watch` and `diag` print whichever link the job wrote.
+
+## 12. The debug log (14.0.0)
+
+A student who is stuck opens **⋯** (More) and clicks **Copy debug log**, then pastes it to you. It is the
+background's own account of what it did, one line per decision, newest last, after a header line naming
+the Beethoven version, the way to the grid (direct, vpn or setup), the portal, the AccessID, the worker's
+name and the time. **Details for your lab lead** shows its last 200 lines under the heading "Debug log",
+with a **Copy debug log** button; **Copy details** adds the same 200 lines.
+
+Each line is `<UTC time> <tag> <what happened>`. The tags:
+
+| Tag | What it says |
+|---|---|
+| `sw` | the background started (Chrome starts it again after it has been idle) |
+| `mode` | direct, vpn or setup, and why: the preference, the bridge, the key, whether the grid answered |
+| `bridge` | each bridge probe: which was chosen, and what each provider said |
+| `ssh` | each ssh connection opened and closed: to where, as whom, through which bridge, why, how long it took and lived |
+| `gate` | each gate verb (its verb and the worker's name; for `read`, which file), its exit status, how long it took, and the first 160 characters of its output; a verb the floor held back says so |
+| `grid` | each check of the grid sign-in, and what it found (framework, Claude Code's sign-in on the grid) |
+| `read` | each read of the run's files: `status.json`'s job, state and `updated_at`, the phase Beethoven made of it, stale or not, seen alive or not, and whether a link is there and of which form |
+| `status` | each `worker status --json` the panel asked while a worker was in line or renewing |
+| `press`, `action`, `ready` | each button by its kind only, the press's result, and what a press waited for (the grid, the approval, the setup) |
+| `connect`, `sitting` | the connect line's start and way, then each event of the sitting by its kind; a Claude sign-in link by its host and path only |
+| `sheet` | each phase of the grid sign-in sheet, and the kinds of the grid's prompts |
+| `access` | each approval check: asked or not, approved or not, and why |
+| `panel`, `online`, `open` | what the panel showed (the moment or the home's state, its sentence and its button), the online moment, each opening of claude.ai |
+| `fail` | each failure, with its detail |
+
+What it never holds: a password, a grid code, the code pasted from Claude's page, a key, a token, or a
+full authorize link. The background passes kinds, words and hosts, never what was typed; and the ring
+itself cuts every web address to its host and path and removes anything key-, token- or code-shaped
+before a line is kept (`extension/src/core/debuglog.ts`). It is in the background's memory only, at most
+3,000 lines: never written to storage, never sent anywhere. It starts empty whenever Chrome starts the
+background again: a browser restart, an update, and Chrome stopping an idle service worker, which it
+does about 30 seconds after the last event while the panel is closed. So ask for it while the panel
+still shows the problem.

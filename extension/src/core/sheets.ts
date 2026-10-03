@@ -3,6 +3,7 @@
 // Details may name jobs, nodes, partitions, the scheduler and the tool: it is exempt from the rule that
 // keeps those words from a student, and says so by its title.
 import { LOGIN_SETUP_PROVEN, type SiteProfile, type StatusFile } from './contract';
+import { DEBUG_DETAILS_LINES } from './debuglog';
 import type { NodeReport } from './diagnostics';
 import type { RunState } from './facts';
 import type { Appearance, ChannelNote, PortalSettings, Prefs } from './keys';
@@ -18,6 +19,8 @@ export interface DetailsInput {
   channel?: ChannelNote;
   /** the audit log's last lines, newest last */
   audit: string[];
+  /** 14.0.0: the debug log's last lines, newest last (the background's DebugRing.tail) */
+  debug?: string[];
   now: number;
 }
 
@@ -67,6 +70,7 @@ export function detailsView(i: DetailsInput): DetailsView {
     probe: b(D.probe, { kind: 'check-compute-node' }),
     footer: D.footer,
     onlineLag: D.onlineLag,
+    debugLog: { title: D.debugLogTitle, note: D.debugLogNote(DEBUG_DETAILS_LINES), lines: (i.debug ?? []).slice(-DEBUG_DETAILS_LINES), copy: b(D.debugLogCopy, { kind: 'copy-debug-log' }) },
   };
 }
 

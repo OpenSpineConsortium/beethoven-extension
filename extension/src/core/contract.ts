@@ -26,10 +26,12 @@
 //   ~/.hpcworker/profile.json                 the site profile; its shared_state_dir names the state directory
 //   ~/.hpcworker/discover.json                `hpcworker discover --save` (optional)
 //   <state_dir>/probe/probe.json              written by the probe job
-//   <state_dir>/<name>/status.json            heartbeat every 30 s: state, job, node, message, session_name, requested_name, environment_url,
-//                                             environment_id, claude_login, consent, consent_source, workspace_trusted, chain, next_job, chain_note
-//   <state_dir>/<name>/connection.json        session_name, requested_name, environment_url, environment_id, node, job, pid, started_at,
-//                                             token_path, workspace, permission_mode, capacity, next_job
+//   <state_dir>/<name>/status.json            heartbeat every 30 s: state, job, node, message, session_name, requested_name, session_url,
+//                                             environment_url, environment_id, claude_login, consent, consent_source, workspace_trusted,
+//                                             chain, next_job, chain_note (framework 14: session_url is the link Claude Code printed, an
+//                                             environment link or a resumed session's own link; environment_url only an environment link)
+//   <state_dir>/<name>/connection.json        session_name, requested_name, session_url, environment_url, environment_id, node, job, pid,
+//                                             started_at, token_path, workspace, permission_mode, capacity, next_job
 //   <state_dir>/<name>/rc.log                 Claude Code's terminal (control codes and all)
 //   <state_dir>/<name>/job.id                 the scheduler's job id of the link that was submitted by hand
 //   <state_dir>/<name>/next.id                "<successor id> <parent id>": the job queued (afterany) to take over at the wall time
@@ -673,11 +675,15 @@ export interface StatusFile {
   session_name?: string;
   /** what the job asked Claude Code for with --name: framework 10's session title ("Wayne State grid"); framework 9 wrote "<site>-<jobid>" */
   requested_name?: string;
-  /** https://claude.ai/code?environment=env_...: stable per machine id, so every job on this login opens the same environment */
+  /** https://claude.ai/code?environment=env_...: stable per machine id, so every job on this login opens the same environment; "" when Claude Code printed no environment link (framework 14: a resumed session) */
   environment_url?: string;
   /** the env_... part of environment_url */
   environment_id?: string;
-  /** older name of environment_url; the job writes both */
+  /**
+   * framework 14: the link Claude Code printed last, either form: the environment link of a fresh registration, or
+   * https://claude.ai/code/session_... when it resumed an earlier session (and printed no environment link). Framework 13
+   * and older wrote it equal to environment_url. Read through facts.ts claudeLinkOf, never on its own.
+   */
   session_url?: string;
   /** loggedIn, email, subscriptionType and nothing else: never a token */
   claude_login?: { loggedIn?: boolean; email?: string; subscriptionType?: string; checked_at?: string };
@@ -772,7 +778,7 @@ export interface ConnectionFile {
   requested_name?: string;
   environment_url?: string;
   environment_id?: string;
-  /** older name of environment_url; the job writes both */
+  /** framework 14: the link Claude Code printed (either form), as in status.json; framework 13 and older: the same as environment_url */
   session_url?: string;
   node?: string;
   job?: string;
@@ -949,16 +955,37 @@ export function sessionName(site: string, job: string): string {
 /** What `claude remote-control` printed when it registered, as read from rc.log or the files. */
 export interface Registration {
   session_name?: string;
+  /** the last environment link printed */
   environment_url?: string;
+  /** 14.0.0: the last link printed of either form (an environment link, or a resumed session's own link) */
+  session_url?: string;
   /** "1/32" */
   capacity?: string;
 }
 
-/** the only link the panel will open: Claude's own Code page for an environment */
-export const ENVIRONMENT_URL = /https:\/\/claude\.ai\/code\?environment=env_[A-Za-z0-9_-]+/;
+/** an environment link: Claude's own Code page for an environment (claude.ai or claude.com) */
+export const ENVIRONMENT_URL = /https:\/\/claude\.(?:ai|com)\/code\?environment=env_[A-Za-z0-9_-]+/;
+/** 14.0.0: a session link, printed by Claude Code when it resumes an earlier session ("Single session · exits when complete") */
+export const SESSION_URL = /https:\/\/claude\.(?:ai|com)\/code\/session_[A-Za-z0-9_-]+/;
+/** 14.0.0: the links the panel will open, either form: an environment link or a session link, on claude.ai or claude.com */
+export const CLAUDE_CODE_LINK = new RegExp(`${ENVIRONMENT_URL.source}|${SESSION_URL.source}`);
 
+/**
+ * An environment link, exactly: where a NEW session can be started on the worker (the home's "New session" opens it).
+ * A resumed session's own link is not one: Claude Code serves that one session there and exits when it is complete ("Single session · exits when complete").
+ * Everything else that asks whether a run has a link asks isClaudeCodeLink.
+ */
 export function isEnvironmentUrl(url: string | undefined): url is string {
-  return typeof url === 'string' && /^https:\/\/claude\.ai\/code\?environment=env_[A-Za-z0-9_-]+$/.test(url);
+  return typeof url === 'string' && new RegExp(`^${ENVIRONMENT_URL.source}$`).test(url);
+}
+
+/**
+ * 14.0.0: a link the panel may open for the worker, either form, exactly (nothing before or after it): the environment
+ * link of a fresh registration, or the session link Claude Code prints when it resumes a session. 13.0.0 knew only the
+ * first, so a worker that had resumed a session (2026-10-03, go2432) was online with a link and read as "Connecting to Claude…".
+ */
+export function isClaudeCodeLink(url: string | undefined): url is string {
+  return typeof url === 'string' && new RegExp(`^(?:${CLAUDE_CODE_LINK.source})$`).test(url);
 }
 
 /**
@@ -971,19 +998,31 @@ export function isEnvironmentUrl(url: string | undefined): url is string {
  *   Or ask Claude to work in this folder from your projects on claude.ai
  *
  * The session name is the bare word-word line between "Capacity:" and "Continue coding"; the
- * environment link is the one https://claude.ai/code?environment= URL. Terminal codes and carriage
- * returns are stripped first, so the raw rc.log parses too. The last registration in the text wins.
- * The shapes (a lowercase word-word name, an env_ id of letters, digits, _ and -) are the ones the
- * framework's own parser accepts (lib/adapters/common.sh, hpcw_parse_registration).
+ * environment link is the last https://claude.ai/code?environment= URL (or claude.com). 14.0.0: a resumed
+ * session prints its own link instead (https://claude.ai/code/session_..., after "Single session · exits
+ * when complete"); session_url is the last link of either form, from whatever line. Terminal codes and
+ * carriage returns are stripped first, so the raw rc.log parses too. The last registration in the text
+ * wins. The shapes (a lowercase word-word name, an env_ or session_ id of letters, digits, _ and -) are
+ * the ones the framework's own parser accepts (lib/adapters/common.sh, hpcw_parse_registration).
+ *
+ * Only complete lines are read: a last line with no newline yet may be a link still being written, and its
+ * first part already has a link's shape (https://claude.ai/code/session_01N4 of a longer id), so it is left
+ * out until its newline comes, as framework 14's parser does (hpcw_complete_lines). The CSI expression's
+ * intermediate bytes are [ -/], space to slash: framework 13's sed wrote [ -\/], which GNU sed reads as space to
+ * backslash, and ESC[K right before a link took the link's h with it.
  */
 export function parseRegistration(text: string): Registration {
-  const clean = String(text ?? '')
+  const raw = String(text ?? '');
+  const end = raw.lastIndexOf('\n');
+  const clean = (end < 0 ? '' : raw.slice(0, end + 1))
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
     .replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '')
     .replace(/\r/g, '');
   const out: Registration = {};
   const urls = clean.match(new RegExp(ENVIRONMENT_URL.source, 'g'));
   if (urls?.length) out.environment_url = urls[urls.length - 1];
+  const links = clean.match(new RegExp(CLAUDE_CODE_LINK.source, 'g'));
+  if (links?.length) out.session_url = links[links.length - 1];
   const lines = clean.split('\n').map((l) => l.trim());
   for (let i = 0; i < lines.length; i++) {
     const cap = /^Capacity:\s*(\d+\s*\/\s*\d+)/.exec(lines[i] ?? '');

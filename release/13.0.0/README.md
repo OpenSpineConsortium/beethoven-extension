@@ -1,5 +1,7 @@
 # Beethoven 13.0.0 package, helper and guides
 
+**Superseded by 14.0.0 (`release/14.0.0/`, 2026-10-03): install that one instead, after publishing framework 14; the entry for this README in `SHA256SUMS.txt` was regenerated after this line was added, so the folder verifies.**
+
 Rebuilt 2026-10-03 at 05:38 UTC, after the review of the first 13.0.0 build, from this repository's
 working tree (not committed; `extension/`, Node 22.23.3): `node helper/build.mjs --check`, `npx tsc
 --noEmit`, `npm run build`, `npm run zip`, then `npx vitest run` with the built package present. The first

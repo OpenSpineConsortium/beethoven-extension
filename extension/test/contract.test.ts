@@ -2,7 +2,7 @@
 // the discovery document, the stop file and restricted marker paths, and the registration block
 // `claude remote-control` prints, parsed the way the extension will meet them.
 import { describe, expect, it } from 'vitest';
-import { commands, expandPath, isEnvironmentUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
+import { commands, expandPath, isClaudeCodeLink, isEnvironmentUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
 
 /** the maintainer's live output of `claude remote-control` (2.1.283) on 2026-09-28/29, after the QR code */
 const REGISTRATION = `  █▀▀▀▀▀█ ▄▀▄▀ █▀▀▀▀▀█
@@ -93,16 +93,77 @@ describe('framework contract', () => {
     expect(r2.session_name).toBe('asx15-quiet-harbor');
     expect(r2.capacity).toBe('2/32');
     expect(r2.environment_url).toBe('https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt');
+    // the link printed is the environment link
+    expect(r2.session_url).toBe('https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt');
     // nothing registered yet: nothing invented
     expect(parseRegistration('===== starting claude remote-control =====\nYou must be logged in to use Remote Control\n')).toEqual({});
     expect(parseRegistration('')).toEqual({});
   });
 
-  it('opens only a claude.ai/code environment link', () => {
+  it("14.0.0: a resumed session's block: its own link (session_url), no environment link, no name", () => {
+    const resumed = 'Resuming session session_01N4R9mLRJ5wFbf1oaDe5pyj (43m ago)\r\n·✔︎· Connected · phone · HEAD\r\n    Single session · exits when complete\r\nContinue coding in the Claude mobile app or \x1b[4mhttps://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj\x1b[24m\r\n';
+    expect(parseRegistration(resumed)).toEqual({ session_url: 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj' });
+    // both: the environment link stays, the link printed last is the session's
+    const both = parseRegistration(REGISTRATION + resumed);
+    expect(both).toMatchObject({ session_name: 'asx10-hazy-meadow', environment_url: 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', session_url: 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj' });
+    // and claude.com for either
+    expect(parseRegistration(resumed.replace(/claude\.ai/g, 'claude.com')).session_url).toBe('https://claude.com/code/session_01N4R9mLRJ5wFbf1oaDe5pyj');
+  });
+
+  it('14.0.0: a cursor code right before the link or the name takes nothing with it', () => {
+    const ENV = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
+    const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+    for (const code of ['\x1b[K', '\x1b[1C', '\x1b[2K', '\x1b[G', '\x1b[1A'])
+      for (const gap of ['', ' ']) {
+        const reg = REGISTRATION.replace('    asx10-hazy-meadow', `${code}    ${code}asx10-hazy-meadow`).replace('or https://', `or ${code}${gap}https://`);
+        expect(parseRegistration(reg), JSON.stringify(code + gap)).toMatchObject({ session_name: 'asx10-hazy-meadow', environment_url: ENV, session_url: ENV });
+        expect(parseRegistration(`Single session · exits when complete\r\nContinue coding in the Claude mobile app or \x1b[4m${code}${gap}${SES}\x1b[24m\r\n`).session_url, JSON.stringify(code + gap)).toBe(SES);
+      }
+  });
+
+  it('14.0.0: only complete lines are read: a link cut mid-write is not a link until its newline comes', () => {
+    const ENV = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
+    const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+    const cut = `Continue coding in the Claude mobile app or ${SES.slice(0, 35)}`;
+    expect(parseRegistration(cut)).toEqual({});
+    expect(parseRegistration(`Single session · exits when complete\r\n${cut}`)).toEqual({});
+    // a registration already printed stands; the cut link is not the link printed last
+    expect(parseRegistration(REGISTRATION + cut)).toMatchObject({ session_name: 'asx10-hazy-meadow', environment_url: ENV, session_url: ENV });
+    // the rest of the line with its newline: now it is the link
+    expect(parseRegistration(`${REGISTRATION}${cut}${SES.slice(35)}\r\n`)).toMatchObject({ environment_url: ENV, session_url: SES });
+    // an environment link cut the same way, a carriage return without its newline, a name line not finished
+    expect(parseRegistration(`or ${ENV.slice(0, -6)}`)).toEqual({});
+    expect(parseRegistration(`or ${ENV}\r`)).toEqual({});
+    expect(parseRegistration('Capacity: 1/32\n    asx10-hazy')).toEqual({ capacity: '1/32' });
+  });
+
+  it('isEnvironmentUrl takes an environment link only (where a new session can start), on claude.ai or claude.com', () => {
     expect(isEnvironmentUrl('https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt')).toBe(true);
+    expect(isEnvironmentUrl('https://claude.com/code?environment=env_01XzAN32jsbL8W1PAFSvitBt')).toBe(true);
+    expect(isEnvironmentUrl('https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj')).toBe(false);
     expect(isEnvironmentUrl('https://claude.ai/code/session/mock-1')).toBe(false);
     expect(isEnvironmentUrl('https://evil.example/code?environment=env_01')).toBe(false);
     expect(isEnvironmentUrl('https://claude.ai/code?environment=env_01X&next=https://evil.example')).toBe(false);
     expect(isEnvironmentUrl(undefined)).toBe(false);
+  });
+
+  it('14.0.0: isClaudeCodeLink takes either form, exactly, on claude.ai or claude.com, and nothing else', () => {
+    for (const ok of ['https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj', 'https://claude.com/code?environment=env_01X', 'https://claude.com/code/session_01N4R9'])
+      expect(isClaudeCodeLink(ok), ok).toBe(true);
+    for (const bad of [
+      undefined,
+      '',
+      'http://claude.ai/code/session_01N4R9',
+      'https://claude.ai/code/session/mock-1',
+      'https://claude.ai/code/sessions',
+      'https://claude.ai/code/session_01N4R9?next=https://evil.example',
+      'https://claude.ai/code/session_01N4R9/../../oauth',
+      'https://claude.ai.evil.example/code/session_01N4R9',
+      'https://evil.example/https://claude.ai/code/session_01N4R9',
+      'https://claude.org/code?environment=env_01',
+      'https://claude.ai/code?environment=env_01X&next=https://evil.example',
+      ' https://claude.ai/code/session_01N4R9',
+    ])
+      expect(isClaudeCodeLink(bad), String(bad)).toBe(false);
   });
 });

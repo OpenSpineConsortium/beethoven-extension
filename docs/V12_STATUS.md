@@ -587,3 +587,322 @@ The audit lines also show whether the link's bytes ever reached the browser. An 
 other than claude.ai or claude.com is dropped without a word (`refused-url`).
 
 **Follow-ups from the 13.0.0 verification (2026-10-03), not done:** (a) while a preempted job is itself listed again (requeued, PENDING), successor_refresh writes nothing, so the gate's 60 s poll floor has no timestamp and each `worker status` asks squeue once; keep that timestamp in a side file in the run folder. (b) With the job gone and the successor RUNNING, successor_refresh still patches scheduler fields; a successor writing its first status.json at that moment could be overwritten with the old preempted record until its next heartbeat; write nothing when the successor is RUNNING. (c) The home's "Your worker isn't answering now" sentence should appear only when a run is present and stale, not in the seconds after a browser restart. (d) The stale-view bound on a lagging grid clock is one heartbeat (30 s) plus the next read, not one heartbeat.
+
+## 2026-10-03 morning: a resumed session's link, and the debug log
+
+**What happened.** Between 07:50 and 08:00 EDT, Greg (go2432) waited on "Starting · Connecting to Claude…"
+with framework 13's worker job 40554211 running. His words: his browser was not signed in to claude.ai,
+"and yet there is no prompt to do so, no recognition of this fact, and no opening of a claude.ai browser
+tab"; and "there should be a detailed log of what you are doing under the hood so i can paste it into here,
+maybe a debugging log in addition to the simple log".
+
+The worker had **resumed** an earlier Remote Control session (`resumed` true in `status.json`). Claude Code
+2.1.283 then prints:
+
+```
+Resuming session session_01N4R9mLRJ5wFbf1oaDe5pyj (43m ago)
+Single session · exits when complete
+Continue coding in the Claude mobile app or https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj
+```
+
+and not the environment link `https://claude.ai/code?environment=env_…` it prints for a fresh registration.
+These lines, and the file's shape below, are as relayed to this pass; this pass did not read the job's
+`rc.log` or `status.json` itself, since nothing here touches the grid.
+
+**The cause.** Both sides knew only the environment form:
+- framework 13's parser (`hpcw_parse_registration`, `lib/adapters/common.sh`) matched only
+  `https://claude.ai/code?environment=…`. The job still went online, because its own test for a
+  registration also matched `claude\.ai/code`, so `status.json` said `online` with `environment_url` "" and
+  `session_url` "";
+- 13.0.0 took a link only in the environment form (`contract.ts` `isEnvironmentUrl`), and with `??` an empty
+  `environment_url` hid any other field. `facts.ts` maps "online without a link" to the phase `connecting`
+  (R5), so the panel drew "Starting · Connecting to Claude…" for a worker that was online.
+
+Beethoven never opens claude.ai without a link, so no tab came. A claude.ai sign-in in the browser is
+claude.ai's own: it asks in the tab Beethoven opens, and nothing in Beethoven could have noticed it missing.
+The worker's own Claude sign-in on the grid was fine.
+
+**Framework 14** (`framework/`):
+- The parser takes either form, on `claude.ai` or `claude.com`, from whatever line it is on. It prints
+  `NAME|ENVIRONMENT_URL|ENVIRONMENT_ID|LINK`: LINK is the last link of either form printed, ENVIRONMENT_URL
+  the last environment link.
+- `status.json` and `connection.json` carry `session_url` = the link printed (either form),
+  `environment_url` = the environment link when one was printed, else "", and `environment_id` as before,
+  or "".
+- The online message names the link that exists: "Open in Claude: <environment link> and find <name> (or
+  tap Code in the Claude app)." or "Open in Claude: <session link> (or tap Code in the Claude app).". So do
+  `progress.log`'s "Online: <link>", the job output's "<H:MM> Online. Open in Claude: <link>", and its
+  "online: session <name> <link>" line (once for each link printed).
+- A link printed after the first online write is written again. Before, the message kept "claude.ai/code".
+- `worker status`, `worker watch` (text and `--json`; `session_url` joined the watch's keys) and `diag` take
+  the link from `session_url` when it is a Claude Code link, else from `environment_url` (`run_link`), so a
+  framework 13 job's files read as before.
+- `VERSION` 14 in `framework/VERSION`, `bin/hpcworker` and `tests/test_status.py`
+  (`test_version_says_14`), and a "Framework 14" paragraph at the top of `framework/README.md`.
+- Tests:
+  - `test_cli.py` `Registration`: the session form alone (the morning's transcript), the environment form,
+    both (each order, and both on one line), `claude.com` for both, and lookalikes that are no link.
+  - `test_job.py`: the whole job against a fake Claude Code that prints the environment form (the
+    message, `session_url`, `environment_id`), the resumed form (`session_url` the session link,
+    `environment_url` and `environment_id` "", the message, `connection.json`, `progress.log`, the job
+    output) and both.
+  - `test_status.py` (`worker status` and `--details` with a session link) and `test_watch_json.py` (the
+    watch ends online on a session link alone).
+  - `test_render.py` pins the job's new lines.
+
+**14.0.0** (`extension/`):
+- `contract.ts` `isClaudeCodeLink`: either form, exactly, on claude.ai or claude.com. It is used wherever
+  13.0.0 asked `isEnvironmentUrl` whether a run has a link:
+  - `facts.ts` `claudeLinkOf` (was `environmentLinkOf`) and the bad-link test;
+  - the online moment and its tab (`openSessionTab`);
+  - **Open my session** (`openSession`);
+  - Copy link and the phone's square code (both drawn from the home's `link`);
+  - the direct way's choice of reading `connection.json`.
+- `isEnvironmentUrl` stays, now for claude.com too, in the two places that need an environment, where a new
+  session can start: the home's **New session** button (`steps.ts` `home`) and the background's
+  `new-session`. A resumed session's own link serves that one session (Claude Code "exits when complete"),
+  so on such a link the home offers Open my session, Copy link and Phone, and no New session.
+- `claudeLinkOf` trusts `connection.json`, then `status.json`, then `rc.log`'s registration block. In each it
+  takes `session_url` first, then `environment_url`, and skips empty values.
+- The run is online when `status.json` says online and either link exists. Online with only a non-link
+  value is the bad-link view.
+- On the GlobalProtect way, `rc.log` is now read for an `online` worker with no link too, not only for
+  `running`. With framework 13 there, the session link comes from Claude Code's own line in `rc.log`. On the
+  direct way the gate reads no `rc.log`, so a resumed session needs framework 14 there.
+- `parseRegistration` gives `session_url`, the last link of either form.
+- The stored last-known state keeps its key `environment_url` (13.0.0's records still read), now holding
+  either form.
+- Tests:
+  - `facts.test.ts`: a session-form `status.json` online with its link; framework 13's empty-links file
+    `connecting`; the environment form unchanged; both forms; claude.com and lookalikes; the order of the
+    files; a found run on the direct way.
+  - `steps.test.ts`: the first run's "You're online." with Open my session, where framework 13's file held
+    "Starting · Connecting to Claude…"; the home without New session; the last known state; the menu.
+  - `contract.test.ts`: `isClaudeCodeLink` and the resumed block.
+  - `background12.test.ts`, framework 14 on the direct way, against the stand-in (`run_link: "session"`):
+    online, Open my session opens the session link, no Connect, nothing started.
+  - `background.test.ts`, framework 13's file on the GlobalProtect way: the link from `rc.log`, online,
+    its tab once.
+
+**The debug log** (`extension/src/core/debuglog.ts`, `background.ts`, `sshChannel.ts`, `signin.ts`):
+- **What it is.** A ring of at most 3,000 lines in the background's memory, each `<ISO time> <tag> <one
+  line>`, newest last. A line repeated right after itself is counted, not kept twice.
+- **When it starts empty.** It survives nothing: a browser restart, an update, and Chrome stopping the idle
+  service worker (about 30 s after the last event while the panel is closed). It is never stored and never
+  sent anywhere.
+- **Where it shows.** **⋯** (More), **Copy debug log**, on the home and on the first run's menu, copies it
+  with a header line: version, mode, portal, account, worker name, time. The words are in `model.ts`
+  `WORDS.home.menu.debugLog` and `WORDS.home.debugLogCopied`. **Details for your lab lead** shows the last
+  200 lines under "Debug log" (`WORDS.details.debugLogTitle`), with a copy button; **Copy details** adds the
+  same 200 lines.
+- **What it records.**
+  - the service worker's start;
+  - the mode and why, when either changes;
+  - each bridge probe;
+  - each ssh connection opened and closed, with the reason, the time it took and its age. That covers the
+    portal's connections and the sign-in sheet's own;
+  - each gate verb by its verb and name, with its exit status, time and the first 160 characters of its
+    output, and a verb the floor held back;
+  - each check of the grid sign-in;
+  - each read of the run's files, with job, state, `updated_at`, phase, stale, `alive_seen` and whether a
+    link is there and of which form;
+  - each `worker status --json`;
+  - each action by its kind only, each press's result, and what `readyForPress` decided;
+  - each phase of the sheet, with the kinds of the grid's prompts;
+  - each approval check;
+  - the connect's start and way, each sitting event by its kind (a Claude sign-in link by its host and path
+    only), and the sitting's end;
+  - each failure (`setFail`, the connect's failure);
+  - what the panel shows, when it changes.
+- **What it never records.** A password, a one-time code, a pasted Claude code, a key, a token or a full
+  authorize link. The callers pass kinds, words and hosts. The ring then cuts every web address to its host
+  and path, and removes PEM blocks, ssh key bodies, named codes and passwords, JSON web tokens and every
+  long base64 run, on top of the audit log's redaction (`redact.ts`). The sitting's terminal tail, which can
+  echo what was typed, is never logged.
+- **Tests.**
+  - `test/debuglog.test.ts`: the cap, the repeat count, the header, the tail, one line of at most 400
+    characters, and redaction of authorize links, named codes, pasted codes, tokens, PEM and ssh keys and
+    base64. Paths, job ids and hosts are kept.
+  - `background12.test.ts`: the first sign-in through the stand-in, then Copy debug log. The header, the
+    lines of each kind, and none of the password, the code, the pasted code or the authorize link's query;
+    the Details view's 200 lines.
+
+**What ran.** All on 2026-10-03, on Greg's laptop and its WSL Ubuntu 24.04, against stand-ins only. Logs are in this session's scratchpad, `fourteen/logs/`.
+- **Framework 14:** `bash framework/tests/run.sh` on a copy of `framework/` in WSL (bash 5.2.21, Python 3.12.3, GNU Awk 5.2.1): **374 of 374 passed, none skipped**, "ALL OK", in 538 s. That is 13.0.0's 366 plus the 8 new ones. A first run failed one stale pin in `test_render.py` (the old variable name), fixed before this run. `deploy_shared.sh`'s local checks, replayed without publishing: VERSION 14 on both lines, no CR in the 18 files, `bash -n` clean.
+- **14.0.0:** `npx tsc --noEmit`, `npm run build` and `npm run zip`, all exit 0, then `npx vitest run` with the built package present: **42 files, 509 of 509 passed, none skipped**. The three package tests name 14.0.0. 13.0.0 had 483 tests.
+- **The package:** 42 entries, the same as 13.0.0's but for `background.js`, the manifest's version and the renamed page chunks; the permissions are unchanged. It is `release/14.0.0/beethoven-14.0.0-chrome.zip`, 503,206 bytes, SHA-256 `e9fe35aeabd8d12fd8c67a64daa6159767c59f3b7601df270995526a3ea5a013`.
+- **Not run:** bash 4.2.46, `tests/e2e_sshd.sh`, the browser harness.
+
+**Not known, or not done:**
+- **What Claude Code prints around a resumed session.** Only the three lines above are known. Whether the
+  resumed block also prints a name after "Single session" is not known: the parser takes a name only after
+  "Capacity:", so such a worker keeps its requested title.
+- **claude.com.** The claude.com form of either link is accepted on the contract's word. No such link has
+  been seen.
+- **The grid.** Nothing touched the grid. Framework 14 is not published, and until it is, the direct way
+  still shows a resumed session as "Connecting to Claude…".
+- **The debug log's lifetime.** It is lost whenever Chrome stops the idle service worker. A student who
+  copies it after the panel has been closed for a while gets only what happened since. A log that survives
+  would have to be stored, which this one deliberately is not.
+- **Not run.** The browser harness (it needs a visible browser) and `tests/e2e_sshd.sh`.
+- **`PRIVACY.md` has no row for the debug log.** Its table of what the extension keeps lists the session
+  state, Show log and the audit log. The debug log holds the same kinds of facts, plus the first 160
+  characters of each command's output, in memory only, and nothing new is sent. This pass was not allowed
+  to change `PRIVACY.md`. A row changes the statement's hash and the version students accept: a decision
+  for Greg before the store upload.
+- **The mock.** The mock portal's job simulator (`mock-ood/lib/jobsim.mjs`) was not taught the session
+  form.
+
+## 2026-10-03, later: the review's fixes, and the second build of 14.0.0
+
+A review of the morning's build found five defects and one open question. All are fixed or answered below,
+and 14.0.0 was built again. The version stays 14.0.0 and framework 14: neither was published.
+
+**1. ESC[K before a link took the link's h (framework).** `hpcw_strip_codes` (`lib/adapters/common.sh`) and
+`hpcw_login_strip` (`lib/login_plain.sh`) wrote the CSI intermediates as `[ -\/]` inside `s/.../`. In a sed
+bracket expression a backslash is a literal, so GNU sed read the range as space to backslash (0x20 to 0x5C).
+A sequence whose final byte is a capital letter then took the next character as its final byte. Measured
+here under GNU sed 4.8 (Git Bash) and 4.9 (WSL): "or ESC[K https://claude.ai/code/session_X" came out as
+"or ttps://…", so no link was found, and "ESC[2Kasx10-hazy-meadow" came out as "sx10-hazy-meadow". Both
+expressions are now `s|\x1b\[[0-9;?]*[ -/]*[@-~]||g`: the `|` delimiter lets the class be written `[ -/]`,
+space to slash. The OSC and charset expressions keep `/` as their delimiter, because the OSC one uses `\|`.
+The extension was already right. In JavaScript `\/` inside a class is the slash itself, so `core/shell.ts`
+`ANSI` (`[ -\/]`) and `contract.ts` `parseRegistration` (`[ -/]`) both mean space to slash, checked with
+Node 22 on the same inputs. Whether Claude Code 2.1.283 ever prints ESC[K right before its link is not
+known. The morning's three lines were relayed as text, with no escape codes.
+
+**2. A link cut mid-write (framework and extension).** The link shapes accept any run of `[A-Za-z0-9_-]`, so
+the first part of a link still being written (`https://claude.ai/code/session_01N4`) is already a link by
+its shape. Only complete lines are parsed now:
+- framework: `hpcw_complete_lines` (bash builtins only) keeps the text up to its last newline;
+  `hpcw_parse_registration` reads through it. The job's `clean_tail OFFSET lines` gives the parser complete
+  lines only (`note_registration "$(clean_tail "$RC_OFF" lines)"`). The consent prompt test and "Last
+  output:" still read the whole tail, since a question waiting for its answer ends with no newline.
+- extension: `parseRegistration` drops everything after the last `\n` before it strips codes.
+
+The cost: a link printed as the very last thing, with no newline after it, is not seen until something
+follows it. Every block Claude Code is known to print ends its lines with CR LF, and a terminal renderer that
+ends each frame with a newline would not hit this. That the link line is always followed by a newline is
+assumed, not measured.
+
+**3. A predecessor's rc.log link stood in for its successor (extension).** On the GlobalProtect way the
+background keeps what `rc.log`'s registration said (`registration`, `rc_tail`, `rc_mtime`). At a renewal,
+`applyStatus` moved the run to the successor's job and cleared `connection.json`, but kept those three. A
+successor online before its own link was parsed (framework 13 writes a resumed session's links as "") then
+read as online with its predecessor's link, and Open my session would have opened the old session.
+`facts.ts` `forJob` now clears `connection`, `connection_mtime`, `registration`, `rc_tail`, `rc_mtime` and
+`next_job` whenever the run moves to another job. With `rc_mtime` gone, the next listing that wants
+`rc.log` downloads it again, even with the old modified time. Every other place a run gets a job builds a
+fresh record (`recordQueued` for another job, `discoverRun`, the direct way's found run).
+
+Clearing alone left one window open. A successor writes its first `status.json` before its main loop moves
+the old `rc.log` aside. A listing that downloads `rc.log` in that window (Details open, or the old job's
+last write) applied it after the reset, and a later `rc.log` with no link never replaced a registration.
+`facts.ts` `applyRcLog` now applies a downloaded `rc.log`:
+- it takes the file only when it was modified at or after the job got its computer (`got_computer_at`, else
+  `started_at`, with 1 s of slack), the rule the node file follows (R4). A file passed over keeps its
+  modified time, so it is not downloaded again until it changes, and the debug log says so;
+- a file it takes replaces the registration whole.
+
+A tag on the registration naming its job was not used, because `rc.log` carries no reliable job line (see
+"Observed, not fixed" below).
+
+**4. New session followed the primary link (extension).** 14.0.0 offered New session only when the run's own
+link (`claudeLinkOf`, which prefers `session_url`) was an environment link. Framework 14 writes the link
+printed last as `session_url` and the environment link as `environment_url`, so a worker that printed both
+lost New session although it had an environment. Now:
+- `facts.ts` `environmentLinkOf` gives the first environment link reported, in the same order of trust
+  (connection.json, status.json, rc.log's registration), and `runFacts` carries it as `environmentLink`;
+- `steps.ts` `newSessionLinkOf` is what the home's button and the background's `new-session` both ask. With a
+  live link it returns the run's environment link, or its own link when that is one. With no live link it
+  returns the last known state's `new_session_url` (new, `keys.ts` `LastKnown`), or its `environment_url`
+  when that is an environment link. That covers a record stored by 13.0.0 or by the morning's build. It
+  never returns a session's own link;
+- `lastKnownOf` stores `new_session_url` beside `environment_url`.
+
+The guides still say that a worker on a resumed session's link offers no New session (`USE.md`, top and part
+4; `LAB_LEAD.md` section 11). That stays true for the case they describe, a session link alone. They do not
+say that a worker which printed both links offers it. They were not changed: this pass could not edit
+`docs/guides/`.
+
+**5. `release/13.0.0/SHA256SUMS.txt`.** `release/13.0.0/README.md` had been edited after its sums were made
+(a two-line addition, uncommitted), so `sha256sum -c` failed on it. The README line was regenerated
+(`8388c5d0…5b20`), and the folder verifies again: 12 of 12 OK. Nothing else in that folder changed.
+
+**6. `PRIVACY.md`.** Not edited, as instructed. `release/14.0.0/README.md` says so, and what the debug log
+is: memory only, never sent, cleared when the service worker stops. It holds the account, the worker's name,
+job ids, nodes (as the gate's replies name them) and the first 160 characters of each gate reply. Whether
+`PRIVACY.md` describes it is Greg's decision before any store upload.
+
+**Tests added.**
+- Framework:
+  - `test_cli.py` `Registration`, three new tests:
+    - ESC[K, ESC[1C, ESC[2K, ESC[G and ESC[1A, each right before the link (with and without a space) and
+      before the name line, on both blocks;
+    - a link cut mid-write: the session form, the environment form, a CR without its LF and an unfinished
+      name line are no link and no name, an earlier registration stands, and the completed line is the link;
+    - `hpcw_complete_lines` on six inputs.
+  - `test_login_plain.py` `LinkFinder`: ESC[K, ESC[2K, ESC[1C and ESC[G right before the authorize link.
+  - `test_job.py` `test_a_link_cut_mid_write_is_never_the_link`: the whole job against a Claude Code that
+    writes the resumed block's link line in two parts 12 s apart, with ESC[K right before the link. The job
+    goes online with no link, then names the whole link once (status.json, connection.json, progress.log,
+    the job output), and the cut link appears nowhere.
+  - Each new test was run against the defect put back, on a copy in WSL. With framework 13's sed, the
+    Registration, LinkFinder and job tests failed, and the parser returned `sx10-hazy-meadow|||`. With
+    `hpcw_complete_lines` made a pass-through, the cut-link, complete-lines and job tests failed, and the job
+    wrote `session_url` `https://claude.ai/code/session_01N4`.
+- Extension:
+  - `shell.test.ts`: the five codes before a link and a name, and a real intermediate byte (ESC[1 q).
+  - `contract.test.ts`: the cursor codes before the link and the name, and the cut link.
+  - `facts.test.ts`:
+    - the hand-over: job A online with its link from rc.log, then job B's own file online with empty links
+      gives no link and phase `connecting`, and `rc.log` is listed for download again. A's `rc.log`
+      downloaded late (modified before B's computer) is passed over. B's own `rc.log` before its link
+      leaves it `connecting`, then B has its own link, and a later file with no link replaces the
+      registration;
+    - `environmentLink` from each file, a lookalike, claude.com.
+  - `steps.test.ts`: New session with the session link primary and the environment link in status.json,
+    connection.json or rc.log; none with the session link alone; the last known state's `new_session_url`;
+    13.0.0's records; a lookalike.
+  - `background.test.ts`: on the GlobalProtect way, a framework 14 file with both links opens the session tab
+    with the session link, the home offers New session, and New session opens the environment link once. A
+    session link alone offers none, and `new-session` opens nothing.
+  - The hand-over and cut-link tests were run with their fix taken out (`forJob` keeping the three fields;
+    `parseRegistration` reading the trailing fragment). Both failed, and the sources were restored byte for
+    byte (`cmp`).
+
+**What ran.** All on 2026-10-03, on Greg's laptop and its WSL Ubuntu 24.04, against stand-ins only. Logs are in
+this session's scratchpad, `fourteen2/logs/`.
+- **Framework 14:** `bash framework/tests/run.sh` on a copy of `framework/` in WSL (bash 5.2.21, Python
+  3.12.3, GNU Awk 5.2.1, GNU sed 4.9): **379 of 379 passed, none skipped**, "ALL OK", in 544 s (13.0.0's 366, the morning's 8 and the 5 new ones). `deploy_shared.sh`'s local checks, replayed without
+  publishing: VERSION 14 on both lines, no CR in the 18 files, `bash -n` clean.
+- **14.0.0:** `node helper/build.mjs --check` (bridge 1.0.0, the same four files), `npx tsc --noEmit`, `npm
+  run build` and `npm run zip`, all exit 0, then `npx vitest run` with the built package present: **42
+  files, 516 of 516 passed, none skipped** (the morning's 509 and 7 new). The three package tests name
+  14.0.0.
+- **The package:** 42 entries. Against the morning's build only `background.js` changed (310,619 to 311,681
+  bytes). Against 13.0.0 the same entries changed as in the morning: `background.js`, the manifest's version
+  and the renamed page chunks. The permissions are unchanged, and the zip has no `.map`, `.ts`,
+  `sourceMappingURL`, `eval(` or `new Function(`. It is `release/14.0.0/beethoven-14.0.0-chrome.zip`,
+  503,481 bytes, SHA-256 `be8c8454c8515056f2a30baff28a8666798474eadd7d24f19412aeec3d69bd65`. `release/14.0.0/SHA256SUMS.txt` was regenerated over every file and
+  verified inside the folder.
+- **Built twice in this pass.** The first rebuild (13:34 UTC, 503,370 bytes, `5a8748c9…cbf3f`) came before
+  `applyRcLog`, which a reading of the finished diff called for. It was replaced, and every extension check
+  above ran again on the second (13:45 UTC). The framework suite ran once, after the last framework change.
+- **Not run:** bash 4.2.46, `tests/e2e_sshd.sh`, the browser harness.
+
+**Observed, not fixed (outside this pass).** The job appends its `===== … starting claude remote-control …
+=====` line to `rc.log` and keeps `RC_OFF` (the size before), then starts `script -qfc launch.sh rc.log`
+without `-a`. Measured here with util-linux 2.39.3: `script` truncates the file, so the header line is lost,
+and `script` writes its own "Script started on …" line instead. On the first start of a job this does no
+harm, since `rc.log` was emptied and `RC_OFF` is 0. On a restart within a job (Remote Control exited and
+starts again after its back-off), `RC_OFF` is the old file's size. `clean_tail` then skips that many bytes
+of the new output, so the new registration may not be read until the file grows past the old size. Not
+measured on the grid. Neither the compute nodes' util-linux version nor a restart's real output has been
+seen. `test_job.py` has no restart case. No change was made.
+
+**Not known, or not done.**
+- Whether Claude Code ever prints a cursor code right before its link, or its link line without a newline
+  after it.
+- Everything the morning's section lists as not known still stands: the grid, claude.com, the debug log's
+  lifetime, the mock's job simulator, and `PRIVACY.md`.

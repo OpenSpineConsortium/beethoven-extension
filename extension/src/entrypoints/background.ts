@@ -40,11 +40,12 @@ import { SignInFlow, type SignInOutcome } from '../core/signin';
 import { DirectError, directFailureOf, SshPortal } from '../core/sshChannel';
 import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/channel';
 import { buildNodes, type DiagCtx } from '../core/checks';
+import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, gateText, isEnvironmentUrl, parseGateJson, parseJobId, parseRegistration, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectOptions, type GateFile, type LoginMode, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectOptions, type GateFile, type LoginMode, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
-import { addActivity, addWait, applyConnection, applyStatus, applyStatusRead, environmentLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
+import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
 import { bundledProfile, usesSharedCopy } from '../core/install';
 import {
   ACCESS_KEY,
@@ -108,7 +109,7 @@ import { reach } from '../core/net';
 import { DASHBOARD, PORTAL_OPS, PortalClient, type PortalApi, type SessionInfo } from '../core/portal';
 import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell';
 import { detailsView, settingsView } from '../core/sheets';
-import { connectionMode, ENROLLED_HOLD_MS, firstRunDone, FOUND_HOLD_MS, PROTECTED_HOLD_MS, heroOf, home, lastKnownOf, panelView, toolbarView, welcomeView, type ConnectFacts, type DirectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
+import { connectionMode, ENROLLED_HOLD_MS, firstRunDone, FOUND_HOLD_MS, PROTECTED_HOLD_MS, heroOf, home, lastKnownOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type DirectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
 import { connectLine, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
@@ -259,6 +260,124 @@ const mem = {
   },
 };
 
+// ---- 14.0.0: the debug log ------------------------------------------------------------------------------
+//
+// What this background does under the hood, one line per decision (core/debuglog.ts): the mode and why, the
+// bridges, each ssh connection and gate verb (core/sshChannel.ts), each read of the run's files and what the
+// panel made of it, each press and what it waited for, the sign-in sheet's phases, the approval check, the
+// sitting's events, every failure, and what the panel shows. In memory only, at most 3000 lines; More, Copy
+// debug log copies it, and Details for your lab lead shows the last 200. Never a password, a one-time code, a
+// pasted Claude code, a key, a token or a full authorize link: the callers below pass kinds, words and hosts,
+// and the ring cuts every address to its host and path and removes anything key- or token-shaped besides.
+
+const debugRing = new DebugRing();
+
+/** one line in the debug log */
+function dbg(tag: string, text: string): void {
+  try {
+    debugRing.add(tag, text);
+  } catch {
+    /* the debug log never stops anything */
+  }
+}
+
+/** what the debug log last said of each of these, so each is said again only when it changes */
+const said = { mode: '', panel: '', connect: '', sheet: '' };
+
+/** a failure, for Details and the debug log; `logged` is what the debug log says instead when the detail may hold a terminal's lines */
+function setFail(detail: string, logged?: string): void {
+  mem.failDetail = detail;
+  dbg('fail', logged ?? detail);
+}
+
+/** a link as the debug log names it: whether there is one, and its form (never the link) */
+function linkWord(link: string | undefined): string {
+  if (!link) return 'none';
+  return isEnvironmentUrl(link) ? 'present (environment link)' : isClaudeCodeLink(link) ? 'present (session link)' : 'not a Claude Code link';
+}
+
+/** an address as the debug log may show it: host and path only (an authorize link keeps nothing of its query) */
+function hostPath(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.host}${u.pathname}`;
+  } catch {
+    return '(not an address)';
+  }
+}
+
+/** a sitting's event in the debug log: its kind, never a code; a link by its host and path */
+function eventWords(ev: ConnectEvent): string {
+  switch (ev.kind) {
+    case 'step': {
+      const st = ev.step;
+      switch (st.step) {
+        case 'queued':
+          return `step queued: job ${st.job} (${st.fresh ? 'new' : 'kept'})`;
+        case 'setup':
+          return `step setup (${st.changed ? 'changed' : 'ready'})`;
+        case 'signed-in':
+          return `step signed-in (plan ${st.plan ?? '-'})`;
+        case 'failed':
+          return `step failed: ${st.code}${st.detail ? `: ${st.detail}` : ''}`;
+        default:
+          return `step ${st.step}`;
+      }
+    }
+    case 'auth-url':
+      return `auth-url: ${hostPath(ev.url)} (the link itself is not logged)`;
+    case 'signed-in':
+      return `signed-in (plan ${ev.plan ?? '-'})`;
+    case 'login-failed':
+    case 'progress':
+      return `${ev.kind}: ${ev.detail}`;
+    default:
+      return ev.kind;
+  }
+}
+
+/** what the panel shows, in one line, for the debug log (durations left out, so a clock ticking is no change) */
+function describePanel(f: Facts): string {
+  try {
+    const v = panelView(f);
+    const r = f.run;
+    const run = r.present ? ` | run ${r.phase}${r.stale ? ', stale' : ''}${r.neverSeenAlive ? ', never seen alive' : ''}, link ${linkWord(r.link)}` : ' | no run';
+    const plain = (t: string | undefined) => String(t ?? '').replace(/\b\d+(?:\.\d+)?\s?(?:h|min|s|ms)\b/g, '…');
+    if (v.kind === 'terms-needed') return `terms needed${run}`;
+    if (v.kind === 'journey') {
+      const j = v.journey as unknown as Record<string, unknown>;
+      const bits = ['hero', 'title', 'sub'].map((k) => (typeof j[k] === 'string' ? plain(j[k] as string) : '')).filter(Boolean);
+      const prob = (j.problem as { body?: string } | undefined)?.body;
+      const prim = j.primary as { label?: string; disabled?: boolean } | undefined;
+      return `journey ${v.journey.moment}${bits.length ? `: ${bits.join(' · ')}` : ''}${prob ? ` (${plain(prob)})` : ''}${prim?.label ? ` [${prim.label}${prim.disabled ? ', disabled' : ''}]` : ''}${run}`;
+    }
+    const h = v.home;
+    return `home ${h.hero.state}: ${plain(h.hero.word)}${h.hero.sub ? ` · ${plain(h.hero.sub)}` : ''}${h.primary ? ` [${h.primary.button.label}]` : ''}${run}`;
+  } catch (e) {
+    return `(the panel's view failed: ${(e as Error).message})`;
+  }
+}
+
+/** the sign-in sheet's phase in the debug log, when it changes: its purpose, phase, work and failure, the kinds of the grid's prompts (never an answer) */
+function noteSheet(): void {
+  const st = mem.direct.sheet?.state;
+  if (!st) return;
+  const line = `${st.purpose}: ${st.phase}${st.work ? ` (${st.work})` : ''}${st.failure ? `, failure ${st.failure}` : ''}${st.prompts?.length ? `, the grid asks for ${st.prompts.map((x) => x.kind).join(' + ')}` : ''}${st.answered ? `, ${st.answered} answered` : ''}${st.notAccepted ? ', not accepted' : ''}${st.refusals ? `, refusals ${st.refusals}` : ''}${st.detail ? `: ${st.detail}` : ''}`;
+  if (line === said.sheet) return;
+  said.sheet = line;
+  dbg('sheet', line);
+}
+
+/** Copy debug log: the header (version, mode, portal, account, worker, time), then every line, newest last */
+async function debugLogText(): Promise<string> {
+  const s = await settingsNow();
+  const grid = await session.get<GridNote>(GRID_KEY);
+  const prefs = await loadPrefs();
+  const account = grid?.account ?? (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
+  const mode = await modeNow().catch(() => 'unknown');
+  return debugRing.text({ version: version(), mode, ...(s ? { portal: s.hostname } : {}), ...(account ? { account } : {}), worker: prefs.worker_name, at: Date.now() });
+}
+
 /** the presses whose handling keeps the tick from carrying a kept press at the same moment */
 const PRESS_KINDS: ReadonlySet<Action['kind']> = new Set(['connect', 'sign-in-claude', 'stop', 'restrict', 'retry', 'cancel']);
 
@@ -297,6 +416,7 @@ export default defineBackground({
   // Firefox MV2: a persistent background keeps the alarm and message listeners simple; ignored on MV3
   persistent: true,
   main() {
+    dbg('sw', `service worker started: Beethoven ${version()}`);
     void dropLeftoversOnce();
     void setPanelBehavior();
     void unregisterOldScripts();
@@ -609,6 +729,7 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
           ...(settings ? { settings, profile: await siteProfile(settings.site) } : {}),
           ...(f.channel ? { channel: f.channel } : {}),
           audit: audit.slice(-60).map((r) => `${String(r.ts ?? '')} ${String(r.method ?? '')} ${String(r.endpoint ?? '')} ${String(r.outcome ?? '')}${r.via ? ` (${String(r.via)})` : ''}`),
+          debug: debugRing.tail(DEBUG_DETAILS_LINES),
           now: f.now,
         });
       return { surface: 'details', view: { ...dv, direct } };
@@ -669,6 +790,18 @@ async function reflect(f: Facts): Promise<void> {
     } catch {
       /* a browser without one of these */
     }
+  }
+  // 14.0.0: the debug log says what the panel shows, and the connect's state, each time they change
+  const pv = describePanel(f);
+  if (pv !== said.panel) {
+    said.panel = pv;
+    dbg('panel', pv);
+  }
+  const c = f.connect;
+  const cs = `in flight ${c.inFlight ? 'yes' : 'no'}, queued ${c.queued ? 'yes' : 'no'}, sign-in ${c.signin}${c.failure ? `, failure ${c.failure}` : ''}${c.interrupted ? ', interrupted' : ''}`;
+  if (cs !== said.connect) {
+    said.connect = cs;
+    dbg('connect', cs);
   }
   // the last known state, kept across browser restarts so the panel shows it at once
   const lk = lastKnownOf(f);
@@ -848,16 +981,23 @@ async function onPinChanged(pinned: boolean): Promise<void> {
 // ---- actions ----------------------------------------------------------------------------------------
 
 /** what a page may ask before the agreement is accepted: nothing that reaches the network or opens a tab of Beethoven's own doing */
-const BEFORE_TERMS: ReadonlySet<Action['kind']> = new Set(['agree', 'use-portal', 'open-settings', 'open-help', 'open-details', 'set-pref', 'tour', 'dismiss', 'log', 'audit', 'copy-details', 'drive-connected']);
+const BEFORE_TERMS: ReadonlySet<Action['kind']> = new Set(['agree', 'use-portal', 'open-settings', 'open-help', 'open-details', 'set-pref', 'tour', 'dismiss', 'log', 'audit', 'copy-details', 'copy-debug-log', 'drive-connected']);
 
 async function act(a: Action): Promise<unknown> {
   // PRIVACY.md: nothing is sent anywhere before the agreement; the pages offer nothing else then, and
   // the background holds to it whatever a page asks
   if (!BEFORE_TERMS.has(a.kind) && !(await termsInForce())) throw new Error(TERMS_REFUSAL);
   const press = PRESS_KINDS.has(a.kind);
+  // the debug log names the action by its kind only: an action's fields can be a password, a code or a pasted Claude code
+  if (a.kind !== 'log' && a.kind !== 'copy-debug-log') dbg(press ? 'press' : 'action', a.kind);
   if (press) mem.pressDepth++;
   try {
-    return await actInner(a);
+    const out = await actInner(a);
+    if (press) dbg('press', `${a.kind}: ${JSON.stringify(out ?? null)}`);
+    return out;
+  } catch (e) {
+    dbg('fail', `${a.kind}: ${(e as Error)?.message ?? String(e)}`);
+    throw e;
   } finally {
     if (press) mem.pressDepth = Math.max(0, mem.pressDepth - 1);
     schedulePush();
@@ -900,6 +1040,8 @@ async function actInner(a: Action): Promise<unknown> {
       return { opened: !!(await openTab(`https://chromewebstore.google.com/detail/${browser.runtime.id}`, { active: true })) } satisfies ActionResults['update'];
     case 'copy-details':
       return { text: await detailsText() } satisfies ActionResults['copy-details'];
+    case 'copy-debug-log':
+      return { text: await debugLogText() } satisfies ActionResults['copy-debug-log'];
     case 'restrict':
       return pressRestrict(a.workerName);
     case 'connect':
@@ -924,8 +1066,14 @@ async function actInner(a: Action): Promise<unknown> {
       return openSession();
     case 'new-session': {
       const f = await buildFacts();
-      const link = f.run.link ?? f.lastKnown?.environment_url;
-      if (!isEnvironmentUrl(link)) return { opened: false, firstTime: false } satisfies ActionResults['new-session'];
+      // 14.0.0: a new session needs an environment link, the one the home's button was offered for (newSessionLinkOf): any
+      // reported, whichever link is the run's own; a resumed session's own link opens that one session only
+      const link = newSessionLinkOf(f);
+      if (!isEnvironmentUrl(link)) {
+        dbg('open', `new session: not opened (link ${linkWord(f.run.link ?? f.lastKnown?.environment_url)}, no environment link)`);
+        return { opened: false, firstTime: false } satisfies ActionResults['new-session'];
+      }
+      dbg('open', `new session: the environment link (the run's link ${linkWord(f.run.link ?? f.lastKnown?.environment_url)})`);
       const o = (await local.get<OnceNotes>(ONCE_KEY)) ?? {};
       const firstTime = !o.new_session_tip_at;
       if (firstTime) {
@@ -1351,6 +1499,7 @@ async function checkGrid(reason: string): Promise<'signed-in' | 'signed-out' | '
   try {
     const before = (await session.get<GridNote>(GRID_KEY))?.session;
     const s = await c.session();
+    dbg('grid', `portal (${reason}): ${s.state}${s.username ? ` as ${s.username}` : ''} (HTTP ${s.status})${s.detail ? `: ${s.detail}` : ''}`);
     // a cold per-user server is signed in; the next check reads it
     const word = s.state === 'cold' ? before ?? 'unknown' : s.state;
     await writeGrid({ session: word as GridNote['session'], ...(s.state === 'unreachable' ? {} : { reach: 'answers' }), ...(s.username ? { account: s.username } : {}) });
@@ -1606,6 +1755,7 @@ function checkAccessNow(trigger: AccessTrigger): Promise<AccessOutcome> {
     }
   })();
   accessInFlight.finally(() => (accessInFlight = undefined)).catch(() => undefined);
+  void accessInFlight.then((o) => dbg('access', `${trigger}: ${o.asked ? 'asked' : 'not asked'}, approved ${o.approved === undefined ? '-' : o.approved ? 'yes' : 'no'}: ${o.detail}`)).catch(() => undefined);
   return accessInFlight;
 }
 
@@ -1644,7 +1794,7 @@ async function ensureSetup(): Promise<void> {
     const s = await settingsNow();
     if (!dir || !s) {
       mem.setup = { state: 'no-shared', detail: `no shared copy of the tool is known for the site "${s?.site ?? ''}"` };
-      mem.failDetail = mem.setup.detail ?? '';
+      setFail(mem.setup.detail ?? '');
       return;
     }
     const c = await directClient();
@@ -1675,7 +1825,7 @@ async function ensureSetup(): Promise<void> {
         await activity(LOG_WORDS.ready);
       } else {
         mem.setup = { state: 'failed', detail: `the setup line ended with exit ${r.exitCode}: ${r.output.slice(-300)}` };
-        mem.failDetail = mem.setup.detail ?? '';
+        setFail(mem.setup.detail ?? '');
       }
     } catch (e) {
       if (isPasswordError(e)) {
@@ -1683,7 +1833,7 @@ async function ensureSetup(): Promise<void> {
         mem.setup = { state: 'unknown' };
       } else {
         mem.setup = { state: 'failed', detail: (e as Error).message };
-        mem.failDetail = (e as Error).message;
+        setFail((e as Error).message);
       }
     }
   } finally {
@@ -1699,6 +1849,12 @@ async function ensureSetup(): Promise<void> {
  * the approval, the setup, and a shell that does not ask for a password (else the key step).
  */
 async function readyForPress(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
+  const r = await readyForPressInner(kind);
+  dbg('ready', `${kind}: ${r.go ? 'go' : r.drop ? 'dropped' : `waits for ${r.waiting ?? 'something'}`} (mode ${said.mode.split(' ')[0] || 'unknown'})`);
+  return r;
+}
+
+async function readyForPressInner(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
   // 12.0.0: while the direct way is being set up, a press waits on it (the helper, the sheet, an unlock)
   const mode = await modeNow();
   if (mode === 'setup') {
@@ -1933,10 +2089,11 @@ async function startConnectClaimed(id: number, login: LoginMode): Promise<boolea
     line = connectLine(dir, opts);
   } catch (e) {
     mem.connect = { ...freshConnect(), failure: 'other' };
-    mem.failDetail = (e as Error).message;
+    setFail((e as Error).message);
     return false;
   }
   if (mem.startId !== id) return false;
+  dbg('connect', `start ${id}: login ${login}, worker ${opts.name}, site ${opts.site}, permission ${opts.permissionMode}, ${opts.chain ? 'chain' : 'no chain'}`);
   mem.connect = { ...freshConnect(), inFlight: true, pressedAt: Date.now() };
   mem.restricted = false;
   await mutateRun((cur) => (cur && cur.stopped_by_student ? { ...cur, stopped_by_student: false } : undefined));
@@ -1948,12 +2105,15 @@ async function startConnectClaimed(id: number, login: LoginMode): Promise<boolea
     const needsClaude = login === 'always' || login === 'fresh' || (login === 'auto' && mem.direct.claude === 'no');
     const held = !!mem.direct.sheet?.holding();
     if (!needsClaude && !(login === 'auto' && held && mem.direct.claude !== 'yes')) {
+      dbg('connect', `start ${id}: the direct way, through the gate (no Claude sign-in; Claude Code on the grid signed in: ${mem.direct.claude ?? '?'})`);
       const gateOpts: ConnectOptions = { ...opts, login: 'never' };
       return startGateConnect(id, gateOpts);
     }
+    dbg('connect', `start ${id}: the direct way, in a sign-in sitting (Claude sign-in wanted: ${needsClaude ? 'yes' : 'no'}; a held sign-in: ${held ? 'yes' : 'no'})`);
     return startSshSitting(id, line, login);
   }
   const ch = await channelNow();
+  dbg('connect', `start ${id}: the GlobalProtect way, ${ch?.mode === 'tab' ? 'through a portal tab' : "through the portal's shell from here"}`);
   return ch?.mode === 'tab' ? startTabSitting(id, s, opts, dir, login) : startDirectSitting(id, line, login);
 }
 
@@ -1986,7 +2146,7 @@ async function startDirectSitting(id: number, line: string, login: LoginMode): P
       return false;
     }
     mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
-    mem.failDetail = (e as Error).message;
+    setFail((e as Error).message);
     schedulePush();
     return false;
   }
@@ -1999,6 +2159,7 @@ async function startDirectSitting(id: number, line: string, login: LoginMode): P
   }
   const gate = new CodeGate((input) => shell.send(input));
   mem.sitting = { id, mode: 'direct', login, gate, close: () => shell.close() };
+  dbg('sitting', `${id} open: the portal's shell, login ${login}`);
   registered = true;
   for (const ev of early.splice(0)) await onConnectEvent(id, ev);
   void shell.done.then((end) => onSittingEnd(id, end.reason, watcher.tail));
@@ -2019,7 +2180,7 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
   } catch (e) {
     if (ownTab && tabId !== undefined) await host.close(tabId).catch(() => undefined);
     mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
-    mem.failDetail = (e as Error).message;
+    setFail((e as Error).message);
     return false;
   }
   if (mem.startId !== id) {
@@ -2054,6 +2215,7 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
     },
   };
   mem.workingInTab++;
+  dbg('sitting', `${id} open: a portal tab (${ownTab ? 'opened for it' : 'kept'}), login ${login}`);
   let ended = false;
   const finish = (reason: string) => {
     if (ended) return;
@@ -2069,7 +2231,7 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
     else if (msg.type === 'password') finish('password');
     else if (msg.type === 'closed') finish(msg.reason);
     else if (msg.type === 'error') {
-      mem.failDetail = msg.message;
+      setFail(msg.message);
       finish('closed');
     }
   });
@@ -2082,6 +2244,7 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
 async function onConnectEvent(id: number, ev: ConnectEvent): Promise<void> {
   const sit = mem.sitting;
   if (!sit || sit.id !== id) return;
+  if (ev.kind !== 'keepalive') dbg('sitting', `${id} ${eventWords(ev)}`);
   sit.gate.onEvent(ev);
   const c = mem.connect;
   switch (ev.kind) {
@@ -2128,7 +2291,7 @@ async function onConnectEvent(id: number, ev: ConnectEvent): Promise<void> {
           break;
         case 'failed':
           mem.connect = { ...mem.connect, inFlight: false, failure: st.code };
-          mem.failDetail = st.detail;
+          setFail(st.detail);
           if (st.code === 'restricted') mem.restricted = true;
           if (st.code === 'setup') mem.setup = { state: 'failed', detail: st.detail };
           break;
@@ -2167,6 +2330,7 @@ async function onConnectEvent(id: number, ev: ConnectEvent): Promise<void> {
 async function onSittingEnd(id: number, reason: string, tail: string[]): Promise<void> {
   const sit = mem.sitting;
   if (!sit || sit.id !== id) return;
+  dbg('sitting', `${id} ended: ${reason} (${mem.connect.inFlight ? 'with no done or failed' : 'after its last step'})`);
   sit.gate.close();
   mem.sitting = undefined;
   if (reason === 'password') {
@@ -2182,7 +2346,7 @@ async function onSittingEnd(id: number, reason: string, tail: string[]): Promise
       mem.connect = { ...c, inFlight: false, ...(c.signin === 'link' || c.signin === 'checking' ? { failure: 'signin-timeout' as ConnectFailure } : {}) };
     } else {
       mem.connect = { ...c, inFlight: false, failure: 'closed' };
-      mem.failDetail = tail.slice(-20).join('\n');
+      setFail(tail.slice(-20).join('\n'), "the sign-in sitting closed before it was done (its last lines are in Details, not here)");
     }
   }
   schedulePush();
@@ -2247,6 +2411,7 @@ async function pasteCode(code: string): Promise<ActionResults['paste-code']> {
   const sit = mem.sitting;
   if (!sit) return { typed: false };
   const out = sit.gate.submit(code);
+  dbg('sitting', `${sit.id} pasted code ${out} (the code itself is never logged)`);
   if (out === 'bad') {
     mem.connect = { ...mem.connect, badCode: true };
     return { typed: false };
@@ -2527,6 +2692,7 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
       if (mem.connect.inFlight || mem.sitting || mem.startId) return;
       const found = await discoverRun(c);
       if (!found) return;
+      dbg('read', `found a run already there (portal): ${found.run}, job ${found.job}`);
       // written only while there is still no record (a Connect may have written its own meanwhile)
       snap = await mutateRun((cur) => (cur ? undefined : found));
       if (!snap) return;
@@ -2540,12 +2706,15 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
       const status = (e as { status?: number }).status;
       if (status === 401 || status === 403) await writeGrid({ session: 'signed-out' });
       const why = (e as Error).message;
+      dbg('read', `the run folder (portal) could not be listed: ${status ?? '-'}: ${why}`);
       await mutateRun((cur) => (sameRun(cur, snap) ? { ...cur!, error: why } : undefined));
       return;
     }
     const answered = Date.now();
-    const rawLink = environmentLinkOf(snap);
-    const needRc = detailsOpen || (snap.status?.state === 'running' && !rawLink);
+    const rawLink = claudeLinkOf(snap);
+    // 14.0.0: "online" with no link too: framework 13 wrote a resumed session's status.json online with both links
+    // empty, and rc.log still carries the session's own link (the direct way has no rc.log: framework 14 is needed there)
+    const needRc = detailsOpen || ((snap.status?.state === 'running' || snap.status?.state === 'online') && !rawLink);
     const plan = listingPlan(snap, listing.files, { progress: mem.logOpen || detailsOpen || !!want.progress, rc: needRc });
     // what this listing read, downloaded outside the queue and applied inside it to the record as it is then
     const read: { status?: StatusFile; connection?: ConnectionFile; node?: string; progress?: string; rc?: string } = {};
@@ -2578,6 +2747,7 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
     // the grid's clock against this computer's, from the Files app's own Date (R5, R12 and the timers compare like with like)
     const offset = clockOffset(listing.serverDate, asked, answered);
     const newer = (mtime: number | undefined, had: number | undefined) => mtime !== undefined && (had === undefined || mtime >= had);
+    let rcPassedOver = false;
     const run = await mutateRun((cur) => {
       if (!sameRun(cur, snap)) return undefined;
       let r = cur!;
@@ -2586,13 +2756,20 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
       if (plan.node && newer(plan.mtimes.node, r.node_mtime)) r = { ...r, node_mtime: plan.mtimes.node, ...(read.node ? { node: read.node } : {}) };
       if (read.progress !== undefined && newer(plan.mtimes.progress, r.progress_mtime)) r = { ...r, progress_tail: read.progress.split('\n').filter(Boolean).slice(-40), progress_mtime: plan.mtimes.progress };
       if (read.rc !== undefined && newer(plan.mtimes.rc, r.rc_mtime)) {
-        const reg = parseRegistration(read.rc);
-        r = { ...r, rc_tail: read.rc.slice(-4000), rc_mtime: plan.mtimes.rc, ...(reg.session_name || reg.environment_url ? { registration: reg } : {}) };
+        // 14.0.0: after the status (a renewal has moved the run to its successor and forgotten the old rc.log by then); an
+        // rc.log older than this job's computer is its predecessor's, passed over (facts.ts applyRcLog)
+        const rc = applyRcLog(r, read.rc, plan.mtimes.rc);
+        r = rc.run;
+        if (!rc.taken) rcPassedOver = true;
       }
       const keepOffset = offset === undefined ? r.clock_offset_ms : r.clock_offset_ms !== undefined && Math.abs(offset - r.clock_offset_ms) <= CLOCK_JITTER_MS ? r.clock_offset_ms : offset;
       return { ...r, listed_at: nowIso(), error: undefined, ...(keepOffset !== undefined ? { clock_offset_ms: keepOffset } : {}) };
     });
-    if (run) await afterRead();
+    if (rcPassedOver) dbg('read', `portal: rc.log is older than job ${run?.job ?? '-'}'s computer (its predecessor's): passed over`);
+    if (run) {
+      if (plan.status || plan.connection) noteRead('portal', run, read.status, plan.status, read.connection, plan.connection);
+      await afterRead();
+    }
   } finally {
     mem.busy.list = false;
     schedulePush();
@@ -2633,7 +2810,11 @@ async function refreshStatusJson(): Promise<void> {
       const cur = await session.get<RunState>(RUN_KEY);
       return !!cur && sameRun(cur, snap) && cur.job === snap.job && asking(cur) && !mem.stopping && !mem.startId && mem.pressDepth === 0 && !(await session.get<PendingPress>(PRESS_KEY));
     };
-    const sj = await statusByShell(c, dir, snap.run, undefined, still).catch(() => undefined);
+    const sj = await statusByShell(c, dir, snap.run, undefined, still).catch((e: unknown) => {
+      dbg('status', `worker status --json failed: ${(e as Error)?.message ?? String(e)}`);
+      return undefined;
+    });
+    dbg('status', sj ? `worker status --json (${direct ? 'direct' : 'portal'}): status ${sj.status?.state ?? '-'}, scheduler ${sj.scheduler?.state ?? '-'}${sj.scheduler?.reason ? ` (${sj.scheduler.reason})` : ''}` : 'worker status --json: no answer, or not asked');
     if (!sj) return;
     let say: string | undefined;
     await mutateRun((cur) => {
@@ -2701,6 +2882,7 @@ async function afterRead(): Promise<void> {
   }
   if (gotComputer) await activity(LOG_WORDS.gotComputer);
   if (online) {
+    dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? '; opening it in a new tab' : ''}`);
     await once({ first_online_at: nowIso() });
     await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? DEFAULT_SITE))?.session_title, prefs.worker_name)));
     if (open) await openSessionTab(open);
@@ -2726,13 +2908,17 @@ async function maybeKeepRunning(): Promise<void> {
 
 // ---- claude.ai --------------------------------------------------------------------------------------
 
-/** open the environment link in one new tab and remember it (claude.ai's tab is never closed by Beethoven) */
+/** open the worker's link in one new tab and remember it (claude.ai's tab is never closed by Beethoven); 14.0.0: either form */
 async function openSessionTab(link: string): Promise<boolean> {
-  if (!isEnvironmentUrl(link)) return false;
+  if (!isClaudeCodeLink(link)) {
+    dbg('open', `session tab: not opened (link ${linkWord(link)})`);
+    return false;
+  }
   const win = mem.panelWindowId;
   const t = await openTab(link, { active: true, anthropicOk: true, ...(win !== undefined ? { windowId: win } : {}) });
+  dbg('open', `session tab: ${t ? 'opened' : 'the browser opened no tab'} (link ${linkWord(link)})`);
   if (!t) return false;
-  await session.set(CLAUDE_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url: 'https://claude.ai/code', opened_at: nowIso(), purpose: 'session', loaded: false, loads_after: 0 } satisfies OpenedTab);
+  await session.set(CLAUDE_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url: `${new URL(link).origin}/code`, opened_at: nowIso(), purpose: 'session', loaded: false, loads_after: 0 } satisfies OpenedTab);
   return true;
 }
 
@@ -2740,11 +2926,15 @@ async function openSessionTab(link: string): Promise<boolean> {
 async function openSession(): Promise<ActionResults['open-session']> {
   const f = await buildFacts();
   const link = f.run.link ?? f.lastKnown?.environment_url;
-  if (!isEnvironmentUrl(link)) return { focused: false, opened: false };
+  if (!isClaudeCodeLink(link)) {
+    dbg('open', `open my session: no link (${linkWord(link)})`);
+    return { focused: false, opened: false };
+  }
   const rec = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
   const exists = rec ? !!(await tabNow(rec.tabId)) : false;
   if (rec && sessionTabDecision(rec, exists) === 'focus') {
     const ok = await focusTab(rec.tabId, rec.windowId);
+    dbg('open', `open my session: ${ok ? 'the tab Beethoven opened, focused' : 'focusing its tab failed'}`);
     if (ok) return { focused: true, opened: false };
   }
   return { focused: false, opened: await openSessionTab(link) };
@@ -2791,7 +2981,9 @@ async function probeBridges(): Promise<BridgeNote> {
   schedulePush();
   mem.direct.probingNow = (async () => {
     const before = await session.get<BridgeNote>(BRIDGE_KEY);
+    const t0 = Date.now();
     const choice = await chooseBridge(bridgeProviders(await profileNow()));
+    dbg('bridge', `probe in ${Date.now() - t0} ms: chosen ${choice.chosen}; ${choice.probes.map((x) => `${x.id} ${x.state}${x.detail ? ` (${x.detail})` : ''}`).join('; ')}`);
     const p = (id: string) => choice.probes.find((x) => x.id === id);
     const helper = p('helper');
     const note: BridgeNote = {
@@ -2859,7 +3051,15 @@ async function modeNow(): Promise<'direct' | 'vpn' | 'setup'> {
   const D = (await local.get<DirectNote>(DIRECT_KEY)) ?? {};
   const B = await session.get<BridgeNote>(BRIDGE_KEY);
   const k = await keyStateNow();
-  return connectionMode({ direct: { ...directBase(prefs, D, B, k) } });
+  const base = directBase(prefs, D, B, k);
+  const mode = connectionMode({ direct: { ...base } });
+  // 14.0.0: the debug log says the mode and why, when either changes
+  const why = `${mode} (preference ${base.pref}${base.vpnChosen ? ', GlobalProtect chosen' : ''}; bridge ${base.bridge}; key ${base.key.present ? (base.key.enrolled ? 'enrolled' : 'not enrolled') : 'none'}${base.key.locked ? ', locked' : ''}${base.unreachable ? '; the grid did not answer through the bridge' : ''}${base.fallbackSeen ? '; the GlobalProtect way was offered' : ''})`;
+  if (why !== said.mode) {
+    said.mode = why;
+    dbg('mode', why);
+  }
+  return mode;
 }
 
 /** the part of DirectFacts connectionMode reads */
@@ -2939,6 +3139,7 @@ async function sshPortal(): Promise<SshPortal> {
     pin: door.pin,
     host: door.host,
     port: door.port,
+    debug: dbg,
   });
   mem.direct.portal?.portal.hold(false);
   mem.direct.portal = { key, portal };
@@ -2972,7 +3173,7 @@ async function checkGridDirect(reason: string): Promise<'signed-in' | 'signed-ou
       mem.direct.claude = v.claude;
     } catch (e) {
       const f = directFailureOf(e);
-      mem.failDetail = `direct: ${f}: ${(e as Error).message}`;
+      setFail(`direct: ${f}: ${(e as Error).message}`);
       if (f === 'locked') {
         word = 'signed-out';
       } else if (f === 'key-refused' || f === 'key-expired' || f === 'no-key') {
@@ -2987,6 +3188,7 @@ async function checkGridDirect(reason: string): Promise<'signed-in' | 'signed-ou
         mem.direct.unreachable = true;
       }
     }
+    dbg('grid', `direct (${reason}): ${word}${account ? ` as ${account}` : ''}${word === 'signed-in' ? `; framework ${sp.lastVersion?.framework ?? '?'}, Claude Code on the grid signed in: ${mem.direct.claude ?? '?'}` : ''}`);
     await writeGrid({ session: word, ...(word === 'unreachable' ? {} : { reach: 'answers' }), ...(account ? { account } : {}) });
     // the door's answer through the bridge, for Details and the fallback (a key refused still means the door answered)
     const B = await session.get<BridgeNote>(BRIDGE_KEY);
@@ -3037,10 +3239,14 @@ function sheetFlow(purpose: 'enrol' | 'claude'): SignInFlow {
         await keyStateNow(true);
         const door = doorOf(await profileNow());
         const audit = new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) });
-        const check = new SshPortal({ bridge: chosenBridge, identity: async () => identity, account: async () => account, audit, pin: door.pin, host: door.host, port: door.port });
+        const check = new SshPortal({ bridge: chosenBridge, identity: async () => identity, account: async () => account, audit, pin: door.pin, host: door.host, port: door.port, debug: dbg });
         return check.version();
       },
-      changed: () => schedulePush(),
+      changed: () => {
+        noteSheet();
+        schedulePush();
+      },
+      debug: dbg,
       audit: new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) }),
       refusals: {
         get: async (account) => ((await session.get<RefusalNote>(REFUSALS_KEY)) ?? {})[account],
@@ -3088,7 +3294,7 @@ async function onSheetEnded(flow: SignInFlow): Promise<void> {
   const at = flow.state.phase === 'stopped' ? flow.state.retryAt : undefined;
   if (at !== undefined && at > Date.now()) setTimeout(() => schedulePush(), Math.min(at - Date.now() + 100, 20 * 60_000));
   // for Details and "Copy details" only
-  if (flow.state.detail) mem.failDetail = `direct sign-in: ${flow.state.failure ?? flow.state.phase}: ${flow.state.detail}`;
+  if (flow.state.detail) setFail(`direct sign-in: ${flow.state.failure ?? flow.state.phase}: ${flow.state.detail}`);
   schedulePush();
 }
 
@@ -3155,6 +3361,7 @@ async function startSshSitting(id: number, line: string, login: LoginMode): Prom
     mem.connect = { ...mem.connect, inFlight: false };
     mem.direct.claudeWanted = true;
     mem.direct.sheetWanted = true;
+    dbg('sitting', `${id}: a Claude sign-in needs the grid sign-in sheet first; the press waits for it`);
     await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', ...(login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
     const f = sheetFlow('claude');
     if (f.state.phase === 'done' || f.state.phase === 'failed' || f.state.phase === 'stopped') f.cancel();
@@ -3171,7 +3378,7 @@ async function startSshSitting(id: number, line: string, login: LoginMode): Prom
     shell = await withFloor(() => flow.openSitting(line, (text) => watcher.feed(text)), undefined, () => mem.startId === id);
   } catch (e) {
     mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
-    mem.failDetail = (e as Error).message;
+    setFail((e as Error).message);
     schedulePush();
     return false;
   }
@@ -3183,6 +3390,7 @@ async function startSshSitting(id: number, line: string, login: LoginMode): Prom
   }
   const gate = new CodeGate((input) => shell.send(input));
   mem.sitting = { id, mode: 'ssh', login, gate, close: () => shell.close() };
+  dbg('sitting', `${id} open: ssh in the held sign-in session, login ${login}`);
   registered = true;
   for (const ev of early.splice(0)) await onConnectEvent(id, ev);
   void shell.done.then((end) => {
@@ -3205,7 +3413,7 @@ async function startGateConnect(id: number, opts: ConnectOptions): Promise<boole
     r = await withFloor(() => sp.connectGate({ name: opts.name, site: opts.site, ...(opts.installId ? { installId: opts.installId } : {}), permissionMode: opts.permissionMode, chain: opts.chain }), undefined, () => mem.startId === id);
   } catch (e) {
     const f = directFailureOf(e);
-    mem.failDetail = `direct connect: ${f}: ${(e as Error).message}`;
+    setFail(`direct connect: ${f}: ${(e as Error).message}`);
     if (f === 'key-refused' || f === 'key-expired') await markNotEnrolled();
     if (f === 'unreachable' || f === 'timeout' || f === 'dropped') mem.direct.unreachable = f === 'unreachable';
     // the gate's caps and an old copy have their own sentences (steps.ts connectProblem)
@@ -3219,6 +3427,7 @@ async function startGateConnect(id: number, opts: ConnectOptions): Promise<boole
     });
     return false;
   }
+  dbg('sitting', `${id} gate connect: exit ${r.exitStatus ?? '-'}, ${r.lines.filter((l) => l.startsWith('HPCW-STEP')).length} step lines`);
   const watcher = new ConnectWatcher((ev) => void onConnectEvent(id, ev));
   watcher.feed(r.lines.join('\n') + '\n');
   void onSittingEnd(id, 'closed', watcher.tail);
@@ -3237,13 +3446,14 @@ async function pollRunDirect(want: { progress?: boolean }): Promise<void> {
     const sj = await statusByShell(sp, dir, prefs.worker_name).catch(() => undefined);
     if (!sj || !sj.job || !sj.state_dir) return;
     const found: RunState = { stateDir: sj.state_dir, run: sj.run || prefs.worker_name, job: String(sj.job), set_at: nowIso(), started_by: 'found', ...(sj.next_job ? { next_job: String(sj.next_job) } : {}) };
+    dbg('read', `found a run already there (direct): ${found.run}, job ${found.job}, state ${sj.status?.state ?? '-'}`);
     snap = await mutateRun((cur) => (cur ? undefined : found));
     if (!snap) return;
   }
   const detailsOpen = [...mem.ports.values()].some((p) => p.surface === 'details');
   const st = snap.status?.state;
   const files: GateFile[] = ['status.json'];
-  if (!environmentLinkOf(snap) || st === 'online' || st === 'running') files.push('connection.json');
+  if (!claudeLinkOf(snap) || st === 'online' || st === 'running') files.push('connection.json');
   if (!snap.node) files.push('node');
   if (mem.logOpen || detailsOpen || want.progress) files.push('progress.log');
   // rc.log (the worker's raw terminal) is not one of the gate's files: on the direct way the link comes from connection.json and status.json
@@ -3257,6 +3467,7 @@ async function pollRunDirect(want: { progress?: boolean }): Promise<void> {
       await writeGrid({ session: 'signed-out' });
     } else if (f === 'unreachable' || f === 'timeout') await writeGrid({ session: 'unreachable' });
     const why = (e as Error).message;
+    dbg('read', `the run's files (direct) could not be read: ${f}: ${why}`);
     await mutateRun((cur) => (sameRun(cur, snap) ? { ...cur!, error: why } : undefined));
     return;
   }
@@ -3276,7 +3487,21 @@ async function pollRunDirect(want: { progress?: boolean }): Promise<void> {
     if (progress !== undefined) r = { ...r, progress_tail: progress.split('\n').filter(Boolean).slice(-40), progress_mtime: mtime };
     return { ...r, listed_at: nowIso(), error: undefined };
   });
-  if (run) await afterRead();
+  if (run) {
+    noteRead('direct', run, status, read['status.json'] !== undefined, connection, files.includes('connection.json'));
+    await afterRead();
+  }
+}
+
+/** 14.0.0: one read of the run's files in the debug log: status.json's job, state and heartbeat, what the panel made of it, and whether a link is there */
+function noteRead(way: 'direct' | 'portal', run: RunState, status: StatusFile | undefined, statusThere: boolean, connection: ConnectionFile | undefined, connectionAsked: boolean): void {
+  const rf = runFacts(run, Date.now());
+  const s = status
+    ? `status.json: job ${status.job ?? '-'}, state ${status.state}, updated_at ${status.updated_at ?? '-'}`
+    : `status.json: ${statusThere ? 'not readable as JSON' : 'not there, or unchanged'}`;
+  dbg('read', `${way}: ${s} -> phase ${rf.phase}, stale ${rf.stale ? 'yes' : 'no'}, alive_seen ${run.alive_seen ? 'yes' : 'no'}, link ${linkWord(rf.link)}${rf.badLink ? ' (the file names a link that is not a Claude Code link)' : ''}`);
+  if (connection) dbg('read', `${way}: connection.json: job ${connection.job ?? '-'}, link ${linkWord(claudeLinkOf({ connection }))}`);
+  else if (connectionAsked && way === 'direct') dbg('read', `${way}: connection.json: not there`);
 }
 
 /** Settings' "Connection" */
@@ -3374,6 +3599,9 @@ async function detailsText(): Promise<string> {
     `direct way: ${await modeNow()}; bridge ${(await session.get<BridgeNote>(BRIDGE_KEY))?.chosen ?? 'not probed'}; key ${(await keyStateNow()).present ? 'present' : 'none'}`,
     `last failure: ${mem.connect.failure ?? 'none'}${mem.failDetail ? `: ${mem.failDetail}` : ''}`,
     run ? `run: ${run.run} job ${run.job}${run.status ? ` state ${run.status.state}` : ''}` : 'run: none',
+    '',
+    `${WORDS.details.debugLogTitle} (${WORDS.details.debugLogNote(DEBUG_DETAILS_LINES)})`,
+    ...debugRing.tail(DEBUG_DETAILS_LINES),
   ].join('\n');
 }
 

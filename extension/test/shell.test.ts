@@ -67,6 +67,17 @@ describe('shell driver pieces', () => {
     expect(clean('\x1b]0;title\x07a\x1b[31mb\x1b[0m\rc\x1b(B')).toBe('abc');
   });
 
+  it('14.0.0: a cursor code ending in a capital letter takes nothing after it (the CSI intermediates are space to slash)', () => {
+    // framework 13's sed read the same class as space to backslash: "or ESC[K https://" lost the h, a name after ESC[2K its first letter
+    for (const code of ['\x1b[K', '\x1b[2K', '\x1b[1C', '\x1b[G', '\x1b[1A']) {
+      expect(clean(`or ${code}https://claude.ai/code/session_01N4R9`), code).toBe('or https://claude.ai/code/session_01N4R9');
+      expect(clean(`or ${code} https://claude.ai/code/session_01N4R9`), code).toBe('or  https://claude.ai/code/session_01N4R9');
+      expect(clean(`${code}asx10-hazy-meadow`), code).toBe('asx10-hazy-meadow');
+    }
+    // a real intermediate byte (space, 0x20) still belongs to its sequence: ESC[1 q sets the cursor's shape
+    expect(clean('a\x1b[1 qb')).toBe('ab');
+  });
+
   it('maps the four 3146 reasons to plain words, in the order app.js tests them', () => {
     expect(explainClose(3146, 'No clusters defined.')).toMatch(/no cluster configured/);
     expect(explainClose(3146, 'Invalid Origin.')).toMatch(/origin check/);

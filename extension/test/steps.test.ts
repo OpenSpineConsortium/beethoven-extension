@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS, type LastKnown } from '../src/core/keys';
 import { formatClock, type HomeView, type JourneyView, type PanelView } from '../src/core/model';
 import { SHORT_STATEMENT, STATEMENT_TICK, PLAN_CLASS_DISCLOSURE } from '../src/core/disclosure';
-import { home, journey, lastKnownOf, momentOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
+import { home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
 import { TERMS_REFUSAL } from '../src/core/terms';
 import { accessFact, type AccessRecord } from '../src/licensing/access';
+import type { StatusFile } from '../src/core/contract';
+import { runFacts, type RunState } from '../src/core/facts';
 
 const NOW = Date.parse('2026-10-01T13:00:00Z');
 const ago = (ms: number) => new Date(NOW - ms).toISOString();
@@ -412,7 +414,7 @@ describe('home: the waiting and status table, one primary or none', () => {
     expect(hv({ run: online, once: { first_online_at: ago(MIN), try_asking_dismissed_at: ago(1) } }).tryAsking).toBeUndefined();
     expect(h.cards).toEqual([{ id: 'tour-card', text: 'See what it can do · 16 s', open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } }]);
     expect(hv({ run: online, tourSeen: { seen_at: ago(1), completed: false } }).cards).toEqual([]);
-    expect(h.header.menu.map((m) => m.label)).toEqual(['See what it can do', 'Your files', 'Settings', 'Details for your lab lead', 'Help']);
+    expect(h.header.menu.map((m) => m.label)).toEqual(['See what it can do', 'Your files', 'Settings', 'Details for your lab lead', 'Copy debug log', 'Help']);
     expect(h.header.moreLabel).toBe('More');
     expect(h.log).toEqual({ show: 'Show log ›', hide: 'Hide log', copy: 'Copy log' });
   });
@@ -649,5 +651,106 @@ describe('a run that has gone quiet or ended never holds a waiting moment withou
     const out = home(facts({ grid: { session: 'signed-out' }, lastKnown: lkOnline, run: stale }));
     expect(out.primary?.kind).toBe('open-session');
     expect(out.hero.asOf).toBe(`As of ${clock}. Sign in to the grid to see it live.`);
+  });
+});
+
+// 14.0.0 (framework 14): a worker that resumed an earlier session prints that session's own link, not the environment
+// link, and framework 14 writes it as session_url with environment_url "". On 2026-10-03 the panel showed "Starting ·
+// Connecting to Claude…" for such a worker, online all along. These views are made from the run record through
+// facts.ts runFacts, as the background makes them.
+describe("14.0.0: a worker online on a resumed session's own link", () => {
+  const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+  const record = (status: StatusFile, extra: Partial<RunState> = {}): RunState => ({ stateDir: '/rs/rs_grp_oschome/go2432/hpcworker', run: 'worker', job: '40554211', set_at: ago(10 * MIN), started_by: 'connect', pressed: true, listed_at: ago(10_000), status, ...extra });
+  const sessionFile = (o: Partial<StatusFile> = {}): StatusFile => ({
+    version: 14,
+    state: 'online',
+    job: '40554211',
+    node: 'asx15',
+    submitted_at: ago(10 * MIN),
+    got_computer_at: ago(6 * MIN),
+    online_at: ago(3 * MIN),
+    updated_at: ago(15_000),
+    title: 'Wayne State grid',
+    resumed: true,
+    session_url: SES,
+    environment_url: '',
+    environment_id: '',
+    ...o,
+  });
+
+  it('the first run: "You\'re online." with Open my session; framework 13\'s file of the same worker held "Starting · Connecting to Claude…"', () => {
+    const rf = runFacts(record(sessionFile()), NOW);
+    expect(rf).toMatchObject({ phase: 'online', live: true, link: SES, readyMinutes: 7 });
+    const f = facts({ ...firstRun, connect: { queued: true }, run: rf, onlineAnnouncedAt: NOW - 1_000 });
+    expect(momentOf(f)).toBe('online');
+    const o = J(f, 'online');
+    expect(o.hero).toBe("You're online.");
+    expect(o.primary).toEqual({ label: 'Open my session', tone: 'teal', action: { kind: 'open-session' } });
+    // the same worker as framework 13 wrote it: online, both links "" — the hang of that morning
+    const rf13 = runFacts(record(sessionFile({ session_url: '', environment_url: '' })), NOW);
+    expect(rf13).toMatchObject({ phase: 'connecting', live: true });
+    const f13 = facts({ ...firstRun, connect: { queued: true }, run: rf13 });
+    expect(momentOf(f13)).toBe('starting');
+    expect(J(f13, 'starting')).toMatchObject({ hero: 'Starting', sub: 'Connecting to Claude…' });
+  });
+
+  it('the home: Online, Open my session, Copy link and Phone with the session link, and no New session (that worker serves the one session)', () => {
+    const f = facts({ run: runFacts(record(sessionFile()), NOW) });
+    const h = home(f);
+    expect(h.hero).toMatchObject({ state: 'online', word: 'Online' });
+    expect(h.primary).toEqual({ kind: 'open-session', button: { label: 'Open my session', tone: 'teal', action: { kind: 'open-session' } } });
+    expect(h.secondary).toEqual({ copyLink: 'Copy link', phone: 'Phone' });
+    expect(h.link).toBe(SES);
+    expect(toolbarView(f)).toMatchObject({ lit: true });
+    // the environment form keeps New session
+    const env = home(facts({ run: runFacts(record(sessionFile({ session_url: LINK, environment_url: LINK, environment_id: 'env_01AbCdEf' })), NOW) }));
+    expect(env.secondary).toEqual({ newSession: { label: 'New session', tone: 'outline', action: { kind: 'new-session' } }, copyLink: 'Copy link', phone: 'Phone' });
+    expect(env.link).toBe(LINK);
+  });
+
+  it('the last known state keeps the session link, and the home opens it signed out of the grid', () => {
+    const lk = lastKnownOf(facts({ run: runFacts(record(sessionFile()), NOW) }));
+    expect(lk).toMatchObject({ state: 'online', environment_url: SES });
+    const h = home(facts({ grid: { session: 'signed-out', account: 'st1234' }, lastKnown: { ...lk!, seen_at: ago(30 * MIN) } }));
+    expect(h.hero).toMatchObject({ state: 'online', word: 'Online' });
+    expect(h.primary?.kind).toBe('open-session');
+    expect(h.link).toBe(SES);
+    expect(h.secondary).toEqual({ copyLink: 'Copy link', phone: 'Phone' });
+  });
+
+  it('New session whenever an environment link was reported, whichever link is the run\'s own; the last known state keeps it', () => {
+    const NEW_SESSION = { label: 'New session', tone: 'outline', action: { kind: 'new-session' } };
+    // framework 14 wrote both: the session's own link first (Open my session, Copy link), the environment link for New session
+    const both = facts({ run: runFacts(record(sessionFile({ environment_url: LINK, environment_id: 'env_01AbCdEf' })), NOW) });
+    expect(both.run).toMatchObject({ link: SES, environmentLink: LINK });
+    const h = home(both);
+    expect(h.link).toBe(SES);
+    expect(h.primary?.kind).toBe('open-session');
+    expect(h.secondary).toEqual({ newSession: NEW_SESSION, copyLink: 'Copy link', phone: 'Phone' });
+    expect(newSessionLinkOf(both)).toBe(LINK);
+    // the environment link from connection.json, or from rc.log's registration, while status.json names only the session's
+    for (const extra of [{ connection: { job: '40554211', session_url: SES, environment_url: LINK } }, { registration: { session_url: SES, environment_url: LINK } }] as Partial<RunState>[]) {
+      const f = facts({ run: runFacts(record(sessionFile(), extra), NOW) });
+      expect(home(f).secondary?.newSession, JSON.stringify(extra)).toEqual(NEW_SESSION);
+      expect(newSessionLinkOf(f)).toBe(LINK);
+    }
+    // the session's link alone: no New session, and nowhere for the background to open one
+    expect(newSessionLinkOf(facts({ run: runFacts(record(sessionFile()), NOW) }))).toBeUndefined();
+    // the last known state keeps the environment link beside the session's, and the home offers New session from it
+    const lk = lastKnownOf(both);
+    expect(lk).toMatchObject({ state: 'online', environment_url: SES, new_session_url: LINK });
+    const off = facts({ grid: { session: 'signed-out', account: 'st1234' }, lastKnown: { ...lk!, seen_at: ago(30 * MIN) } });
+    expect(home(off).secondary).toEqual({ newSession: NEW_SESSION, copyLink: 'Copy link', phone: 'Phone' });
+    expect(newSessionLinkOf(off)).toBe(LINK);
+    // a record 13.0.0 or the first 14.0.0 build stored: its environment link in environment_url still counts; a session link there does not
+    expect(newSessionLinkOf({ run: NO_RUN, lastKnown: { worker_name: 'worker', state: 'online', environment_url: LINK, seen_at: ago(MIN) } })).toBe(LINK);
+    expect(newSessionLinkOf({ run: NO_RUN, lastKnown: { worker_name: 'worker', state: 'online', environment_url: SES, seen_at: ago(MIN) } })).toBeUndefined();
+    // a lookalike stored as new_session_url is no environment link
+    expect(newSessionLinkOf({ run: NO_RUN, lastKnown: { worker_name: 'worker', state: 'online', environment_url: SES, new_session_url: 'https://claude.ai.evil.example/code?environment=env_01', seen_at: ago(MIN) } })).toBeUndefined();
+  });
+
+  it("More has Copy debug log on the home (the first run's menu is the panel's own, ui/panel.ts journeyMenu)", () => {
+    const h = home(facts({ run: runFacts(record(sessionFile()), NOW) }));
+    expect(h.header.menu.find((m) => m.label === 'Copy debug log')?.action).toEqual({ kind: 'copy-debug-log' });
   });
 });

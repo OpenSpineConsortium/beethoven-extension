@@ -1,5 +1,5 @@
 // The home panel: one headline state with its orb, exactly one primary in the same place every time,
-// the online secondary row (New session, Copy link, Phone), the three-row status card, the foot row with
+// the online secondary row (New session when the link is an environment's, Copy link, Phone), the three-row status card, the foot row with
 // Stop or Cancel and its confirmation, Try asking, the one-time cards and Show log, folded. Everything
 // fits the 360 × 658 panel without scrolling while the log is closed. Pure function of HomeView and the
 // page-local state the panel keeps (the confirm row, the phone view, the log fold).
@@ -46,7 +46,7 @@ function secondary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
   return el(
     'div',
     { class: 'home-secondary' },
-    button({ ...s.newSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }),
+    s.newSession ? button({ ...s.newSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }) : null,
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.copy(link, WORDS.home.linkCopied) }, el('span', { class: 'btn-label', text: s.copyLink })),
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.setPhone(true) }, el('span', { class: 'btn-label', text: s.phone })),
   );

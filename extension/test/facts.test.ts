@@ -4,8 +4,8 @@
 // it, and it is live, R2); and the wait was counted from the browser (every clock counts from the files,
 // R10). Also: which files a listing downloads, the wait history, and Show log's merge.
 import { describe, expect, it } from 'vitest';
-import type { StatusFile } from '../src/core/contract';
-import { addActivity, addWait, applyConnection, applyStatus, applyStatusRead, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../src/core/facts';
+import { parseRegistration, type StatusFile } from '../src/core/contract';
+import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, environmentLinkOf, forJob, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../src/core/facts';
 import { formatClock } from '../src/core/model';
 import type { DirEntry } from '../src/core/portal';
 
@@ -280,5 +280,156 @@ describe('the Files listing: a found run is seen alive once its status.json is w
   it('a found run whose file is hours old on its first download is stale and never seen alive', () => {
     const r = applyStatus(found(), file(120 * MIN), sec(NOW - 120 * MIN)).run;
     expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ stale: true, live: false, neverSeenAlive: true });
+  });
+});
+
+// 14.0.0 (framework 14): Claude Code prints one of two links. A fresh registration prints the environment link; a job
+// that resumes an earlier session prints that session's own link (https://claude.ai/code/session_..., "Single session ·
+// exits when complete"). On 2026-10-03 go2432's job 40554211 resumed a session: framework 13 knew only the environment
+// form and wrote status.json online with both links "", and 13.0.0, which also knew only that form, showed "Starting ·
+// Connecting to Claude…" for a worker that was online. Framework 14 writes session_url = the link printed (either form).
+describe('14.0.0: the link of a run is either form', () => {
+  const ENV = LINK;
+  const SES = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+  const online = (s: Partial<StatusFile>, extra: Partial<RunState> = {}) =>
+    runWith({ ...queuedFile(), node: 'asx15', got_computer_at: ago(4 * MIN), state: 'online', online_at: ago(MIN), updated_at: ago(10 * S), ...s } as StatusFile, extra);
+
+  it("a session-form status.json (session_url the session's link, environment_url \"\") is online with that link", () => {
+    const f = runFacts(online({ session_url: SES, environment_url: '', environment_id: '' }), NOW);
+    expect(f).toMatchObject({ phase: 'online', live: true, stale: false, link: SES });
+    expect(f.badLink).toBeUndefined();
+    expect(claudeLinkOf({ status: { state: 'online', session_url: SES, environment_url: '' } })).toBe(SES);
+  });
+
+  it("the morning of 2026-10-03: framework 13's file of a resumed session, online with both links \"\", stays connecting (no link to open)", () => {
+    const f = runFacts(online({ session_url: '', environment_url: '', environment_id: '' }), NOW);
+    expect(f).toMatchObject({ phase: 'connecting', live: true });
+    expect(f.link).toBeUndefined();
+    expect(f.badLink).toBeUndefined();
+  });
+
+  it('the environment form, as framework 13 and 14 write it (session_url equal to environment_url, or only environment_url), is unchanged', () => {
+    expect(runFacts(online({ session_url: ENV, environment_url: ENV, environment_id: 'env_01AbCdEf' }), NOW)).toMatchObject({ phase: 'online', link: ENV });
+    expect(runFacts(online({ environment_url: ENV }), NOW)).toMatchObject({ phase: 'online', link: ENV });
+  });
+
+  it('both written: session_url, the link printed last, comes first; a session_url that is no Claude Code link is passed over for environment_url', () => {
+    expect(runFacts(online({ session_url: SES, environment_url: ENV }), NOW).link).toBe(SES);
+    const f = runFacts(online({ session_url: 'https://evil.example/code/session_01', environment_url: ENV }), NOW);
+    expect(f).toMatchObject({ phase: 'online', link: ENV });
+    expect(f.badLink).toBeUndefined();
+  });
+
+  it('claude.com for either form; a lookalike is no link, and online with only a lookalike is a bad link', () => {
+    expect(runFacts(online({ session_url: SES.replace('claude.ai', 'claude.com'), environment_url: '' }), NOW).link).toBe(SES.replace('claude.ai', 'claude.com'));
+    expect(runFacts(online({ session_url: ENV.replace('claude.ai', 'claude.com'), environment_url: '' }), NOW).link).toBe(ENV.replace('claude.ai', 'claude.com'));
+    for (const bad of ['https://claude.ai.evil.example/code/session_01', 'http://claude.ai/code/session_01', 'https://claude.ai/code/session_01?next=https://evil.example', 'https://claude.ai/code/sessions']) {
+      const f = runFacts(online({ session_url: bad, environment_url: '' }), NOW);
+      expect(f, bad).toMatchObject({ phase: 'online', badLink: true });
+      expect(f.link, bad).toBeUndefined();
+    }
+  });
+
+  it("connection.json is trusted first, then status.json, then rc.log's registration block; an empty value hides nothing", () => {
+    const viaConnection = online({ session_url: '', environment_url: '' }, { connection: { job: '40501234', session_url: SES, environment_url: '' } });
+    expect(runFacts(viaConnection, NOW)).toMatchObject({ phase: 'online', link: SES });
+    // 13.0.0 took connection.json's "" with ?? and never looked further
+    const emptyConnection = online({ session_url: SES, environment_url: '' }, { connection: { job: '40501234', session_url: '', environment_url: '' } });
+    expect(runFacts(emptyConnection, NOW).link).toBe(SES);
+    const viaRc = online({ session_url: '', environment_url: '' }, { registration: { session_url: SES } });
+    expect(runFacts(viaRc, NOW).link).toBe(SES);
+    // a connection.json of another job says nothing (R1)
+    expect(applyConnection(runWith(undefined), { job: '1', session_url: SES }).taken).toBe(false);
+  });
+
+  it('on the direct way, a found run whose session-form file changes between two reads is online and seen alive', () => {
+    const sec = (ms: number) => Math.floor(ms / 1000);
+    const found: RunState = { stateDir: STATE, run: 'worker', job: '40554211', set_at: ago(10 * S), started_by: 'found', listed_at: ago(0) };
+    const file = (beatAgo: number): StatusFile => ({ ...queuedFile('40554211'), state: 'online', node: 'asx15', got_computer_at: ago(50 * MIN), online_at: ago(43 * MIN), updated_at: ago(beatAgo), session_url: SES, environment_url: '', environment_id: '', resumed: true });
+    let r = applyStatusRead(found, file(20 * S), sec(NOW - 30 * S)).run;
+    expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ phase: 'online', link: SES, stale: false, neverSeenAlive: true });
+    r = applyStatusRead(r, file(0), sec(NOW)).run;
+    expect(r.alive_seen).toBe(true);
+    expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ phase: 'online', link: SES });
+  });
+
+  it("a renewal forgets the previous job's rc.log: its successor online before its own link is read is connecting, then has its own link", () => {
+    const OLD = 'https://claude.ai/code/session_01OldJobOldJobOldJob0000';
+    const NEW = 'https://claude.ai/code/session_01NewJobNewJobNewJob1111';
+    const blank = { session_url: '', environment_url: '', environment_id: '' };
+    // job A online with framework 13's empty links; its link came from its rc.log (the GlobalProtect way), a successor queued
+    let r = applyStatus(runWith(undefined), { ...queuedFile('40501234'), ...blank, state: 'online', node: 'asx15', got_computer_at: ago(9 * MIN), online_at: ago(8 * MIN), updated_at: ago(10 * S), next_job: '40509999' }, 100).run;
+    const rcA = `Single session · exits when complete\r\nContinue coding in the Claude mobile app or ${OLD}\r\n`;
+    r = { ...r, registration: parseRegistration(rcA), rc_tail: rcA, rc_mtime: 200 };
+    expect(runFacts(r, NOW)).toMatchObject({ phase: 'online', link: OLD });
+    // the hand-over: job B's own file, already online, its links not written, and its rc.log not read yet
+    const h = applyStatus(r, { ...queuedFile('40509999'), ...blank, state: 'online', renewal: true, node: 'asx16', got_computer_at: ago(MIN), online_at: ago(20 * S), updated_at: ago(5 * S) }, 300);
+    expect(h.taken).toBe(true);
+    expect(h.run.job).toBe('40509999');
+    expect([h.run.registration, h.run.rc_tail, h.run.rc_mtime, h.run.connection, h.run.next_job]).toEqual([undefined, undefined, undefined, undefined, undefined]);
+    const f = runFacts(h.run, NOW);
+    expect(f).toMatchObject({ phase: 'connecting', live: true, renewal: true });
+    expect(f.link).toBeUndefined();
+    expect(claudeLinkOf(h.run)).toBeUndefined();
+    // rc.log is downloaded again at the next listing that wants it, even with the modified time the old one had
+    expect(listingPlan(h.run, [entry('status.json', 300), entry('rc.log', 200)], { rc: true }).rc).toBe(true);
+    // a download of A's rc.log taken in the hand-over (B writes its status.json before it moves A's rc.log aside): modified
+    // before B got its computer, it is passed over, and its modified time kept so it is not downloaded again
+    const sec = (ms: number) => Math.floor(ms / 1000);
+    const late = applyRcLog(h.run, rcA, sec(NOW - 3 * MIN));
+    expect(late.taken).toBe(false);
+    expect([late.run.registration, late.run.rc_tail, late.run.rc_mtime]).toEqual([undefined, undefined, sec(NOW - 3 * MIN)]);
+    expect(runFacts(late.run, NOW).link).toBeUndefined();
+    // B's own rc.log, before its link: taken, no link yet
+    const early = applyRcLog(late.run, 'Resuming session session_01NewJobNewJobNewJob1111 (2m ago)\r\n', sec(NOW - 40 * S));
+    expect(early.taken).toBe(true);
+    expect(early.run.registration).toBeUndefined();
+    expect(runFacts(early.run, NOW)).toMatchObject({ phase: 'connecting' });
+    // then B's own link, from B's own rc.log
+    const rcB = `Single session · exits when complete\r\nContinue coding in the Claude mobile app or ${NEW}\r\n`;
+    const own = applyRcLog(early.run, rcB, sec(NOW - 30 * S));
+    expect(own).toMatchObject({ taken: true, run: { rc_tail: rcB, rc_mtime: sec(NOW - 30 * S), registration: { session_url: NEW } } });
+    expect(runFacts(own.run, NOW)).toMatchObject({ phase: 'online', link: NEW });
+    // a later rc.log of the same job that holds no link (Remote Control restarted it) replaces the registration whole
+    expect(applyRcLog(own.run, 'Remote Control stopped\r\n', sec(NOW - 10 * S)).run.registration).toBeUndefined();
+    // forJob is that step alone: the same job changes nothing
+    expect(forJob(r, r.job)).toBe(r);
+    expect(parseRegistration(rcA).session_url).toBe(OLD);
+  });
+
+  it("a previous job's rc.log is passed over while this job's start is unknown: no status of its own yet, or a queued record", () => {
+    const sec = (ms: number) => Math.floor(ms / 1000);
+    const OLD = 'https://claude.ai/code/session_01OldJobOldJobOldJob0000';
+    const rcA = `Capacity: 1\r\nold-name\r\nContinue coding in the Claude mobile app or ${OLD}\r\n`;
+    const base = { stateDir: '/x', run: 'w', job: '40509999', set_at: new Date(NOW - MIN).toISOString() } as unknown as RunState;
+    // no status of its own yet
+    const none = applyRcLog(base, rcA, sec(NOW - 3 * MIN));
+    expect([none.taken, none.run.registration, none.run.rc_mtime]).toEqual([false, undefined, sec(NOW - 3 * MIN)]);
+    // a queued record: neither got_computer_at nor started_at (hpcworker write_queued_status writes none)
+    const queued = { ...base, status: { state: 'queued', job: '40509999', updated_at: new Date(NOW - 30 * S).toISOString() } as unknown as StatusFile };
+    expect(applyRcLog(queued, rcA, sec(NOW - 3 * MIN)).taken).toBe(false);
+    expect(applyRcLog(queued, rcA, undefined).taken).toBe(false);
+    // another job's status: still unknown for this job
+    const other = { ...base, status: { state: 'online', job: '40509998', started_at: new Date(NOW - MIN).toISOString() } as unknown as StatusFile };
+    expect(applyRcLog(other, rcA, sec(NOW - 3 * MIN)).taken).toBe(false);
+    // once this job has a computer, its own transcript is taken
+    const started = { ...base, status: { state: 'starting', job: '40509999', got_computer_at: new Date(NOW - MIN).toISOString() } as unknown as StatusFile };
+    expect(applyRcLog(started, rcA, sec(NOW - 30 * S)).taken).toBe(true);
+  });
+
+  it("New session's link: any environment link reported, whichever link is the run's own", () => {
+    // both in status.json (framework 14: session_url the link printed last, environment_url the environment link)
+    expect(runFacts(online({ session_url: SES, environment_url: ENV }), NOW)).toMatchObject({ phase: 'online', link: SES, environmentLink: ENV });
+    // a resumed session's link alone: nowhere to start a new session
+    expect(runFacts(online({ session_url: SES, environment_url: '' }), NOW).environmentLink).toBeUndefined();
+    // from connection.json, or from rc.log's registration, while status.json names only the session's link
+    expect(runFacts(online({ session_url: SES, environment_url: '' }, { connection: { job: '40501234', session_url: SES, environment_url: ENV } }), NOW)).toMatchObject({ link: SES, environmentLink: ENV });
+    expect(runFacts(online({ session_url: SES, environment_url: '' }, { registration: { session_url: SES, environment_url: ENV } }), NOW)).toMatchObject({ link: SES, environmentLink: ENV });
+    // the environment form alone: the same link for both
+    expect(runFacts(online({ session_url: ENV, environment_url: ENV }), NOW)).toMatchObject({ link: ENV, environmentLink: ENV });
+    // a lookalike is no environment link; another job's connection.json says nothing (R1)
+    expect(runFacts(online({ session_url: SES, environment_url: 'https://claude.ai.evil.example/code?environment=env_01' }), NOW).environmentLink).toBeUndefined();
+    expect(environmentLinkOf({ status: { state: 'online', session_url: SES, environment_url: ENV.replace('claude.ai', 'claude.com') } })).toBe(ENV.replace('claude.ai', 'claude.com'));
+    expect(environmentLinkOf(undefined)).toBeUndefined();
   });
 });

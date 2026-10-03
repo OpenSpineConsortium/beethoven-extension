@@ -123,6 +123,11 @@ export interface SignInDeps {
   /** the state moved: push the views */
   changed(state: SheetState): void;
   log?: (line: string) => void;
+  /**
+   * 14.0.0, the debug log (core/debuglog.ts): this flow's own ssh connection, opened and closed, with the reason and
+   * how long it lived. Never a prompt's answer: the password and the code are the grid's business, not the log's.
+   */
+  debug?: (tag: string, line: string) => void;
   pin?: string;
   host?: string;
   port?: number;
@@ -153,6 +158,8 @@ export class SignInFlow {
   state: SheetState;
   private gen = 0;
   private conn: SshConnection | undefined;
+  /** when the sign-in's connection was opened (the debug log's "after") */
+  private openedAt: number | undefined;
   private pending: { answers: string[]; need: number; resolve: (a: string[]) => void; reject: (e: Error) => void } | undefined;
   /** the grid gave its "wrong code, or no 2FA set up" refusal in this attempt */
   private codeRefused = false;
@@ -359,13 +366,17 @@ export class SignInFlow {
     }
     const conn = new SshConnection({ stream, username: account, pinnedFingerprint: this.d.pin ?? GRID_HOST_KEY_PIN, ...(this.d.log ? { log: this.d.log } : {}) });
     this.conn = conn;
+    const t0 = Date.now();
+    this.openedAt = t0;
     try {
       await conn.connect();
     } catch (e) {
+      this.debug(`open ${this.d.host ?? GRID_HOST}:${this.d.port ?? GRID_PORT} for the sign-in as ${account} failed after ${Date.now() - t0} ms: ${(e as Error).message}`);
       live();
       this.fail((e as { hostKeyMismatch?: boolean }).hostKeyMismatch ? 'wrong-grid' : 'unreachable', (e as Error).message);
       return undefined;
     }
+    this.debug(`open ${this.d.host ?? GRID_HOST}:${this.d.port ?? GRID_PORT} for the sign-in as ${account} through the ${bridge.id} bridge in ${Date.now() - t0} ms; the grid asks its own questions next`);
     live();
     // the grid's own conversation
     try {
@@ -471,7 +482,18 @@ export class SignInFlow {
     this.heldTimer = undefined;
     const c = this.conn;
     this.conn = undefined;
-    if (c) void c.close().catch(() => undefined);
+    if (c) {
+      this.debug(`close the sign-in session after ${this.openedAt !== undefined ? Date.now() - this.openedAt : '?'} ms (${this.state.phase === 'done' ? 'held for a Claude sign-in and not used, or let go' : `the sign-in ${this.state.phase}`})`);
+      void c.close().catch(() => undefined);
+    }
+  }
+
+  private debug(line: string): void {
+    try {
+      this.d.debug?.('ssh', line);
+    } catch {
+      /* the debug log never stops a sign-in */
+    }
   }
 
   /** a signed-in session is held (a first sign-in a moment ago, still open) */
@@ -514,8 +536,10 @@ export class SignInFlow {
       reason = 'timeout';
       void h.close();
     }, o.maxMs ?? SESSION_MAX_MS);
+    this.debug('the held sign-in session carries the Claude sign-in sitting now');
     const done = h.done.then(() => {
       clearTimeout(cap);
+      this.debug(`close the sign-in session: the sitting ended (${reason}) after ${Date.now() - t0} ms, ${outBytes} bytes out, ${inBytes} bytes in`);
       void conn.close().catch(() => undefined);
       return { reason, outputBytes: outBytes, inputBytes: inBytes, ms: Date.now() - t0 } satisfies ShellSessionEnd;
     });
