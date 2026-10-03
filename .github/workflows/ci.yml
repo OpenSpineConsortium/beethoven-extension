@@ -46,4 +46,4 @@ jobs:
         with:
           name: chrome-mv3
           path: extension/.output/chrome-mv3
-          retention-days: 14
+          retention-days: 90
