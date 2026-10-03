@@ -470,7 +470,11 @@ export class Browser {
     if (this.offline) dns.push('MAP openspineconsortium.com ~NOTFOUND', 'MAP www.openspineconsortium.com ~NOTFOUND');
     const args = [`--disable-extensions-except=${this.ext}`, `--load-extension=${this.ext}`, '--enable-unsafe-extension-debugging', `--remote-debugging-port=${this.cdpPort}`, `--host-resolver-rules=${dns.join(', ')}`, '--ignore-certificate-errors', `--window-size=${this.windowSize}`, '--window-position=0,0'];
     if (this.reducedMotion) args.push('--force-prefers-reduced-motion');
-    this.context = await cr.launchPersistentContext(this.profile, { headless: false, viewport: null, colorScheme: this.colorScheme, ...(this.reducedMotion ? { reducedMotion: 'reduce' } : {}), args });
+    // headed, as a student's Chrome is, and UIA needs it; E2E_HEADLESS=1 runs Chromium's own headless mode
+    // instead (channel 'chromium': plain headless is the shell, which loads no extension) for a machine with
+    // no display at all, such as a cluster node: the UIA steps are already Windows-only, and window pictures
+    // come back blank there
+    this.context = await cr.launchPersistentContext(this.profile, { ...(process.env.E2E_HEADLESS ? { headless: true, channel: 'chromium' } : { headless: false }), viewport: null, colorScheme: this.colorScheme, ...(this.reducedMotion ? { reducedMotion: 'reduce' } : {}), args });
     this.run.ev('SETUP', `Chromium ${this.context.browser()?.version()}; package ${this.ext} version ${this.version}; ${keepProfile ? 'kept' : 'fresh'} profile ${this.profile}; access service ${this.liveAccess ? 'LIVE for st1234 at localhost only' : 'the mock stand-in (live service unreachable)'}`);
     await this.instrument();
     let sw = this.context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));

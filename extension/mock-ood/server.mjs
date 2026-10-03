@@ -121,6 +121,10 @@ import { readJobs, removeJob, stateDir as mockStateDir } from './lib/jobs.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.join(here, 'bin');
+// bash passes over a file on PATH that is not executable and runs the next one, so a stand-in that lost its
+// mode (a checkout from Windows) would hand the shell to the host's real sbatch, squeue or scancel: on a
+// cluster node that is a real job (measured on Wayne State's kbt2, 2026-10-03). They are made executable here
+for (const f of fs.readdirSync(BIN)) { try { fs.chmodSync(path.join(BIN, f), 0o755); } catch { /* Windows: no modes */ } }
 const LIB = path.join(here, 'lib');
 const COOKIE = 'mock_session';
 /** what the login node sees as the client of every ssh the Shell app makes: the OnDemand server */
