@@ -1,5 +1,9 @@
 # Install this build in Chrome
 
+<!-- This file is the SOURCE of the text on each CI run's Summary page and of the INSTALL.md
+inside the artifact zip. The direct download link is minted per run at upload time, so it never
+appears here: CI writes it as the headline above this text on the run page. -->
+
 This is the Beethoven extension exactly as CI built it from this commit — for people this
 repository is shared with. Your GitHub sign-in in the browser is what authorized the download.
 
