@@ -6,6 +6,10 @@
 > `framework/profiles/`. The cluster side (hpcworker) lives in the sibling repository,
 > `OpenSpineConsortium/hpcworker`. The text below predates the split and describes the whole
 > product; where it names `framework/` beyond the profiles, read the sibling repository.
+> Collaborators with access to this repository can run the newest green build in one command:
+> `bash extension/scripts/dev-install.sh` (gh sign-in, then a one-time "Load unpacked" in Chrome).
+> Students get Beethoven only through the private Chrome Web Store listing, the one channel that
+> gives a real one-click install.
 
 The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
