@@ -1,5 +1,12 @@
 # Beethoven
 
+> **This repository** is the **client half** of the 2026-10-03 split of
+> `OpenSpineConsortium/beethoven`: `extension/` (the Beethoven browser extension), `helper/` (the
+> bundled bridge) and `release/` (the store packages), with the site profiles vendored as data in
+> `framework/profiles/`. The cluster side (hpcworker) lives in the sibling repository,
+> `OpenSpineConsortium/hpcworker`. The text below predates the split and describes the whole
+> product; where it names `framework/` beyond the profiles, read the sibling repository.
+
 The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
 reviewer sees say Beethoven, and it is not an Anthropic product. The repository is

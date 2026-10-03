@@ -1,0 +1,49 @@
+name: ci
+# The extension's suite in the environment it really has: Node 22, a real bash for the mock
+# portal's stand-ins, python with asyncssh for the grid stand-in the ssh tests speak to, and
+# Playwright's Chromium for the mock's terminal section. No secrets: every test runs against
+# the mock portal and the bundled stand-ins; nothing here can reach a grid or claude.ai.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  suite:
+    name: typecheck, vitest, mock selftest, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: asyncssh, for the grid stand-in the ssh tests run against
+        run: pip install asyncssh
+      - run: npm ci
+      - name: profiles and agreement texts into public/ (the tests read them)
+        run: npm run sync-profiles
+      - run: npm run typecheck
+      - run: npx vitest run
+      - name: Playwright Chromium, for the mock's terminal section
+        run: |
+          npm i --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: mock portal selftest (every section, a real browser for the terminal)
+        run: PLAYWRIGHT_DIR="$PWD/node_modules/playwright" node e2e/mock-selftest.mjs
+      - name: build (chrome)
+        run: npm run build:chrome
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrome-mv3
+          path: extension/.output/chrome-mv3
+          retention-days: 14

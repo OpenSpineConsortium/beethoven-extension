@@ -1,0 +1,12 @@
+node_modules/
+.output/
+.wxt/
+dist/
+*.log
+.env
+*.pem
+.DS_Store
+Thumbs.db
+__pycache__/
+*.pyc
+.pytest_cache/

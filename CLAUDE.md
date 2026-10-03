@@ -154,6 +154,8 @@ name and identifier carry no university name.
 
 ## Layout and streams
 
+(Pre-split text: the `framework/` pieces below, beyond `profiles/`, live in the sibling repository `OpenSpineConsortium/hpcworker`; see the split section at the end.)
+
 - `framework/`: bash 4.2 plus Python 3.6 standard library only (the Wayne State login node is CentOS
   7). `lib/profile.py` (site profile schema and CLI), `lib/adapters/{common,slurm,pbs,lsf}.sh` (the
   eight-call adapter interface), `profiles/<site>.json`, the job template and probe job,
@@ -181,6 +183,8 @@ name and identifier carry no university name.
   the login node only tar, chmod, setfacl and one link; older versions are kept).
 
 ## Building and testing
+
+(Pre-split text: the `framework/` pieces below, beyond `profiles/`, live in the sibling repository `OpenSpineConsortium/hpcworker`; see the split section at the end.)
 
 Windows: Node 22 is at `/c/Users/grego/tools/node22`; python is `python -X utf8`; inline shell heredocs
 eat backslashes, so write scripts with the Write tool and run them by path; line endings LF.
@@ -273,3 +277,25 @@ plausible. Check against something outside the computation: the report's cited b
 actual response, a render of the panel, the raw line in `rc.log`. When a tidy explanation presents
 itself, test it before believing it. Say plainly what is not known; "not yet measured" is the preferred
 form.
+
+## This repository (the split, 2026-10-03)
+
+This is the **client half** of the split of `OpenSpineConsortium/beethoven`: `extension/` (the
+Beethoven browser extension), `helper/` (the bundled native-messaging bridge) and `release/` (the
+store packages). The **server half** — `framework/` (hpcworker) and the maintainer's tools — lives
+in `OpenSpineConsortium/hpcworker`. The original repository remains as the history up to the split;
+new work goes here.
+
+The seam between the two is the contract, not an import: `extension/src/core/contract.ts` describes
+the files and lines the cluster side writes, and must change together with the server repository's
+`docs/V11_CONTRACT.md` and code. The only server-side content here is `framework/profiles/` —
+site profiles vendored **as data** for `extension/scripts/sync-profiles.mjs` (canonical in the server
+repository; refresh with `bash framework/profiles/pull.sh`). Since 8.0.0 nothing else of the
+cluster side may enter the package.
+
+CI (`.github/workflows/ci.yml`) runs the whole client suite hermetically on ubuntu: typecheck,
+vitest with the ssh tests against the python/asyncssh grid stand-in, the mock portal's full
+selftest with Playwright's Chromium for the terminal section, and a chrome build uploaded as an
+artifact. No secrets exist in this repository and the workflow needs none; the browser e2e harness
+(`extension/e2e/run.mjs`) stays a maintainer's tool, since its Chrome-native moments need Windows UIA
+(headless on a cluster node: `E2E_HEADLESS=1`).
