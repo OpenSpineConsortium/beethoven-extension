@@ -394,3 +394,196 @@ inside the package (a 2016 Google staff note said native hosts belong in a separ
 - Anything that copies `framework/` by a file list must include `lib/profile.awk` and
   `lib/profile_sh.sh` (`deploy_shared.sh` takes every file under `lib/`; `hpcworker install` of an own
   copy lists them).
+
+## 2026-10-02 evening: the direct-way hang
+
+**What happened.** Greg (go2432) ran his worker under the run name `worker`, on `reqp` with
+`--qos=requeue`. His own account cancelled the chained successor at 20:42:10 and the job itself at
+20:42:16. The job's trap left `worker/status.json` as `{"state":"preempted","next_job":"40551869",…}`,
+with `updated_at` 00:42:21Z. A fresh copy of 12.0.0 then signed in on the direct way (20:43:37,
+`browser-key add`) and showed "Starting · Connecting to Claude…" with no button for an hour. No connect
+was ever sent: the gate's caps file and `last -F` show none. It was not a connect stuck in flight;
+nothing on that screen sends anything.
+
+**The cause, as far as it is known.** Nothing records which file the panel read. The new copy reads the
+run named by `bridge.prefs.worker_name`, which is "worker" unless it was changed. Greg's earlier panel
+was labelled "wayne-worker", so his folder may hold both `worker/` and `wayne-worker/`.
+- *If it read `worker/status.json`*, the shape above explains the hang by itself. The extension maps
+  "preempted" with a `next_job` to the phase `renewing` (`facts.ts`, R8). The first run's moment draws
+  that as "Starting", with no button. Nothing asked whether 40551869 still existed:
+  - the framework's status refresh asked the scheduler only while a file said "queued";
+  - `worker watch` and `worker watch --json` treated "preempted" with a next job as alive (`bin/hpcworker`
+    before framework 13).
+
+  "preempted" is not a live state, so the stale-heartbeat rule (R12) never applies to it. The extension
+  fix below would not by itself have freed that panel. Framework 13, and 13.0.0 asking about a renewal,
+  do (below).
+- *If it read a file left "online" or "running" by a job that had gone* (`wayne-worker/` could hold one),
+  two extension defects explain the hang, and both were reproduced:
+  - `pollRunDirect` stamped each read's own moment as the file's modified time (the gate's `read` has
+    none). The heartbeat therefore never aged, and neither R12 (stale after 3 minutes) nor R5 (online
+    needs a heartbeat under 90 s) ever fired on the direct way.
+  - The first run's moment (`momentOf`) took a run's phase without asking whether it was stale.
+
+They were reproduced with the extension's own harness: a fresh copy, `claude=yes`, and a run left
+"online" or "running" with a two-hour-old heartbeat. 12.0.0 as built sits on `starting` / "Connecting
+to Claude…" with no Connect and no `gate connect`. With the link present it is worse: a dead worker is
+shown as "Online · up 2 h", and the first run is marked done.
+
+What the screen itself would have told apart (12.0.0's first-run "Starting" moment, `steps.ts` `journey`,
+which 13.0.0 did not change). Under "Starting · Connecting to Claude…":
+- a "preempted" file with a `next_job` (phase `renewing`) adds the line "Reconnecting…";
+- a dead "running" or "starting" file adds "Still connecting. This is taking longer than usual.", because
+  the real worker writes `got_computer_at` and it is hours old (phase `slow`; a "starting" file of a worker
+  that had been online before, `restarts` 1 or more, adds "Reconnecting…" instead);
+- only an "online" file without a link shows the bare line, with nothing under it (phase `connecting`;
+  with a link, 12.0.0 showed "Online").
+
+This was checked by running `journey` on each shape with the heartbeat looking fresh, as 12.0.0 read every
+file on the direct way (an ad-hoc check outside the repository, 2026-10-03).
+
+Greg reported only "Connecting to Claude", and that "it never prints a link". If that account of the screen
+is complete, the panel read an "online" file without a link: not `worker/status.json` as it was found
+afterwards, so the second reading. If a second line was there and went unmentioned, either reading still
+stands. The screen was not captured, so this stays conditional.
+
+**The first fix** (extension only, in the working tree; amended by the review below):
+- `facts.ts` `applyStatusRead`, used by `pollRunDirect`. On the direct way the heartbeat is the file's
+  own `updated_at`. A read's moment counts only as proof of life, when the file changed since the last
+  read of the same job. A dead run therefore reads as stale on its first read, and a grid clock that lags
+  this one cannot keep a live worker stale for more than up to one heartbeat (30 s): the first read after
+  its next heartbeat sees the file changed.
+- `steps.ts`:
+  - `momentOf` ignored a stale run's phase. The review narrowed this to runs found and never seen alive
+    (M1, below).
+  - An earlier Connect's "queued" no longer holds "In line for a computer" once its run has stopped or
+    ended.
+  - On the home, a stale run keeps its last known state and has Connect as its primary (also narrowed by
+    M1).
+- `ssh/client.ts`: a channel whose connection ends while CHANNEL_OPEN is being sent no longer leaves an
+  unhandled rejection. The new tests met it at teardown.
+
+**13.0.0 and framework 13: the review of that fix, applied.**
+- **M1.** Only a run this browser has never seen alive gets Connect when it is stale: `started_by`
+  "found", and its status.json never seen to change between two reads. `RunState.alive_seen` records the
+  change: `applyStatusRead` sets it on the direct way, and `applyStatus` sets it on the GlobalProtect way
+  when a listing's modified time moves. `RunFacts.neverSeenAlive` carries the result to the views.
+  Anything else that is stale keeps its phase and R7's "Still connecting": a run of the student's own
+  Connect or of the restart, or a found run seen alive. The real worker writes nothing for up to about
+  three minutes between "starting" and its main loop on a cold node (`worker.sbatch.tpl` 175-240). On the
+  home, such a run keeps its last known state, with that state's own primary or none (Open my session for
+  online, Sign in to Claude for needs-you), never the stale run's Connect.
+- **m1.** The home's Connect for a stale run also requires that no Stop is under way.
+- **m2.** A stale run with no last known state is not shown live, and nothing is recorded as last known
+  from it. A found run never seen alive: the hero is "Stopped" (state `unknown`), its button is Connect, and
+  the toolbar is plain. A run of the student's own, or one seen alive (the review of 13.0.0, below): its
+  phase's hero, not live ("Still connecting" for `slow`), so no Connect, and a plain toolbar.
+- **m3.** The mock's job simulator (`mock-ood/lib/jobsim.mjs`) heartbeats every 30 s in every live state,
+  as the worker's main loop does (`worker.sbatch.tpl`, `write_status` every `HEARTBEAT_S`). Before, only
+  "online" did, so a mock run in "starting", "need_login" or "need_consent" went stale.
+- **m5.** A background case covers a live worker whose grid clock lags by five minutes (`run_live`,
+  `run_age_s` 300). The stale view lasts up to one heartbeat (30 s): every read before the worker's next
+  heartbeat sees the same file. "Starting" follows and stays. The stand-in (`test/sshgrid/server.py`
+  `run_live`) moves `updated_at` once a heartbeat (`run_beat_s`, 30 s by default, the worker's
+  `HEARTBEAT_S`), never with a read; the case heartbeats every 6 s and asserts that every read showing the
+  stale view falls within one heartbeat of the first.
+- **Framework 13** (`bin/hpcworker` `successor_refresh`). When status.json says "preempted" and names a
+  successor (`next_job`, or a `next.id` queued by that job), `worker status` and `worker watch` ask the
+  scheduler about the job and the successor in one call (`adapter_status_many JOB,NEXT`, the call `worker
+  start` makes), under the same floor (`checked_at`). These are the gate's `status` and `watch`.
+  - The job itself still listed, in any state but ended (PENDING, REQUEUED, CONFIGURING, RUNNING,
+    COMPLETING): the record is left alone, whatever the successor's state. A job preempted under
+    `--qos=requeue` is listed again under its own id and writes its own status.json when it starts again,
+    and `job.id` cannot tell that write from the old one, so nothing is written, not even `checked_at`.
+    While the job is listed, each `worker status` therefore asks once (the panel asks once a minute, a watch
+    at most once a minute).
+  - The job gone or ended, the successor PENDING or RUNNING: the record stays as it is, with
+    `scheduler_state` and `checked_at`. The one call carries no reason or estimate, so `reason` and
+    `expected_start` stay as they were.
+  - The job gone or ended, and the successor gone or ended (not listed, or listed as ended): only then
+    does the record become "stopped", with `stop_reason` `successor_gone`, an empty `next_job` and a new
+    `updated_at`. `progress.log` says "Ended", and the `next.id` naming that successor goes.
+  - The write is guarded. The file must still say "preempted" for that job and successor, and `job.id`
+    must still name the job. The job's own fields, `claude_login` included, are kept as written.
+- **13.0.0 asks while renewing.** It asks `worker status --json` once a minute while a run is renewing,
+  as it already did while a run was in line. A panel already showing a renewal therefore also sees
+  "stopped" and offers Connect, and a fresh copy sees it at once. Framework 12 and older answer as
+  before, with no scheduler call outside "queued", so with them that case still hangs.
+
+**The review of 13.0.0, applied (2026-10-03).**
+- **The home's hero for a stale run with no last known state** (`heroOf`). "Stopped" with Connect only for
+  a found run never seen alive (`neverSeenAlive`). A run of the student's own, or one seen alive, shows its
+  phase's hero with `live` false, for example "Still connecting", so `primaryOf` gives no Connect.
+- **The home's Connect for a stale found run never seen alive** (`primaryOf`). Signed in, with no Stop and
+  no Connect under way, it is Connect whatever the last known state, online and needs-you included: after
+  a browser restart the run record counts as found. A grid out of reach keeps its own answer. Signed in,
+  the "As of" sentence no longer asks for the grid's sign-in: it reads "As of 9:02 AM. Your worker isn't
+  answering now." (`WORDS.home.asOfSignedIn`; new student-facing words). Signed out it is unchanged.
+- **Framework 13's successor check** asks about the job and the successor in one call and leaves the record
+  alone while the job itself is listed (above). Framework stays 13.
+- **The stand-in's heartbeat** moves once per heartbeat, not with each read (m5, above).
+- `extension/package-lock.json` says 13.0.0.
+
+**Tests.**
+- `framework/tests/test_status.py` `SuccessorOfAnEndedJob` covers a successor the fake scheduler no
+  longer lists, one listed as ended, one still listed PENDING or RUNNING (left alone, and the floor), the
+  job itself listed again as PENDING, REQUEUED, CONFIGURING, RUNNING or COMPLETING with its successor gone,
+  ended or in line (left alone byte for byte, and asked again past no floor), the job listed as ended with
+  its successor gone (stopped), a scheduler that does not answer, a successor that has started (never
+  written over), a successor named by `next.id` alone, and the text watch. Every case asks ONE squeue
+  about both ids.
+- `test_watch_json.py` covers the JSON watch: it ends on "stopped", goes on while the job is listed
+  again, and respects the floor.
+- `test_login_node.py` `StatusPatch` covers the `preempted=JOB,NEXT` guard and `top_field`.
+- `test_browser_key.py` `GateReal` covers the gate's `status` and `watch`, the job listed again included.
+  It runs on Linux only.
+- In the extension: `test/steps.test.ts` (with the review's two cases: the student's own stale run with no
+  last known state keeps "Still connecting" with no Connect; a stale found run never seen alive gets
+  Connect whatever its last known state, and its "As of" asks for no sign-in), `test/facts.test.ts`,
+  `test/jobsim.test.ts`, and
+  `test/background12.test.ts`. The background cases are three dead-run cases, a live worker, the lagging
+  clock, and framework 13's successor gone, both found that way and found renewing.
+  `test/sshgrid/server.py` gained `run_successor` and `gone_after_status`.
+
+The e2e harness was not run: it needs a build and a visible browser.
+
+**Not known or not handled:**
+- What Greg's `worker/status.json`, and any `wayne-worker/status.json`, said while the panel was on
+  screen. The shape above is the file as found afterwards.
+- A run this browser saw alive whose worker then died without writing an end state (SIGKILL, a node
+  failure) keeps its last known state, or "Still connecting", and on the home it has that state's own
+  primary or none, never Connect, until a browser restart makes its record a found one. This is M1's
+  trade-off; R12's "last known" is all the panel can say.
+- Two copies installed side by side remove each other's browser key at every sign-in
+  (`browser_key.sh` keeps one line per account). That explains the three sign-ins in seven minutes, not
+  the hang.
+- Framework 13 is not deployed. Until it is, the gate's `status` on the grid is framework 12's.
+
+**hy9698's sittings (VPN route).** Her "In line for a computer for an hour" was the
+queued-after-the-run-ended defect above, and it is fixed.
+
+The sittings that failed with exit 3 about 4 min 20 s after each job started are unexplained. No
+extension timer near five minutes was found on that route: 15 s to open, 30 s of silence before typing,
+15 min in all. `AUTH-URL:` lines from `relay.sh` parse. Why the link never reached her panel is not known.
+
+Two readings exist, and neither has been measured:
+- Connect's 14-minute deadline left a code budget of about 4 min after an allocation wait of about
+  9.5 min.
+- Open OnDemand's 300 s shell-inactivity sweep ignores output. This conflicts with `core/shell.ts`'s own
+  comment, which says only input and output reset OnDemand's idle timer, and that this is why `connect`
+  prints its own keepalive line. The 300 s there is Passenger killing an idle shell app.
+
+What would decide it:
+- the `HPCW-LOGIN-FAILED` sentence and the sacct Submit and Start times of each `hpcw_claude` job;
+- her browser's audit lines, `login terminal: <reason> (close <code>), N bytes read, …`. Reason
+  `client` means Beethoven closed the sitting. That happens when "Sign in to Claude" is pressed again:
+  each press closes the sitting under way, and the button stays offered while the sign-in waits for its
+  computer.
+- On the direct channel, a sitting known to have opened that left no WS record at all (no "login
+  terminal:", "error:" or "refused:" line) means the service worker died during it; on the tab channel, it
+  means the portal page did.
+
+The audit lines also show whether the link's bytes ever reached the browser. An `AUTH-URL` on a host
+other than claude.ai or claude.com is dropped without a word (`refused-url`).
+
+**Follow-ups from the 13.0.0 verification (2026-10-03), not done:** (a) while a preempted job is itself listed again (requeued, PENDING), successor_refresh writes nothing, so the gate's 60 s poll floor has no timestamp and each `worker status` asks squeue once; keep that timestamp in a side file in the run folder. (b) With the job gone and the successor RUNNING, successor_refresh still patches scheduler fields; a successor writing its first status.json at that moment could be overwritten with the old preempted record until its next heartbeat; write nothing when the successor is RUNNING. (c) The home's "Your worker isn't answering now" sentence should appear only when a run is present and stale, not in the seconds after a browser restart. (d) The stale-view bound on a lagging grid clock is one heartbeat (30 s) plus the next read, not one heartbeat.

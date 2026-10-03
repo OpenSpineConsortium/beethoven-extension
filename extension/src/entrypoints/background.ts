@@ -44,7 +44,7 @@ import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from
 import { commands, gateText, isEnvironmentUrl, parseGateJson, parseJobId, parseRegistration, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectOptions, type GateFile, type LoginMode, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
-import { addActivity, addWait, applyConnection, applyStatus, environmentLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
+import { addActivity, addWait, applyConnection, applyStatus, applyStatusRead, environmentLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
 import { bundledProfile, usesSharedCopy } from '../core/install';
 import {
   ACCESS_KEY,
@@ -744,8 +744,10 @@ async function tick(): Promise<void> {
   const starting = mem.connect.inFlight || ['queued', 'got-computer', 'connecting', 'slow', 'reconnecting', 'needs-claude', 'needs-consent', 'renewing'].includes(rf.phase);
   if (grid?.session === 'signed-in' && now - mem.last.list >= (starting ? LIST_STARTING_MS : LIST_IDLE_MS)) void pollRun();
   const pressWaiting = !!(await session.get<PendingPress>(PRESS_KEY));
-  // the scheduler's reason, once a minute while in line; never while a press of the student's waits or runs
-  if (grid?.session === 'signed-in' && rf.phase === 'queued' && now - mem.last.statusJson >= STATUS_JSON_MS && !pressWaiting && !mem.stopping && !mem.startId && mem.pressDepth === 0) void refreshStatusJson();
+  // the scheduler's reason, once a minute while in line; never while a press of the student's waits or runs.
+  // 13.0.0: while renewing too: framework 13's `worker status` asks about the successor a job that ended named,
+  // and says "stopped" when it is gone (before, such a run read as "Reconnecting…" for good)
+  if (grid?.session === 'signed-in' && (rf.phase === 'queued' || rf.phase === 'renewing') && now - mem.last.statusJson >= STATUS_JSON_MS && !pressWaiting && !mem.stopping && !mem.startId && mem.pressDepth === 0) void refreshStatusJson();
   // a press kept for later goes ahead by itself once what it waits on is there (never beside a press being handled now)
   if (grid?.session === 'signed-in' && !mem.sitting && !mem.startId && mem.pressDepth === 0 && now - mem.last.carry >= PRESS_RETRY_MS && pressWaiting) {
     mem.last.carry = now;
@@ -2610,7 +2612,7 @@ function clockOffset(serverDate: string | undefined, asked: number, answered: nu
   return Math.abs(off) <= CLOCK_JITTER_MS ? 0 : Math.round(off);
 }
 
-/** `worker status --json`, once a minute while queued with a page open: the scheduler's reason and estimate (direct only: tab mode would open a portal tab every minute) */
+/** `worker status --json`, once a minute while queued (13.0.0: or renewing) with a page open: the scheduler's reason and estimate, and from framework 13 whether a renewal's successor is still there (direct only: tab mode would open a portal tab every minute) */
 async function refreshStatusJson(): Promise<void> {
   if (mem.busy.statusJson) return;
   const direct = (await modeNow()) === 'direct';
@@ -2623,12 +2625,13 @@ async function refreshStatusJson(): Promise<void> {
     const dir = await sharedDirNow();
     const c: PortalApi | undefined = direct ? await sshPortal() : await directClient();
     if (!snap || !dir || !c) return;
-    // asked only while the run is still in line and no press of the student's waits or runs
-    if (runFacts(snap, Date.now()).phase !== 'queued' || mem.stopping || mem.startId || mem.pressDepth > 0 || (await session.get<PendingPress>(PRESS_KEY))) return;
-    // still wanted when it goes: in line, the same job, and no press of the student's waiting or under way
+    // asked only while the run is still in line (or renewing) and no press of the student's waits or runs
+    const asking = (r: RunState) => ['queued', 'renewing'].includes(runFacts(r, Date.now()).phase);
+    if (!asking(snap) || mem.stopping || mem.startId || mem.pressDepth > 0 || (await session.get<PendingPress>(PRESS_KEY))) return;
+    // still wanted when it goes: in line or renewing, the same job, and no press of the student's waiting or under way
     const still = async () => {
       const cur = await session.get<RunState>(RUN_KEY);
-      return !!cur && sameRun(cur, snap) && cur.job === snap.job && runFacts(cur, Date.now()).phase === 'queued' && !mem.stopping && !mem.startId && mem.pressDepth === 0 && !(await session.get<PendingPress>(PRESS_KEY));
+      return !!cur && sameRun(cur, snap) && cur.job === snap.job && asking(cur) && !mem.stopping && !mem.startId && mem.pressDepth === 0 && !(await session.get<PendingPress>(PRESS_KEY));
     };
     const sj = await statusByShell(c, dir, snap.run, undefined, still).catch(() => undefined);
     if (!sj) return;
@@ -2639,9 +2642,10 @@ async function refreshStatusJson(): Promise<void> {
       if (!sameRun(cur, snap) || cur!.job !== snap.job) return undefined;
       let next: RunState = { ...cur!, scheduler: sj.scheduler, status_json_at: nowIso() };
       const st = cur!.status?.state;
-      if (sj.status && (!st || st === 'queued')) next = applyStatus(next, sj.status).run;
-      // "In line: …" in Show log, once per job and reason class (D25)
-      if (sj.scheduler && sj.scheduler.state === 'PENDING') {
+      // framework 13: a job that ended naming its successor ("preempted") reads "stopped" once the successor is gone
+      if (sj.status && (!st || st === 'queued' || st === 'preempted')) next = applyStatus(next, sj.status).run;
+      // "In line: …" in Show log, once per job and reason class (D25), for a job in line (never a renewal's successor)
+      if (sj.scheduler && sj.scheduler.state === 'PENDING' && st !== 'preempted') {
         const tag = `${next.job}|${reasonClass(sj.scheduler.reason)}`;
         if (next.reason_logged !== tag) {
           next = { ...next, reason_logged: tag };
@@ -3265,7 +3269,8 @@ async function pollRunDirect(want: { progress?: boolean }): Promise<void> {
   const run = await mutateRun((cur) => {
     if (!sameRun(cur, snap)) return undefined;
     let r = cur!;
-    if (status) r = applyStatus(r, status, mtime).run;
+    // the gate's read has no modified time: the heartbeat is the file's own, the read's moment only proof of a new one (facts.ts applyStatusRead)
+    if (status) r = applyStatusRead(r, status, mtime).run;
     if (connection) r = applyConnection(r, connection, mtime).run;
     if (node) r = { ...r, node_mtime: mtime, node: node.slice(0, 100) };
     if (progress !== undefined) r = { ...r, progress_tail: progress.split('\n').filter(Boolean).slice(-40), progress_mtime: mtime };

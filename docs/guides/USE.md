@@ -1,6 +1,12 @@
 # Use Beethoven
 
-For Beethoven 12.0.0. Written 2026-10-02.
+For Beethoven 13.0.0. Written 2026-10-02.
+
+**New in 13.0.0.** Sometimes your worker's next job is cancelled on the grid. Beethoven used to wait on
+**Connecting to Claude…** with no button. Once framework 13 is published on the grid (your lab lead does
+that), it shows **Stopped** with **Connect**: press **Connect** to start your worker again. A worker
+Beethoven finds already on the grid that has stopped answering also gets **Connect**. Install 13.0.0 in
+place of 12.0.0 ([Install Beethoven](INSTALL.md)).
 
 Beethoven starts a Claude Code worker in your own account on the Wayne State grid and opens it in
 claude.ai. This guide covers:

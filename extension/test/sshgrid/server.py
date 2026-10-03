@@ -17,9 +17,21 @@ Switches (JSON on argv[1]): {"split": n} sends every server write in chunks of n
 stall); {"silent_after_kex": true} never answers after NEWKEYS; {"hostkey": "ed25519"}; {"slow_exec": s};
 {"bashrc": text} printed before every key session's output (an account's ~/.bashrc); {"gate_limit": "names"}
 makes the gate's connect answer framework 11's cap.
+{"job": id} puts a run in the worker's folder before anything else happens, its status.json "online". With
+{"run_state": s} (online, running, starting, need_login, preempted, stopped) and {"run_age_s": n} that file is
+written as framework 11's worker writes it: its heartbeat updated_at n seconds old, got_computer_at and
+claude_login (signed in); {"run_next": id} names a successor; {"run_link": true} carries an environment
+link; {"run_live": true} keeps it heartbeating as the worker's main loop does: updated_at moves once a
+heartbeat, every {"run_beat_s": s} seconds (30 by default, the worker's HEARTBEAT_S), never with a read, and stays
+n seconds behind (a grid clock that lags this computer's); the run's other times stay where they were. Without
+run_live the run is dead: its file never changes again.
+{"run_successor": "gone"} with run_state "preempted" and run_next plays framework 13's `worker status` for a job
+that ended naming a successor the scheduler no longer has: past {"gone_after_status": n} status calls (default 0,
+the first), the gate's status answers, and the file then reads, "stopped" with stop_reason "successor_gone" and no
+next job; before that, the successor is in line (scheduler PENDING, Dependency).
 Prints one line "READY {json}" with the port and the host key's SHA256 fingerprint, then serves.
 """
-import asyncio, base64, hashlib, json, sys
+import asyncio, base64, hashlib, json, sys, time
 import asyncssh
 
 CFG = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
@@ -32,7 +44,46 @@ PW_PROMPT = "Password: "
 CODE_PROMPT = "Your google authenticator one-time verification code: "
 
 KEYS = {}            # user -> list of (keytype, base64) added by browser-key add
-STATE = {"claude": "no", "job": "", "state": "", "forgotten": 0, "commands": []}
+STATE = {"claude": "no", "job": "", "state": "", "forgotten": 0, "commands": [], "found": False, "stop_reason": "", "status_calls": 0}
+STARTED = time.time()
+
+
+def iso(t):
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+
+
+def status_doc():
+    """status.json of the current run. A run started here (a connect) is in line, as the queued file says; the
+    run that was there before ({"job": id}) is shaped by the run_* switches (see the docstring)"""
+    doc = {"state": STATE["state"] or "queued", "job": STATE["job"], "submitted_at": "2026-10-02T12:00:00Z", "heartbeat_at": "2026-10-02T12:00:00Z"}
+    if not STATE["found"] or "run_age_s" not in CFG:
+        return doc
+    age = float(CFG["run_age_s"])
+    base = STARTED - age
+    beat = base
+    if CFG.get("run_live"):
+        # the worker writes status.json once a heartbeat (worker.sbatch.tpl, write_status every HEARTBEAT_S), so
+        # updated_at moves at each heartbeat since the server started and is the same for every read in between
+        period = float(CFG.get("run_beat_s", 30))
+        beat = base + period * int((time.time() - STARTED) // period)
+    doc["submitted_at"] = iso(base - 600)
+    doc["updated_at"] = iso(beat)
+    if doc["state"] != "queued":
+        doc["got_computer_at"] = iso(base - 300)
+        doc["claude_login"] = {"loggedIn": True, "email": "st1234@wayne.edu", "subscriptionType": "max", "checked_at": iso(beat)}
+    if CFG.get("run_next") and STATE["stop_reason"] != "successor_gone":
+        doc["next_job"] = CFG["run_next"]
+    if CFG.get("run_link"):
+        doc["environment_url"] = "https://claude.ai/code?environment=env_01TestDeadRun000000000000"
+        doc["online_at"] = iso(base - 200)
+    if doc["state"] == "stopped":
+        doc["stop_reason"] = STATE["stop_reason"] or "request"
+        if STATE["stop_reason"] == "successor_gone":
+            # framework 13's patch: the record stopped when the successor was found gone, its other fields kept
+            doc["next_job"] = ""
+            doc["scheduler_state"] = "GONE"
+            doc["message"] = "the next job in the chain was cancelled or never started; press Connect to start again"
+    return doc
 
 
 class Server(asyncssh.SSHServer):
@@ -96,9 +147,20 @@ def gate(user, cmd):
     if t[0] == "status" and len(t) == 2:
         if not STATE["job"]:
             return "", 1
-        st = {"v": 1, "run": t[1], "job": STATE["job"], "next_job": "", "state_dir": "/rs/rs_grp_oschome/%s/hpcworker" % user,
-              "status": {"state": STATE["state"] or "queued", "job": STATE["job"], "submitted_at": "2026-10-02T12:00:00Z"},
-              "connection": None, "scheduler": {"state": "PENDING", "reason": "Priority", "expected_start": "", "node": "", "checked_at": "2026-10-02T12:00:30Z"},
+        STATE["status_calls"] += 1
+        sched = {"state": "PENDING", "reason": "Priority", "expected_start": "", "node": "", "checked_at": "2026-10-02T12:00:30Z"}
+        if STATE["found"] and STATE["state"] == "preempted" and CFG.get("run_next"):
+            # framework 13: the successor a job that ended named is asked about; gone, the record stops
+            if CFG.get("run_successor") == "gone" and STATE["status_calls"] > int(CFG.get("gone_after_status", 0)):
+                STATE["state"] = "stopped"
+                STATE["stop_reason"] = "successor_gone"
+                sched = {"state": "GONE", "reason": "", "expected_start": "", "node": "", "checked_at": iso(time.time())}
+            else:
+                sched = {"state": "PENDING", "reason": "Dependency", "expected_start": "", "node": "", "checked_at": iso(time.time())}
+        doc = status_doc()
+        st = {"v": 1, "run": t[1], "job": STATE["job"], "next_job": doc.get("next_job", ""), "state_dir": "/rs/rs_grp_oschome/%s/hpcworker" % user,
+              "status": doc,
+              "connection": None, "scheduler": sched,
               "line": "Your worker is in line for a computer (0 min so far)."}
         return json.dumps(st) + "\n", 0
     if t[0] == "read" and len(t) == 3:
@@ -108,7 +170,7 @@ def gate(user, cmd):
         if not STATE["job"]:
             return "", 1
         if t[2] == "status.json":
-            return json.dumps({"state": STATE["state"] or "queued", "job": STATE["job"], "submitted_at": "2026-10-02T12:00:00Z", "heartbeat_at": "2026-10-02T12:00:00Z"}) + "\n", 0
+            return json.dumps(status_doc()) + "\n", 0
         if t[2] == "progress.log":
             return "2026-10-02T12:00:00Z Asked the grid for a computer\n", 0
         return "", 1
@@ -118,11 +180,14 @@ def gate(user, cmd):
             return "HPCW-GATE limit %s\n" % CFG["gate_limit"], 123
         STATE["job"] = "40501234"
         STATE["state"] = "queued"
+        STATE["found"] = False
+        STATE["stop_reason"] = ""
         return ("HPCW-STEP setup ready\nHPCW-STEP consent\nHPCW-STEP queued 40501234 new /rs/rs_grp_oschome/%s/hpcworker/%s\n"
                 "HPCW-STEP done\n" % (user, t[1])), 0
     if t[0] in ("stop", "restrict") and len(t) == 2:
         if t[0] == "stop":
             STATE["state"] = "stopped"
+            STATE["stop_reason"] = "request"
             return "worker %s: stopped (by request; the chain ended)\n" % t[1], 0
         return "worker %s: marked restricted (/rs/x/workspaces/%s/.restricted); it will not start there until the marker is removed\n" % (t[1], t[1]), 0
     if t[0] == "forget" and len(t) == 1:
@@ -167,6 +232,8 @@ async def handle(process):
     if " connect " in cmd:
         STATE["job"] = "40509876"
         STATE["state"] = "queued"
+        STATE["found"] = False
+        STATE["stop_reason"] = ""
         process.stdout.write("HPCW-STEP setup ready\r\nHPCW-STEP consent\r\nHPCW-STEP queued 40509876 new /rs/rs_grp_oschome/%s/hpcworker/worker\r\nHPCW-STEP signin\r\n" % user)
         process.stdout.write("HPCW-LOGIN: on asx15; checking whether you are signed in already\r\n")
         process.stdout.write("AUTH-URL: https://claude.ai/oauth/authorize?code=true&client_id=test\r\n")
@@ -274,7 +341,8 @@ async def main():
         STATE["claude"] = CFG["claude"]
     if CFG.get("job"):
         STATE["job"] = CFG["job"]
-        STATE["state"] = "online"
+        STATE["state"] = CFG.get("run_state", "online")
+        STATE["found"] = True
     print("READY " + json.dumps({"port": front, "fp": fp}), flush=True)
     # a line on stdin asks for the state (the tests read what the grid saw)
     loop = asyncio.get_running_loop()

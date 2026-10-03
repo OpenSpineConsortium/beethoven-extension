@@ -634,8 +634,12 @@ export function sessionTitleFor(profileTitle: string | undefined, workerName: st
  */
 export type WorkerState = 'queued' | 'starting' | 'need_login' | 'need_consent' | 'running' | 'online' | 'stopped' | 'preempted' | 'error' | 'unknown';
 
-/** why a worker is "stopped" (framework 10): the student's stop, or the job gave up waiting for the Claude sign-in (login_abandon_s) */
-export type StopReason = 'request' | 'login_abandoned';
+/**
+ * why a worker is "stopped" (framework 10): the student's stop, or the job gave up waiting for the Claude sign-in
+ * (login_abandon_s); framework 13: successor_gone, a job that ended naming a successor the scheduler no longer has
+ * (`worker status` and `worker watch` write it; Connect starts the worker again)
+ */
+export type StopReason = 'request' | 'login_abandoned' | 'successor_gone';
 
 /** where the framework found the student's Remote Control answer: Claude Code's own settings file, a marker file, or nowhere */
 export type ConsentSource = 'claude_config' | 'marker' | 'none' | string;

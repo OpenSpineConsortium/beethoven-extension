@@ -269,6 +269,8 @@ export const WORDS = {
     stoppedSub: 'Connect to start Claude on the grid.',
     errorHero: "Couldn't start",
     asOf: (clock: string) => `As of ${clock}. Sign in to the grid to see it live.`,
+    /** 13.0.0: the last known state while signed in to the grid (the run's heartbeat stale): no sign-in to ask for */
+    asOfSignedIn: (clock: string) => `As of ${clock}. Your worker isn't answering now.`,
     unreachableHero: "Can't reach the grid",
     unreachableSub: (app: string) => `Is ${app} on? Your worker keeps running.`,
     openSession: 'Open my session',

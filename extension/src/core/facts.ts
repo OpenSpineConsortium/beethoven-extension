@@ -29,6 +29,12 @@ export interface RunState {
   set_at?: string;
   /** how the run was found: the student's Connect, the "Keep my worker running" restart, or the files of a run already there */
   started_by?: 'connect' | 'auto' | 'found';
+  /**
+   * 13.0.0: this browser has seen the run's status.json change between two of its reads (a heartbeat, or any
+   * write): its worker was alive then. A run found already in the folder without it may have been gone for hours
+   * (RunFacts.neverSeenAlive): the direct-way hang of 2026-10-02, docs/V12_STATUS.md.
+   */
+  alive_seen?: boolean;
   /** the student's own Connect submitted this job (open once, "ready N min after you asked", the wait history) */
   pressed?: boolean;
   status?: StatusFile;
@@ -118,10 +124,35 @@ export function applyStatus(run: RunState, status: StatusFile, mtime?: number): 
   if (status.state === 'queued' && job && past.has(job)) return { run: { ...next, ...(mtime !== undefined ? { status_mtime: mtime } : {}) }, taken: false };
   if (status.state !== 'queued' && job) past.add(job);
   const nextJob = status.next_job ? String(status.next_job) : next.next_job;
+  // 13.0.0: a listing whose modified_at moved since the last download of this run's file: written in between (alive_seen)
+  const wrote = mtime !== undefined && run.status !== undefined && run.status_mtime !== undefined && mtime !== run.status_mtime;
   return {
-    run: { ...next, status, ...(mtime !== undefined ? { status_mtime: mtime } : {}), past_queued: [...past].slice(-10), ...(nextJob && nextJob !== next.job ? { next_job: nextJob } : {}) },
+    run: { ...next, status, ...(mtime !== undefined ? { status_mtime: mtime } : {}), past_queued: [...past].slice(-10), ...(nextJob && nextJob !== next.job ? { next_job: nextJob } : {}), ...(wrote ? { alive_seen: true } : {}) },
     taken: true,
   };
+}
+
+/**
+ * 12.0.0, the direct way: R1 and R3 for a status.json read through the gate, whose read carries no
+ * modified time. The heartbeat is then the file's own updated_at (R5, R12), and the moment of the read
+ * (`readAt`, s) stands in for the listing's modified_at only as proof of life: when the file changed
+ * since the last read of the same job (the worker wrote a heartbeat in between). A first read of a job,
+ * or a read of a file that has not changed, never refreshes it, so a run whose worker has gone (its
+ * file left "online" or "running") reads as stale; and a grid clock behind this computer's cannot make
+ * a heartbeating worker stale past the first read after its next heartbeat (up to one heartbeat, 30 s, on
+ * a fresh copy). Stamping every read with its own moment, as the
+ * direct way did at first, made every such file look alive for ever (2026-10-02, docs/V12_STATUS.md).
+ * 13.0.0: a file that changed between two reads also marks the run alive_seen (a renewal's first file too).
+ */
+export function applyStatusRead(run: RunState, status: StatusFile, readAt: number): { run: RunState; taken: boolean } {
+  const before = run.status;
+  const r = applyStatus(run, status);
+  if (!r.taken) return r;
+  const changed = !!before && JSON.stringify(before) !== JSON.stringify(status);
+  const seen = changed ? { alive_seen: true } : {};
+  const sameJob = !!before && String(before.job ?? '') === String(status.job ?? '') && run.job === r.run.job;
+  if (!sameJob) return { run: { ...r.run, ...seen, status_mtime: undefined }, taken: true };
+  return changed ? { run: { ...r.run, ...seen, status_mtime: readAt }, taken: true } : r;
 }
 
 /** R1 for connection.json: taken only for the run's job */
@@ -204,6 +235,8 @@ export function runFacts(run: RunState | undefined, now: number): RunFacts {
     pressed: !!run.pressed,
     renewal,
     chain: s?.chain !== false,
+    // 13.0.0 (M1): found already in the folder, and its file never seen to change here
+    ...(run.started_by === 'found' && !run.alive_seen ? { neverSeenAlive: true } : {}),
     ...(checkedAt !== undefined ? { checkedAt } : {}),
     ...(link ? { link } : {}),
     ...(title ? { title } : {}),

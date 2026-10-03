@@ -17,8 +17,12 @@
 //   online       sim.start_s seconds after it got its computer (MOCK_START_S): "Connecting to
 //                Claude", then status.json online with the link, connection.json, the registration
 //                block in rc.log, "Online: <link>" in progress.log and "<H:MM> Online. Open in Claude:
-//                <link>" in the job's output; a heartbeat (updated_at) every 30 s; the sign-in checked
-//                again every 300 s; MOCK_RECONNECT_AFTER_S plays one Remote Control restart;
+//                <link>" in the job's output; the sign-in checked again every 300 s;
+//                MOCK_RECONNECT_AFTER_S plays one Remote Control restart;
+//   heartbeat    13.0.0: in every live state (starting, need_consent, need_login, online), the last
+//                status.json written again with a new updated_at every 30 s, as the job's main loop
+//                does (worker.sbatch.tpl: write_status every HEARTBEAT_S), so the mock's runs never read
+//                as stale (R12) while their job is alive;
 //   wall time    at ends_at (sim.renew_s: MOCK_RENEW_S, else the profile's hours): "Renewing", status
 //                preempted with next_job, and the successor gets in line (renewal: true); with the
 //                chain off, "Ended".
@@ -91,7 +95,13 @@ export function statusDoc(j, s, state, now, extra = {}) {
   };
 }
 
+/** the states whose file the job keeps heartbeating (the contract's live states once the job has its computer) */
+const BEATING = new Set(['starting', 'need_login', 'need_consent', 'running', 'online']);
+
 async function write(j, s, state, now, extra) {
+  // what the heartbeat writes again: this state, with the same extra fields
+  s.last_written = { state, ...(extra ? { extra } : {}) };
+  s.last_beat = now;
   await writeStatus(s.rd, statusDoc(j, s, state, now, extra));
 }
 
@@ -178,7 +188,7 @@ export async function advance(home, { now = Date.now() } = {}) {
         if (succ) {
           await write(j, s, 'preempted', now, { rc_alive: false });
           await progress(s.rd, PROGRESS.renewing, new Date(now));
-          succ.sim = { ...s, kind: 'worker', renewal: true, submitted_at: s.got_at, start_at: now + s.renew_queue_s * S, reason: 'Priority', expected: 'estimate', phase: 'pending', got_at: undefined, online_at: undefined, online_target: undefined, last_beat: undefined, last_auth: undefined, logged: {}, restarts: 0, next: '', reconnected: false, parent: undefined };
+          succ.sim = { ...s, kind: 'worker', renewal: true, submitted_at: s.got_at, start_at: now + s.renew_queue_s * S, reason: 'Priority', expected: 'estimate', phase: 'pending', got_at: undefined, online_at: undefined, online_target: undefined, last_beat: undefined, last_written: undefined, last_auth: undefined, logged: {}, restarts: 0, next: '', reconnected: false, parent: undefined };
           changed.push(`${j.pbsid} renewing into ${succ.pbsid}`);
         } else {
           s.next = '';
@@ -189,6 +199,10 @@ export async function advance(home, { now = Date.now() } = {}) {
         }
         continue;
       }
+      // the heartbeat: every 30 s in every live state, the last file written again with a new updated_at (write
+      // keeps last_written and last_beat); a branch below that writes for another reason beats with it
+      const lw = s.last_written;
+      if (lw && BEATING.has(lw.state) && now - (s.last_beat ?? now) >= 30 * S) await write(j, s, lw.state, now, lw.extra);
       if (s.phase === 'online') {
         if (now - s.last_auth >= 300 * S) {
           s.last_auth = now;
@@ -212,10 +226,6 @@ export async function advance(home, { now = Date.now() } = {}) {
           await progress(s.rd, PROGRESS.reconnecting, new Date(now));
           changed.push(`${j.pbsid} reconnecting`);
           continue;
-        }
-        if (now - s.last_beat >= 30 * S) {
-          s.last_beat = now;
-          await write(j, s, 'online', now);
         }
         continue;
       }

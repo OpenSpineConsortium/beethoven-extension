@@ -1,6 +1,13 @@
 # Install Beethoven
 
-For Beethoven 12.0.0. Written 2026-10-02.
+For Beethoven 13.0.0. Written 2026-10-02.
+
+**Updating from 12.0.0.** First remove the 12.0.0 copy: click the puzzle icon, then **⋮** next to
+Beethoven, then **Remove from Chrome**. Then install 13.0.0 as in Part 1. Keep only one copy, because two
+copies side by side sign each other out of the grid. Your helper, your worker and your files on the grid
+stay as they are; you sign in to the grid once more. What changes: if your worker's next job was
+cancelled, Beethoven shows **Stopped** with **Connect**, once framework 13 is published on the grid (your
+lab lead does that). Before, it waited with no button.
 
 Beethoven has two parts:
 

@@ -99,6 +99,12 @@ export interface RunFacts {
   live: boolean;
   /** R12: a live state whose heartbeat is over 3 minutes old reads as last known */
   stale: boolean;
+  /**
+   * 13.0.0: a run found already in the worker folder (not this browser's Connect or restart) whose status.json
+   * this browser has never seen change (RunState.alive_seen). Stale, it may have been gone for hours, and the
+   * panel offers Connect; a run of the student's own Connect that is merely quiet keeps its phase (R7)
+   */
+  neverSeenAlive?: boolean;
   submittedAt?: string;
   gotComputerAt?: string;
   onlineAt?: string;
@@ -475,7 +481,16 @@ export function momentOf(f: Facts): JourneyView['moment'] {
   if (claudeNeedsStudent(f)) return 'claude';
   const c = f.connect;
   if (c.inFlight && !c.queued) return 'connect';
-  if (f.run.present && f.run.phase !== 'none') {
+  // R12 for a run found already in the worker folder and never seen alive by this browser (RunFacts.neverSeenAlive):
+  // its worker may have been gone for hours, so it is not one coming up, and the panel offers Connect (connect keeps
+  // a job that is in fact still there). A run of the student's own Connect that has gone quiet keeps its phase: the
+  // worker writes nothing for up to about three minutes between "starting" and its main loop on a cold node, and
+  // R7's "Still connecting" is the answer then. A Connect's "queued" is over once its run has stopped or ended, or
+  // is such a run (2026-10-02: "Starting · Connecting to Claude…" and "In line for a computer" held by runs that
+  // had ended; docs/V12_STATUS.md)
+  const unseenStale = f.run.present && f.run.stale && !!f.run.neverSeenAlive;
+  const over = unseenStale || (f.run.present && (f.run.phase === 'stopped' || f.run.phase === 'ended'));
+  if (f.run.present && f.run.phase !== 'none' && !unseenStale) {
     switch (f.run.phase) {
       case 'queued':
         return 'queue';
@@ -495,7 +510,7 @@ export function momentOf(f: Facts): JourneyView['moment'] {
         break;
     }
   }
-  if (c.queued) return 'queue';
+  if (c.queued && !over) return 'queue';
   // a refusal before anything was queued stays on the connect moment with its reason; the
   // workspace and setup refusals belong to the statement, and a password to the key step
   if (c.failure && !c.inFlight && c.pressedAt !== undefined && c.failure !== 'setup' && c.failure !== 'restricted' && c.failure !== 'password') return 'connect';
@@ -1106,7 +1121,20 @@ export function heroOf(f: Facts): HeroView & { live: boolean } {
     if (f.lastKnown && (f.grid.session === 'signed-out' || f.grid.session === 'unknown' || f.run.stale || !f.run.present)) {
       const s = knownHeroState(k);
       const base = staticHero(f, s === 'online-new' ? 'online' : s, title);
-      return { ...base, ...(asOfClock && f.grid.session !== 'unknown' ? { asOf: WORDS.home.asOf(asOfClock) } : {}), live: false };
+      // "As of …": signed out, it asks for the grid's sign-in; 13.0.0: signed in (the run stale, or not read yet),
+      // that sign-in is done, and the second form says only that the worker is not answering now
+      const asOf = asOfClock && f.grid.session !== 'unknown' ? (f.grid.session === 'signed-in' ? WORDS.home.asOfSignedIn(asOfClock) : WORDS.home.asOf(asOfClock)) : undefined;
+      return { ...base, ...(asOf ? { asOf } : {}), live: false };
+    }
+    // 13.0.0: R12 with no last known state. A run found already in the folder and never seen alive here
+    // (RunFacts.neverSeenAlive) whose heartbeat stopped is shown "Stopped", so the hero, its button (Connect) and
+    // the toolbar (plain) agree (m2). A run of the student's own Connect or restart, or a found run seen alive,
+    // keeps its phase's hero ("Still connecting", R7), not live, and so gets no Connect (M1): the worker writes
+    // nothing for up to about three minutes on a cold node. Nothing is recorded as last known from either
+    if (f.run.present && f.run.stale) {
+      if (f.run.neverSeenAlive) return { ...staticHero(f, 'unknown', title), live: false };
+      const s = liveState(f);
+      return { ...liveHero(f, s === 'online-new' ? 'online' : s, title), live: false };
     }
   }
   const s = liveState(f);
@@ -1203,6 +1231,12 @@ function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
   const link = f.run.link ?? f.lastKnown?.environment_url;
   const open: HomePrimary = { kind: 'open-session', button: button(H.openSession, 'teal', { kind: 'open-session' }) };
   const connect: HomePrimary = { kind: 'connect', button: button(f.press?.kind === 'connect' ? WORDS.statement.connectingWhenReady : H.connect, 'ink', { kind: 'connect' }, f.press?.kind === 'connect' ? { busy: true } : {}), reminder: H.connectReminder };
+  // R12 for a run found already in the folder and never seen alive here (RunFacts.neverSeenAlive): Connect, whatever
+  // its last known state says, online and needs-you included (after a browser restart the run record counts as
+  // found, and a stale heartbeat is all there is to go on); connect keeps a job that is in fact still there. Not
+  // while a Stop or a Connect is under way (m1). A run coming up, or one of the student's own that is only quiet,
+  // has its state's own primary or none (2026-10-02, the direct-way hang). The grid out of reach keeps its answer
+  if (f.run.stale && f.run.neverSeenAlive && f.grid.session === 'signed-in' && !f.stopping && !f.connect.inFlight && hero.state !== 'unreachable') return connect;
   switch (hero.state) {
     case 'online':
     case 'online-new':
@@ -1219,6 +1253,7 @@ function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
     case 'unreachable':
       return f.lastKnown?.state === 'online' && link ? open : connect;
     default:
+      // asked, in line, starting or renewing: none (the stale found run's Connect is above)
       return undefined;
   }
 }

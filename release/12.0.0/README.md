@@ -1,5 +1,9 @@
 # Beethoven 12.0.0 package, helper, guides, store kit and reviewers' mock portal
 
+**Superseded by 13.0.0** (`release/13.0.0/README.md`, built 2026-10-03), which fixes a panel that
+waited with no button on a dead worker (and, once framework 13 is on the grid, on one whose next job
+was cancelled): install that one, not this copy.
+
 Built 2026-10-02 at 20:23 UTC from this repository's working tree (not yet committed; `extension/`,
 Node 22.23.3: `node helper/build.mjs`, `npx tsc --noEmit`, `npm run build`, `npm run zip`, then
 `npx vitest run` with the built package present). Checksums of every file in this folder are in

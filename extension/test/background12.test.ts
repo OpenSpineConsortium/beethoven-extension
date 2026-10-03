@@ -270,3 +270,231 @@ describe.skipIf(!PY)("the direct way, through the background: GlobalProtect chos
     await until(panel, () => JSON.stringify(view(panel) ?? {}).includes(WORDS.direct.gate.names), 30_000);
   }, 120_000);
 });
+
+// 2026-10-02 evening (docs/V12_STATUS.md, "the direct-way hang"): a fresh copy signs in on the direct way
+// for an account whose worker folder already holds a run that has ended without its file saying so (the job
+// killed; status.json left "online" or "running", its heartbeat hours old). Claude Code is signed in on the
+// grid. The panel stayed on "Starting · Connecting to Claude…" with no button, and nothing was ever sent:
+// the gate's read carries no modified time, the background stamped the moment of the read in its place, so
+// the heartbeat never aged (R12 never fired), and the first run's moment trusted the run's phase anyway.
+async function firstSignIn(world: World, panel: ReturnType<typeof openPort>): Promise<void> {
+  await send(world, { type: 'panel.opened', windowId: 1 });
+  await until(panel, () => view(panel)?.journey?.moment === 'sign-in-sheet' && view(panel)?.journey?.phase === 'account');
+  await send(world, { type: 'action', action: { kind: 'grid-signin-account', account: 'st1234' } });
+  await until(panel, () => view(panel)?.journey?.phase === 'prompt');
+  await send(world, { type: 'action', action: { kind: 'grid-signin-answer', text: 'pw-correct' } });
+  await until(panel, () => (view(panel)?.journey?.prompts as Array<{ kind: string }> | undefined)?.[0]?.kind === 'code');
+  await send(world, { type: 'action', action: { kind: 'grid-signin-answer', text: '864209' } });
+  await until(panel, () => view(panel)?.journey?.moment === 'enrolled', 30_000);
+  await send(world, { type: 'action', action: { kind: 'grid-signin-continue' } });
+  await send(world, { type: 'action', action: { kind: 'protect-key-later' } });
+}
+const runRecord = (world: World) =>
+  world.storage.session['bridge.run'] as { job?: string; started_by?: string; status?: { state?: string; stop_reason?: string; next_job?: string }; listed_at?: string; alive_seen?: boolean } | undefined;
+const offersConnect = (panel: ReturnType<typeof openPort>) => /"kind":"connect"/.test(JSON.stringify(view(panel) ?? {}));
+
+for (const dead of [
+  { name: '"online" with no link', cfg: { run_state: 'online' } },
+  { name: '"online" with its link', cfg: { run_state: 'online', run_link: true } },
+  { name: '"running"', cfg: { run_state: 'running' } },
+]) {
+  describe.skipIf(!PY)(`the direct way, a fresh copy, a run already in the worker folder that ended with its status.json left ${dead.name} (heartbeat two hours old)`, () => {
+    let grid: Grid;
+    let world: World;
+    beforeAll(async () => {
+      grid = await startGrid({ claude: 'yes', job: '40400001', run_age_s: 7200, ...dead.cfg });
+    }, 60_000);
+    afterAll(() => grid?.stop());
+    beforeEach(() => {
+      vi.resetModules();
+      world = install();
+      world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+    });
+    afterEach(() => {
+      for (const s of [...world.sockets]) s.close(1000);
+    });
+
+    it('after the sign-in the panel offers Connect, never "Connecting to Claude…" for the dead run, and Connect goes through the gate', async () => {
+      nativeHelperToTcp(world, grid.port);
+      await boot(world);
+      const panel = openPort(world, 'panel');
+      await firstSignIn(world, panel);
+      // the background finds the old run through the gate and reads its file
+      await until(panel, () => runRecord(world)?.job === '40400001' && runRecord(world)?.status?.state === dead.cfg.run_state, 30_000);
+      const seen: string[] = [];
+      await until(
+        panel,
+        () => {
+          const j = view(panel)?.journey;
+          const b = j ? `${j.moment}${j.sub ? ` ${JSON.stringify(j.sub)}` : ''}` : String(view(panel)?.kind);
+          if (seen[seen.length - 1] !== b) seen.push(b);
+          return offersConnect(panel);
+        },
+        30_000,
+      );
+      // a dead run is never shown as one coming up, nor as online
+      expect(view(panel)?.journey?.moment).not.toBe('starting');
+      expect(view(panel)?.journey?.moment).not.toBe('online');
+      expect((world.storage.local['bridge.once'] as { first_online_at?: string } | undefined)?.first_online_at).toBeUndefined();
+      await send(world, { type: 'action', action: { kind: 'connect' } });
+      await until(panel, () => runRecord(world)?.job === '40501234', 30_000);
+      const g = await grid.state();
+      expect(g.state.commands.filter((c) => c.startsWith('gate connect'))).toEqual([`gate connect worker wayne ${INSTALL} default chain`]);
+      expect(seen.some((s) => s.startsWith('starting'))).toBe(false);
+    }, 120_000);
+  });
+}
+
+describe.skipIf(!PY)('the direct way, a fresh copy, a worker in the folder that is alive (its heartbeat moves every 30 s)', () => {
+  let grid: Grid;
+  let world: World;
+  beforeAll(async () => {
+    grid = await startGrid({ claude: 'yes', job: '40400001', run_state: 'running', run_age_s: 0, run_live: true });
+  }, 60_000);
+  afterAll(() => grid?.stop());
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+  });
+  afterEach(() => {
+    for (const s of [...world.sockets]) s.close(1000);
+  });
+
+  it('is shown coming up ("Starting"), with no Connect, and nothing is started', async () => {
+    nativeHelperToTcp(world, grid.port);
+    await boot(world);
+    const panel = openPort(world, 'panel');
+    await firstSignIn(world, panel);
+    await until(panel, () => runRecord(world)?.status?.state === 'running' && view(panel)?.journey?.moment === 'starting', 30_000);
+    for (let i = 0; i < 20; i++) {
+      panel.tick();
+      await sleep(150);
+    }
+    expect(view(panel)?.journey?.moment).toBe('starting');
+    expect(offersConnect(panel)).toBe(false);
+    expect((await grid.state()).state.commands.filter((c) => c.startsWith('gate connect'))).toEqual([]);
+  }, 120_000);
+});
+
+// 13.0.0 (the review, m5): a live worker whose grid clock lags this computer's by five minutes. Its file's own
+// updated_at is five minutes old at every read, and the worker writes it once a heartbeat (HEARTBEAT_S, 30 s), so
+// every read before its next heartbeat sees the same file and cannot tell it from a dead one: the stale view
+// (Connect) may last up to one heartbeat, and the first read after it, which sees the file changed, shows the
+// worker coming up. The stand-in heartbeats every BEAT_S seconds here, to keep the case short.
+const BEAT_S = 6;
+describe.skipIf(!PY)("the direct way, a fresh copy, a live worker whose heartbeat reads five minutes old (the grid's clock behind this one)", () => {
+  let grid: Grid;
+  let world: World;
+  beforeAll(async () => {
+    grid = await startGrid({ claude: 'yes', job: '40400001', run_state: 'running', run_age_s: 300, run_live: true, run_beat_s: BEAT_S });
+  }, 60_000);
+  afterAll(() => grid?.stop());
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+  });
+  afterEach(() => {
+    for (const s of [...world.sockets]) s.close(1000);
+  });
+
+  it('the stale view lasts at most one heartbeat; then "Starting", which stays, and nothing is started', async () => {
+    nativeHelperToTcp(world, grid.port);
+    await boot(world);
+    const panel = openPort(world, 'panel');
+    await firstSignIn(world, panel);
+    // each read of the run's files stamps the record's listed_at: the reads are counted from it, and a read made
+    // before the file was seen to change (alive_seen not yet set) is one that showed the stale view
+    const reads = new Set<string>();
+    const staleReads = new Set<string>();
+    let startingAt: number | undefined;
+    await until(
+      panel,
+      () => {
+        const r = runRecord(world);
+        if (r?.job === '40400001' && r.status?.state === 'running' && r.listed_at) {
+          reads.add(r.listed_at);
+          if (!r.alive_seen) staleReads.add(r.listed_at);
+        }
+        if (view(panel)?.journey?.moment === 'starting' && reads.size > 0) startingAt = reads.size;
+        return startingAt !== undefined;
+      },
+      40_000,
+    );
+    expect(runRecord(world)?.alive_seen).toBe(true);
+    // the reads that showed the stale view all fall within one heartbeat of the first (a read's stamp is taken when
+    // its answer is in, so 1.5 s for the reads' own time); the read after the heartbeat showed "Starting"
+    const stale = [...staleReads].map((s) => Date.parse(s));
+    expect(stale.length).toBeGreaterThan(0);
+    expect(Math.max(...stale) - Math.min(...stale)).toBeLessThanOrEqual(BEAT_S * 1000 + 1500);
+    expect(reads.size).toBeGreaterThan(staleReads.size);
+    // and it stays so across later reads: the stale view never comes back
+    const until8 = Date.now() + 8_000;
+    while (Date.now() < until8) {
+      panel.tick();
+      await sleep(150);
+      const r = runRecord(world);
+      if (r?.listed_at) reads.add(r.listed_at);
+      expect(view(panel)?.journey?.moment).toBe('starting');
+      expect(offersConnect(panel)).toBe(false);
+    }
+    expect(reads.size).toBeGreaterThan(startingAt!);
+    expect((await grid.state()).state.commands.filter((c) => c.startsWith('gate connect'))).toEqual([]);
+  }, 120_000);
+});
+
+// Framework 13 (bin/hpcworker successor_refresh): a job that ended naming a successor the scheduler no longer has
+// (2026-10-02: go2432's successor cancelled at 20:42:10, the job at 20:42:16; status.json left "preempted",
+// next_job 40551869) is reported by the gate's status as "stopped", stop_reason successor_gone. The panel then
+// offers Connect: at once for a fresh copy that finds it, and within the minute for a browser already showing
+// the run as renewing (13.0.0 asks `worker status` while renewing, as while in line).
+for (const c of [
+  { name: 'found that way by a fresh copy', after: 0 },
+  { name: 'found renewing, its successor cancelled afterwards', after: 1 },
+]) {
+  describe.skipIf(!PY)(`framework 13, the direct way: a worker whose next job in the chain is gone, ${c.name}`, () => {
+    let grid: Grid;
+    let world: World;
+    beforeAll(async () => {
+      grid = await startGrid({ claude: 'yes', job: '40400001', run_state: 'preempted', run_next: '40551869', run_successor: 'gone', gone_after_status: c.after, run_age_s: 3600 });
+    }, 60_000);
+    afterAll(() => grid?.stop());
+    beforeEach(() => {
+      vi.resetModules();
+      world = install();
+      world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+    });
+    afterEach(() => {
+      for (const s of [...world.sockets]) s.close(1000);
+    });
+
+    it('the panel shows it stopped and offers Connect, and Connect goes through the gate', async () => {
+      nativeHelperToTcp(world, grid.port);
+      await boot(world);
+      const panel = openPort(world, 'panel');
+      await firstSignIn(world, panel);
+      const seen: string[] = [];
+      const note = () => {
+        const j = view(panel)?.journey;
+        const b = j ? `${j.moment}${j.sub ? ` ${JSON.stringify(j.sub)}` : ''}` : String(view(panel)?.kind);
+        if (seen[seen.length - 1] !== b) seen.push(b);
+      };
+      if (c.after > 0) {
+        // the successor still in line when the run is found: renewing ("Starting", reconnecting), no Connect
+        await until(panel, () => (note(), runRecord(world)?.status?.state === 'preempted' && view(panel)?.journey?.moment === 'starting'), 30_000);
+        expect(offersConnect(panel)).toBe(false);
+      }
+      await until(panel, () => (note(), runRecord(world)?.status?.state === 'stopped' && offersConnect(panel)), 30_000);
+      expect(runRecord(world)?.status).toMatchObject({ state: 'stopped', stop_reason: 'successor_gone', next_job: '' });
+      expect(view(panel)?.journey?.moment).toBe('statement');
+      if (c.after === 0) expect(seen.some((s) => s.startsWith('starting'))).toBe(false);
+      const statusCalls = (await grid.state()).state.commands.filter((x) => x === 'gate status worker').length;
+      expect(statusCalls).toBe(c.after + 1);
+      await send(world, { type: 'action', action: { kind: 'connect' } });
+      await until(panel, () => runRecord(world)?.job === '40501234', 30_000);
+      const g = await grid.state();
+      expect(g.state.commands.filter((x) => x.startsWith('gate connect'))).toEqual([`gate connect worker wayne ${INSTALL} default chain`]);
+    }, 120_000);
+  });
+}

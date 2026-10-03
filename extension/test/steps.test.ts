@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS, type LastKnown } from '../src/core/keys';
 import { formatClock, type HomeView, type JourneyView, type PanelView } from '../src/core/model';
 import { SHORT_STATEMENT, STATEMENT_TICK, PLAN_CLASS_DISCLOSURE } from '../src/core/disclosure';
-import { home, journey, momentOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
+import { home, journey, lastKnownOf, momentOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
 import { TERMS_REFUSAL } from '../src/core/terms';
 import { accessFact, type AccessRecord } from '../src/licensing/access';
 
@@ -510,5 +510,144 @@ describe('no internal words reach a student', () => {
     for (const phase of ['offer', 'password', 'checking', 'done', 'paste', 'closed'] as const) views.push(panelView(facts({ loginSetup: { phase, line: 'bash /a/bin/hpcworker login-setup' } })));
     const hits = views.flatMap((v) => strings(v)).filter((s) => BANNED.test(s) && !ALLOWED.includes(s));
     expect([...new Set(hits)]).toEqual([]);
+  });
+});
+
+// 2026-10-02 evening (docs/V12_STATUS.md, "the direct-way hang"): a run found already in the worker folder
+// whose heartbeat stopped (R12, stale) and that this browser has never seen alive, or a run whose job ended, is
+// not a worker coming up. The first run's moment showed "Starting · Connecting to Claude…" (or "In line for a
+// computer") from it, with no button, and nothing was ever sent. 13.0.0 (the review, M1): only such a found run
+// is shown with Connect; a run of the student's own Connect that is merely quiet keeps its phase, because the
+// worker writes nothing for up to about three minutes between "starting" and its main loop on a cold node
+// (framework/jobs/worker.sbatch.tpl), and R7's "Still connecting" is the answer then.
+describe('a run that has gone quiet or ended never holds a waiting moment without a way on', () => {
+  const offersConnect = (v: unknown) => /"kind":"connect"/.test(JSON.stringify(v));
+  /** a run found already in the folder whose file this browser never saw change (RunFacts.neverSeenAlive) */
+  const found = (r: Partial<RunFacts>) => run({ pressed: false, neverSeenAlive: true, ...r });
+
+  it('the first run: a found run never seen alive, stale (its heartbeat over three minutes old), gives Connect, not "Starting"', () => {
+    for (const phase of ['connecting', 'slow', 'got-computer', 'reconnecting', 'needs-claude', 'online'] as const) {
+      const f = facts({ ...firstRun, run: found({ phase, live: false, stale: true, link: phase === 'online' ? LINK : undefined }) });
+      expect(momentOf(f)).toBe('statement');
+      expect(offersConnect(journey(f))).toBe(true);
+    }
+  });
+
+  it("M1, the first run: a run of the student's own Connect that is only quiet keeps its phase, with no Connect", () => {
+    // in line, then the worker's cold-node gap: "Still connecting" (R7), never the statement
+    const slow = facts({ ...firstRun, connect: { queued: true }, run: run({ phase: 'slow', live: false, stale: true }) });
+    expect(momentOf(slow)).toBe('starting');
+    expect(J(slow, 'starting').problem?.body).toBe('Still connecting. This is taking longer than usual.');
+    expect(offersConnect(journey(slow))).toBe(false);
+    for (const phase of ['connecting', 'got-computer', 'reconnecting'] as const) {
+      const f = facts({ ...firstRun, run: run({ phase, live: false, stale: true }) });
+      expect(momentOf(f)).toBe('starting');
+      expect(offersConnect(journey(f))).toBe(false);
+    }
+    // a found run this browser has seen alive (its file changed between two reads) that went quiet: the same
+    expect(momentOf(facts({ ...firstRun, run: run({ phase: 'slow', live: false, stale: true, pressed: false }) }))).toBe('starting');
+  });
+
+  it('the first run: a live run is still shown coming up, with no Connect', () => {
+    const f = facts({ ...firstRun, run: run({ phase: 'connecting' }) });
+    expect(momentOf(f)).toBe('starting');
+    expect(J(f, 'starting').sub).toBe('Connecting to Claude…');
+    expect(offersConnect(journey(f))).toBe(false);
+    // found and not yet seen to change, but its heartbeat fresh: coming up too
+    expect(momentOf(facts({ ...firstRun, run: found({ phase: 'connecting' }) }))).toBe('starting');
+  });
+
+  it('the first run: "In line for a computer" is not held by an earlier Connect once its run has stopped or ended, or is a found run never seen alive', () => {
+    expect(momentOf(facts({ ...firstRun, connect: { queued: true }, run: run({ phase: 'stopped', live: false }) }))).toBe('statement');
+    expect(momentOf(facts({ ...firstRun, connect: { queued: true }, run: run({ phase: 'ended', live: false }) }))).toBe('statement');
+    expect(momentOf(facts({ ...firstRun, connect: { queued: true }, run: found({ phase: 'connecting', live: false, stale: true }) }))).toBe('statement');
+    // still in line while the Connect's job has not been read yet, or is in line
+    expect(momentOf(facts({ ...firstRun, connect: { queued: true } }))).toBe('queue');
+    expect(momentOf(facts({ ...firstRun, connect: { queued: true }, run: run({ phase: 'queued' }) }))).toBe('queue');
+  });
+
+  it('the home: a found run never seen alive shows its last known state, and Connect; not while stopping (m1)', () => {
+    const lk: LastKnown = { worker_name: 'worker', state: 'starting', title: 'Wayne State grid', seen_at: ago(30 * MIN) };
+    const withKnown = home(facts({ lastKnown: lk, run: found({ phase: 'connecting', live: false, stale: true }) }));
+    expect(withKnown.hero.state).toBe('connecting');
+    expect(withKnown.primary?.kind).toBe('connect');
+    // m1: a Stop under way offers no Connect beside it
+    expect(home(facts({ stopping: true, lastKnown: lk, run: found({ phase: 'connecting', live: false, stale: true }) })).primary).toBeUndefined();
+    // M1: a run of the student's own that is only quiet keeps its last known state with no primary, as before
+    expect(home(facts({ lastKnown: lk, run: run({ phase: 'slow', live: false, stale: true }) })).primary).toBeUndefined();
+    // a live one coming up has no primary (the spec: none while asked, in line, starting or renewing)
+    expect(home(facts({ run: run({ phase: 'connecting' }) })).primary).toBeUndefined();
+  });
+
+  it('m2: a stale run with no last known state is not shown live: hero "Stopped", Connect, and a plain toolbar agree', () => {
+    for (const r of [found({ phase: 'connecting', live: false, stale: true }), found({ phase: 'online', live: false, stale: true, link: LINK })]) {
+      const f = facts({ run: r });
+      const h = home(f);
+      expect(h.hero).toMatchObject({ state: 'unknown', orb: 'stopped', word: 'Stopped' });
+      expect(h.primary?.kind).toBe('connect');
+      expect(h.track).toBeUndefined();
+      expect(h.foot.right).toBeUndefined();
+      const tb = toolbarView(f);
+      expect(tb.badge).toBeUndefined();
+      expect(tb).toMatchObject({ title: 'Beethoven', lit: false });
+      // and the first run's toolbar agrees with its Connect
+      expect(toolbarView(facts({ ...firstRun, run: r })).badge).toBeUndefined();
+    }
+  });
+
+  it("the review of 13.0.0, 1: a stale run of the student's own, or a found run seen alive, with no last known state keeps its phase's hero, not live, and gets no Connect", () => {
+    // the student's own Connect, phase slow, stale, no last known state: "Still connecting", never "Stopped" with Connect
+    const own = facts({ run: run({ phase: 'slow', live: false, stale: true }) });
+    const h = home(own);
+    expect(h.hero).toMatchObject({ state: 'slow', word: 'Still connecting', sub: 'This is taking longer than usual.' });
+    expect(h.primary).toBeUndefined();
+    expect(offersConnect(h)).toBe(false);
+    expect(h.track).toBeUndefined();
+    expect(h.foot.right).toBeUndefined();
+    expect(toolbarView(own)).toEqual({ title: 'Beethoven', lit: false });
+    // not live: nothing is recorded as last known from it
+    expect(lastKnownOf(own)).toBeUndefined();
+    // the other quiet phases of the student's own run, and a found run this browser has seen alive: the same
+    for (const r of [
+      run({ phase: 'connecting', live: false, stale: true }),
+      run({ phase: 'got-computer', live: false, stale: true }),
+      run({ phase: 'reconnecting', live: false, stale: true }),
+      run({ phase: 'slow', live: false, stale: true, pressed: false }),
+    ]) {
+      const v = home(facts({ run: r }));
+      expect(v.hero.state).not.toBe('unknown');
+      expect(v.hero.word).not.toBe('Stopped');
+      expect(offersConnect(v)).toBe(false);
+    }
+    // a found run never seen alive is the one that reads "Stopped" with Connect (m2)
+    expect(home(facts({ run: found({ phase: 'slow', live: false, stale: true }) })).primary?.kind).toBe('connect');
+  });
+
+  it('the review of 13.0.0, 2: on the home a stale found run never seen alive gets Connect whatever its last known state, and its "As of" asks for no sign-in', () => {
+    const at = ago(30 * MIN);
+    const clock = formatClock(at, true);
+    const stale = found({ phase: 'online', live: false, stale: true, link: LINK });
+    for (const state of ['online', 'needs-you', 'error', 'renewing', 'queued', 'starting', 'stopped'] as const) {
+      const lk: LastKnown = { worker_name: 'worker', state, title: 'Wayne State grid', environment_url: LINK, seen_at: at };
+      const h = home(facts({ lastKnown: lk, run: stale }));
+      expect(h.primary?.kind, state).toBe('connect');
+      expect(h.hero.asOf, state).toBe(`As of ${clock}. Your worker isn't answering now.`);
+      expect(JSON.stringify(h), state).not.toContain('Sign in to the grid');
+    }
+    const lkOnline: LastKnown = { worker_name: 'worker', state: 'online', title: 'Wayne State grid', environment_url: LINK, seen_at: at };
+    // a Stop under way: the last known state's own primary (online: Open my session), never Connect beside the Stop (m1)
+    expect(home(facts({ stopping: true, lastKnown: lkOnline, run: stale })).primary?.kind).toBe('open-session');
+    // a Connect in flight: none of its own
+    expect(home(facts({ connect: { inFlight: true }, lastKnown: lkOnline, run: stale })).primary?.kind).not.toBe('connect');
+    // M1: the student's own run, or a found one seen alive, keeps the last known state's own primary
+    expect(home(facts({ lastKnown: lkOnline, run: run({ phase: 'online', live: false, stale: true, link: LINK }) })).primary?.kind).toBe('open-session');
+    expect(home(facts({ lastKnown: lkOnline, run: run({ phase: 'online', live: false, stale: true, link: LINK, pressed: false }) })).primary?.kind).toBe('open-session');
+    expect(home(facts({ lastKnown: { ...lkOnline, state: 'needs-you' }, run: run({ phase: 'needs-claude', live: false, stale: true }) })).primary?.kind).toBe('sign-in-claude');
+    // signed in, so the "As of" of the student's own stale run asks for no sign-in either
+    expect(home(facts({ lastKnown: lkOnline, run: run({ phase: 'online', live: false, stale: true, link: LINK }) })).hero.asOf).toBe(`As of ${clock}. Your worker isn't answering now.`);
+    // signed out of the grid: no Connect from a heartbeat it cannot see, and the "As of" asks for the sign-in as before
+    const out = home(facts({ grid: { session: 'signed-out' }, lastKnown: lkOnline, run: stale }));
+    expect(out.primary?.kind).toBe('open-session');
+    expect(out.hero.asOf).toBe(`As of ${clock}. Sign in to the grid to see it live.`);
   });
 });

@@ -507,6 +507,9 @@ export class SshConnection {
     };
     this.channels.set(id, ch);
     const opened = new Promise<void>((res, rej) => (ch.openWait = { res, rej }));
+    // the connection can end while CHANNEL_OPEN is still being sent (finishChannel rejects this before the
+    // race below is attached): marked handled here, the race still sees it; otherwise an unhandled rejection
+    opened.catch(() => undefined);
     await this.transport.sendPacket(new Writer().byte(MSG.CHANNEL_OPEN).string('session').u32(id).u32(LOCAL_WINDOW).u32(LOCAL_MAX_PACKET).bytes());
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
