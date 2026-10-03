@@ -6,10 +6,31 @@
 > `framework/profiles/`. The cluster side (hpcworker) lives in the sibling repository,
 > `OpenSpineConsortium/hpcworker`. The text below predates the split and describes the whole
 > product; where it names `framework/` beyond the profiles, read the sibling repository.
-> Collaborators with access to this repository can run the newest green build in one command:
-> `bash extension/scripts/dev-install.sh` (gh sign-in, then a one-time "Load unpacked" in Chrome).
-> Students get Beethoven only through the private Chrome Web Store listing, the one channel that
-> gives a real one-click install.
+
+## Trying it from this repository (collaborators)
+
+A page cannot install a Chrome extension — only the Chrome Web Store can, which is why students
+get Beethoven through the private listing, the one real one-click install. For people this
+repository is shared with, two developer paths, closest-to-one-click first:
+
+**No terminal at all.** Your GitHub sign-in in the browser is the authorization.
+1. Open this repository's **Actions** tab and the newest green **ci** run.
+2. Under **Artifacts**, download **chrome-mv3** and extract the zip (Windows Explorer and macOS
+   Finder do this themselves).
+3. In Chrome: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick the
+   extracted folder.
+To update later, repeat with a newer run's artifact into the same folder and press the reload
+arrow on the Beethoven card.
+
+**One command, self-updating folder** (needs git and [gh](https://cli.github.com)):
+```
+gh api repos/OpenSpineConsortium/beethoven-extension/contents/get-beethoven.sh -H "Accept: application/vnd.github.raw+json" | bash
+```
+It signs you in if needed, clones or updates the repository, installs the newest green CI build
+to a stable folder, and prints the one-time Load-unpacked step; later runs update in place.
+
+Chrome shows its developer-mode banner for anything loaded this way and never auto-updates it:
+that is the browser's permanent price for an install from outside the Web Store.
 
 The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
