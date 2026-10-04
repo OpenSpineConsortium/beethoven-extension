@@ -631,7 +631,7 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
       // a refused link is what this background saw end the sitting; "interrupted" is only read from an earlier sitting's Claude tab
       if (c.notSubscription) problem = { body: WORDS.claude.subscriptionOnly, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.interrupted) problem = { body: WORDS.claude.interrupted, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
-      else if (c.noPlan) problem = { body: WORDS.claude.noPlan, button: button(WORDS.claude.useAnother, 'ink', { kind: 'sign-in-claude', fresh: true }) };
+      else if (c.noPlan) problem = { body: `${WORDS.claude.noPlan} ${WORDS.claude.switchAccount}`, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.failure === 'signin-timeout') problem = { body: WORDS.claude.timedOut, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.failure === 'signin-code') problem = { body: WORDS.claude.badCode, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.failure === 'signin-billed' || c.failure === 'signin-method') problem = connectProblem(c.failure);

@@ -178,7 +178,12 @@ export const WORDS = {
     tabClosed: 'The Claude tab was closed.',
     openAgain: 'Open it again',
     noPlan: 'This Claude account has no Pro or Max plan. Remote Control needs one.',
-    useAnother: 'Use another account',
+    /**
+     * shown after noPlan, in place of 14.0.0's "Use another account" (framework 17: Beethoven never signs
+     * anyone out of Claude, and the grid refuses the `--login fresh` earlier builds typed for it, so the
+     * switch is the student's own, as the lab lead's guide shows)
+     */
+    switchAccount: "To use another Claude account, sign out of Claude on the grid first (your lab lead's guide shows how), then press Sign in again.",
     /** the sign-in sitting was lost (the browser stopped Beethoven's background mid-sign-in): a plain sentence and a fresh start */
     interrupted: 'The sign-in stopped before it finished.',
     /** the sitting offered a page that is not a Claude subscription's sign-in (the Console's, which bills by use, or any other): nothing was opened (greg, 2026-10-04: no API key anywhere) */
@@ -858,7 +863,7 @@ export interface ClaudeMoment {
   inLine?: Timer;
   /** "Signed in as alex@wayne.edu · Max", with a drawn check, for 3 s */
   signedIn?: string;
-  /** bad code; timed out [Sign in again]; tab closed [Open it again]; no Pro or Max [Use another account] */
+  /** bad code; timed out [Sign in again]; tab closed [Open it again]; no Pro or Max, with how to switch accounts [Sign in again] */
   problem?: ProblemView;
 }
 
@@ -1473,8 +1478,8 @@ export type Action =
   | { kind: 'cancel' }
   /** "Stop" and "Cancel" (in line), after the confirm row: worker stop alone, through the shell */
   | { kind: 'stop' }
-  /** "Sign in to Claude", "Sign in again"; fresh: "Use another account" (connect --login fresh) */
-  | { kind: 'sign-in-claude'; fresh?: boolean }
+  /** "Sign in to Claude", "Sign in again": connect --login always (never a sign-out: framework 17 refuses `--login fresh`, and the account switch is the student's own, said under noPlan) */
+  | { kind: 'sign-in-claude' }
   /** the pasted code: typed once into the sitting and forgotten; never stored or logged */
   | { kind: 'paste-code'; code: string }
   /** "Open the Claude tab again", "Open it again": the same authorize link, in a new tab, in the panel's window */

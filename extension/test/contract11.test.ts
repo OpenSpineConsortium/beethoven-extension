@@ -5,7 +5,7 @@
 // login-setup's outcome, the reason classes, the plan words, the pasted code's shape, the session title
 // and the shared formatters. The architect's 71 scratch cases (scratchpad/v11/contract/check.ts), as tests.
 import { describe, expect, it } from 'vitest';
-import { commands, isLoginSetupLine, isSubscriptionSignIn, KEEPALIVE_LINE, LOGIN_SETUP_DONE, loginSetupOutcome, parseConnectLine, parseProgressLine, parseStatusJson, parseStepLine, planAllowsRemoteControl, planWord, plausibleCode, reasonClass, sessionTitleFor, withoutKeepalive } from '../src/core/contract';
+import { commands, CONNECT_LINE_RE, gateLineFor, isLoginSetupLine, isSubscriptionSignIn, KEEPALIVE_LINE, LOGIN_SETUP_DONE, loginSetupOutcome, parseConnectLine, parseProgressLine, parseStatusJson, parseStepLine, planAllowsRemoteControl, planWord, plausibleCode, reasonClass, sessionTitleFor, withoutKeepalive } from '../src/core/contract';
 import { defaultPortalFrom } from '../src/core/keys';
 import { formatAgo, formatClock, formatTimer, formatUp, WORDS } from '../src/core/model';
 
@@ -15,7 +15,15 @@ const ID = '0123456789abcdef0123456789abcdef';
 describe('the lines 11.0.0 types', () => {
   it('connect names the shared copy by its full path, with the consent only when given, and --no-chain when the chain is off', () => {
     expect(commands.connect(SHARED, { name: 'worker', site: 'wayne', installId: ID, login: 'auto', permissionMode: 'default', chain: true })).toBe(`exec bash '${SHARED}/bin/hpcworker' connect --name 'worker' --profile 'wayne' --consent '${ID}' --login 'auto' --permission-mode 'default'`);
-    expect(commands.connect(SHARED, { name: 'w2', site: 'wayne', login: 'fresh', permissionMode: 'plan', chain: false })).toBe(`exec bash '${SHARED}/bin/hpcworker' connect --name 'w2' --profile 'wayne' --login 'fresh' --permission-mode 'plan' --no-chain`);
+    expect(commands.connect(SHARED, { name: 'w2', site: 'wayne', login: 'always', permissionMode: 'plan', chain: false })).toBe(`exec bash '${SHARED}/bin/hpcworker' connect --name 'w2' --profile 'wayne' --login 'always' --permission-mode 'plan' --no-chain`);
+  });
+
+  it("never asks for --login fresh (framework 17 refuses it: Beethoven never signs anyone out of Claude), yet still reads an older build's line that did", () => {
+    expect(() => commands.connect(SHARED, { name: 'w2', site: 'wayne', login: 'fresh' as never, permissionMode: 'plan', chain: false })).toThrow();
+    const older = `exec bash '${SHARED}/bin/hpcworker' connect --name 'w2' --profile 'wayne' --login 'fresh' --permission-mode 'plan' --no-chain`;
+    expect(CONNECT_LINE_RE.exec(older)?.slice(1)).toEqual(['w2', 'wayne', undefined, 'fresh', 'plan', ' --no-chain']);
+    // and, as any line that asks for a Claude sign-in, the gate never carries it
+    expect(gateLineFor(older)).toBeUndefined();
   });
 
   it('refuses a bad name, a dot-dot shared folder, a bad site, id, login or mode before anything is typed', () => {

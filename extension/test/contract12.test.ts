@@ -38,7 +38,7 @@ describe('the 11.0.0 lines the gate carries, and the ones it never does', () => 
     const base = { name: 'worker', site: 'wayne', installId: ID, permissionMode: 'default' as const, chain: true };
     expect(gateLineFor(commands.connect(SHARED, { ...base, login: 'never' }))).toBe(`connect worker wayne ${ID} default chain`);
     expect(gateLineFor(commands.connect(SHARED, { ...base, login: 'never', chain: false }))).toBe(`connect worker wayne ${ID} default no-chain`);
-    for (const login of ['auto', 'always', 'fresh'] as const) expect(gateLineFor(commands.connect(SHARED, { ...base, login }))).toBeUndefined();
+    for (const login of ['auto', 'always'] as const) expect(gateLineFor(commands.connect(SHARED, { ...base, login }))).toBeUndefined();
   });
 
   it('install, consent, probe and anything else are not carried', () => {

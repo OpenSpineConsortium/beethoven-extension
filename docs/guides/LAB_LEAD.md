@@ -13,6 +13,11 @@ and no environment link) is read as online, which needs framework 14 on the grid
 the panel keeps a debug log in memory that a student copies for you with **⋯** (More), **Copy debug log**.
 Publish framework 14 with the two commands of section 2 (`--dry-run` first), as for 11 and 13.
 
+**15.0.0 and framework 17 (2026-10-04).** Beethoven never signs anyone out of Claude. Framework 17
+refuses the `--login fresh` that earlier builds typed for **Use another account**, 15.0.0 never asks for
+it, and a student who needs another Claude account signs out of Claude Code themselves, then presses
+**Sign in again** (section 13).
+
 ## 1. What changes for you
 
 - **Students reach the grid's login node directly**, over ssh, from their own computers, with no VPN:
@@ -259,6 +264,9 @@ Beethoven says which in plain words and offers GlobalProtect for that action.
 - **"The grid lets this computer's key use only a few worker names."** The names cap (section 7).
   Signing in again with the password and code clears it; so does waiting a week.
 - **"I lost my laptop."** Section 5.
+- **"This Claude account has no Pro or Max plan."** The Claude account they signed in with has no
+  Remote Control. To use another one they sign out of Claude on the grid themselves, then press
+  **Sign in again**; Beethoven never does the sign-out (section 13).
 - **"Your grid account can't use the lab's copy yet."** and **Copy details** shows `setup: failed (the
   setup line ended with exit 126: bash: /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker:
   Permission denied)`. Their AccessID is not on the list yet (section 9).
@@ -506,3 +514,23 @@ before a line is kept (`extension/src/core/debuglog.ts`). It is in the backgroun
 background again: a browser restart, an update, and Chrome stopping an idle service worker, which it
 does about 30 seconds after the last event while the panel is closed. So ask for it while the panel
 still shows the problem.
+
+## 13. Switching Claude accounts (15.0.0, framework 17)
+
+Beethoven never signs a student out of Claude. Its own tooling has no command for it, on purpose:
+earlier builds' **Use another account** typed `connect --login fresh`, which signed out of Claude Code
+on the grid before signing in again; framework 17 refuses that line, and 15.0.0 never types it. So when
+a student needs to use another Claude account (the panel said "This Claude account has no Pro or Max
+plan. Remote Control needs one.", or they have a second account of their own), the sign-out is theirs:
+
+1. In a terminal on a compute node, inside the lab's worker image, with the student's own sign-in
+   folder (`~/.beethoven/claude`) as `CLAUDE_CONFIG_DIR`, the student runs Claude Code's own
+   `claude auth logout`. The exact way to open that terminal depends on the site; your own notes hold
+   the one that works on your grid.
+2. Back in Beethoven, the student presses **Sign in again**. The sitting runs as on the first day: a
+   Claude tab, the code, **Continue**, and the new account's plan is checked the same way.
+
+The panel's sentence under "no Pro or Max plan" sends the student here: "To use another Claude
+account, sign out of Claude on the grid first (your lab lead's guide shows how), then press Sign in
+again." Nothing of Beethoven's reads or changes the sign-in folder; what `claude auth logout` removes
+is Claude Code's own, run by the student.
