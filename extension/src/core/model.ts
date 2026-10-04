@@ -181,6 +181,10 @@ export const WORDS = {
     useAnother: 'Use another account',
     /** the sign-in sitting was lost (the browser stopped Beethoven's background mid-sign-in): a plain sentence and a fresh start */
     interrupted: 'The sign-in stopped before it finished.',
+    /** the sitting offered a page that is not a Claude subscription's sign-in (the Console's, which bills by use, or any other): nothing was opened (greg, 2026-10-04: no API key anywhere) */
+    subscriptionOnly: "Beethoven signs in only with a Claude subscription, on Claude's own sign-in page. This sign-in offered a different page, so Beethoven didn't open it.",
+    /** framework 17's signin-method: Claude Code on the grid is signed in some other way (a key, a token, a cloud provider); signing in again changes nothing, since Beethoven never signs anyone out */
+    otherSignIn: 'Claude on the grid is signed in, but not with a Claude subscription, and Beethoven runs only on your own subscription. Ask your lab lead to help you sign in again with your Claude account.',
   },
 
   /** AM2: the one-time key step. UNPROVEN ON THE GRID until a student without a key has tried it. */

@@ -260,6 +260,44 @@ describe.skipIf(!PY)('the direct way, through the background, when Claude Code i
   }, 120_000);
 });
 
+// greg, 2026-10-04: no API key anywhere. The sitting offers the Anthropic Console's sign-in (API usage billing)
+// in place of a subscription's: nothing is opened, the sitting is closed before any code could be typed, and the
+// student reads that Beethoven signs in only with a Claude subscription, with Sign in again.
+describe.skipIf(!PY)("the direct way, through the background, when the sign-in offers the Console's page", () => {
+  let grid: Grid;
+  let world: World;
+  beforeAll(async () => {
+    grid = await startGrid({ auth_url: 'https://platform.claude.com/oauth/authorize?code=true&client_id=test&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback' });
+  }, 60_000);
+  afterAll(() => grid?.stop());
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_host: 'grid.wayne.edu', ssh_port: 22, ssh_host_key: grid.fp, ssh_relay: null }));
+  });
+
+  it('opens nothing, closes the sitting and says why in plain words', async () => {
+    nativeHelperToTcp(world, grid.port);
+    await boot(world);
+    const panel = openPort(world, 'panel');
+    await firstSignIn(world, panel);
+    await until(panel, () => view(panel)?.journey?.moment === 'statement');
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    const { WORDS } = await import('../src/core/model');
+    await until(panel, () => (view(panel)?.journey?.problem as { body?: string } | undefined)?.body === WORDS.claude.subscriptionOnly, 30_000);
+    expect(view(panel)!.journey!.moment).toBe('claude');
+    expect(view(panel)!.journey!.problem).toEqual({ body: WORDS.claude.subscriptionOnly, button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-claude' } } });
+    expect(world.log.filter((l) => /tabs\.create/.test(l) && /claude\.(?:ai|com)|anthropic\.com/.test(l))).toEqual([]);
+    // the sitting is gone: a code has nowhere to go, and the grid never took one
+    expect(await send(world, { type: 'action', action: { kind: 'paste-code', code: 'goodcode-abcdef' } })).toMatchObject({ ok: true, value: { typed: false } });
+    expect((await grid.state()).state.claude).toBe('no');
+    const dl = (await send(world, { type: 'action', action: { kind: 'copy-debug-log' } })) as { ok: boolean; value: { text: string } };
+    expect(dl.value.text).toMatch(/ sitting \d+ refused-url$/m);
+    expect(dl.value.text).toMatch(/ sitting \d+ closed: its sign-in link was not a Claude subscription's, and nothing was opened/);
+    expect(dl.value.text).not.toContain('client_id');
+  }, 120_000);
+});
+
 describe.skipIf(!PY)("the direct way, through the background: GlobalProtect chosen and given up, a cap at Connect, ~/.bashrc noise", () => {
   let grid: Grid;
   let world: World;

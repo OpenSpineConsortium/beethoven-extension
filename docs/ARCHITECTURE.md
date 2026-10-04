@@ -380,10 +380,15 @@ known once a person has signed in through it.
 Rules the two sides keep. The extension reads `^HPCW-LOGIN` (informational, shown as the sitting's
 progress), `^AUTH-URL:\s*(\S+)`, `^SIGNED-IN` and `^HPCW-LOGIN-FAILED`; everything else is shown as
 the terminal's text and stored nowhere durable. It opens an `AUTH-URL` only when the address is
-`https` and its host is `claude.ai`, `claude.com` or a subdomain of either (`isClaudeAuthUrl`); any
-other address is reported as refused, not opened, and the sitting continues so the student can read
-what happened. A redrawn `AUTH-URL` line is not a second page. It sends the code as keystrokes on the
-port (the pasted line, then Enter) after the framework's paste line, counts the bytes for the audit
+`https` and its host is `claude.ai`, `claude.com` or a subdomain of either other than
+`platform.claude.com` or a subdomain of it, the Console's sign-in, which bills API usage
+(`isClaudeAuthUrl`; no API key anywhere, greg 2026-10-04: Beethoven signs in only with a Claude
+subscription); any other address is reported as refused, not opened, and the sitting continues so the
+student can read what happened. From the release after 14.0.0 the connect sitting instead closes on a
+refused address, since no code can come, and the panel says that Beethoven signs in only with a Claude
+subscription, with *Sign in again*. A redrawn `AUTH-URL` line is not a second page. It sends the code
+as keystrokes on the port (the pasted line, then Enter) after the framework's paste line, counts the
+bytes for the audit
 record, clears the box, and keeps nothing; a rejected code is asked for again by the framework's own
 line. The framework prints `AUTH-URL:` once, presses Enter for Claude Code should a login-method menu
 sit in front of the link (at most six times, never while the link is up; whether such a menu appears

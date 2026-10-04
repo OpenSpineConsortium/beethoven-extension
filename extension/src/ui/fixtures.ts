@@ -530,6 +530,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-claude-timed-out', surface: 'panel', note: 'the sign-in timed out', view: journey(claudeMoment({ problem: { body: WORDS.claude.timedOut, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
   { name: 'j-claude-tab-closed', surface: 'panel', note: 'the Claude tab was closed', view: journey(claudeMoment({ problem: { body: WORDS.claude.tabClosed, button: ink(WORDS.claude.openAgain, { kind: 'reopen-claude-tab' }) } })) },
   { name: 'j-claude-interrupted', surface: 'panel', note: 'the background was stopped mid-sign-in', view: journey(claudeMoment({ problem: { body: WORDS.claude.interrupted, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
+  { name: 'j-claude-not-subscription', surface: 'panel', note: "a sign-in link that is not a Claude subscription's (the Console's): nothing opened", view: journey(claudeMoment({ problem: { body: WORDS.claude.subscriptionOnly, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
   { name: 'j-claude-no-plan', surface: 'panel', note: 'a plan without Remote Control', view: journey(claudeMoment({ problem: { body: WORDS.claude.noPlan, button: ink(WORDS.claude.useAnother, { kind: 'sign-in-claude', fresh: true }) } })) },
 
   // AM2: the one-time key step (unproven on the grid)

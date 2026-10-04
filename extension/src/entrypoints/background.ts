@@ -674,6 +674,10 @@ async function buildFacts(): Promise<Facts> {
   // a Claude sign-in this background no longer holds (the service worker was stopped mid-sitting):
   // Anthropic's tab is still on record, and nothing on the grid says the sign-in finished
   const interrupted = !!S[ANTHROPIC_TAB_KEY] && !mem.sitting && !mem.startId && !mem.connect.inFlight && mem.connect.signin !== 'signed-in' && !rf.claude?.loggedIn;
+  // a refused sign-in link holds the Claude moment only until the grid says otherwise (a sign-in made another
+  // way, the worker online), as "interrupted" does: the flag itself stays until a press starts afresh
+  const { notSubscription, ...connectRest } = mem.connect;
+  const connect: ConnectFacts = { ...connectRest, ...(notSubscription && !rf.claude?.loggedIn && rf.phase !== 'online' ? { notSubscription } : {}), ...(interrupted ? { interrupted } : {}) };
   const press = S[WELCOME_PRESS_KEY] as { at?: string } | undefined;
   const pressAt = press?.at ? Date.parse(press.at) : NaN;
   return {
@@ -689,7 +693,7 @@ async function buildFacts(): Promise<Facts> {
     setup: mem.setup,
     statement: { inForce: !!statementFor(L[STATEMENTS_KEY] as Statements | undefined, prefs.worker_name), workerName: prefs.worker_name, ...(mem.restricted ? { restricted: true } : {}) },
     ...(S[PRESS_KEY] ? { press: S[PRESS_KEY] as PendingPress } : {}),
-    connect: interrupted ? { ...mem.connect, interrupted: true } : mem.connect,
+    connect,
     welcome: { state: mem.welcome.state, ...(Number.isFinite(pressAt) ? { pressAt } : {}) },
     ...(mem.loginSetup ? { loginSetup: { phase: mem.loginSetup.phase, line: mem.loginSetup.line } } : {}),
     run: rf,
@@ -2222,6 +2226,18 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
     }
   });
   const theTab = tabId;
+  let ended = false;
+  // the tab's share of the end, once: "Working on the grid…" lowered and a tab opened for the sitting closed
+  const release = (): boolean => {
+    if (ended) return false;
+    ended = true;
+    mem.workingInTab = Math.max(0, mem.workingInTab - 1);
+    if (ownTab) void host.close(theTab).catch(() => undefined);
+    return true;
+  };
+  const finish = (reason: string) => {
+    if (release()) void onSittingEnd(id, reason, []);
+  };
   mem.sitting = {
     id,
     mode: 'tab',
@@ -2236,18 +2252,13 @@ async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptio
       } catch {
         /* gone */
       }
+      // Chrome fires onDisconnect only on the far end, so finish never runs for a close from here; the
+      // caller ends the sitting itself (Sign in again, Cancel, Stop, a refused link)
+      release();
     },
   };
   mem.workingInTab++;
   dbg('sitting', `${id} open: a portal tab (${ownTab ? 'opened for it' : 'kept'}), login ${login}`);
-  let ended = false;
-  const finish = (reason: string) => {
-    if (ended) return;
-    ended = true;
-    mem.workingInTab = Math.max(0, mem.workingInTab - 1);
-    if (ownTab) void host.close(theTab).catch(() => undefined);
-    void onSittingEnd(id, reason, []);
-  };
   port.onMessage.addListener((m: unknown) => {
     const msg = m as ConnectOut;
     if (!msg || typeof msg !== 'object') return;
@@ -2334,6 +2345,15 @@ async function onConnectEvent(id: number, ev: ConnectEvent): Promise<void> {
       sit.authUrl = ev.url;
       mem.connect = { ...c, signin: 'link', claudeTabClosed: false, linkShown: true };
       await openAnthropicTab(ev.url);
+      break;
+    case 'refused-url':
+      // not a Claude subscription's sign-in page (the Console's bills API usage; no API key anywhere): nothing is
+      // opened, and the sitting, which could only wait for a code that never comes, is closed as Sign in again would
+      sit.gate.close();
+      sit.close();
+      mem.sitting = undefined;
+      mem.connect = { ...c, inFlight: false, notSubscription: true };
+      dbg('sitting', `${id} closed: its sign-in link was not a Claude subscription's, and nothing was opened`);
       break;
     case 'code-prompt':
       if (c.signin === 'asked') mem.connect = { ...c, signin: 'link' };

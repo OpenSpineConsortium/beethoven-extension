@@ -212,8 +212,20 @@ describe('journey: the first run, moment by moment', () => {
     const p = (c: Partial<Facts['connect']>) => J(facts({ ...firstRun, connect: { queued: true, signin: 'link', ...c } }), 'claude').problem;
     expect(p({ badCode: true })).toEqual({ body: "That code didn't work. Copy it again from the Claude tab." });
     expect(p({ failure: 'signin-timeout' })).toEqual({ body: 'The sign-in timed out.', button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-claude' } } });
+    // framework 17 closes the sitting itself on a sign-in that is not a Claude subscription's: the same sentence as a refused link, with
+    // Sign in again; when Claude Code on the grid is already signed in some other way, signing in again changes nothing, so the lead is the next step
+    expect(p({ failure: 'signin-billed' })).toEqual({ body: "Beethoven signs in only with a Claude subscription, on Claude's own sign-in page. This sign-in offered a different page, so Beethoven didn't open it.", button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-claude' } } });
+    expect(p({ failure: 'signin-method' })).toEqual({ body: 'Claude on the grid is signed in, but not with a Claude subscription, and Beethoven runs only on your own subscription. Ask your lab lead to help you sign in again with your Claude account.', button: { label: 'Copy details', tone: 'ink', action: { kind: 'copy-details' } } });
+    expect(momentOf(facts({ ...firstRun, connect: { inFlight: false, queued: true, failure: 'signin-method', pressedAt: NOW - 1 } }))).toBe('claude');
     expect(p({ claudeTabClosed: true })).toEqual({ body: 'The Claude tab was closed.', button: { label: 'Open it again', tone: 'ink', action: { kind: 'reopen-claude-tab' } } });
     expect(p({ noPlan: true, signin: 'signed-in', signedIn: { email: 'a@b.c', plan: 'free', at: NOW } })).toEqual({ body: 'This Claude account has no Pro or Max plan. Remote Control needs one.', button: { label: 'Use another account', tone: 'ink', action: { kind: 'sign-in-claude', fresh: true } } });
+    // no API key anywhere: a sign-in link that is not a subscription's was refused and its sitting closed; the moment stays, in plain words
+    const refused = facts({ ...firstRun, connect: { inFlight: false, queued: true, signin: 'asked', notSubscription: true } });
+    expect(momentOf(refused)).toBe('claude');
+    expect(J(refused, 'claude').problem).toEqual({ body: "Beethoven signs in only with a Claude subscription, on Claude's own sign-in page. This sign-in offered a different page, so Beethoven didn't open it.", button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-claude' } } });
+    expect(momentOf(facts({ ...firstRun, connect: { inFlight: false, queued: false, signin: 'asked', notSubscription: true } }))).toBe('claude');
+    // an earlier sitting's Claude tab still on record ("interrupted") does not hide why this one ended
+    expect(J(facts({ ...firstRun, connect: { inFlight: false, queued: true, signin: 'asked', notSubscription: true, interrupted: true } }), 'claude').problem?.body).toMatch(/^Beethoven signs in only with a Claude subscription/);
   });
 
   it('the one-time key step (AM2), each phase in its words', () => {

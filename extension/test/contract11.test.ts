@@ -5,7 +5,7 @@
 // login-setup's outcome, the reason classes, the plan words, the pasted code's shape, the session title
 // and the shared formatters. The architect's 71 scratch cases (scratchpad/v11/contract/check.ts), as tests.
 import { describe, expect, it } from 'vitest';
-import { commands, isLoginSetupLine, KEEPALIVE_LINE, LOGIN_SETUP_DONE, loginSetupOutcome, parseConnectLine, parseProgressLine, parseStatusJson, parseStepLine, planAllowsRemoteControl, planWord, plausibleCode, reasonClass, sessionTitleFor, withoutKeepalive } from '../src/core/contract';
+import { commands, isLoginSetupLine, isSubscriptionSignIn, KEEPALIVE_LINE, LOGIN_SETUP_DONE, loginSetupOutcome, parseConnectLine, parseProgressLine, parseStatusJson, parseStepLine, planAllowsRemoteControl, planWord, plausibleCode, reasonClass, sessionTitleFor, withoutKeepalive } from '../src/core/contract';
 import { defaultPortalFrom } from '../src/core/keys';
 import { formatAgo, formatClock, formatTimer, formatUp, WORDS } from '../src/core/model';
 
@@ -61,6 +61,9 @@ describe('the HPCW-STEP grammar', () => {
     ['HPCW-STEP done', { step: 'done' }],
     ['HPCW-STEP failed refused sbatch: error: invalid partition specified', { step: 'failed', code: 'refused', detail: 'sbatch: error: invalid partition specified' }],
     ['HPCW-STEP failed weird thing', { step: 'failed', code: 'other', detail: 'thing' }],
+    // framework 17: the sitting's own refusals of a sign-in that is not a Claude subscription's
+    ['HPCW-STEP failed signin-billed Claude Code offered a sign-in that bills by use', { step: 'failed', code: 'signin-billed', detail: 'Claude Code offered a sign-in that bills by use' }],
+    ['HPCW-STEP failed signin-method Claude Code on the grid is signed in in a way that bills by use', { step: 'failed', code: 'signin-method', detail: 'Claude Code on the grid is signed in in a way that bills by use' }],
   ])('%s', (line, want) => {
     expect(JSON.parse(JSON.stringify(parseStepLine(line)))).toEqual(want);
   });
@@ -82,6 +85,10 @@ describe('the connect sitting', () => {
     ['HPCW-LOGIN: requesting a compute node', { kind: 'signin-wait' }],
     ['AUTH-URL: https://claude.ai/oauth/authorize?code=true', { kind: 'auth-url', url: 'https://claude.ai/oauth/authorize?code=true' }],
     ['AUTH-URL: https://evil.example/oauth/authorize', { kind: 'refused-url' }],
+    // no API key anywhere: the Console's sign-in is refused by its host, a subscription's link is not, though it names that host in its query
+    ['AUTH-URL: https://platform.claude.com/oauth/authorize?code=true&client_id=abc', { kind: 'refused-url' }],
+    ['AUTH-URL: https://console.anthropic.com/oauth/authorize?code=true&client_id=abc', { kind: 'refused-url' }],
+    ['AUTH-URL: https://claude.ai/oauth/authorize?code=true&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback', { kind: 'auth-url', url: 'https://claude.ai/oauth/authorize?code=true&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback' }],
     ['HPCW-LOGIN: paste the code from that page', { kind: 'code-prompt' }],
     ['HPCW-LOGIN: code received, checking', { kind: 'code-received' }],
     ['HPCW-LOGIN: that code was not accepted; paste it again', { kind: 'code-rejected' }],
@@ -133,6 +140,19 @@ describe('the small words', () => {
     expect(planAllowsRemoteControl('free')).toBe(false);
     expect(planAllowsRemoteControl('-')).toBe(true);
     expect(planAllowsRemoteControl('pro')).toBe(true);
+  });
+
+  // greg, 2026-10-04: no API key anywhere. Only a Claude subscription's own sign-in counts.
+  it("counts only a Claude subscription's sign-in from `claude auth status`", () => {
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty' })).toBe(true);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai' })).toBe(true);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'console', apiProvider: 'firstParty' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'oauth_token', apiProvider: 'firstParty' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'api_key' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'bedrock' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: false, authMethod: 'claude.ai' })).toBe(false);
+    expect(isSubscriptionSignIn(undefined)).toBe(false);
   });
 
   it('takes a pasted code only in the shape of one', () => {
