@@ -1,0 +1,6 @@
+{
+  "_comment": "Copy this file to signing.json (gitignored) beside build-msi.ps1 and fill in the maintainer's own Azure Artifact Signing names; nothing secret belongs in it, the sign-in is the maintainer's own Entra sign-in (for example az login).",
+  "Endpoint": "https://<region>.codesigning.azure.net",
+  "CodeSigningAccountName": "<account>",
+  "CertificateProfileName": "<profile>"
+}
