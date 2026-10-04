@@ -15,8 +15,10 @@ Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of
 - Any identity: the Developer ID certificates and their private keys, the Apple team identifier, the
   notarization keychain profile and the app-specific password or App Store Connect key behind it, the
   Azure subscription, the Artifact Signing account name, the certificate profile name and its endpoint,
-  the Entra sign-in. The Windows account names live in `helper/release/windows/signing.json`, which
-  `.gitignore` keeps out; only the committed example beside it, with placeholders, is tracked.
+  the Entra sign-in. The Windows account names (endpoint, account, certificate profile) live in the
+  maintainer's vendor folder for the Mac route, which passes them to `build-msi-mac.sh` as
+  arguments, and in `helper/release/windows/signing.json`, which `.gitignore` keeps out, for the
+  route on a Windows machine; only the committed example beside it, with placeholders, is tracked.
 - The signed packages and their sidecars (`helper/signed/`, gitignored).
 - The `.pkg` and `.msi` a release build copies into `extension/public/bridge/` (gitignored there), and
   the `manifest.json` a release build writes beside them, which lists the signed entries and is
@@ -53,8 +55,24 @@ development build's.
   they go into the keychain under that profile name and nowhere else. The script submits with
   `xcrun notarytool submit ... --keychain-profile <profile> --wait` and staples the ticket with
   `xcrun stapler staple`. The profile name is the script's parameter; see its header for the default.
+- For the Windows installer, built on the Mac too (the usual way, `build-msi-mac.sh`): the Windows
+  target, `rustup target add x86_64-pc-windows-gnu`; from Homebrew, `brew install mingw-w64 msitools
+  osslsigncode azure-cli jsign` (or jsign's jar in the vendor folder with a Java runtime, as
+  `helper/release/windows/README.md` describes); `az login` as the identity that holds the signer
+  role; and the Artifact Signing account below. `helper/release/windows/README.md` has the details
+  and what about this route is not yet measured.
 
-### The Windows machine
+### Artifact Signing (both routes for the MSI)
+
+- An Azure subscription with an **Artifact Signing** account (the service was called Trusted Signing
+  until its rename), identity validation completed and a certificate profile under it. The signing
+  itself is done by the service; no certificate or key is ever on the Mac or the Windows machine.
+- An Entra sign-in with rights on the signing account (the "Trusted Signing Certificate Profile
+  Signer" role, as the service's documents named it), made on the machine that builds the MSI, for
+  example with `az login`. The sign-in is the maintainer's own; neither script takes a key file, a
+  client secret or a token.
+
+### The Windows machine (only for the alternative route, build-msi.ps1)
 
 - The Rust MSVC toolchain (`rustup`, target `x86_64-pc-windows-msvc`; the Visual Studio Build Tools
   it needs).
@@ -64,17 +82,11 @@ development build's.
 - WiX v5: `dotnet tool install --global wix`. The package is per-user (`Scope="perUser"`), so no
   administrator rights are asked and it is removed from Settings > Apps > "Beethoven bridge" >
   Uninstall.
-- An Azure subscription with an **Artifact Signing** account (the service was called Trusted Signing
-  until its rename), identity validation completed and a certificate profile under it. The signing
-  itself is done by the service; no certificate or key is ever on this machine.
 - The Dlib package the service's signtool integration needs. It was published on NuGet as
   `Microsoft.Trusted.Signing.Client` and may have followed the rename; this is not checked from here,
   which is why the script takes the path of `Azure.CodeSigning.Dlib.dll` as a parameter instead of
   guessing a folder. See the script's header.
-- An Entra sign-in with rights on the signing account (the "Trusted Signing Certificate Profile
-  Signer" role, as the service's documents named it), made in the same session as the build, for
-  example with `az login`. The sign-in is the maintainer's own; the script never takes a key file,
-  a client secret or a token.
+- The Entra sign-in above, made in the same session as the build.
 - `helper/release/windows/signing.json`, copied from the committed example beside it and filled with
   the account's `Endpoint`, `CodeSigningAccountName` and `CertificateProfileName`. The script writes
   them into the `metadata.json` that `signtool sign /fd SHA256 /tr http://timestamp.acs.microsoft.com
@@ -83,9 +95,11 @@ development build's.
 
 ### The machine that releases
 
-Node 22 and the repository checkout, with the extension's `npm ci` done. Any of the three machines
-can be it; the signed pairs are copied to it over whatever the maintainer trusts (the sidecars carry
-the size and SHA-256, and `build.mjs` refuses a file that does not match them).
+Node 22 and the repository checkout, with the extension's `npm ci` done. Usually the Mac, which then
+builds both packages itself and nothing is copied. When the MSI comes from a Windows machine, or the
+release is made elsewhere, the signed pairs are copied to the releasing machine over whatever the
+maintainer trusts (the sidecars carry the size and SHA-256, and `build.mjs` refuses a file that does
+not match them).
 
 ## The order
 
@@ -98,16 +112,23 @@ the size and SHA-256, and `build.mjs` refuses a file that does not match them).
    `beethoven-bridge-mac.pkg.json` in `helper/signed/`. The package's postinstall writes the browser's
    host file for Chrome (always) and for Microsoft Edge and Chromium (when that browser's folder exists)
    under the user's home, with the absolute path of the installed bridge, and deletes nothing.
-2. **On Windows:** from the repository root in PowerShell, `helper\release\windows\build-msi.ps1
-   -StoreId <id>` (the parameter spelling is the script's; see its header). It builds
-   `beethoven-bridge.exe` for x64, signs it, builds the per-user MSI with WiX v5 (files in
+2. **The Windows installer, on the Mac (the usual way):** from the repository root,
+   `bash helper/release/windows/build-msi-mac.sh --store-id <id> --azure-endpoint <host>
+   --azure-account <name> --azure-profile <name>`, the three names from the vendor folder. It
+   cross-builds `beethoven-bridge.exe` for x64 with the mingw-w64 linker, signs it through Artifact
+   Signing with `jsign`, builds the per-user MSI from `bridge.wxs` with msitools' `wixl` (files in
    `%LOCALAPPDATA%\Beethoven\bridge\`: the executable, the host file whose `path` is the relative
    `beethoven-bridge.exe`, which Chrome allows on Windows, and `README.txt`; the default values of the
-   Chrome and Edge `NativeMessagingHosts` keys under `HKCU` set to the host file's full path), signs
-   the MSI, and leaves `beethoven-bridge-windows.msi` and `beethoven-bridge-windows.msi.json` in
-   `helper/signed/`.
-3. **Copy both pairs** into `helper/signed/` on the machine that releases: four files, the two
-   packages and the two sidecars, nothing else in that folder.
+   Chrome and Edge `NativeMessagingHosts` keys under `HKCU` set to the host file's full path), reads
+   its tables back, signs the MSI, and leaves `beethoven-bridge-windows.msi` and
+   `beethoven-bridge-windows.msi.json` in `helper/signed/`. **Or, on a Windows machine (the
+   alternative):** from the repository root in PowerShell, `helper\release\windows\build-msi.ps1
+   -StoreId <id>` (the parameter spelling is the script's; see its header), which builds the same
+   package from `Package.wxs` with the MSVC toolchain, WiX v5 and `signtool`, and leaves the same two
+   files.
+3. **Copy a pair only when it was built on another machine** than the one that releases, into
+   `helper/signed/` there. Either way that folder holds four files before the next step, the two
+   packages and the two sidecars, nothing else.
 4. **Run the extension's checks first**, while `extension/public/bridge/` is still the tracked
    build: from `extension/`, `npx tsc --noEmit` and `npx vitest run`. The suite's bridge tests read
    the packaged zips and expect the placeholder; after step 5 they would read a release build.
@@ -257,9 +278,12 @@ Nothing below has been shown by a real machine. Each item stays here until it ha
   installer package. Gatekeeper's behaviour on the stapled package, `pkgbuild`'s and `productbuild`'s
   exact options as the script spells them, and whether a current-user-home package installs without
   any prompt are not yet measured.
-- The signed installers have not been built or opened anywhere: neither `build-pkg.sh` nor
-  `build-msi.ps1` has run on a machine with the identities, and no student has opened a `.pkg` or an
-  `.msi` of the bridge. The whole runbook above is the design, not yet measured.
+- The signed installers have not been built or opened anywhere: none of `build-pkg.sh`,
+  `build-msi-mac.sh` and `build-msi.ps1` has run on a machine with the identities, and no student has
+  opened a `.pkg` or an `.msi` of the bridge. The whole runbook above is the design, not yet
+  measured. `build-msi-mac.sh` has run end to end only on Linux; what about it is not yet measured
+  on a Mac (the Homebrew formulas, bash 3.2, the C runtime mingw-w64 links, Artifact Signing's answer
+  to `jsign`, Windows Installer on a `wixl`-built MSI) is listed in `helper/release/windows/README.md`.
 - Notarization's acceptance of the hardened-runtime binary and the package is not yet measured.
 - SmartScreen's reaction to a new publisher is not yet measured: an Authenticode signature from a
   publisher Windows has not seen before may still show "Windows protected your PC" until the

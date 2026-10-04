@@ -27,11 +27,12 @@ The signed installers (the binary edition; in the package of a store build only)
 
 | System  | Package                        | Signed                                                    | Installs to                                   |
 |---------|--------------------------------|-----------------------------------------------------------|-----------------------------------------------|
-| Windows | `beethoven-bridge-windows.msi`, a per-user MSI (WiX v5, `Scope="perUser"`), x64 | Authenticode, the executable and then the MSI, through Azure Artifact Signing (formerly Trusted Signing) | `%LOCALAPPDATA%\Beethoven\bridge\` (`beethoven-bridge.exe`, the host manifest whose `path` is the relative `beethoven-bridge.exe`, `README.txt`); the default value of the Chrome and Edge `NativeMessagingHosts` keys under `HKCU`. Uninstall: Settings > Apps > "Beethoven bridge" > Uninstall |
+| Windows | `beethoven-bridge-windows.msi`, a per-user MSI (built with msitools' `wixl` from `bridge.wxs` on the Mac, or with WiX v5 from `Package.wxs` on a Windows machine; per user), x64 | Authenticode, the executable and then the MSI, through Azure Artifact Signing (formerly Trusted Signing) | `%LOCALAPPDATA%\Beethoven\bridge\` (`beethoven-bridge.exe`, the host manifest whose `path` is the relative `beethoven-bridge.exe`, `README.txt`); the default value of the Chrome and Edge `NativeMessagingHosts` keys under `HKCU`. Uninstall: Settings > Apps > "Beethoven bridge" > Uninstall |
 | macOS   | `beethoven-bridge-mac.pkg`, an installer package for the current user's home only (`enable_currentUserHome="true"`, so no administrator password) | the universal binary (aarch64 and x86_64 joined with `lipo`) with "Developer ID Application", the hardened runtime and a timestamp; the package with "Developer ID Installer", notarized and stapled | `~/Library/Application Support/Beethoven/bridge/` (`beethoven-bridge`, `uninstall.command`, `README.txt`, `allowed_origins.json`); a postinstall writes the host manifest for Chrome, and for Edge and Chromium when their folders exist, with the absolute path under the home, and deletes nothing |
 
 How they come to be: the scripts under `helper/release/` build, sign and package the binary edition
-on the maintainer's own Mac and Windows machine, each with `--store-id <id>`, which bakes
+on the maintainer's own Mac (the MSI too, cross-built there; a Windows machine is the alternative
+for it), each with `--store-id <id>`, which bakes
 `allowed_origins = ["chrome-extension://<id>/"]` into the package. No identity, certificate, token,
 key file or account secret enters the repository or CI; CI's rust lane builds unsigned binaries for
 maintainers only. Each package lands in `helper/signed/` (gitignored) beside a sidecar `<name>.json`
@@ -287,8 +288,9 @@ Not yet measured, each in those words until a real machine has shown it:
 
 The binary edition is what Mac and Windows students get on a store build, as `beethoven-bridge-mac.pkg`
 and `beethoven-bridge-windows.msi`. They are built, signed, notarized and packaged only on the
-maintainer's own machines by `helper/release/mac/build-pkg.sh` and
-`helper/release/windows/build-msi.ps1`, then merged into the package by `node helper/build.mjs
+maintainer's own Mac by `helper/release/mac/build-pkg.sh` and
+`helper/release/windows/build-msi-mac.sh` (or, as the alternative for the MSI, on a Windows machine
+by `helper/release/windows/build-msi.ps1`), then merged into the package by `node helper/build.mjs
 --store-id <id>`. `helper/release/README.md` is the runbook: the prerequisites per machine, the
 order, the sidecar, what never enters the repository or CI, and what is not yet measured.
 
