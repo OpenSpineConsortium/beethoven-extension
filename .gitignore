@@ -12,3 +12,7 @@ __pycache__/
 .pytest_cache/
 helper/src/rust/target/
 helper/src/*/allow.txt
+# the signed installers and their sidecars, built on the maintainer's machines (helper/release/)
+helper/signed/
+# the maintainer's Azure Artifact Signing account names; the committed example beside it stays
+helper/release/windows/signing.json
