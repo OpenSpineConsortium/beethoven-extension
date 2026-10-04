@@ -3163,14 +3163,20 @@ async function directFacts(prefs: Prefs, profile: SiteProfile | undefined, setti
   };
 }
 
-/** this computer's installer from the package's bridge manifest */
+/** this computer's installer from the package's bridge manifest (15.0.0: a signed one only when it is made out to this very extension) */
 async function helperDownloadNow(): Promise<HelperDownload | undefined> {
   if (mem.direct.download !== undefined) return mem.direct.download || undefined;
   const os = await helperOs();
   const m = await bridgeManifest();
-  const dl = helperDownloadFor(m, os, (p) => assetUrl(p));
+  const dl = helperDownloadFor(m, os, (p) => assetUrl(p), browser.runtime.id);
   mem.direct.download = dl ?? null;
   return dl;
+}
+
+/** the integer before the first dot of a version ("1.0.0" -> 1); undefined when there is none */
+function majorOf(version: string | undefined): number | undefined {
+  const m = /^(\d+)/.exec(version ?? '');
+  return m ? Number(m[1]) : undefined;
 }
 
 /** the direct portal: the gate's verbs over ssh with this computer's key */
@@ -3560,13 +3566,26 @@ async function connectionSettings(prefs: Prefs): Promise<ConnectionSettingsView>
   const B = await session.get<BridgeNote>(BRIDGE_KEY);
   const download = await helperDownloadNow();
   const installed = B?.helper === 'available';
+  // 15.0.0: an installed helper of an older major than the package brings: LICENSE section 17 promises that the
+  // extension says so and offers the newer installer (the download link stays beside the line, ui/settings.ts).
+  // Versions that cannot be read, or the same major, read as today; a newer helper than ours is left alone.
+  const shipped = (await bridgeManifest())?.helper;
+  const installedMajor = majorOf(B?.helper_version);
+  const shippedMajor = majorOf(shipped);
+  const outdated = installed && installedMajor !== undefined && shippedMajor !== undefined && installedMajor < shippedMajor;
   return {
     title: W.title,
     mode: { label: W.modeLabel, value: prefs.connection ?? 'direct', options: [{ value: 'direct', label: W.modes.direct }, { value: 'vpn', label: W.modes.vpn }] },
     protectKey: { label: W.protectKey, note: W.protectKeyNote, value: k.wrapped, available: mem.direct.protectOutcome !== 'unsupported', present: k.present, ...(k.present && !k.wrapped ? { laterNote: W.protectLaterNote } : {}) },
     keyLine: !k.present ? W.keyNone : k.wrapped ? W.keyProtected : W.keyPlain,
     forget: { label: W.forget, note: W.forgetNote, confirm: W.forgetConfirm, button: { label: W.forgetButton, tone: 'text', action: { kind: 'forget-computer' } }, disabled: !k.present, ...(k.locked && k.enrolled ? { locked: true } : {}) },
-    helper: { label: W.helper, text: installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing, installed, ...(download ? { download } : {}), checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } } },
+    helper: {
+      label: W.helper,
+      text: outdated && B?.helper_version && shipped ? W.helperOutdated(B.helper_version, shipped) : installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing,
+      installed,
+      ...(download ? { download } : {}),
+      checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } },
+    },
   };
 }
 
@@ -3587,7 +3606,7 @@ async function directDetails(): Promise<DirectDetails> {
     key: k.present ? `${k.keyType ?? k.alg ?? '?'} ${k.fingerprint ?? ''}, protected: ${k.wrapped ? 'yes' : 'no'}${k.locked ? ' (locked)' : ''}, enrolled: ${k.enrolledAt ?? 'no'}` : 'none',
     reach: B ? `${B.reach22} (${B.checked_at})` : 'not checked',
     ...(D.account ? { account: D.account } : {}),
-    ...(dl ? { helperFile: `${dl.file}${dl.bytes ? ` ${dl.bytes} bytes` : ''}${dl.sha256 ? ` sha256 ${dl.sha256}` : ''}` } : {}),
+    ...(dl ? { helperFile: `${dl.file}${dl.bytes ? ` ${dl.bytes} bytes` : ''}${dl.sha256 ? ` sha256 ${dl.sha256}` : ''}${dl.signed ? ' signed' : ''}` } : {}),
     unproven: WORDS.details.directUnproven,
   };
 }

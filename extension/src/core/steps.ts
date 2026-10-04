@@ -757,14 +757,18 @@ export function directJourney(f: Facts, moment: DirectMoment): JourneyView {
                 ? { state: 'waiting', text: W.waiting }
                 : { state: 'not-found', text: W.notFound }
               : { state: 'idle' };
+      // 15.0.0: a signed installer (kind binary; core/bridge.ts offers no binary that is not signed) has its own
+      // three steps and no Unblock note (Smart App Control blocks downloaded scripts, not a signed .msi); its note
+      // says it is signed, the zip's that it is not
+      const installer = dl?.kind === 'binary';
       return {
         moment: 'install-helper',
         title: W.title,
         body: dl ? W.body : `${W.body} ${W.noDownload}`,
         ...(dl ? { download: { ...dl, label: W.download(dl.osLabel), fileLine: dl.size ? W.fileLine(dl.file, dl.size) : dl.file } } : {}),
-        steps: dl ? (dl.open ? W.stepsNamed[dl.os](dl.open) : [...W.steps[dl.os]]) : [],
-        ...(dl && W.osNote[dl.os] ? { osNote: W.osNote[dl.os]! } : {}),
-        unsignedNote: W.unsignedNote,
+        steps: dl ? (installer ? [...(W.installerSteps[dl.os] ?? [])] : dl.open ? W.stepsNamed[dl.os](dl.open) : [...W.steps[dl.os]]) : [],
+        ...(dl && !installer && W.osNote[dl.os] ? { osNote: W.osNote[dl.os]! } : {}),
+        ...(installer ? { signedNote: W.signedNote } : { unsignedNote: W.unsignedNote }),
         status,
         checkAgain: button(W.checkAgain, 'outline', { kind: 'check-bridge' }, d.probing && d.probingByHand ? { busy: true } : {}),
         useVpn: button(W.useVpn(app), 'text', { kind: 'use-vpn' }),

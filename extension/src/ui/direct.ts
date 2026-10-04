@@ -140,8 +140,8 @@ function installHelper(m: InstallHelperMoment, ctx: DirectCtx): HTMLElement {
       title(m.title),
       body(m.body),
       d ? null : el('p', { class: 'problem-body m-problem', role: 'status' }, icon('alert', 18), el('span', { text: WORDS.direct.installHelper.noDownload })),
-      // why the system may warn, said before it does
-      d ? el('p', { class: 'm-fine' }, icon('shield', 15), el('span', { text: m.unsignedNote })) : null,
+      // why the system may warn, said before it does (15.0.0: or that the installer is signed, in the same place)
+      d ? el('p', { class: 'm-fine' }, icon('shield', 15), el('span', { text: m.signedNote ?? m.unsignedNote ?? '' })) : null,
       spacer(),
       el('div', { class: 'm-foot' }, downloadButton, d ? el('p', { class: 'm-note mono-note', text: d.fileLine }) : null, soft(m.useVpn, ctx)),
     );
@@ -152,7 +152,7 @@ function installHelper(m: InstallHelperMoment, ctx: DirectCtx): HTMLElement {
     title(m.title),
     el('ol', { class: 'rsteps os-steps' }, ...m.steps.map((s, i) => el('li', { class: 'rstep', key: `s${i}` }, el('span', { class: 'rstep-num', 'aria-hidden': 'true', text: String(i + 1) }), el('div', { class: 'rstep-body' }, el('p', { class: 'rstep-text', text: s }))))),
     // why the system warns was said before the download (the screen above); here only what to do when it blocks
-    m.osNote ? el('p', { class: 'm-fine' }, icon('alert', 15), el('span', { text: m.osNote })) : el('p', { class: 'm-fine' }, icon('shield', 15), el('span', { text: m.unsignedNote })),
+    m.osNote ? el('p', { class: 'm-fine' }, icon('alert', 15), el('span', { text: m.osNote })) : el('p', { class: 'm-fine' }, icon('shield', 15), el('span', { text: m.signedNote ?? m.unsignedNote ?? '' })),
     spacer(),
     // the check's word sits with Check again, in the foot that stays in view while the steps scroll
     el(
