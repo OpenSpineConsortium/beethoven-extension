@@ -31,12 +31,13 @@ The signed installers (the binary edition; in the package of a store build only)
 | macOS   | `beethoven-bridge-mac.pkg`, an installer package for the current user's home only (`enable_currentUserHome="true"`, so no administrator password) | the universal binary (aarch64 and x86_64 joined with `lipo`) with "Developer ID Application", the hardened runtime and a timestamp; the package with "Developer ID Installer", notarized and stapled | `~/Library/Application Support/Beethoven/bridge/` (`beethoven-bridge`, `uninstall.command`, `README.txt`, `allowed_origins.json`); a postinstall writes the host manifest for Chrome, and for Edge and Chromium when their folders exist, with the absolute path under the home, and deletes nothing |
 
 How they come to be: the scripts under `helper/release/` build, sign and package the binary edition
-on the maintainer's own Mac (the MSI too, cross-built there; a Windows machine is the alternative
-for it), each with `--store-id <id>`, which bakes
-`allowed_origins = ["chrome-extension://<id>/"]` into the package. No identity, certificate, token,
-key file or account secret enters the repository or CI; CI's rust lane builds unsigned binaries for
-maintainers only. Each package lands in `helper/signed/` (gitignored) beside a sidecar `<name>.json`
-(name, os, kind, helper, protocol, size, sha256, allowed_origins, signed, built_at, tools).
+on the maintainer's own Mac (the `.msi` cross-built and signed through Azure Artifact Signing there,
+not yet measured), with `build-msi.ps1` on a Windows machine as the fallback, each with
+`--store-id <id>`, which bakes `allowed_origins = ["chrome-extension://<id>/"]` into the package. No
+identity, certificate, token, key file or account secret enters the repository or CI; CI's rust lane
+builds unsigned binaries for maintainers only. Each package lands in `helper/signed/` (gitignored)
+beside a sidecar `<name>.json` (name, os, kind, helper, protocol, size, sha256, allowed_origins,
+signed, built_at, tools).
 `node helper/build.mjs` verifies every sidecar against the file and against `helper/VERSION`,
 copies the package into `extension/public/bridge/` unchanged and lists it in `manifest.json` after
 the script zips: `{"os","kind":"binary","name","size","sha256","allowed_origins":[...],"signed"}`,
