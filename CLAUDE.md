@@ -52,7 +52,7 @@ name and identifier carry no university name.
   signs in with `claude auth login` on a compute node themselves; the framework only starts Claude
   Code where its own credential already is (`claude_config_dir` in the profile) and reads `claude
   auth status`. Every credential variable is removed from the worker's environment; `claude auth
-  logout` is never run. One person, one account.
+  logout` is never run. One person, their own accounts, each signed in by them into its own directory (`$HOME/.beethoven/accounts/<label>/claude`; the launcher's directory is the account `main`), never anyone else's; the engine selects a directory for the next session and never copies anything between them (greg, 2026-10-04T02:30Z; BUILD_PLAN section 17).
 - **Tokens and secrets never appear on command lines, in argv, in logs, in job files or in
   `sbatch --export`.** Never echo one. The per-job token is a mode-0600 file.
 - **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's only
