@@ -27,6 +27,9 @@
 # after every check, so a refused signature leaves nothing behind for a build to pick up.
 #
 # Written for the bash 3.2 that macOS ships: no associative arrays, no mapfile, no ${x,,}, no |&.
+# Captured text is matched with a here-string, never piped into grep -q: grep -q stops at its first
+# match, and under pipefail the writer it leaves behind, killed by SIGPIPE, would turn a match into a
+# miss now and then.
 # Exit status: 2 bad arguments, 3 a tool is missing, 4 a step did not produce what it should,
 # 5 Azure refused or could not be reached. Test hook, used only by
 # extension/test/releaseWindowsMac.test.ts and never by the maintainer: BEETHOVEN_MSI_TEST_EXE=<file>,
@@ -43,10 +46,14 @@ OBJDUMP=x86_64-w64-mingw32-objdump
 AZ_RESOURCE=https://codesigning.azure.net
 TSA_URL=http://timestamp.acs.microsoft.com
 # What a release exe may import: the libraries every Windows 10 and 11 carries. The first six are
-# what the bridge imports when cross-built today (measured 2026-10-04); advapi32, bcrypt and userenv
-# are Windows' own too and have been imported by other releases of Rust's standard library. A mingw
-# runtime library (libgcc_s_seh-1.dll, libwinpthread-1.dll) is exactly what must not slip in: a
-# student's computer does not have it, and the bridge would not start.
+# what the bridge imported when cross-built on 2026-10-04 with Ubuntu's mingw-w64 11, whose C runtime
+# is msvcrt; advapi32, bcrypt and userenv are Windows' own too and have been imported by other
+# releases of Rust's standard library. A mingw-w64 whose default C runtime is the Universal CRT
+# (upstream's default since mingw-w64 12, and so likely Homebrew's) links the api-ms-win-crt-*-l1-1-0
+# sets in place of msvcrt.dll; the Universal CRT is part of Windows 10 and 11 too, so the import
+# check accepts those by name pattern. A mingw runtime library (libgcc_s_seh-1.dll,
+# libwinpthread-1.dll) is exactly what must not slip in: a student's computer does not have it, and
+# the bridge would not start.
 ALLOWED_DLLS="kernel32.dll ntdll.dll msvcrt.dll ws2_32.dll bcryptprimitives.dll api-ms-win-core-synch-l1-2-0.dll advapi32.dll bcrypt.dll userenv.dll"
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 HELPER=$(cd "$HERE/../.." && pwd -P)
@@ -106,31 +113,36 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-printf '%s' "$STORE_ID" | grep -Eq '^[a-p]{32}$' \
+grep -Eq '^[a-p]{32}$' <<<"$STORE_ID" \
   || die 2 "--store-id must be the extension's 32-letter identifier (letters a to p), as the Chrome Web Store developer dashboard shows it."
 
 # The endpoint is the host jsign talks to; the Azure portal shows it as a URL, so a leading https://
-# and a trailing slash are taken off rather than refused.
+# and a trailing slash are taken off rather than refused, and a host name is the same in any case, so
+# it is taken down to lower case (the release's config accepts either).
 ENDPOINT=${ENDPOINT#https://}
 ENDPOINT=${ENDPOINT%/}
+ENDPOINT=$(printf '%s' "$ENDPOINT" | tr '[:upper:]' '[:lower:]')
 if [ "$SIGN" = 1 ]; then
   [ -n "$ENDPOINT" ] || die 2 "--azure-endpoint is required (the account's endpoint host, like <region>.codesigning.azure.net), unless --no-sign is given for a trial that never ships."
   [ -n "$ACCOUNT" ] || die 2 "--azure-account is required (the Artifact Signing account's name), unless --no-sign is given for a trial that never ships."
   [ -n "$PROFILE" ] || die 2 "--azure-profile is required (the certificate profile's name), unless --no-sign is given for a trial that never ships."
 fi
 if [ -n "$ENDPOINT" ]; then
-  printf '%s' "$ENDPOINT" | grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' \
-    || die 2 "--azure-endpoint must be a host name in lower case, like <region>.codesigning.azure.net, with no path."
+  grep -Eq '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' <<<"$ENDPOINT" \
+    || die 2 "--azure-endpoint must be a host name, like <region>.codesigning.azure.net, with no path."
 fi
-# Names only: letters, digits and hyphens, which also refuses an example's <placeholder> and the
-# "account/profile" pair jsign is given, so a name cannot be put in the wrong place.
-for pair in "--azure-account=$ACCOUNT" "--azure-profile=$PROFILE"; do
-  opt=${pair%%=*}
-  v=${pair#*=}
-  [ -z "$v" ] && continue
-  printf '%s' "$v" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9-]*$' \
-    || die 2 "$opt must be a name of letters, digits and hyphens, as the Azure portal shows it."
-done
+# Names only, which also refuses an example's <placeholder> and the "account/profile" pair jsign is
+# given, so a name cannot be put in the wrong place: letters, digits and hyphens, and "_" in a
+# profile's name as the release's config allows (which names Azure itself allows is not yet measured;
+# the service refuses one it does not have).
+if [ -n "$ACCOUNT" ]; then
+  grep -Eq '^[A-Za-z0-9][A-Za-z0-9-]*$' <<<"$ACCOUNT" \
+    || die 2 "--azure-account must be a name of letters, digits and hyphens, as the Azure portal shows it."
+fi
+if [ -n "$PROFILE" ]; then
+  grep -Eq '^[A-Za-z0-9][A-Za-z0-9_-]*$' <<<"$PROFILE" \
+    || die 2 "--azure-profile must be a name of letters, digits, \"_\" and hyphens, as the Azure portal shows it."
+fi
 
 TEST_EXE=${BEETHOVEN_MSI_TEST_EXE:-}
 if [ -n "$TEST_EXE" ]; then
@@ -147,7 +159,8 @@ if [ -z "$TEST_EXE" ]; then
   need rustup "install Rust with rustup."
   need "$LINKER" "brew install mingw-w64 (Rust links the Windows exe with it)."
   need "$OBJDUMP" "brew install mingw-w64 (it lists the libraries the exe imports)."
-  rustup target list --installed | grep -Fxq "$TARGET" || die 3 "the Rust target $TARGET is not installed: rustup target add $TARGET"
+  INSTALLED=$(rustup target list --installed) || die 3 "rustup could not list the installed targets."
+  grep -Fxq "$TARGET" <<<"$INSTALLED" || die 3 "the Rust target $TARGET is not installed: rustup target add $TARGET"
 fi
 need wixl "brew install msitools (wixl builds the MSI)."
 need msiinfo "brew install msitools (msiinfo reads the MSI's tables back)."
@@ -161,20 +174,34 @@ fi
 if [ "$SIGN" = 1 ]; then
   need az "brew install azure-cli, then az login with the account that may sign with the certificate profile."
   need osslsigncode "brew install osslsigncode (it checks both signatures)."
-  # jsign: the command in JSIGN if set (it may be "java -jar /path/jsign.jar"), else jsign on PATH,
-  # else jsign.jar in the vendor folder run with java.
+  # jsign: the command in JSIGN if set (it may be "java -jar /path/jsign.jar"; it is split at spaces),
+  # else jsign on PATH, else a jar in the vendor folder run with java: jsign.jar there, else the first
+  # jsign/*.jar, the same places setup-mac.sh accepts.
+  JAR=
+  for j in "$VENDOR/jsign.jar" "$VENDOR"/jsign/*.jar; do
+    if [ -f "$j" ]; then JAR=$j; break; fi
+  done
   if [ -n "${JSIGN:-}" ]; then
     set -f
     JSIGN_CMD=($JSIGN)
     set +f
     command -v "${JSIGN_CMD[0]}" >/dev/null 2>&1 || die 3 "JSIGN names ${JSIGN_CMD[0]}, which was not found."
+    if [ "${JSIGN_CMD[1]:-}" = -jar ] && [ ! -f "${JSIGN_CMD[2]:-}" ]; then
+      die 3 "JSIGN runs java -jar ${JSIGN_CMD[2]:-}, which is not a file. JSIGN is split at spaces, so a jar whose path has a space cannot be named there; put jsign.jar in the vendor folder ($VENDOR) instead."
+    fi
   elif command -v jsign >/dev/null 2>&1; then
     JSIGN_CMD=(jsign)
-  elif [ -f "$VENDOR/jsign.jar" ]; then
-    need java "brew install openjdk (jsign.jar in the vendor folder runs on it)."
-    JSIGN_CMD=(java -jar "$VENDOR/jsign.jar")
+  elif [ -n "$JAR" ]; then
+    need java "brew install openjdk (the jsign jar in the vendor folder runs on it)."
+    JSIGN_CMD=(java -jar "$JAR")
   else
-    die 3 "jsign was not found: brew install jsign, or put jsign.jar from Maven Central (net.jsign:jsign) in $VENDOR with java on PATH, or set JSIGN to the command."
+    die 3 "jsign was not found: brew install jsign, or put jsign.jar from Maven Central (net.jsign:jsign) in $VENDOR (or any jsign jar in $VENDOR/jsign/) with java on PATH, or set JSIGN to the command."
+  fi
+  # macOS's /usr/bin/java is on PATH even with no Java installed, a stub that only says so; found
+  # here, it is a missing tool, not a refusal from Azure after the build.
+  if [ "$(basename "${JSIGN_CMD[0]}")" = java ]; then
+    "${JSIGN_CMD[0]}" -version >/dev/null 2>&1 \
+      || die 3 "java is on PATH but does not run (macOS's /usr/bin/java is only a stub until a Java runtime is installed): after brew install openjdk, run sudo ln -sfn \"\$(brew --prefix)/opt/openjdk/libexec/openjdk.jdk\" /Library/Java/JavaVirtualMachines/openjdk.jdk as brew says, or put \"\$(brew --prefix openjdk)/bin\" first on PATH."
   fi
   # A sign-in that has lapsed is found now, before anything is built; --output none means az prints
   # nothing on success, so the token goes nowhere.
@@ -185,12 +212,12 @@ fi
 
 step "Reading helper/VERSION"
 VERSION=$(tr -d '\r\n' < "$HELPER/VERSION")
-printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.0\.0$' || die 4 "helper/VERSION must be a whole-number version like 1.0.0, not $VERSION."
+grep -Eq '^[0-9]+\.0\.0$' <<<"$VERSION" || die 4 "helper/VERSION must be a whole-number version like 1.0.0, not $VERSION."
 for f in "$WXS" "$HERE/README.txt" "$RUST/Cargo.toml"; do
   [ -f "$f" ] || die 4 "$f is missing."
 done
 UPGRADE_CODE=$(sed -n 's/.*UpgradeCode="\([0-9A-F-]*\)".*/\1/p' "$WXS" | sed -n 1p)
-printf '%s' "$UPGRADE_CODE" | grep -Eq '^[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$' || die 4 "bridge.wxs carries no UpgradeCode this script can read."
+grep -Eq '^[0-9A-F]{8}(-[0-9A-F]{4}){3}-[0-9A-F]{12}$' <<<"$UPGRADE_CODE" || die 4 "bridge.wxs carries no UpgradeCode this script can read."
 say "   bridge $VERSION"
 
 [ -n "$OUT" ] || OUT="$HELPER/signed"
@@ -241,17 +268,17 @@ check_signature() {
   what=$2
   chain=0
   out=$(osslsigncode verify -in "$f" 2>&1) && chain=1
-  if printf '%s\n' "$out" | grep -q 'No signature found'; then
+  if grep -q 'No signature found' <<<"$out"; then
     printf '%s\n' "$out" >&2
     die 4 "$(basename "$f") carries no signature after jsign signed it; nothing was written to $OUT."
   fi
   cur=$(printf '%s\n' "$out" | sed -n -E "s/^Current $what *: *([0-9A-Fa-f]+).*/\\1/p" | sed -n 1p)
   calc=$(printf '%s\n' "$out" | sed -n -E "s/^Calculated $what *: *([0-9A-Fa-f]+).*/\\1/p" | sed -n 1p)
-  if [ -z "$cur" ] || [ "$cur" != "$calc" ] || printf '%s\n' "$out" | grep -q 'MISMATCH'; then
+  if [ -z "$cur" ] || [ "$cur" != "$calc" ] || grep -q 'MISMATCH' <<<"$out"; then
     printf '%s\n' "$out" >&2
     die 4 "the signature on $(basename "$f") does not match the file (osslsigncode's report is above); nothing was written to $OUT."
   fi
-  if ! printf '%s\n' "$out" | grep -Eq '^[[:space:]]*Timestamp time:'; then
+  if ! grep -Eq '^[[:space:]]*Timestamp time:' <<<"$out"; then
     printf '%s\n' "$out" >&2
     die 4 "the signature on $(basename "$f") carries no timestamp, so it would stop being valid when the short-lived certificate expires; nothing was written to $OUT."
   fi
@@ -288,7 +315,10 @@ else
     lower=$(printf '%s' "$dll" | tr '[:upper:]' '[:lower:]')
     case " $ALLOWED_DLLS " in
       *" $lower "*) say "   imports $dll" ;;
-      *) die 4 "the exe imports $dll, which is not one of Windows' own libraries, so the bridge would not start on a student's computer; nothing was signed." ;;
+      *) case "$lower" in
+           api-ms-win-crt-*-l1-1-0.dll|ucrtbase.dll) say "   imports $dll (the Universal C Runtime, part of Windows 10 and 11)" ;;
+           *) die 4 "the exe imports $dll, which is not one of Windows' own libraries, so the bridge would not start on a student's computer; nothing was signed." ;;
+         esac ;;
     esac
   done
 fi
@@ -336,7 +366,7 @@ if ! WIXL_OUT=$(wixl -a x64 -D "Version=$VERSION" -D "StageDir=$STAGE" -o "$MSI"
 fi
 if [ -n "$WIXL_OUT" ]; then
   printf '%s\n' "$WIXL_OUT"
-  if printf '%s\n' "$WIXL_OUT" | grep -Eiq 'warning|critical|error|unhandled|no property'; then
+  if grep -Eiq 'warning|critical|error|unhandled|no property' <<<"$WIXL_OUT"; then
     die 4 "wixl warned while building the MSI (above), so it may have left part of bridge.wxs out; nothing was signed."
   fi
 fi
@@ -354,33 +384,36 @@ if ! REGISTRY=$(table Registry) || ! UPGRADE=$(table Upgrade) || ! PROPERTY=$(ta
 fi
 # Every registry value under HKEY_CURRENT_USER (Root 1), nothing under the machine's hive.
 [ "$(printf '%s\n' "$REGISTRY" | grep -c .)" = 6 ] || die 4 "the MSI's Registry table does not hold the six values bridge.wxs names."
-if printf '%s\n' "$REGISTRY" | cut -f2 | grep -vqx 1; then
+ROOTS=$(printf '%s\n' "$REGISTRY" | cut -f2)
+if grep -vqx 1 <<<"$ROOTS"; then
   die 4 "the MSI writes a registry value outside HKEY_CURRENT_USER (Root other than 1)."
 fi
 for browser in 'Google\Chrome' 'Microsoft\Edge'; do
   row="${TAB}1${TAB}Software\\${browser}\\NativeMessagingHosts\\${HOST_NAME}${TAB}${TAB}[BridgeFolder]${HOST_NAME}.json${TAB}HostRegistration"
-  printf '%s\n' "$REGISTRY" | grep -Fq -- "$row" \
+  grep -Fq -- "$row" <<<"$REGISTRY" \
     || die 4 "the MSI does not set the default value of the $browser NativeMessagingHosts key to the manifest's path."
 done
 # MajorUpgrade: one row finds an older bridge to replace, one finds a newer one and refuses.
 for prop in WIX_UPGRADE_DETECTED WIX_DOWNGRADE_DETECTED; do
-  printf '%s\n' "$UPGRADE" | grep -E "^\{$UPGRADE_CODE\}${TAB}" | grep -Eq "${TAB}${prop}\$" \
+  grep -Eq "^\{$UPGRADE_CODE\}${TAB}(.*${TAB})?${prop}\$" <<<"$UPGRADE" \
     || die 4 "the MSI's Upgrade table has no $prop row for the UpgradeCode in bridge.wxs."
 done
 # Per user: no ALLUSERS (nor the per-user-or-machine switch), and the summary's "no elevation" bit.
-if printf '%s\n' "$PROPERTY" | cut -f1 | grep -Eqx 'ALLUSERS|MSIINSTALLPERUSER'; then
+NAMES=$(printf '%s\n' "$PROPERTY" | cut -f1)
+if grep -Eqx 'ALLUSERS|MSIINSTALLPERUSER' <<<"$NAMES"; then
   die 4 "the MSI sets ALLUSERS or MSIINSTALLPERUSER, so it is not the per-user package bridge.wxs describes."
 fi
-printf '%s\n' "$PROPERTY" | grep -Fxq "ProductVersion${TAB}$VERSION" || die 4 "the MSI's ProductVersion is not $VERSION."
-printf '%s\n' "$PROPERTY" | grep -Fxq "ARPNOMODIFY${TAB}1" || die 4 "the MSI does not set ARPNOMODIFY."
+grep -Fxq "ProductVersion${TAB}$VERSION" <<<"$PROPERTY" || die 4 "the MSI's ProductVersion is not $VERSION."
+grep -Fxq "ARPNOMODIFY${TAB}1" <<<"$PROPERTY" || die 4 "the MSI does not set ARPNOMODIFY."
 WORD_COUNT=$(printf '%s\n' "$SUMMARY" | sed -n 's/^Source: \([0-9][0-9]*\).*/\1/p' | sed -n 1p)
 [ -n "$WORD_COUNT" ] && [ $((WORD_COUNT & 8)) = 8 ] || die 4 "the MSI's summary does not say it installs without administrator rights."
-printf '%s\n' "$SUMMARY" | grep -Fxq 'Template: x64;1033' || die 4 "the MSI is not marked x64 (wixl -a x64)."
+grep -Fxq 'Template: x64;1033' <<<"$SUMMARY" || die 4 "the MSI is not marked x64 (wixl -a x64)."
 # The three files, each the size of the staged one, so the exe in the MSI is the one that was checked.
 [ "$(printf '%s\n' "$FILES" | grep -c .)" = 3 ] || die 4 "the MSI's File table does not hold exactly the three payload files."
+COLS=$(printf '%s\n' "$FILES" | cut -f3,4)
 for name in "$EXE_NAME" "$HOST_NAME.json" README.txt; do
   size=$(wc -c < "$STAGE/$name" | tr -d ' ')
-  printf '%s\n' "$FILES" | cut -f3,4 | grep -Fxq "$name${TAB}$size" || die 4 "the MSI does not carry $name as staged ($size bytes)."
+  grep -Fxq "$name${TAB}$size" <<<"$COLS" || die 4 "the MSI does not carry $name as staged ($size bytes)."
 done
 say "   six HKCU values with both browsers' keys, the upgrade rows, per user, x64, three files"
 
@@ -407,7 +440,7 @@ fi
 step "Writing the sidecar"
 SIZE=$(wc -c < "$FINAL" | tr -d ' ')
 SHA=$($SHA_CMD "$FINAL" | cut -d' ' -f1)
-printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{64}$' || die 4 "the SHA-256 of $FINAL could not be read."
+grep -Eq '^[0-9a-f]{64}$' <<<"$SHA" || die 4 "the SHA-256 of $FINAL could not be read."
 BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 # The tool versions are a record of what built the package, nothing more; an empty answer is left out.
 first_line() { "$@" 2>/dev/null | sed -n 1p | tr -d '\000-\037' || true; }

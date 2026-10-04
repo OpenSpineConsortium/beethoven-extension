@@ -50,7 +50,7 @@ All of it from Homebrew, except Rust:
 ```
 rustup target add x86_64-pc-windows-gnu
 brew install mingw-w64 msitools osslsigncode azure-cli
-brew install jsign            # or: jsign.jar from Maven Central (net.jsign:jsign) in the vendor folder, with brew install openjdk
+brew install jsign            # or: jsign.jar from Maven Central (net.jsign:jsign) in the vendor folder, with java (below)
 ```
 
 - `mingw-w64` is the linker Rust uses for the Windows exe (`x86_64-w64-mingw32-gcc`) and the
@@ -58,9 +58,17 @@ brew install jsign            # or: jsign.jar from Maven Central (net.jsign:jsig
 - `msitools` gives `wixl` (builds the MSI) and `msiinfo` (reads its tables back).
 - `jsign` signs PE and MSI files from any system; its `TRUSTEDSIGNING` store type is the Artifact
   Signing service. The script runs the command in `JSIGN` if that is set (for example
-  `JSIGN="java -jar /path/jsign.jar"`), else `jsign` on PATH, else `java -jar <vendor>/jsign.jar`,
-  where the vendor folder is `BEETHOVEN_VENDOR_DIR`, else `ASHLEY_VENDOR_DIR`, else
-  `~/.beethoven-vendor`.
+  `JSIGN="java -jar /path/jsign.jar"`), else `jsign` on PATH, else `java -jar` on a jar in the vendor
+  folder: `<vendor>/jsign.jar`, else the first `<vendor>/jsign/*.jar` (the two places the release's
+  setup check, `setup-mac.sh`, accepts too). The vendor folder is `BEETHOVEN_VENDOR_DIR`, else
+  `ASHLEY_VENDOR_DIR`, else `~/.beethoven-vendor`. `JSIGN` is split at spaces and its quotes are not
+  read, so a jar whose path has a space goes in the vendor folder instead, whose path may have
+  spaces; the script refuses such a `JSIGN` before anything is built.
+- Java, for the jar: `brew install openjdk`. Homebrew keeps it off PATH, and macOS's `/usr/bin/java`
+  is only a stub until a Java runtime is registered, so also run the line brew prints,
+  `sudo ln -sfn "$(brew --prefix)/opt/openjdk/libexec/openjdk.jdk" /Library/Java/JavaVirtualMachines/openjdk.jdk`,
+  or put `"$(brew --prefix openjdk)/bin"` first on PATH. The script checks that `java -version` runs
+  before anything is built.
 - `osslsigncode` reads each signature back.
 - `az` (azure-cli), signed in with `az login` as the identity that holds the certificate profile's
   signer role.
@@ -78,8 +86,10 @@ bash helper/release/windows/build-msi-mac.sh --store-id <32 letters a-p> \
 
 The three Azure names are the maintainer's own and live in the vendor folder, never in the
 repository; the one-command release on the Mac reads them from there and passes them in. The
-endpoint may be given as the portal shows it (`https://<region>.codesigning.azure.net/`); the script
-takes it down to the host.
+endpoint may be given as the portal shows it (`https://<region>.codesigning.azure.net/`, in any
+case); the script takes it down to the host in lower case. The account's name is letters, digits and
+hyphens, the profile's may also hold `_`, as the release's config accepts; which names Azure itself
+allows is not yet measured.
 
 Each step prints one line saying what it does. The output is `helper/signed/beethoven-bridge-windows.msi`
 and `helper/signed/beethoven-bridge-windows.msi.json`, the sidecar, which `node helper/build.mjs`
@@ -108,8 +118,14 @@ fixes it), 4 a step did not produce what it should, 5 Azure refused or could not
    is untouched.
 4. Lists the exe's imported libraries with `objdump -p` and refuses any that is not one of Windows'
    own (a mingw runtime library such as `libwinpthread-1.dll` would keep the bridge from starting
-   on a student's computer). On 2026-10-04 the cross-built bridge imported `KERNEL32`, `ntdll`,
-   `msvcrt`, `WS2_32`, `bcryptprimitives` and `api-ms-win-core-synch`, all part of Windows.
+   on a student's computer). On 2026-10-04, cross-built on Linux with Ubuntu's mingw-w64 11, whose C
+   runtime is msvcrt, the bridge imported `KERNEL32`, `ntdll`, `msvcrt`, `WS2_32`,
+   `bcryptprimitives` and `api-ms-win-core-synch`, all part of Windows. A mingw-w64 whose default C
+   runtime is the Universal CRT (upstream's default since mingw-w64 12, and so likely Homebrew's)
+   links the `api-ms-win-crt-*-l1-1-0` sets in place of `msvcrt`; the Universal CRT is part of
+   Windows 10 and 11, and the script accepts those names (and `ucrtbase.dll`) too. Simulated on Linux
+   by linking against the Universal CRT's import library: the bridge then imported eight
+   `api-ms-win-crt-*` sets and no `msvcrt`, and the script went on.
 5. Stages the exe, the host manifest (the same bytes `build-msi.ps1` writes) and `README.txt`.
 6. Signs the exe: `jsign --storetype TRUSTEDSIGNING --keystore <endpoint> --alias <account>/<profile>
    --storepass env:<variable> --alg SHA-256 --tsaurl http://timestamp.acs.microsoft.com --tsmode RFC3161`,
@@ -238,6 +254,10 @@ asked for a signature. In particular:
   exe and an MSI with a throwaway certificate and a local timestamp server. On a Mac none of it has
   run: the Homebrew formulas named above (that `jsign` and `msitools` are there under those names
   included), the bash 3.2 that macOS ships, and the Homebrew `wixl` staying silent on a clean build.
+- Which C runtime Homebrew's mingw-w64 links (the Universal CRT is likely; the script accepts it and
+  msvcrt alike), and that an exe linked against the Universal CRT starts on Windows: no such exe of
+  the bridge has run on Windows.
+- That Homebrew's `openjdk` with the `ln -sfn` line above makes `/usr/bin/java` run jsign's jar.
 - That Artifact Signing accepts `jsign`'s `TRUSTEDSIGNING` request with an `az` token from a Mac,
   and that Microsoft's timestamp server answers `jsign`'s RFC 3161 request.
 - Whether osslsigncode on the Mac follows the certificate chain to Microsoft's root (the script

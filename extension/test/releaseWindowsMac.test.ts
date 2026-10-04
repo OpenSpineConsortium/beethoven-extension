@@ -228,6 +228,7 @@ printf 'MZ stand-in exe for %s\n' "$target" > "$dir/$target/release/beethoven-br
   'x86_64-w64-mingw32-objdump': String.raw`[ "$1" = -p ] || exit 9
 printf '\nThe Import Tables (interpreted .idata section contents)\n'
 printf '\tDLL Name: KERNEL32.dll\n\tvma:  Hint/Ord Member-Name Bound-To\n\tDLL Name: WS2_32.dll\n\tDLL Name: api-ms-win-core-synch-l1-2-0.dll\n'
+if [ "$SHIM_UCRT" = 1 ]; then printf '\tDLL Name: api-ms-win-crt-runtime-l1-1-0.dll\n\tDLL Name: api-ms-win-crt-heap-l1-1-0.dll\n\tDLL Name: ucrtbase.dll\n'; fi
 if [ "$SHIM_BAD_DLL" = 1 ]; then printf '\tDLL Name: libwinpthread-1.dll\n'; fi
 exit 0
 `,
@@ -239,7 +240,12 @@ case "$*" in
 esac
 `,
   jsign: JSIGN_BODY,
-  java: String.raw`[ "$1" = -jar ] || exit 9
+  // -version as a JDK answers it, or (SHIM_JAVA_STUB) as macOS's /usr/bin/java does with no Java runtime registered
+  java: String.raw`if [ "$1" = -version ]; then
+  if [ "$SHIM_JAVA_STUB" = 1 ]; then printf 'The operation could not be completed. Unable to locate a Java Runtime.\n' >&2; exit 1; fi
+  printf 'openjdk version "21" (stand-in)\n' >&2; exit 0
+fi
+[ "$1" = -jar ] || exit 9
 printf 'java-jar\t%s\n' "$2" >> "$SHIM_LOG"
 shift 2
 ` + JSIGN_BODY,
@@ -305,7 +311,7 @@ function fresh(label: string): Ctx {
 
 function run(args: string[], c: Ctx, env: Record<string, string> = {}, PATH = `${shims}${path.delimiter}${process.env.PATH ?? ''}`) {
   const base: Record<string, string | undefined> = { ...process.env };
-  for (const k of ['JSIGN', 'BEETHOVEN_MSI_TEST_EXE', 'ASHLEY_VENDOR_DIR', 'SHIM_AZ_FAIL', 'SHIM_JSIGN_FAIL', 'SHIM_BAD_DLL', 'SHIM_OSSL_MISMATCH', 'SHIM_OSSL_NOTS', 'SHIM_NO_TARGET']) delete base[k];
+  for (const k of ['JSIGN', 'BEETHOVEN_MSI_TEST_EXE', 'ASHLEY_VENDOR_DIR', 'SHIM_AZ_FAIL', 'SHIM_JSIGN_FAIL', 'SHIM_BAD_DLL', 'SHIM_UCRT', 'SHIM_JAVA_STUB', 'SHIM_OSSL_MISMATCH', 'SHIM_OSSL_NOTS', 'SHIM_NO_TARGET']) delete base[k];
   const p = spawnSync('bash', [SCRIPT, ...args], {
     encoding: 'utf8',
     timeout: 120_000,
@@ -411,6 +417,13 @@ describe('build-msi-mac.sh as text', () => {
     for (const d of ['kernel32.dll', 'ntdll.dll', 'msvcrt.dll', 'ws2_32.dll', 'bcryptprimitives.dll', 'api-ms-win-core-synch-l1-2-0.dll']) expect(allowed).toContain(d);
     expect(allowed.every((d) => /^[a-z0-9_-]+\.dll$/.test(d) && !/^lib/.test(d))).toBe(true);
     expect(allowed.length).toBeLessThanOrEqual(10);
+    // the Universal C Runtime a UCRT-default mingw-w64 links in place of msvcrt.dll, by name pattern
+    expect(code).toContain('api-ms-win-crt-*-l1-1-0.dll|ucrtbase.dll)');
+  });
+
+  it('matches captured text without a pipe into grep -q (a writer killed by SIGPIPE under pipefail turns a match into a miss)', () => {
+    expect(code).not.toMatch(/(?<!\|)\|(?!\|)\s*grep\s+-[A-Za-z]*q/);
+    expect(code.match(/<<<"\$[A-Za-z_]+"/g)?.length).toBeGreaterThanOrEqual(15);
   });
 });
 
@@ -445,14 +458,16 @@ describe.skipIf(!RUN)('build-msi-mac.sh refusals', () => {
     }
     const bad: Array<[string, string]> = [
       ['--azure-endpoint', 'https://eus.codesigning.azure.net/path'],
-      ['--azure-endpoint', 'EUS.codesigning.azure.net'],
+      ['--azure-endpoint', '-eus.codesigning.azure.net'],
       ['--azure-endpoint', 'stand-in-account'],
       ['--azure-endpoint', '<region>.codesigning.azure.net'],
       ['--azure-account', '<account>'],
       ['--azure-account', 'account/profile'],
       ['--azure-account', 'two words'],
+      ['--azure-account', 'under_score'],
       ['--azure-profile', '<profile>'],
       ['--azure-profile', '-leading-hyphen'],
+      ['--azure-profile', 'account/profile'],
     ];
     for (const [opt, value] of bad) {
       const args = [...SIGN_ARGS];
@@ -484,13 +499,27 @@ describe.skipIf(!RUN)('build-msi-mac.sh refusals', () => {
   });
 
   it('a missing tool exits 3 with the fix, before anything is built', () => {
+    const spaced = path.join(T, 'Mobile Documents', 'jsign.jar');
+    mkdirSync(path.dirname(spaced), { recursive: true });
+    writeFileSync(spaced, 'a real file whose path has a space\n');
+    const jar = path.join(T, 'jar', 'jsign.jar');
+    mkdirSync(path.dirname(jar), { recursive: true });
+    writeFileSync(jar, 'a stand-in jar\n');
+    const stubVendor = path.join(T, 'vendor-stub');
+    mkdirSync(path.join(stubVendor, 'jsign'), { recursive: true });
+    writeFileSync(path.join(stubVendor, 'jsign', 'jsign-7.5.jar'), 'a stand-in jar\n');
     const cases: Array<{ omit: string[]; args: string[]; env?: Record<string, string>; says: string[] }> = [
       { omit: ['wixl'], args: ['--store-id', ID, '--no-sign'], says: ['wixl was not found', 'brew install msitools'] },
       { omit: ['x86_64-w64-mingw32-gcc'], args: ['--store-id', ID, '--no-sign'], says: ['x86_64-w64-mingw32-gcc was not found', 'brew install mingw-w64'] },
       { omit: ['az'], args: SIGN_ARGS, says: ['az was not found', 'brew install azure-cli'] },
       { omit: ['osslsigncode'], args: SIGN_ARGS, says: ['osslsigncode was not found', 'brew install osslsigncode'] },
-      { omit: ['jsign', 'java'], args: SIGN_ARGS, env: { JSIGN: '' }, says: ['jsign was not found', 'net.jsign:jsign'] },
+      { omit: ['jsign', 'java'], args: SIGN_ARGS, env: { JSIGN: '' }, says: ['jsign was not found', 'net.jsign:jsign', `${vendor}/jsign/`] },
       { omit: [], args: SIGN_ARGS, env: { JSIGN: path.join(T, 'no-such-jsign') }, says: ['JSIGN names'] },
+      // JSIGN is split at spaces: the jar is there, and the tool check says why it cannot be named so
+      { omit: [], args: SIGN_ARGS, env: { JSIGN: `java -jar ${spaced}` }, says: ['split at spaces', 'not a file'] },
+      // macOS's /usr/bin/java with no Java runtime registered, by either route that runs java
+      { omit: [], args: SIGN_ARGS, env: { JSIGN: `java -jar ${jar}`, SHIM_JAVA_STUB: '1' }, says: ['java is on PATH but does not run', 'openjdk.jdk'] },
+      { omit: ['jsign'], args: SIGN_ARGS, env: { JSIGN: '', BEETHOVEN_VENDOR_DIR: stubVendor, SHIM_JAVA_STUB: '1' }, says: ['java is on PATH but does not run'] },
       { omit: [], args: ['--store-id', ID, '--no-sign'], env: { SHIM_NO_TARGET: '1' }, says: ['rustup target add x86_64-pc-windows-gnu'] },
     ];
     for (const [i, k] of cases.entries()) {
@@ -729,6 +758,46 @@ describe.skipIf(!MSITOOLS)('a signed build, against stand-ins for cargo, objdump
     }
   });
 
+  it('runs the first jar under the vendor folder\'s jsign/ when there is no jsign.jar (the places setup-mac.sh accepts)', () => {
+    const v2 = path.join(T, 'vendor-dir');
+    const jar = path.join(v2, 'jsign', 'jsign-7.5.jar');
+    mkdirSync(path.dirname(jar), { recursive: true });
+    writeFileSync(jar, 'a stand-in, java is a stand-in too\n');
+    const v = fresh('vendor-dir-jar');
+    const bin = path.join(T, 'bin-vendor-dir');
+    writeShims(bin, SHIMS, ['jsign']);
+    const r = run([...SIGN_ARGS, '--out', v.out], v, { JSIGN: '', BEETHOVEN_VENDOR_DIR: v2 }, `${bin}${path.delimiter}${farm(path.join(T, 'farm-vendor-dir'), ['jsign', ...Object.keys(SHIMS)])}`);
+    expect(r.code, r.err).toBe(0);
+    expect(calls(v.log, 'java').map((l) => l[1])).toEqual(['-version', '-jar', '-jar', '-jar']);
+    expect(calls(v.log, 'java-jar').map((l) => l[1])).toEqual([jar, jar, jar]);
+    expect(listed(v.out)).toEqual([MSI, `${MSI}.json`]);
+  });
+
+  it('takes the names the release\'s config accepts: the endpoint as a URL in upper case, a profile with "_"', () => {
+    const n = fresh('names');
+    const args = [...SIGN_ARGS];
+    args[args.indexOf('--azure-endpoint') + 1] = `https://${ENDPOINT.toUpperCase()}/`;
+    args[args.indexOf('--azure-profile') + 1] = 'stand_in_profile';
+    const r = run([...args, '--out', n.out], n);
+    expect(r.code, r.out + r.err).toBe(0);
+    const signs = calls(n.log, 'jsign').filter((l) => l[1] !== '--version');
+    expect(signs).toHaveLength(2);
+    for (const l of signs) expect(l.slice(1, 7)).toEqual(['--storetype', 'TRUSTEDSIGNING', '--keystore', ENDPOINT, '--alias', `${ACCOUNT}/stand_in_profile`]);
+  });
+
+  it('accepts the Universal C Runtime a UCRT-default mingw-w64 links (api-ms-win-crt-*, ucrtbase.dll), and still refuses a mingw library beside it', () => {
+    const u = fresh('ucrt');
+    const r = run([...SIGN_ARGS, '--out', u.out], u, { SHIM_UCRT: '1' });
+    expect(r.code, r.out + r.err).toBe(0);
+    for (const d of ['api-ms-win-crt-runtime-l1-1-0.dll', 'api-ms-win-crt-heap-l1-1-0.dll', 'ucrtbase.dll']) expect(r.out).toContain(`imports ${d} (the Universal C Runtime, part of Windows 10 and 11)`);
+    expect(listed(u.out)).toEqual([MSI, `${MSI}.json`]);
+    const b = fresh('ucrt-bad');
+    const rb = run([...SIGN_ARGS, '--out', b.out], b, { SHIM_UCRT: '1', SHIM_BAD_DLL: '1' });
+    expect(rb.code, rb.out + rb.err).toBe(4);
+    expect(rb.err).toContain('imports libwinpthread-1.dll');
+    expect(listed(b.out)).toEqual([]);
+  });
+
   const refusals: Array<{ label: string; env: Record<string, string>; code: number; says: string; jsigns: number }> = [
     { label: 'az cannot get a token', env: { SHIM_AZ_FAIL: '1' }, code: 5, says: 'az could not get a token', jsigns: 0 },
     { label: 'Artifact Signing refuses', env: { SHIM_JSIGN_FAIL: '1' }, code: 5, says: 'jsign did not sign beethoven-bridge.exe', jsigns: 1 },
@@ -782,7 +851,9 @@ describe.skipIf(!CROSS)('the real cross-build of the bridge (--no-sign), where t
     const dlls = [...dump.matchAll(/DLL Name:\s*(\S+)/g)].map((m) => (m[1] ?? '').toLowerCase());
     const allowed = (/^ALLOWED_DLLS="([^"]+)"$/m.exec(readFileSync(SCRIPT, 'utf8'))?.[1] ?? '').split(' ');
     expect(dlls.length).toBeGreaterThan(0);
-    for (const d of dlls) expect(allowed, d).toContain(d);
+    // a UCRT-default mingw-w64 (likely Homebrew's) links the Universal C Runtime's sets in place of msvcrt.dll
+    const ucrt = (d: string) => /^api-ms-win-crt-[a-z]+-l1-1-0\.dll$/.test(d) || d === 'ucrtbase.dll';
+    for (const d of dlls) expect(allowed.includes(d) || ucrt(d), d).toBe(true);
     expect(dlls).not.toEqual(expect.arrayContaining([expect.stringMatching(/^lib/)]));
     for (const d of dlls) expect(res.out.toLowerCase()).toContain(`imports ${d}`);
     const row = table(path.join(c.out, 'trial', MSI), 'File').find((r) => r[2] === 'beethoven-bridge.exe');
