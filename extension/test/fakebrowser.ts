@@ -46,7 +46,11 @@ export interface World {
   dirs: Set<string>;
   shellLines: Array<{ at: number; line: string }>;
   connectLines: Array<{ at: number; line: string }>;
-  opts: { dashboardDelayMs: number; shellPageDelayMs: number; signedIn: boolean; reach: boolean; keyless: boolean; claudeSignedIn: boolean; connectHold: boolean };
+  /**
+   * pageScript: tab mode's page script answers on a portal tab (ping, portal calls, the connect port), with a
+   * portal client of the page's own; authUrl: the sign-in link the connect sitting prints instead of claude.ai's
+   */
+  opts: { dashboardDelayMs: number; shellPageDelayMs: number; signedIn: boolean; reach: boolean; keyless: boolean; claudeSignedIn: boolean; connectHold: boolean; pageScript?: boolean; authUrl?: string };
   chrome: any;
   granted: Set<string>;
   sockets: Set<any>;
@@ -214,6 +218,61 @@ export function install(): World {
     if (!world.tabs.delete(id)) throw new Error(`No tab with id: ${id}`);
     onRemoved.fire(id, {});
   }
+  // ---- tab mode's page script (world.opts.pageScript), as src/entrypoints/portal.content.ts answers ----
+  const pageScriptIn = (tabId: number) => !!world.opts.pageScript && !!world.tabs.get(tabId)?.url.startsWith(`${ORIGIN}/`);
+  const pageClient = async () => {
+    const [{ PortalClient }, { Audit }, { local }] = await Promise.all([import('../src/core/portal'), import('../src/core/audit'), import('../src/ext/storage')]);
+    return new PortalClient(ORIGIN, { fetch: (i: string, init?: RequestInit) => fetch(i, init), WebSocket: (globalThis as any).WebSocket }, new Audit(local), { shellHost: 'default', credentials: 'same-origin', via: 'page' });
+  };
+  /** the connect port: Chrome fires onDisconnect only on the far end of the side that called disconnect() */
+  function pageConnectPort(tabId: number) {
+    const toExt = ev();
+    const extGone = ev();
+    const toPage = ev();
+    const pageGone = ev();
+    let open = true;
+    const end = (by: 'extension' | 'page') => {
+      if (!open) return;
+      open = false;
+      L(`tab #${tabId}: connect port disconnected by the ${by}`);
+      (by === 'extension' ? pageGone : extGone).fire();
+    };
+    const say = (m: unknown) => setTimeout(() => open && toExt.fire(m), 0);
+    let session: any;
+    pageGone.addListener(() => session?.close());
+    toPage.addListener(async (m: any) => {
+      if (m?.type === 'close') {
+        L(`tab #${tabId}: the page script was asked to close its sitting`);
+        session?.close();
+      } else if (m?.type === 'input') session?.send(m.text);
+      else if (m?.type === 'connect') {
+        const [{ commands }, { ConnectWatcher }] = await Promise.all([import('../src/core/contract'), import('../src/core/login')]);
+        const watcher = new ConnectWatcher((event: unknown) => say({ type: 'event', event }));
+        try {
+          session = await (await pageClient()).openLoginShell(commands.connect(m.sharedDir, m.options), (text: string) => watcher.feed(text));
+        } catch (e) {
+          say({ type: 'error', message: (e as Error).message });
+          return;
+        }
+        if (!open) return session.close();
+        say({ type: 'open' });
+        const e = await session.done;
+        if (e.reason === 'password') say({ type: 'password' });
+        say({ type: 'closed', reason: e.reason });
+        setTimeout(() => end('page'), 0);
+      }
+    });
+    return {
+      name: 'beethoven-connect',
+      postMessage(m: unknown) {
+        if (!open) throw new Error('Attempting to use a disconnected port object');
+        setTimeout(() => toPage.fire(m), 0);
+      },
+      disconnect: () => end('extension'),
+      onMessage: toExt,
+      onDisconnect: extGone,
+    };
+  }
   const areas: Record<string, any> = {};
   const onChanged = ev();
   for (const name of ['local', 'session'] as const) {
@@ -318,11 +377,21 @@ export function install(): World {
         L(`tabs.remove #${id} (was ${t?.url})`);
         removeImpl(id);
       },
-      async sendMessage() {
-        throw new Error('Could not establish connection. Receiving end does not exist.');
+      async sendMessage(tabId: number, msg: any) {
+        if (!pageScriptIn(tabId)) throw new Error('Could not establish connection. Receiving end does not exist.');
+        const { fail, succeed } = await import('../src/core/messages');
+        if (msg?.type === 'portal.ping') return succeed(true);
+        if (msg?.type !== 'portal.call') return undefined;
+        try {
+          const client = (await pageClient()) as any;
+          return succeed(await client[msg.op](...(msg.args ?? [])));
+        } catch (e) {
+          return fail(e as Error);
+        }
       },
-      connect() {
-        throw new Error('no content script');
+      connect(tabId: number, o: { name?: string } = {}) {
+        if (!pageScriptIn(tabId) || o.name !== 'beethoven-connect') throw new Error('no content script');
+        return pageConnectPort(tabId);
       },
       async getCurrent() {
         return undefined;
@@ -537,7 +606,7 @@ export function install(): World {
       await say('HPCW-LOGIN: requesting a compute node');
       await say('HPCW-LOGIN: on asx1; checking whether you are signed in already', 100);
       const n = world.connectLines.length;
-      await say(`AUTH-URL: https://claude.ai/oauth/authorize?sitting=${n}`);
+      await say(`AUTH-URL: ${world.opts.authUrl ?? `https://claude.ai/oauth/authorize?sitting=${n}`}`);
       await say('HPCW-LOGIN: paste the code from that page');
       const code = await new Promise<string>((r) => (this.codeWait = r));
       L(`connect sitting #${n} received a code of length ${code.length}`);

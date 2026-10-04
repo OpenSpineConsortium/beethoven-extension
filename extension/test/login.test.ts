@@ -31,13 +31,26 @@ describe('the plain login lines', () => {
 
   it('opens only https pages on claude.ai or claude.com', () => {
     expect(isClaudeAuthUrl(URL)).toBe(true);
-    expect(isClaudeAuthUrl('https://platform.claude.com/oauth/code/callback')).toBe(true);
     expect(isClaudeAuthUrl('https://claude.com/login')).toBe(true);
+    expect(isClaudeAuthUrl('https://claude.com/cai/oauth/authorize?code=true&client_id=abc&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback')).toBe(true);
     expect(isClaudeAuthUrl('http://claude.ai/oauth/authorize')).toBe(false);
     expect(isClaudeAuthUrl('https://claude.ai.evil.example/oauth')).toBe(false);
     expect(isClaudeAuthUrl('https://evil.example/?u=https://claude.ai')).toBe(false);
     expect(isClaudeAuthUrl('javascript:alert(1)')).toBe(false);
     expect(isClaudeAuthUrl(undefined)).toBe(false);
+  });
+
+  // greg, 2026-10-04: no API key anywhere. The Console's sign-in bills API usage, so its pages are never
+  // opened; the host decides, since a subscription link names platform.claude.com in its redirect_uri.
+  it('opens a subscription link that names the Console host in its query, and never the Console\'s own sign-in', () => {
+    expect(URL).toContain('platform.claude.com');
+    expect(isClaudeAuthUrl(URL)).toBe(true);
+    expect(isClaudeAuthUrl('https://platform.claude.com/oauth/authorize?code=true&client_id=abc&response_type=code&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback&scope=org%3Acreate_api_key+user%3Aprofile&state=xyz')).toBe(false);
+    expect(isClaudeAuthUrl('https://platform.claude.com/oauth/code/callback')).toBe(false);
+    expect(isClaudeAuthUrl('https://PLATFORM.claude.com/login')).toBe(false);
+    expect(isClaudeAuthUrl('https://a.platform.claude.com/oauth/authorize')).toBe(false);
+    expect(isClaudeAuthUrl('https://console.anthropic.com/oauth/authorize?code=true&client_id=abc&redirect_uri=https%3A%2F%2Fclaude.ai%2Foauth')).toBe(false);
+    expect(isClaudeAuthUrl('https://anthropic.com/login')).toBe(false);
   });
 
   it('assembles lines across frames and terminal codes, emits each event once, and sees the prompt without a newline', () => {
@@ -99,6 +112,18 @@ describe('the connect sitting\'s reader', () => {
     w.feed('AUTH-URL: https://evil.example/oauth\r\nPaste code here if prompted > ');
     expect(seen.map((e) => e.kind)).toEqual(['refused-url', 'code-prompt']);
     expect(w.authUrl).toBeUndefined();
+  });
+
+  it("refuses the Console's sign-in link and hands on a subscription's", () => {
+    const seen: ConnectEvent[] = [];
+    const w = new ConnectWatcher((e) => seen.push(e));
+    w.feed('AUTH-URL: https://platform.claude.com/oauth/authorize?code=true&client_id=abc&state=xyz\r\n');
+    w.feed('AUTH-URL: https://console.anthropic.com/oauth/authorize?code=true&client_id=abc&state=xyz\r\n');
+    expect(seen.map((e) => e.kind)).toEqual(['refused-url', 'refused-url']);
+    expect(w.authUrl).toBeUndefined();
+    w.feed(`AUTH-URL: ${URL}\r\n`);
+    expect(seen.map((e) => e.kind)).toEqual(['refused-url', 'refused-url', 'auth-url']);
+    expect(w.authUrl).toBe(URL);
   });
 });
 

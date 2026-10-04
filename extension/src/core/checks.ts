@@ -17,9 +17,9 @@
 // panel's buttons, not by a check); and the probe is offered as "Check a compute node".
 import type { KV } from './audit';
 import { statementFor, type Statements } from './disclosure';
-import { commands, consentSourceWords, LOGIN_SETUP_PROVEN, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
+import { commands, consentSourceWords, isSubscriptionSignIn, LOGIN_SETUP_PROVEN, parseDiscovery, paths, probeVerdict, profileRestricts, stateDirFrom, type Discovery, type ProbeFile } from './contract';
 import type { DiagNode } from './diagnostics';
-import { ACCESS_KEY, CHANNEL_KEY, IDENTITY_KEY, KILLLIST_KEY, LOGIN_SEEN_KEY, SERVICES_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type ChannelNote, type IdentityNote, type LoginSeen, type PortalSettings, type Prefs } from './keys';
+import { ACCESS_KEY, CHANNEL_KEY, IDENTITY_KEY, KILLLIST_KEY, SERVICES_KEY, SESSION_SEEN_KEY, STATEMENTS_KEY, type ChannelNote, type IdentityNote, type PortalSettings, type Prefs } from './keys';
 import { accessFact, type AccessRecord, type StoredServices } from '../licensing/access';
 import { killListVerdict, type StoredKillList } from '../licensing/killlist';
 import type { PortalApi, SessionInfo } from './portal';
@@ -335,21 +335,21 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Signed in to Claude on the cluster',
       layer: 'claude',
       dependsOn: ['probe-job'],
-      assumption: 'the probe ran `claude auth status` (never reading the credential) and found a sign-in in the configured Claude folder; the job strips CLAUDE_CODE_OAUTH_TOKEN and the other credential variables itself',
+      assumption: 'the probe ran `claude auth status` (never reading the credential) and found a Claude subscription\'s sign-in (authMethod "claude.ai") in the configured Claude folder; the job strips CLAUDE_CODE_OAUTH_TOKEN and the other credential variables itself',
       manualFix: SIGN_IN_INSTRUCTION,
       fixAction: 'sign-in-claude',
       futureRisk: 'the sign-in expires after roughly a month; a Remote Control session that outlives it stops making progress',
       async check(ctx) {
         const p = await probeFile(ctx);
         const a = p?.claude_auth;
-        // a sign-in made from this browser's login terminal after the probe ran overtakes the probe's word
-        const seen = await ctx.env.local.get<LoginSeen>(LOGIN_SEEN_KEY);
-        const probeAt = p?.when ? new Date(p.when).getTime() : 0;
-        if (seen && new Date(seen.at).getTime() > probeAt) return { ok: true, detail: `signed in from this browser on ${seen.at.slice(0, 16).replace('T', ' ')}${seen.detail ? ` (${seen.detail})` : ''}; the next probe will confirm it` };
+        // only the probe's word counts: the note of a sign-in from this browser (bridge.loginSeen) has not been
+        // written since 11.0.0, says nothing of the sign-in method, and 10.0.0's sitting opened the Console's page too
         if (!a) return { ok: false, detail: 'the probe reported nothing about the Claude sign-in' };
         if (!a.loggedIn) return { ok: false, detail: a.config_dir_present ? 'not signed in to Claude on the cluster' : 'not signed in to Claude on the cluster (the Claude folder named in the profile does not exist yet)' };
         const who = [a.email, a.subscriptionType].filter(Boolean).join(', ');
-        const method = a.authMethod && !/claude\.ai|oauth/i.test(a.authMethod) ? ` (sign-in method "${a.authMethod}": Remote Control needs a claude.ai sign-in, not an API key or setup-token)` : '';
+        // only a Claude subscription's own sign-in counts: never the Console, a setup-token or a cloud provider
+        const how = [a.authMethod ? `sign-in method "${a.authMethod}"` : 'no sign-in method reported', a.apiProvider !== undefined && a.apiProvider !== 'firstParty' ? `service "${a.apiProvider || 'not named'}"` : ''].filter(Boolean).join(', ');
+        const method = isSubscriptionSignIn(a) ? '' : ` (${how}: ${PRODUCT_NAME} works only with a Claude subscription's own sign-in, never an API key, a setup-token or a cloud provider)`;
         return { ok: !method, warn: false, detail: `signed in${who ? ` (${who})` : ''}${method}` };
       },
     },

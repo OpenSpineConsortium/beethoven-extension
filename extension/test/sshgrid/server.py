@@ -16,7 +16,8 @@ What it imitates (from what the grid answered on 2026-10-01, docs/V12_CONTRACT.m
 Switches (JSON on argv[1]): {"split": n} sends every server write in chunks of n bytes (the receive loop's
 stall); {"silent_after_kex": true} never answers after NEWKEYS; {"hostkey": "ed25519"}; {"slow_exec": s};
 {"bashrc": text} printed before every key session's output (an account's ~/.bashrc); {"gate_limit": "names"}
-makes the gate's connect answer framework 11's cap.
+makes the gate's connect answer framework 11's cap. {"auth_url": url} is the sign-in link the sitting prints instead
+of a subscription's on claude.ai (the Console's, which Beethoven refuses).
 {"job": id} puts a run in the worker's folder before anything else happens, its status.json "online". With
 {"run_state": s} (online, running, starting, need_login, preempted, stopped) and {"run_age_s": n} that file is
 written as framework 11's worker writes it: its heartbeat updated_at n seconds old, got_computer_at and
@@ -242,7 +243,7 @@ async def handle(process):
         STATE["stop_reason"] = ""
         process.stdout.write("HPCW-STEP setup ready\r\nHPCW-STEP consent\r\nHPCW-STEP queued 40509876 new /rs/rs_grp_oschome/%s/hpcworker/worker\r\nHPCW-STEP signin\r\n" % user)
         process.stdout.write("HPCW-LOGIN: on asx15; checking whether you are signed in already\r\n")
-        process.stdout.write("AUTH-URL: https://claude.ai/oauth/authorize?code=true&client_id=test\r\n")
+        process.stdout.write("AUTH-URL: %s\r\n" % CFG.get("auth_url", "https://claude.ai/oauth/authorize?code=true&client_id=test"))
         process.stdout.write("HPCW-LOGIN: paste the code from that page\r\n")
         try:
             line = await asyncio.wait_for(process.stdin.readline(), 30)

@@ -27,7 +27,8 @@ The other adversaries considered:
   (the sign-in page during a sitting, the session's claude.ai/code link) are never read.
 - A compromised framework or portal printing a link. The one address the cluster hands the extension
   during a sign-in sitting is opened only when it is `https` on `claude.ai` or `claude.com` (or a
-  subdomain of either), and is reported as refused otherwise; the only link opened when a worker
+  subdomain of either, never `platform.claude.com`, the Console's sign-in, which bills by use), and is
+  reported as refused otherwise; the only link opened when a worker
   connects must match `https://claude.ai/code?environment=env_...` exactly; anything else is shown
   as text.
 - Another portal user. The Open OnDemand `/rnode/` proxy does no job or ownership lookup: any
@@ -113,8 +114,10 @@ Cluster side:
 - Beethoven never reads, stores, copies, prints or relays a Claude credential. The student signs in
   with `claude auth login` on a compute node; the framework starts Claude Code where that credential is
   and reads only `claude auth status`. Every credential variable (`CLAUDE_CODE_OAUTH_TOKEN`,
-  `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, the file-descriptor variants) is
-  removed from the worker's environment before Claude Code starts. `claude auth logout` is never run.
+  `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, the file-descriptor variants) and,
+  from framework 17, every provider switch (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`,
+  `CLAUDE_CODE_USE_FOUNDRY`) is removed from the worker's environment before Claude Code starts.
+  `claude auth logout` is never run.
 - Tokens and secrets never appear on command lines, in argv, in logs, in job files or in
   `sbatch --export`; the per-job token is a mode-0600 file on shared storage.
 - Supervised mode (`--permission-mode default`) by default; a task manifest enforced by the framework;

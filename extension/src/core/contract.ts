@@ -326,13 +326,22 @@ export const LOGIN_LINES = {
   codePrompt: /Paste code here|paste the code from that page/i,
 };
 
-/** the only pages the login terminal ever opens: Anthropic's own sign-in pages on claude.ai or claude.com, over https */
+/**
+ * The Anthropic Console's sign-in (API usage billing; it was console.anthropic.com, which the
+ * claude.ai/claude.com rule below already refuses). No API key anywhere (greg, 2026-10-04): Beethoven
+ * signs in only with a Claude subscription. Judged on the link's own host: a subscription link names
+ * platform.claude.com in its redirect_uri, and its token exchange goes there too.
+ */
+const CONSOLE_SIGNIN_HOST = 'platform.claude.com';
+
+/** the only pages the login terminal ever opens: a Claude subscription's sign-in pages on claude.ai or claude.com, over https, never the Console's */
 export function isClaudeAuthUrl(url: string | undefined): url is string {
   if (typeof url !== 'string') return false;
   try {
     const u = new URL(url);
     if (u.protocol !== 'https:') return false;
     const h = u.hostname.toLowerCase();
+    if (h === CONSOLE_SIGNIN_HOST || h.endsWith(`.${CONSOLE_SIGNIN_HOST}`)) return false;
     return h === 'claude.ai' || h === 'claude.com' || h.endsWith('.claude.ai') || h.endsWith('.claude.com');
   } catch {
     return false;
@@ -367,12 +376,14 @@ export function parseLoginLine(line: string): LoginEvent | undefined {
 export const KEEPALIVE_LINE = 'HPCW-LOGIN: still waiting';
 
 /** the failure codes of `HPCW-STEP failed <code> <sentence>`; anything else reads as "other" */
-export type StepFailCode = 'usage' | 'setup' | 'restricted' | 'refused' | 'signin-node' | 'signin-code' | 'signin-timeout' | 'signin' | 'other';
+export type StepFailCode = 'usage' | 'setup' | 'restricted' | 'refused' | 'signin-node' | 'signin-code' | 'signin-timeout' | 'signin-billed' | 'signin-method' | 'signin' | 'other';
 
-const FAIL_CODES: readonly StepFailCode[] = ['usage', 'setup', 'restricted', 'refused', 'signin-node', 'signin-code', 'signin-timeout', 'signin', 'other'];
+// framework 17 adds signin-billed (the sitting refused a page that is not a Claude subscription's) and
+// signin-method (Claude Code on the grid is signed in some other way); a framework 16 copy says plain signin
+const FAIL_CODES: readonly StepFailCode[] = ['usage', 'setup', 'restricted', 'refused', 'signin-node', 'signin-code', 'signin-timeout', 'signin-billed', 'signin-method', 'signin', 'other'];
 
 /** connect's exit status for each failure code (0 for "HPCW-STEP done"); the extension reads the line, a person at a terminal the status */
-export const STEP_EXIT: Record<StepFailCode | 'done', number> = { done: 0, other: 1, usage: 2, setup: 3, restricted: 4, refused: 5, 'signin-node': 6, 'signin-code': 7, 'signin-timeout': 7, signin: 7 };
+export const STEP_EXIT: Record<StepFailCode | 'done', number> = { done: 0, other: 1, usage: 2, setup: 3, restricted: 4, refused: 5, 'signin-node': 6, 'signin-code': 7, 'signin-timeout': 7, 'signin-billed': 7, 'signin-method': 7, signin: 7 };
 
 /** one `HPCW-STEP` line, parsed */
 export type StepEvent =
@@ -439,7 +450,7 @@ export type ConnectEvent =
   | { kind: 'signin-wait' }
   /** "HPCW-LOGIN: on <host>; checking whether you are signed in already": the sign-in has its computer */
   | { kind: 'signin-node' }
-  /** "AUTH-URL: <url>": only an https link on claude.ai or claude.com (isClaudeAuthUrl) is reported; anything else is "refused-url" */
+  /** "AUTH-URL: <url>": only a subscription's https link on claude.ai or claude.com (isClaudeAuthUrl) is reported; anything else, the Console's included, is "refused-url" */
   | { kind: 'auth-url'; url: string }
   | { kind: 'refused-url' }
   /** "HPCW-LOGIN: paste the code from that page" (or Claude Code's own "Paste code here"): focus the box */
@@ -494,6 +505,16 @@ export function parseConnectLine(line: string): ConnectEvent | undefined {
 export function plausibleCode(code: unknown): string | undefined {
   const c = String(code ?? '').trim();
   return /^[\x21-\x7e]{8,512}$/.test(c) ? c : undefined;
+}
+
+/**
+ * `claude auth status` says the sign-in is a Claude subscription's: authMethod "claude.ai" on
+ * Anthropic's own service (apiProvider "firstParty", or not said). Everything else is refused (greg,
+ * 2026-10-04: no API key anywhere): the Console ("console", API usage billing), a token taken from the
+ * environment ("oauth_token", the setup-token route the credential rule forbids) and a cloud provider.
+ */
+export function isSubscriptionSignIn(a: { loggedIn?: boolean; authMethod?: string; apiProvider?: string } | undefined): boolean {
+  return !!a?.loggedIn && a.authMethod === 'claude.ai' && (a.apiProvider ?? 'firstParty') === 'firstParty';
 }
 
 /** the Claude plans Remote Control works on; "-" or nothing (unknown) is not refused */
@@ -819,7 +840,8 @@ export interface ProbeFile {
   image?: { type?: string; path?: string; node_version?: string; claude_version?: string; first_exec_seconds?: number; curl_api_from_image?: string };
   remote_control_flags?: string;
   remote_control_help_head?: string;
-  claude_auth?: { loggedIn?: boolean; subscriptionType?: string; email?: string; authMethod?: string; config_dir_present?: boolean };
+  /** apiProvider only from a probe that reports it (read by isSubscriptionSignIn) */
+  claude_auth?: { loggedIn?: boolean; subscriptionType?: string; email?: string; authMethod?: string; apiProvider?: string; config_dir_present?: boolean };
   /** the student's answer to "Enable Remote Control?" is on record (Claude Code's own remoteDialogSeen, or the marker file) */
   consent_recorded?: boolean;
   /** where the answer was read from: claude_config (Claude Code's settings file), marker, or none */

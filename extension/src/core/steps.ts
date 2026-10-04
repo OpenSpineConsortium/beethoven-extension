@@ -87,6 +87,8 @@ export interface ConnectFacts {
   linkShown?: boolean;
   /** Anthropic's tab is on record but no sitting holds it any more (the browser stopped Beethoven's background mid-sign-in) */
   interrupted?: boolean;
+  /** the sitting offered a sign-in link that is not a Claude subscription's (the Console's, or any other host): nothing was opened and the sitting was closed */
+  notSubscription?: boolean;
 }
 
 export type RunPhase = 'none' | 'queued' | 'got-computer' | 'connecting' | 'slow' | 'reconnecting' | 'needs-claude' | 'needs-consent' | 'online' | 'renewing' | 'ended' | 'stopped' | 'error';
@@ -312,6 +314,8 @@ export function endedWait(failure: ConnectFailure | undefined): ProblemView | un
     case 'restricted':
     case 'signin-code':
     case 'signin-timeout':
+    case 'signin-billed':
+    case 'signin-method':
     case 'limit-names':
     case 'limit-hourly':
     case 'limit-busy':
@@ -381,6 +385,11 @@ export function connectProblem(failure: ConnectFailure | undefined): ProblemView
       return { body: WORDS.claude.badCode, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
     case 'signin-timeout':
       return { body: WORDS.claude.timedOut, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
+    // framework 17: the sitting itself refused a sign-in that is not a Claude subscription's (no API key anywhere)
+    case 'signin-billed':
+      return { body: WORDS.claude.subscriptionOnly, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
+    case 'signin-method':
+      return { body: WORDS.claude.otherSignIn, button: button(WORDS.statement.noSharedCopy.button, 'ink', { kind: 'copy-details' }) };
     case 'password':
       // the one-time key step takes over (AM2); nothing to say here
       return undefined;
@@ -403,7 +412,7 @@ export function connectProblem(failure: ConnectFailure | undefined): ProblemView
 }
 
 /** the failures that belong to the Claude sign-in moment rather than to the connect moment */
-const CLAUDE_FAILURES: ReadonlySet<ConnectFailure> = new Set(['signin-code', 'signin-timeout']);
+const CLAUDE_FAILURES: ReadonlySet<ConnectFailure> = new Set(['signin-code', 'signin-timeout', 'signin-billed', 'signin-method']);
 
 // ---- which moment ----------------------------------------------------------------------------------
 
@@ -449,7 +458,7 @@ function studentMoment(f: Facts): JourneyView['moment'] | undefined {
 
 function claudeNeedsStudent(f: Facts): boolean {
   const c = f.connect;
-  if (c.interrupted || c.noPlan || c.claudeTabClosed) return true;
+  if (c.interrupted || c.notSubscription || c.noPlan || c.claudeTabClosed) return true;
   if (c.failure && CLAUDE_FAILURES.has(c.failure)) return true;
   if (c.signin === 'link' || c.signin === 'checking') return true;
   // "Signed in as … · Max" holds the moment a little, only when the student was on it (spec moment 8:
@@ -619,10 +628,13 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
     case 'claude': {
       const c = f.connect;
       let problem: ProblemView | undefined;
-      if (c.interrupted) problem = { body: WORDS.claude.interrupted, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
+      // a refused link is what this background saw end the sitting; "interrupted" is only read from an earlier sitting's Claude tab
+      if (c.notSubscription) problem = { body: WORDS.claude.subscriptionOnly, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
+      else if (c.interrupted) problem = { body: WORDS.claude.interrupted, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.noPlan) problem = { body: WORDS.claude.noPlan, button: button(WORDS.claude.useAnother, 'ink', { kind: 'sign-in-claude', fresh: true }) };
       else if (c.failure === 'signin-timeout') problem = { body: WORDS.claude.timedOut, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
       else if (c.failure === 'signin-code') problem = { body: WORDS.claude.badCode, button: button(WORDS.claude.signInAgain, 'ink', { kind: 'sign-in-claude' }) };
+      else if (c.failure === 'signin-billed' || c.failure === 'signin-method') problem = connectProblem(c.failure);
       else if (c.claudeTabClosed) problem = { body: WORDS.claude.tabClosed, button: button(WORDS.claude.openAgain, 'ink', { kind: 'reopen-claude-tab' }) };
       else if (c.badCode) problem = { body: WORDS.claude.badCode };
       const signedIn = c.signin === 'signed-in' && c.signedIn && !c.noPlan ? signedInClaude(c.signedIn) : undefined;

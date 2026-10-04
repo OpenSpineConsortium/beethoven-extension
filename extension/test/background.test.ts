@@ -12,7 +12,7 @@ import { EXT, install, openPort, ORIGIN, send, sleep, STATE, type World } from '
 const INSTALL = '0123456789abcdef0123456789abcdef';
 const LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
 
-async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRun?: boolean; connection?: 'direct' | 'vpn' } = {}) {
+async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRun?: boolean; connection?: 'direct' | 'vpn'; channel?: 'direct' | 'tab' } = {}) {
   const terms = await import('../src/core/terms');
   const disclosure = await import('../src/core/disclosure');
   const audit = await import('../src/core/audit');
@@ -32,7 +32,7 @@ async function boot(world: World, o: { terms?: boolean; ready?: boolean; firstRu
       'bridge.portal': { origin: ORIGIN, hostname: 'ondemand.grid.wayne.edu', connected_at: now, shell_host: 'default', site: 'wayne' },
       'bridge.access': { v: 1, access_id: 'st1234', portal: 'ondemand.grid.wayne.edu', approved: true, checked_at: now, last_attempt_at: now },
       'bridge.statements': { [disclosure.makeAcknowledgement('worker').work_dir]: disclosure.makeAcknowledgement('worker') },
-      'bridge.channel': { origin: ORIGIN, mode: 'direct', shell: 'ok', tested_at: now },
+      'bridge.channel': { origin: ORIGIN, mode: o.channel ?? 'direct', shell: 'ok', tested_at: now },
       ...(o.firstRun ? {} : { 'bridge.once': { first_online_at: now } }),
     });
   }
@@ -238,4 +238,70 @@ describe('the background, run whole', () => {
     }
     expect(again.last()?.view?.journey).toMatchObject({ moment: 'claude', problem: { body: 'The sign-in stopped before it finished.', button: { label: 'Sign in again' } } });
   }, 30_000);
+
+  // greg, 2026-10-04: no API key anywhere. A sign-in link that is not a Claude subscription's (the Console's) is not
+  // opened and its sitting is closed; the sentence holds the Claude moment only until the grid says otherwise
+  it("a Console sign-in link: nothing opened, the plain sentence, and the worker coming online after all ends the moment", async () => {
+    const { WORDS } = await import('../src/core/model');
+    await boot(world);
+    world.opts.authUrl = 'https://platform.claude.com/oauth/authorize?code=true&client_id=test&redirect_uri=https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback';
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await until(panel, () => panel.last()?.view?.journey?.problem?.body === WORDS.claude.subscriptionOnly);
+    expect(panel.last()?.view?.journey).toMatchObject({ moment: 'claude', problem: { button: { label: 'Sign in again', action: { kind: 'sign-in-claude' } } } });
+    expect(world.log.filter((l) => /tabs\.create/.test(l) && /claude\.(?:ai|com)|anthropic\.com/.test(l))).toEqual([]);
+    // signed in on the grid another way, the worker comes online: the refusal no longer holds the panel
+    const sj = `${STATE}/worker/status.json`;
+    const at = new Date().toISOString();
+    world.fs.set(sj, JSON.stringify({ ...JSON.parse(world.fs.get(sj)!), state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, environment_url: LINK, claude_login: { loggedIn: true, email: 'st1234@wayne.edu', subscriptionType: 'max', checked_at: at } }));
+    await until(panel, () => !JSON.stringify(panel.last()?.view).includes(WORDS.claude.subscriptionOnly), 15_000);
+    expect(panel.last()?.view?.journey?.moment).not.toBe('claude');
+  }, 40_000);
+
+  // tab mode: Chrome fires a port's onDisconnect only on the far end, so a sitting closed from the background
+  // (Sign in again, Cancel, a refused link) lowers "Working on the grid…" and closes its own portal tab itself
+  it('tab mode: a sitting closed from here lowers "Working on the grid…" and closes its own tab (Sign in again, Cancel, a refused link)', async () => {
+    const { WORDS } = await import('../src/core/model');
+    await boot(world, { channel: 'tab' });
+    world.opts.pageScript = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(1_500);
+    // each sitting opens a portal tab of its own (inactive) for its page script
+    const sittingTabs = () => world.log.filter((l) => /tabs\.create #\d+ https:\/\/ondemand\.grid\.wayne\.edu\/pun\/sys\/dashboard\/ active=false/.test(l)).map((l) => Number(/#(\d+)/.exec(l)![1]));
+    const portalTabs = () => [...world.tabs.values()].filter((t) => t.url.startsWith(`${ORIGIN}/`));
+    const settled = () => !panel.last()?.view?.overlays?.workingInTab && portalTabs().length === 0;
+    const links = () => world.log.filter((l) => /tabs\.(?:create|update) .*claude\.ai\/oauth/.test(l)).length;
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await until(panel, () => links() === 1);
+    // Sign in again: the waiting sitting gives way to a new one (after the scheduler's floor), then Cancel closes that one too
+    await sleep(1_600);
+    await send(world, { type: 'action', action: { kind: 'sign-in-claude' } });
+    await until(panel, () => links() === 2);
+    await send(world, { type: 'action', action: { kind: 'cancel' } });
+    await until(panel, settled, 10_000);
+    expect(sittingTabs()).toHaveLength(2);
+    expect(world.log.filter((l) => /connect port disconnected by the extension/.test(l))).toHaveLength(2);
+    for (const id of sittingTabs()) expect(world.log.some((l) => l.includes(`tabs.remove #${id} `))).toBe(true);
+    // a refused link closes its sitting the same way
+    world.opts.authUrl = 'https://console.anthropic.com/oauth/authorize?code=true&client_id=test';
+    await sleep(1_600);
+    await send(world, { type: 'action', action: { kind: 'sign-in-claude' } });
+    await until(panel, () => panel.last()?.view?.journey?.problem?.body === WORDS.claude.subscriptionOnly);
+    await until(panel, settled, 10_000);
+    expect(sittingTabs()).toHaveLength(3);
+    expect(world.log.filter((l) => /connect port disconnected by the extension/.test(l))).toHaveLength(3);
+    expect(world.log.some((l) => l.includes(`tabs.remove #${sittingTabs()[2]} `))).toBe(true);
+    expect(world.log.filter((l) => /tabs\.create/.test(l) && /console\.anthropic\.com|platform\.claude\.com/.test(l))).toEqual([]);
+  }, 60_000);
 });
+
+async function until(panel: ReturnType<typeof openPort>, cond: () => boolean, ms = 20_000): Promise<void> {
+  const t0 = Date.now();
+  while (!cond()) {
+    if (Date.now() - t0 > ms) throw new Error(`timed out; last view ${JSON.stringify(panel.last())?.slice(0, 600)}\n${world.log.slice(-25).join('\n')}`);
+    panel.tick();
+    await sleep(150);
+  }
+}

@@ -306,17 +306,48 @@ describe('diagnostics', () => {
     expect(by3['xdg-runtime']!.detail).toMatch(/inside the image/);
   });
 
+  // greg, 2026-10-04: no API key anywhere. Only a Claude subscription's own sign-in passes check 13: the Console,
+  // a token from the environment (the setup-token route) and a cloud provider fail it, and check 14 waits on it.
+  it("passes the Claude sign-in only for a Claude subscription's own sign-in", async () => {
+    const withAuth = async (claude_auth: Record<string, unknown>) => byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: { ...GOOD_PROBE, claude_auth } }), ack: true })));
+    const base = { loggedIn: true, subscriptionType: 'max', email: 'a@wayne.edu', config_dir_present: true };
+    const good = await withAuth({ ...base, authMethod: 'claude.ai', apiProvider: 'firstParty' });
+    expect(good['claude-login']!.status).toBe('ok');
+    expect(good['claude-login']!.detail).toBe('signed in (a@wayne.edu, max)');
+    for (const [auth, said] of [
+      [{ authMethod: 'console', apiProvider: 'firstParty' }, /sign-in method "console"/],
+      [{ authMethod: 'oauth_token', apiProvider: 'firstParty' }, /sign-in method "oauth_token"/],
+      [{ authMethod: 'claude.ai', apiProvider: 'bedrock' }, /service "bedrock"/],
+      // a service field written empty is not Anthropic's own service, and the words say so rather than contradict themselves
+      [{ authMethod: 'claude.ai', apiProvider: '' }, /sign-in method "claude\.ai", service "not named"/],
+      [{}, /no sign-in method reported/],
+    ] as const) {
+      const by = await withAuth({ ...base, ...auth });
+      expect(by['claude-login']!.status, JSON.stringify(auth)).toBe('fail');
+      expect(by['claude-login']!.detail).toMatch(said);
+      expect(by['claude-login']!.detail).toMatch(/works only with a Claude subscription's own sign-in, never an API key/);
+      expect(by['claude-login']!.fixAction).toBe('sign-in-claude');
+      expect(by['remote-control-ready']!.status).toBe('blocked');
+    }
+  });
+
   it('empty Remote Control flags from a probe that ran signed out are "known once you are signed in", not "too old"', async () => {
     // measured on the grid (probe of 2026-09-29 04:06Z, signed out): `flags: ` empty; the signed-in worker listed them
     const signedOut = { ...GOOD_PROBE, remote_control_flags: '', claude_auth: { loggedIn: false, config_dir_present: true } };
     const ctx = await ctxWith({ portal: fakePortal({}, { probe: signedOut }), ack: true });
-    // the sign-in made from this browser since the probe satisfies check 13, so check 14 runs
+    // 10.0.0's note of a sign-in from this browser, newer than the probe, no longer overtakes the probe's word (no API
+    // key anywhere: nothing has written it since 11.0.0, it says nothing of the sign-in method, and 10.0.0 opened the
+    // Console's page too), so check 13 fails on the probe and check 14 waits on it
     await ctx.env.local.set('bridge.loginSeen', { at: '2026-09-28T02:00:00Z', detail: 'a@wayne.edu max' });
     const by = byId(await runDiagnostics(buildNodes(), ctx));
-    expect(by['claude-login']!.status).toBe('ok');
-    expect(by['remote-control-ready']!.status).toBe('warn');
-    expect(by['remote-control-ready']!.detail).toMatch(/known once you are signed in/);
-    expect(by['remote-control-ready']!.detail).not.toMatch(/too old/);
+    expect(by['claude-login']!.status).toBe('fail');
+    expect(by['claude-login']!.detail).toBe('not signed in to Claude on the cluster');
+    expect(by['remote-control-ready']!.status).toBe('blocked');
+    // check 14's own words for such a probe
+    const rc = await buildNodes().find((n) => n.id === 'remote-control-ready')!.check(ctx);
+    expect(rc).toMatchObject({ ok: true, warn: true });
+    expect(rc.detail).toMatch(/known once you are signed in/);
+    expect(rc.detail).not.toMatch(/too old/);
     // signed in at probe time and still no flags: that is the old-version verdict
     const signedInNoFlags = { ...GOOD_PROBE, remote_control_flags: '' };
     const by2 = byId(await runDiagnostics(buildNodes(), await ctxWith({ portal: fakePortal({}, { probe: signedInNoFlags }), ack: true })));

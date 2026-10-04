@@ -57,9 +57,11 @@ carries it out.
 - **D8. `HPCW-STEP queued` carries the job id and the run folder** (`HPCW-STEP queued <job> new|kept
   <run dir>`), so the extension can list the run folder within a second without first reading
   `profile.json`. (§5.3)
-- **D9. Eight failure codes** in `HPCW-STEP failed <code> <sentence>`: `usage`, `setup`,
-  `restricted`, `refused`, `signin-node`, `signin-code`, `signin-timeout`, `signin`, and `other` for
-  anything else. The panel words come from the code, never from the sentence. (§5.3)
+- **D9. Ten failure codes** in `HPCW-STEP failed <code> <sentence>`: `usage`, `setup`,
+  `restricted`, `refused`, `signin-node`, `signin-code`, `signin-timeout`, `signin-billed` and
+  `signin-method` (framework 17: the sitting refused a sign-in that is not a Claude subscription's),
+  `signin`, and `other` for anything else. The panel words come from the code, never from the
+  sentence. (§5.3)
 - **D10. status.json gains `online_at`, `renewal` and `stop_reason`** besides the spec's fields.
   `online_at` gives "Ready in Claude, 7 min after you asked." and the terminal line without the
   browser's clock; `renewal` stops a chain successor from showing a queue clock counted from hours
@@ -275,6 +277,8 @@ Unknown flags and bad values: `HPCW-STEP failed usage <sentence>`, exit 2, nothi
    | no computer for the sitting within 600 s, or the allocation ended early | `signin-node` | 6 |
    | "Claude Code did not accept the code; …" | `signin-code` | 7 |
    | "no code arrived within …", "the sign-in did not finish within …" | `signin-timeout` | 7 |
+   | "Claude Code offered a sign-in that bills by use …" (framework 17: the link's host or the menu was the Console's; nothing was opened) | `signin-billed` | 7 |
+   | "Claude Code on the grid is signed in in a way that …" (framework 17: already signed in, not with a Claude subscription) | `signin-method` | 7 |
    | any other `HPCW-LOGIN-FAILED` | `signin` | 7 |
 
 7. Print `HPCW-STEP done`, exit 0.
@@ -306,7 +310,8 @@ HPCW-STEP failed <code> <sentence>
 - `<email>`, `<plan>`: one token each, `-` when Claude Code did not say. `<plan>` is Claude Code's
   `subscriptionType` (`max`, `pro`, `team`, `enterprise`, `free`, …).
 - `<code>`: `usage`, `setup`, `restricted`, `refused`, `signin-node`, `signin-code`,
-  `signin-timeout`, `signin` or `other` (an unknown word reads as `other`). `<sentence>`: one line in
+  `signin-timeout`, `signin-billed`, `signin-method`, `signin` or `other` (an unknown word reads as
+  `other`; a framework 16 copy never prints the two framework 17 codes). `<sentence>`: one line in
   the tool's words, for Details and the log; may be empty.
 
 | Line | What the extension does |
@@ -317,7 +322,7 @@ HPCW-STEP failed <code> <sentence>
 | `signin` | "Getting your Claude sign-in ready…"; after 2 minutes without `signin-node` or `auth-url`, "The grid is busy. Still finding a computer for the sign-in…" |
 | `signed-in <email> <plan>` | "Signed in as <email> · <Plan>" with the drawn check for 3 s; refuses the plan per D33 ("This Claude account has no Pro or Max plan. Remote Control needs one." [Use another account]); closes the Anthropic tab per §17 |
 | `done` | the sitting is over; the files take it from here |
-| `failed <code> …` | `setup`: "Your grid account can't use the lab's copy yet. Ask your lab lead." [Copy details]; `restricted`: "This workspace is marked restricted. Choose another under More about your data."; `refused`: "The grid didn't take the request." [Try again]; `signin-node`: "The grid didn't find a computer for the sign-in. Your worker keeps its place in line." [Try again]; `signin-code`: "That code didn't work. Copy it again from the Claude tab." [Sign in again]; `signin-timeout`: "The sign-in timed out." [Sign in again]; `signin`, `usage`, `other`: "The grid didn't take the request." [Try again] |
+| `failed <code> …` | `setup`: "Your grid account can't use the lab's copy yet. Ask your lab lead." [Copy details]; `restricted`: "This workspace is marked restricted. Choose another under More about your data."; `refused`: "The grid didn't take the request." [Try again]; `signin-node`: "The grid didn't find a computer for the sign-in. Your worker keeps its place in line." [Try again]; `signin-code`: "That code didn't work. Copy it again from the Claude tab." [Sign in again]; `signin-timeout`: "The sign-in timed out." [Sign in again]; `signin-billed`: "Beethoven signs in only with a Claude subscription, on Claude's own sign-in page. This sign-in offered a different page, so Beethoven didn't open it." [Sign in again]; `signin-method`: "Claude on the grid is signed in, but not with a Claude subscription, and Beethoven runs only on your own subscription. Ask your lab lead to help you sign in again with your Claude account." [Copy details]; `signin`, `usage`, `other`: "The grid didn't take the request." [Try again] |
 | the socket closes with no `done` or `failed` | "The grid didn't take the request." [Try again]; the transcript's last 20 lines go to Details only |
 
 ### 5.4 The sitting's lines
@@ -343,7 +348,11 @@ HPCW-LOGIN: still waiting                                              (the keep
 Under `--login fresh` the sitting runs `claude auth logout` before `claude auth login` and prints no
 extra line. The extension's reading (`parseConnectLine`): `requesting a compute node` starts the
 2-minute clock; `on <host>;` stops it; `AUTH-URL:` opens Anthropic's page only when
-`isClaudeAuthUrl` passes (https, claude.ai or claude.com) and otherwise ignores it as `refused-url`;
+`isClaudeAuthUrl` passes (https, claude.ai or claude.com, never `platform.claude.com` or a subdomain
+of it, the Console's sign-in, which bills by use) and otherwise reads it as `refused-url`: nothing is
+opened, and the panel says that Beethoven signs in only with a Claude subscription, with Sign in
+again (no API key anywhere, greg, 2026-10-04). A framework 17 sitting never prints such a link: it
+ends itself with `signin-billed` (§5.2);
 `paste the code from that page` (or Claude Code's own "Paste code here") focuses the box; `code
 received, checking` shows the box busy; `that code was not accepted` shows "That code didn't work.
 Copy it again from the Claude tab." and keeps the sitting open for another paste.
