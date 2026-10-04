@@ -1,4 +1,4 @@
-# Beethoven 12.0.0 for the lab lead
+# Beethoven 15.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it stands in the working
@@ -12,6 +12,16 @@ resumed an earlier session (Claude Code prints that session's own link, `https:/
 and no environment link) is read as online, which needs framework 14 on the grid for the direct way; and
 the panel keeps a debug log in memory that a student copies for you with **⋯** (More), **Copy debug log**.
 Publish framework 14 with the two commands of section 2 (`--dry-run` first), as for 11 and 13.
+
+**15.0.0 (2026-10-04).** Nothing changes on the grid. On Windows and macOS the helper students
+install is now a compiled program in a signed installer, built only on Greg's own machines:
+`beethoven-bridge-windows.msi`, signed through Azure Artifact Signing and removed from Windows'
+Settings, Apps, "Beethoven bridge"; and `beethoven-bridge-mac.pkg`, signed with a Developer ID and
+notarized by Apple (`ACCOUNTS.md`, 2.1). Linux keeps the script. A helper a student already has
+keeps working; it is the same version, 1.0.0. The agreement is now version 10 and the privacy
+statement version 11, so every student accepts once more. Neither installer has been opened on a
+real computer yet: what students see on the way is not yet measured, and `INSTALL.md` asks them to
+tell you, in the window's own words; keep what they report (section 8).
 
 ## 1. What changes for you
 
@@ -243,9 +253,14 @@ Beethoven says which in plain words and offers GlobalProtect for that action.
   has no grid code yet; Beethoven asks the student which. Only a student with no code at all should
   run 2FA Setup (`USE.md`, part 2): running it twice destroys the existing code. Beethoven warns
   before each step that could lead there.
-- **"Windows (or my Mac) says the helper is unsafe."** Expected: it is an unsigned script
-  (`ACCOUNTS.md`, 2.1). `INSTALL.md` has the clicks for each system, Smart App Control's **Unblock**
-  included.
+- **"Windows (or my Mac) says the helper is unsafe."** Since 15.0.0 the Windows and Mac installers
+  are signed (`ACCOUNTS.md`, 2.1), so the warnings of the unsigned script are not expected any more.
+  On Windows, SmartScreen may still warn while a new publisher has little reputation; **More info**,
+  then **Run anyway** is the panel's own second step. Whether and how often that happens is not yet
+  measured: ask for the window's exact words or a photo, and keep them. A warning on Windows that
+  names no publisher, or any warning on a Mac, is not expected: have the student stop, use
+  GlobalProtect, and send you the file's name and where it came from. On Linux the helper is still
+  the script, and `INSTALL.md` has its steps.
 - **"Can't reach the grid directly."** Their network blocks outbound port 22 (some hospital and hotel
   networks do). They use **Use GlobalProtect instead**.
 - **"Stopped: the grid's identity didn't match."** The grid's host key did not match the pin.
