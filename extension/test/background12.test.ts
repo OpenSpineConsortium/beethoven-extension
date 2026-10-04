@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { install, nativeHelperToTcp, openPort, send, sleep, type World } from './fakebrowser';
+import { ev, install, nativeHelperToTcp, openPort, send, sleep, type World } from './fakebrowser';
 import { havePythonAsyncssh, startGrid, type Grid } from './sshgrid/harness';
 
 const INSTALL = '0123456789abcdef0123456789abcdef';
@@ -218,6 +218,116 @@ describe.skipIf(!PY)('the direct way, through the background', () => {
     // nothing was recorded for an account the grid did not accept
     expect(world.storage.local['bridge.direct']).toBeUndefined();
   }, 60_000);
+});
+
+// 15.0.0: the signed installers (helper/release) are made out to one extension when they are built, and the
+// manifest names it in allowed_origins. Through the real background, with an .msi beside the zip: the .msi is
+// offered when its origins name this extension (chrome.runtime.id), the zip when they name another one, so a
+// development build, whose identifier no signed package names, keeps the zip as before. No helper answers, so
+// the moment is the download; no grid is needed, the moment comes before any sign-in.
+describe('the signed installer, through the background', () => {
+  const OWN = 'abcdefghijklmnopabcdefghijklmnop';
+  const OTHER = 'ponmlkjihgfedcbaponmlkjihgfedcba';
+  let world: World;
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_relay: null }));
+    // the fake's own identifier is "ext" (test/fakebrowser.ts); a store build's is 32 letters a to p, and only one
+    // of those can be what a signed package names, so this test gives the fake one of those
+    world.chrome.runtime.id = OWN;
+  });
+  // the background answers only its own pages (sender.id against chrome.runtime.id), so the pages here speak as OWN:
+  // the fake's openPort and send say "ext"
+  const openPortAs = (surface: 'panel' | 'details' | 'settings'): ReturnType<typeof openPort> => {
+    const views: unknown[] = [];
+    const msg = ev();
+    const disc = ev();
+    world.chrome.runtime.onConnect.fire({ name: 'beethoven-view', sender: { id: OWN }, postMessage: (m: unknown) => views.push(m), onMessage: msg, onDisconnect: disc });
+    msg.fire({ type: 'subscribe', surface, windowId: 1 });
+    return { views, tick: () => msg.fire({ type: 'tick' }), close: () => disc.fire(), last: () => (views[views.length - 1] as { view?: unknown } | undefined)?.view };
+  };
+  const sendAs = async (m: unknown): Promise<unknown> => (world.chrome.runtime.onMessage.fire(m, { id: OWN }) as unknown[]).find((r) => r !== undefined);
+
+  const manifest = (id: string) =>
+    JSON.stringify({
+      host_name: 'com.openspineconsortium.beethoven.bridge',
+      helper: '1.0.0',
+      protocol: 1,
+      files: [
+        { os: 'windows', kind: 'script', name: 'beethoven-bridge-windows.zip', open: 'install.cmd', size: 12663, sha256: 'c'.repeat(64) },
+        { os: 'windows', kind: 'binary', name: 'beethoven-bridge-windows.msi', size: 1_258_291, sha256: 'b'.repeat(64), allowed_origins: [`chrome-extension://${id}/`], signed: 'authenticode' },
+      ],
+    });
+
+  for (const c of [
+    { name: 'made out to this extension: the .msi, its own steps, the signed note, no Unblock note', id: OWN, file: 'beethoven-bridge-windows.msi' },
+    { name: 'made out to another extension: the zip, with its steps, as before', id: OTHER, file: 'beethoven-bridge-windows.zip' },
+  ]) {
+    it(c.name, async () => {
+      world.files.set('/bridge/manifest.json', manifest(c.id));
+      await boot(world);
+      const panel = openPortAs('panel');
+      await sendAs({ type: 'panel.opened', windowId: 1 });
+      await until(panel, () => view(panel)?.journey?.moment === 'install-helper');
+      const ih = view(panel)!.journey as unknown as { download?: { file: string; url: string; label: string; kind?: string; open?: string; signed: boolean }; steps: string[]; signedNote?: string; unsignedNote?: string; osNote?: string };
+      const msi = c.file.endsWith('.msi');
+      expect(ih.download).toMatchObject({ file: c.file, url: `chrome-extension://ext/bridge/${c.file}`, label: 'Download for Windows', signed: msi, kind: msi ? 'binary' : 'script' });
+      if (msi) {
+        expect(ih.download!.open).toBeUndefined();
+        expect(ih.steps[0]).toBe('Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no administrator rights are needed.');
+        expect(ih.signedNote).toBe("This installer is signed, so your computer can check that it came from Beethoven's maker before it runs.");
+        expect(ih.unsignedNote).toBeUndefined();
+        expect(ih.osNote).toBeUndefined();
+      } else {
+        expect(ih.download!.open).toBe('install.cmd');
+        expect(ih.steps[1]).toMatch(/double-click install\.cmd/);
+        expect(ih.unsignedNote).toMatch(/isn't signed/);
+        expect(ih.signedNote).toBeUndefined();
+        expect(ih.osNote).toMatch(/Unblock/);
+      }
+      // Details for the lab lead names the file, and says "signed" only of the installer
+      const details = openPortAs('details');
+      await until(details, () => !!(details.last()?.view as { direct?: { helperFile?: string } } | undefined)?.direct?.helperFile);
+      const helperFile = (details.last()!.view as unknown as { direct: { helperFile: string } }).direct.helperFile;
+      expect(helperFile.startsWith(`${c.file} `)).toBe(true);
+      expect(helperFile.endsWith(' signed')).toBe(msi);
+      // Settings offers the same download under Helper: "Not installed"
+      const settings = openPortAs('settings');
+      await until(settings, () => !!(settings.last()?.view as { connection?: { helper?: { download?: unknown } } } | undefined)?.connection?.helper?.download);
+      expect((settings.last()!.view as unknown as { connection: { helper: { text: string; installed: boolean; download: { file: string } } } }).connection.helper).toMatchObject({ text: 'Not installed', installed: false, download: { file: c.file } });
+    }, 30_000);
+  }
+});
+
+// 15.0.0, LICENSE section 17: when a later Beethoven needs a newer helper, the extension says so and offers the newer
+// installer. The fake helper's hello says version 1 (test/fakebrowser.ts); the package here brings 2.0.0, or 1.0.0.
+// The port given to the fake helper is never reached: the probe is the hello alone, and the test stops at the sheet.
+describe("Settings' Helper line, through the background, when the installed helper answers", () => {
+  let world: World;
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_relay: null }));
+  });
+
+  for (const c of [
+    { shipped: '2.0.0', text: 'Installed · version 1. This Beethoven brings version 2.0.0: download and open it once more.' },
+    { shipped: '1.0.0', text: 'Installed · version 1' },
+  ]) {
+    it(`the package brings ${c.shipped}: "${c.text}", the download beside it`, async () => {
+      world.files.set('/bridge/manifest.json', JSON.stringify({ host_name: 'com.openspineconsortium.beethoven.bridge', helper: c.shipped, protocol: 1, files: [{ os: 'windows', kind: 'script', name: 'beethoven-bridge-windows.zip', open: 'install.cmd', size: 12663, sha256: 'c'.repeat(64) }] }));
+      nativeHelperToTcp(world, 1);
+      await boot(world);
+      const panel = openPort(world, 'panel');
+      await send(world, { type: 'panel.opened', windowId: 1 });
+      await until(panel, () => view(panel)?.journey?.moment === 'sign-in-sheet');
+      const settings = openPort(world, 'settings');
+      const helper = () => (settings.last()?.view as { connection?: { helper?: { text: string; installed: boolean; download?: { file: string } } } } | undefined)?.connection?.helper;
+      await until(settings, () => helper()?.installed === true);
+      expect(helper()).toMatchObject({ installed: true, text: c.text, download: { file: 'beethoven-bridge-windows.zip', version: c.shipped } });
+    }, 30_000);
+  }
 });
 
 describe.skipIf(!PY)('the direct way, through the background, when Claude Code is signed in on the grid already', () => {

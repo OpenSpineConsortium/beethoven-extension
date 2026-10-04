@@ -257,10 +257,11 @@ describe('the built package', () => {
       if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
       // nothing beside the manifest, the pages, the scripts, the styles, the icons (11.0.0: and their lit variants), the
       // profiles, the texts, the bundled fonts with their licences (9.0.0), the tour's copy of the site diagram (11.0.0),
-      // and (12.0.0, D1) the Beethoven bridge's installers as zips with the manifest that names them
-      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css)|bridge\/[A-Za-z0-9._-]+\.zip|bridge\/manifest\.json)$/.test(n));
+      // (12.0.0, D1) the Beethoven bridge's installers as zips with the manifest that names them, and (15.0.0) the
+      // maintainer's signed installers beside them, a .pkg for macOS and an .msi for Windows, when the build had them
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css)|bridge\/[A-Za-z0-9._-]+\.(?:zip|pkg|msi)|bridge\/manifest\.json)$/.test(n));
       expect(other, label).toEqual([]);
-      // 12.0.0: the bridge's manifest names only files that are there, each a zip under bridge/
+      // 12.0.0: the bridge's manifest names only files that are there, each under bridge/ (a zip; 15.0.0: or a signed installer)
       const bm = entries.find((e) => e.name === 'bridge/manifest.json');
       if (bm) {
         // the helper stream writes each entry's file as "name" (core/bridge.ts parseBridgeManifest also reads the older "file")
@@ -388,6 +389,9 @@ describe('the words a student reads', () => {
     String(D.installHelper.stepsNamed.mac('st1234')),
     String(D.installHelper.stepsNamed.linux('st1234')),
     D.installHelper.waiting,
+    // 15.0.0: the signed installer's first step on Windows names the Beethoven bridge (the contract's sentence); the
+    // Mac's steps and the signed note use no restricted word
+    D.installHelper.installerSteps.windows![0]!,
     // the browser's key: what the grid did with it, what this browser could not do, the later protection, Forget
     D.signin.wrongGrid,
     D.signin.keyNotTakenTitle,

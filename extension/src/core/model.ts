@@ -410,12 +410,27 @@ export const WORDS = {
         ],
         linux: (open: string) => ['Unpack the zip you downloaded.', `In a terminal in that folder, type bash ${open} and press Enter.`, 'Press Enter when it asks. When it says the bridge is installed, press Check again here.'],
       },
-      /** under the steps, on Windows only: Smart App Control blocks a downloaded script with no Run button until the zip is unblocked */
+      /**
+       * 15.0.0: the steps for a signed installer (the .pkg on a Mac, the .msi on Windows), in place of the zip's:
+       * one file, opened, installs into the student's own account, so no Gatekeeper override, no Unblock, no
+       * administrator. Linux keeps the zip and has none here (helper/release makes no Linux package).
+       */
+      installerSteps: {
+        windows: [
+          'Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no administrator rights are needed.',
+          'If Windows asks you to confirm, choose Install (or More info, then Run anyway).',
+          'When the window closes, come back here and press Check again.',
+        ],
+        mac: ['Open the file you downloaded. The macOS Installer opens.', 'Click Continue, then Install. It installs into your own account, so no administrator password is asked.', 'When it says the installation was successful, close it and press Check again here.'],
+      } as Partial<Record<'windows' | 'mac' | 'linux', string[]>>,
+      /** under the steps, on Windows only: Smart App Control blocks a downloaded script with no Run button until the zip is unblocked (the scripts only; a signed installer is not blocked that way) */
       osNote: {
         windows: 'Blocked with no way to run it? Right-click the zip, choose Properties, tick Unblock, choose OK, then Extract all again.',
       } as Partial<Record<'windows' | 'mac' | 'linux', string>>,
-      /** why the operating system warns: the helper is not signed (docs/store: the accounts guide says what signing costs) */
+      /** why the operating system warns: the script helper is not signed (docs/store: the accounts guide says what signing costs); the zips keep this sentence */
       unsignedNote: "Your computer may warn you because the helper isn't signed by a company. It is a short script you can read.",
+      /** 15.0.0: the signed installer's counterpart, said in the same place: the signature is what the operating system checks before it runs the file */
+      signedNote: "This installer is signed, so your computer can check that it came from Beethoven's maker before it runs.",
       checkAgain: 'Check again',
       checking: 'Looking for the helper…',
       found: 'Helper found.',
@@ -581,6 +596,8 @@ export const WORDS = {
       forgetLocked: 'Unlock first, so the grid forgets the key too.',
       helper: 'Helper',
       helperInstalled: (version: string) => `Installed · version ${version}`,
+      /** 15.0.0: an older helper answers; LICENSE section 17 promises that Beethoven says so and offers the newer installer (the download link stays beside it) */
+      helperOutdated: (installed: string, shipped: string) => `Installed · version ${installed}. This Beethoven brings version ${shipped}: download and open it once more.`,
       helperMissing: 'Not installed',
       keyNone: 'No key on this computer yet',
       keyPlain: 'Key on this computer',
@@ -981,10 +998,12 @@ export interface HelperDownload {
   bytes?: number;
   /** hex, for the student who checks (Details shows it too) */
   sha256?: string;
-  /** "script" (a script every operating system already runs) or "binary" (a compiled variant, later) */
+  /** "script" (a zip with a script every operating system already runs) or "binary" (15.0.0: the signed installer, a .pkg or an .msi, made out to this extension when it was built) */
   kind?: 'script' | 'binary';
   /** the helper version this file installs */
   version?: string;
+  /** 15.0.0: the file carries a signature the operating system checks (the manifest's "signed"); the scripts do not */
+  signed: boolean;
 }
 
 /** moment "install-helper": no bridge is available; the bundled helper is offered, with GlobalProtect beside it */
@@ -995,11 +1014,13 @@ export interface InstallHelperMoment {
   body: string;
   /** absent when the manifest has no file for this computer (then only "Use GlobalProtect instead") */
   download?: HelperDownload & { label: string; fileLine: string };
-  /** the three steps for this operating system */
+  /** the three steps for this operating system (15.0.0: the signed installer's own steps when the download is one) */
   steps: string[];
-  /** under the steps for this system (Windows: Smart App Control's Unblock) */
+  /** under the steps for this system (Windows: Smart App Control's Unblock); a script's only */
   osNote?: string;
-  unsignedNote: string;
+  /** exactly one of the two: why the system may warn about a script, or that the installer is signed */
+  unsignedNote?: string;
+  signedNote?: string;
   /** the probe: waiting (Beethoven looks by itself after the download), looking (the student's Check again), found (drawn check, held a moment, then the sign-in sheet), not-found, broken */
   status: { state: 'idle' | 'waiting' | 'looking' | 'found' | 'not-found' | 'broken'; text?: string };
   /** "Check again": re-probes the bridges */
@@ -1404,7 +1425,7 @@ export interface ConnectionSettingsView {
   keyLine: string;
   /** "Forget this computer" with its confirm row; disabled when there is no key */
   forget: { label: string; note: string; confirm: string; button: ButtonView; disabled: boolean; locked?: boolean };
-  /** "Helper": "Installed · version 1" or "Not installed", with the download for this computer */
+  /** "Helper": "Installed · version 1", "Not installed", or (15.0.0) the older-helper sentence, with the download for this computer (shown whenever there is one) */
   helper: { label: string; text: string; installed: boolean; download?: HelperDownload; checkAgain: ButtonView };
 }
 

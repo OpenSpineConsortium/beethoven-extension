@@ -31,6 +31,8 @@ function contents(zip: Uint8Array): Map<string, { mode: number; data: Buffer }> 
 }
 
 describe('the helper zip, made out to this extension', () => {
+  // the zips only: since 15.0.0 a maintainer's signed .pkg or .msi (helper/build.mjs, from helper/signed/) may sit
+  // beside them in a local build, and those are not rewritten here (ui/helperFile.ts leaves them as they are too)
   const zips = fs.readdirSync(BRIDGE).filter((f) => f.endsWith('.zip'));
 
   it('ships three zips, each carrying the placeholder the installers refuse', () => {

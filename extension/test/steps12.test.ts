@@ -76,13 +76,16 @@ describe('which way: connectionMode', () => {
 
 describe('D3: the direct way first, the helper offered, GlobalProtect beside it', () => {
   it('no bridge: the bundled helper for this computer, with Check again and Use GlobalProtect instead', () => {
-    const f = facts({}, { bridge: 'none', helper: { state: 'not-installed' }, key: { present: false, wrapped: false, locked: false, enrolled: false }, download: { os: 'windows', osLabel: 'Windows', url: 'chrome-extension://id/bridge/beethoven-bridge-setup.cmd', file: 'beethoven-bridge-setup.cmd', size: '3 KB', kind: 'script' } });
+    const f = facts({}, { bridge: 'none', helper: { state: 'not-installed' }, key: { present: false, wrapped: false, locked: false, enrolled: false }, download: { os: 'windows', osLabel: 'Windows', url: 'chrome-extension://id/bridge/beethoven-bridge-setup.cmd', file: 'beethoven-bridge-setup.cmd', size: '3 KB', kind: 'script', signed: false } });
     expect(momentOf(f)).toBe('install-helper');
     const v = J<'install-helper'>(f);
     expect(v.title).toBe(WORDS.direct.installHelper.title);
     expect(v.download).toMatchObject({ label: 'Download for Windows', url: 'chrome-extension://id/bridge/beethoven-bridge-setup.cmd', fileLine: 'beethoven-bridge-setup.cmd · 3 KB' });
     expect(v.steps).toEqual([...WORDS.direct.installHelper.steps.windows]);
-    const named = J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'windows', osLabel: 'Windows', url: 'u', file: 'beethoven-bridge-windows.zip', open: 'install.cmd' } }));
+    // a script: why the system may warn, and never the signed sentence
+    expect(v.unsignedNote).toBe(WORDS.direct.installHelper.unsignedNote);
+    expect(v.signedNote).toBeUndefined();
+    const named = J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'windows', osLabel: 'Windows', url: 'u', file: 'beethoven-bridge-windows.zip', open: 'install.cmd', signed: false } }));
     expect(named.steps[1]).toMatch(/double-click install\.cmd/);
     expect(v.checkAgain.action).toEqual({ kind: 'check-bridge' });
     expect(v.useVpn).toMatchObject({ label: 'Use GlobalProtect instead', action: { kind: 'use-vpn' } });
@@ -97,6 +100,36 @@ describe('D3: the direct way first, the helper offered, GlobalProtect beside it'
     expect(J<'install-helper'>(facts({}, { bridge: 'none', probing: true, probingByHand: true })).checkAgain.busy).toBe(true);
     expect(named.osNote).toMatch(/Unblock/);
     expect(J<'install-helper'>(facts({}, { bridge: 'none', helper: { state: 'broken' } })).status.state).toBe('broken');
+  });
+
+  // 15.0.0: the signed installers (helper/release): the .msi and the .pkg have their own three steps, the signed
+  // sentence where the zip's warning was, and no Unblock note (Smart App Control blocks downloaded scripts)
+  it('a signed installer: its own steps, "This installer is signed", no Unblock note; the script path unchanged', () => {
+    const W = WORDS.direct.installHelper;
+    const msi = J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'windows', osLabel: 'Windows', url: 'u', file: 'beethoven-bridge-windows.msi', size: '1.2 MB', kind: 'binary', signed: true, version: '1.0.0' } }));
+    expect(msi.steps).toEqual(W.installerSteps.windows);
+    expect(msi.steps[0]).toBe('Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no administrator rights are needed.');
+    expect(msi.steps[2]).toBe('When the window closes, come back here and press Check again.');
+    expect(msi.osNote).toBeUndefined();
+    expect(msi.signedNote).toBe("This installer is signed, so your computer can check that it came from Beethoven's maker before it runs.");
+    expect(msi.unsignedNote).toBeUndefined();
+    expect(msi.download).toMatchObject({ label: 'Download for Windows', fileLine: 'beethoven-bridge-windows.msi · 1.2 MB', signed: true });
+    const pkg = J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'mac', osLabel: 'macOS', url: 'u', file: 'beethoven-bridge-mac.pkg', size: '1.4 MB', kind: 'binary', signed: true } }));
+    expect(pkg.steps).toEqual(W.installerSteps.mac);
+    expect(pkg.steps[0]).toBe('Open the file you downloaded. The macOS Installer opens.');
+    expect(pkg.steps[1]).toBe('Click Continue, then Install. It installs into your own account, so no administrator password is asked.');
+    expect(pkg.steps[2]).toBe('When it says the installation was successful, close it and press Check again here.');
+    expect(pkg.signedNote).toBe(W.signedNote);
+    expect(pkg.osNote).toBeUndefined();
+    // the zips as before: the named steps, Windows' Unblock note, the unsigned sentence
+    const zip = J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'windows', osLabel: 'Windows', url: 'u', file: 'beethoven-bridge-windows.zip', open: 'install.cmd', kind: 'script', signed: false } }));
+    expect(zip.steps).toEqual(W.stepsNamed.windows('install.cmd'));
+    expect(zip.osNote).toMatch(/Unblock/);
+    expect(zip.unsignedNote).toBe(W.unsignedNote);
+    expect(zip.signedNote).toBeUndefined();
+    // Linux has no signed installer: the words have none for it, and the zip's steps stay
+    expect(W.installerSteps.linux).toBeUndefined();
+    expect(J<'install-helper'>(facts({}, { bridge: 'none', download: { os: 'linux', osLabel: 'Linux', url: 'u', file: 'beethoven-bridge-linux.zip', open: 'install.sh', kind: 'script', signed: false } })).steps).toEqual(W.stepsNamed.linux('install.sh'));
   });
 
   it('"Helper found." holds a moment, then the sheet', () => {
