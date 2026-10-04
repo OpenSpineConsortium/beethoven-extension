@@ -4,7 +4,8 @@
 #   bash helper/release/release.sh [--no-upload] [--dry-run] [--allow-branch]
 #
 # It builds and signs both bridge installers on this Mac (the .pkg through Apple's notary service, the
-# .msi through Azure Artifact Signing, so no Windows machine is needed), merges them into the extension,
+# .msi through Azure Artifact Signing, so no Windows machine should be needed; Artifact Signing from a
+# Mac is not yet measured, and build-msi.ps1 on Windows is the fallback), merges them into the extension,
 # runs the checks, zips the extension, records the shipped files in release/<version>/ and uploads the
 # zip to the Chrome Web Store, submitted for Google's review. It commits and pushes nothing; it prints
 # the git commands for the record at the end. greg, 2026-10-04: "save as much as possible to make this
@@ -29,7 +30,8 @@
 #       extension/public/bridge/ (gitignored there, and the bridge tests fail while they are there)
 #    4  npm ci   5  npm run sync-profiles, as CI does   6  tsc   7  the whole test suite, while
 #       extension/public/bridge/ is still the tracked build: its bridge tests expect the placeholder
-#       build and would fail on the merged one
+#       build and would fail on the merged one; then git status must still list nothing, so that a
+#       tracked file these rewrote is found before the notarization, not at step 14
 #    8  the Mac installer (mac/build-pkg.sh)   9  the Windows installer (windows/build-msi-mac.sh)
 #   10  the merge (helper/build.mjs --store-id)   11  npm run zip   12  the package tests on that zip
 #   13  the record in release/<version>/   14  the tracked bridge files back (git checkout), the two
@@ -37,7 +39,11 @@
 #   15  the upload of the recorded zip, submitted for review (publish-store.mjs --require-signed --publish)
 # The zip is recorded before it is uploaded, so the record holds the bytes the store got, and a failed
 # upload leaves a complete record to upload again by hand. A failure at any step stops the release there
-# with that step's own message, after putting the tracked extension/public/bridge/ back.
+# with that step's own message, after putting the tracked extension/public/bridge/ back; a stop at step
+# 13 or 14 also removes the record this run began, since nothing was uploaded, so the same version can
+# simply run again. The record's zip and bridge/ name the store's extension and carry the signed
+# installers, so .gitignore keeps them out of the repository: they stay on this Mac, and the record's
+# README.md and its two SHA256SUMS.txt files, which are committed, pin them.
 #
 #   --no-upload     stop after the record and the restore; the summary says how to upload that same zip
 #   --dry-run       print every command in order after "$ ", names filled in, and run none of them. The
@@ -117,6 +123,9 @@ ARMED=0
 STOPPED=
 HINT=
 WORK=
+# 1 from the moment this run makes release/<version>/ until step 14 has passed: an unfinished record of
+# its own, which a stop removes (a failed upload keeps its complete record on purpose)
+OWN_REL=0
 
 # Prints one argument list as a shell line a person can paste: plain words as they are, anything
 # else in single quotes.
@@ -134,7 +143,7 @@ show() {
 begin() { N=$((N + 1)); LABEL=$1; say ""; say "-- step $N: $1"; }
 
 stop() {
-  STOPPED="Stopped at step $N ($LABEL): $*"
+  if [ "$N" = 0 ]; then STOPPED="Stopped before the first step: $*"; else STOPPED="Stopped at step $N ($LABEL): $*"; fi
   [ -z "$HINT" ] || STOPPED="$STOPPED
 $HINT"
   exit 5
@@ -179,6 +188,7 @@ passed() { say "   ok: $1"; }
 
 finish() {
   st=$?
+  trap - ERR
   if [ "$ARMED" = 1 ]; then
     ARMED=0
     if git checkout -- "$BRIDGE/" 2>/dev/null && rm -f "$BRIDGE/$MAC_PKG" "$BRIDGE/$WIN_MSI"; then
@@ -187,11 +197,23 @@ finish() {
       say "   Could not put the tracked $BRIDGE/ back; before anything else run: git checkout -- $BRIDGE/"
     fi
   fi
+  if [ "$OWN_REL" = 1 ] && [ "$st" != 0 ]; then
+    OWN_REL=0
+    if rm -rf "$REL"; then
+      say "   (the unfinished record $REL/ is removed: nothing was uploaded, so $VERSION can simply run again)"
+    else
+      say "   Could not remove this run's unfinished $REL/; nothing was uploaded: remove it, then run again."
+    fi
+  fi
   if [ -n "$STOPPED" ]; then printf '%s\n' "$STOPPED" >&2; fi
   if [ -n "$WORK" ]; then rm -rf "$WORK"; fi
   exit "$st"
 }
 trap finish EXIT
+# a check the script makes itself, a $(...) or a ( ... ) that set -e would end the run on, is a failed
+# step too: its stop names the step and exits 5. Not inherited by functions, so a function whose
+# failure matters is called with || stop.
+trap 'stop "a command this step runs itself exited with status $?; its own message is above."' ERR
 
 # ---- before anything runs: the checkout holds every script the release calls ------------------
 
@@ -231,7 +253,7 @@ ZIP="extension/.output/$ZIP_NAME"
 UPLOAD_CMD="node helper/release/publish-store.mjs upload --publisher $(show "$PUBLISHER_ID") --item $STORE_ID --zip $REL/$ZIP_NAME --require-signed --publish"
 # a record is never overwritten, and the store takes only a higher version than it has
 if [ -e "$REL" ]; then
-  refuse 4 "$REL/ is already there: a release record is never overwritten. Raise the version in extension/package.json, or move a rehearsal's folder away."
+  refuse 4 "$REL/ is already there: a release record is never overwritten. If its zip reached the store, raise the version in extension/package.json; if it did not (a rehearsal, --no-upload, a failed upload, a run cut off), upload that zip with the command its run printed, or move the folder away and run again."
 fi
 DIRTY=$(git status --porcelain)
 if [ -n "$DIRTY" ]; then
@@ -274,6 +296,15 @@ run_in extension "Copying the site profiles and the texts into the extension" np
 run_in extension "Type-checking the extension" npx tsc --noEmit
 logto suite
 run_in extension "Running the whole test suite, on the tracked bridge build" npx vitest run
+# what step 14 would find, found before the notarization: npm run sync-profiles rewrites tracked copies
+# (extension/public/'s LICENSE.txt, PRIVACY.md and others) when the committed ones are out of step
+if [ "$DRY" = 1 ]; then
+  then_check "git status lists nothing: the checks changed no tracked file and left no file behind"
+else
+  left=$(git status --porcelain -uall)
+  [ -z "$left" ] || stop "after the checks git status lists $(printf '%s' "$left" | tr '\n' ';'); they must change nothing, or the zip would not be this commit's. Commit what they write (or remove what they left), then run again."
+  passed "the checks changed no tracked file and left no file behind"
+fi
 
 # ---- 8-9: the two installers -----------------------------------------------------------------
 
@@ -370,6 +401,10 @@ holds the checksum of every file in this folder but the two checksum files; chec
 
 The package's SHA-256 is \`$(sum "$REL/$ZIP_NAME")\`. $upload
 
+The zip and the six files of \`bridge/\` name the store's extension, and the two installers carry their
+signing certificates, so \`.gitignore\` keeps them out of the repository: they stay on the maintainer's
+Mac, and the two \`SHA256SUMS.txt\` files, committed with this README and \`guides/\`, pin them.
+
 ## The signed installers
 
 ### \`$MAC_PKG\`, $(size "$REL/bridge/$MAC_PKG") bytes, SHA-256 \`$(sum "$REL/bridge/$MAC_PKG")\`
@@ -415,6 +450,7 @@ if [ "$DRY" = 1 ]; then
   say "   bridge/, the six files of $BRIDGE/ with their SHA256SUMS.txt; guides/, from docs/guides;"
   say "   README.md; and SHA256SUMS.txt over the folder"
 else
+  OWN_REL=1
   mkdir -p "$REL/bridge"
   cp "$ZIP" "$REL/$ZIP_NAME"
   for n in $SIX; do cp "$BRIDGE/$n" "$REL/bridge/$n"; done
@@ -424,7 +460,7 @@ else
     mkdir -p "$REL/guides"
     cp docs/guides/*.md "$REL/guides/"
   fi
-  write_readme > "$WORK/README.md"
+  write_readme > "$WORK/README.md" || stop "the record's README.md could not be written."
   mv "$WORK/README.md" "$REL/README.md"
   (cd "$REL" && find . -type f ! -name SHA256SUMS.txt | sed 's|^\./||' | LC_ALL=C sort | while IFS= read -r f; do $SHA "$f"; done) > "$WORK/sums"
   mv "$WORK/sums" "$REL/SHA256SUMS.txt"
@@ -446,6 +482,7 @@ else
   # untracked file is listed one by one, since a first record shows only as "release/" otherwise
   left=$(git status --porcelain -uall | sed "\\|^?? $REL/|d")
   [ -z "$left" ] || stop "besides $REL/, git status lists $(printf '%s' "$left" | tr '\n' ';'), so the zip may not be this commit's; nothing was uploaded."
+  OWN_REL=0
   passed "git status lists nothing but $REL/"
 fi
 
@@ -474,7 +511,8 @@ say "Beethoven $VERSION"
 say "  Mac installer      $MAC_PKG      sha256 $(sum "$REL/bridge/$MAC_PKG" | cut -c1-12)..."
 say "  Windows installer  $WIN_MSI  sha256 $(sum "$REL/bridge/$WIN_MSI" | cut -c1-12)..."
 if [ "$UPLOAD" = 1 ]; then
-  answer=$(sed '/^[[:space:]]*$/d' "$WORK/upload.log" | tail -n 1)
+  # the upload is done: a summary that cannot read its log must not report a failed step
+  answer=$(sed '/^[[:space:]]*$/d' "$WORK/upload.log" | tail -n 1) || answer=
   say "  The store's answer: ${answer:-(it printed nothing)}"
   say "Google reviews it; students get it within hours of approval."
 else
@@ -482,7 +520,8 @@ else
   say "  $UPLOAD_CMD"
 fi
 say ""
-say "The record is in $REL/. To keep it (this script commits and pushes nothing):"
+say "The record is in $REL/. Its zip and bridge/ name the store's extension, so .gitignore keeps them out"
+say "of the repository: keep the folder on this Mac. To commit the rest (this script commits and pushes nothing):"
 say "  git add $REL"
 say "  git commit -m \"Beethoven $VERSION: the release record\""
 if [ "$ALLOW" != 1 ]; then say "  git push origin main"; fi

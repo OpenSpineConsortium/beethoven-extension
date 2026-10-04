@@ -12,10 +12,12 @@ Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of
 
 ## Your release, start to finish
 
-Everything runs on your Mac; no Windows machine is needed. The `.pkg` is signed with your Developer ID
-and notarized by Apple, the `.msi` is cross-built on the Mac and signed through Azure Artifact Signing,
-and the extension goes to the Chrome Web Store from the same command. The route through a Windows
-machine stays below as the fallback ("The Windows machine (the fallback)").
+The release is designed to run entirely on your Mac. The `.pkg` is signed with your Developer ID and
+notarized by Apple, the `.msi` is cross-built on the Mac and signed through Azure Artifact Signing, and
+the extension goes to the Chrome Web Store from the same command. That Artifact Signing accepts jsign's
+request from a Mac is not yet measured (below), so keep the Windows machine until a release has gone
+through from the Mac; the route through it stays below as the fallback ("The Windows machine (the
+fallback)").
 
 ### Once
 
@@ -28,8 +30,10 @@ machine stays below as the fallback ("The Windows machine (the fallback)").
 2. The steps only you can do. The check prints them, numbered, with where each is done, whenever
    something is missing:
    1. join the Apple Developer Program;
-   2. make the Developer ID Application and Developer ID Installer certificates and add both to the
-      login keychain;
+   2. make the Developer ID Application and Developer ID Installer certificates from a certificate
+      signing request made on this Mac (Keychain Access, Certificate Assistant; a request made on
+      another computer leaves the private key there), or in Xcode's Manage Certificates, and add both
+      to the login keychain;
    3. `xcrun notarytool store-credentials <a name you choose>`;
    4. in the Azure portal, an Artifact Signing account, its identity validation, a certificate profile
       and the Certificate Profile Signer role for your own sign-in;
@@ -39,9 +43,15 @@ machine stays below as the fallback ("The Windows machine (the fallback)").
       keeps the one in brackets, and it never reads from a pipe) and writes `release.json` in your
       vendor folder (`BEETHOVEN_VENDOR_DIR`, else `ASHLEY_VENDOR_DIR`, else `~/.beethoven-vendor`),
       mode 0600 in a 0700 folder. Names only; `release.example.json` here shows the shape;
-   8. in the Google Cloud console, a project with the Chrome Web Store API and a Desktop OAuth client,
-      then `node helper/release/publish-store.mjs sign-in --client <its JSON file>`. That sign-in stays
-      in `<vendor>/chrome-web-store/`, and only `publish-store.mjs` opens it.
+   8. in the Google Cloud console, a project with the Chrome Web Store API, its OAuth consent screen
+      set to External and either published or with the Google account that owns the item added as a
+      test user (while the app stays in "Testing", Google drops the saved sign-in after seven days,
+      and the next release stops at its upload until you sign in again; whether a published app keeps
+      it longer is not yet measured), and a Desktop OAuth client; then
+      `node helper/release/publish-store.mjs sign-in --client <its JSON file>`, signed in as the
+      account that owns the item. That sign-in stays in `<vendor>/chrome-web-store/` (`client.json`
+      and `token.json`; the check wants both), and only `publish-store.mjs` opens it. "Uploading to
+      the Chrome Web Store", "Once, by hand", below has each step.
 3. `bash helper/release/setup-mac.sh` until it ends with "Everything a release needs is on this Mac."
    It calls Apple's notary service once, to check the profile.
 
@@ -71,9 +81,11 @@ so it needs no network. `--no-upload` stops after the record and prints the uplo
 When a step fails, the release stops there with that step's own message and a last line naming the
 step, after putting `extension/public/bridge/` back. Fix the cause and run it again: the installers in
 `helper/signed/` and their copies in `extension/public/bridge/` are the script's own, cleared at the
-start of the next run. A failed upload is the exception: the record is already complete, and the last
-lines give the upload command for that same zip; run that command rather than the whole release, which
-would refuse the existing record.
+start of the next run, and a stop while the record is being written or checked (steps 13 and 14)
+removes the `release/<version>/` that run began, since nothing was uploaded, so the same version runs
+again. A failed upload is the exception: the record is already complete, and the last lines give the
+upload command for that same zip; run that command rather than the whole release, which would refuse
+the existing record.
 
 ### What Google's review means
 
@@ -90,8 +102,9 @@ email to the developer account, and the developer dashboard shows the item's sta
 - Whether Homebrew carries a jsign formula (otherwise openjdk and the jar in the vendor folder), and
   msitools, mingw-w64 and osslsigncode as Homebrew builds them on macOS.
 - That `security find-identity -v` lists the Developer ID Installer identity, that `xcrun notarytool
-  history --keychain-profile <name>` answers for a working profile, and that `az account show` is a
-  fair test of the Azure sign-in.
+  history --keychain-profile <name>` answers for a working profile, and that `az account
+  get-access-token --resource https://codesigning.azure.net --output none` (the sign-in check, the
+  same call `windows/build-msi-mac.sh` makes) fails on a Mac whose Azure sign-in has lapsed.
 - That Azure Artifact Signing accepts signing from a Mac (jsign with an access token) at all.
 - `unzip -Z1` and `unzip -p` with macOS's own unzip, which the zip check uses.
 - The whole extension suite on a Mac: CI runs it on Linux, and the tests that need Python's asyncssh
@@ -109,6 +122,12 @@ email to the developer account, and the developer dashboard shows the item's sta
   `helper/release/windows/signing.json`, which `.gitignore` keeps out; only the committed example
   beside it, with placeholders, is tracked.
 - The signed packages and their sidecars (`helper/signed/`, gitignored).
+- The files of a release record that name the store's extension or carry a signing certificate: the
+  Chrome zip in `release/<version>/`, and the six files in its `bridge/` (the three zips with the store
+  identifier written in, the `.pkg` and `.msi` with their certificates, and `manifest.json`).
+  `.gitignore` keeps them out; they stay on the Mac, so keep the folder there (and in the backup of
+  your vendor folder, if you keep one). What `git add release/<version>` commits is the record's
+  `README.md`, `guides/` and its two `SHA256SUMS.txt` files, which pin those files byte for byte.
 - The `.pkg` and `.msi` a release build copies into `extension/public/bridge/` (gitignored there), and
   the `manifest.json` a release build writes beside them, which lists the signed entries and is
   restored before any commit (last step below). The tracked `manifest.json` lists the three zips only.
@@ -146,8 +165,10 @@ development build's.
   `xcrun stapler staple`. The profile name is the script's parameter; see its header for the default.
 - For the Windows installer, built on the same Mac: Homebrew's mingw-w64 (the linker for Rust's
   `x86_64-pc-windows-gnu` target, added with `rustup target add x86_64-pc-windows-gnu`), msitools
-  (`wixl` builds the MSI), osslsigncode, azure-cli, and jsign (or openjdk and jsign's jar in the
-  vendor folder). An Azure Artifact Signing account as below, and `az login` on the Mac.
+  (`wixl` builds the MSI), osslsigncode, azure-cli, and jsign (the check and the Windows step look in
+  the same places, in this order: the command in `JSIGN`, `jsign` on PATH, and jsign's jar run with
+  openjdk, saved as `<vendor>/jsign.jar` or else the first jar in `<vendor>/jsign/`). An Azure
+  Artifact Signing account as below, and `az login` on the Mac.
 - `bash helper/release/setup-mac.sh` checks all of the above and says how to fix what is missing.
 
 ### The Windows machine (the fallback)
@@ -155,7 +176,9 @@ development build's.
 Only when the Mac cannot build or sign the `.msi`: build it on a Windows machine with
 `build-msi.ps1`, copy the pair into `helper/signed/` on the Mac, and type the steps of "The order" by
 hand, as "Building the Windows installer on Windows (the fallback)" says, since `release.sh` always
-builds both installers itself.
+builds both installers itself. On this route the setup check is read, not passed: its lines for the
+Windows tools on the Mac (mingw-w64, msitools, osslsigncode, azure-cli, jsign, the Rust target
+`x86_64-pc-windows-gnu` and the Azure sign-in) may stay missing; every other line must say ok.
 
 - The Rust MSVC toolchain (`rustup`, target `x86_64-pc-windows-msvc`; the Visual Studio Build Tools
   it needs).
@@ -240,10 +263,13 @@ sidecars carry the size and SHA-256, and `build.mjs` refuses a file that does no
    commit, with which tool versions (the sidecars' `tools` and `built_at` fields have them), what was
    checked and what is not proven, and a `SHA256SUMS.txt` over the folder.
    `release.sh` writes it all and verifies both checksum files. The record's `bridge/manifest.json`
-   and the zips name the store's extension, since that is what shipped; the README it writes does not.
+   and the zips name the store's extension, since that is what shipped, and the `.pkg` and `.msi`
+   carry their certificates, so `.gitignore` keeps the zip and `bridge/`'s six files out of the
+   repository ("What never enters the repository or CI"); the README it writes names neither id.
 8. **Restore the tracked files:** `git checkout -- extension/public/bridge/`. The manifest with the
-   signed entries, and the zips with the store identifier written in, are never committed: the tracked
-   build is the placeholder build that `node helper/build.mjs --check --no-signed` proves in CI.
+   signed entries, and the zips with the store identifier written in, are never committed, there or in
+   the record: the tracked build is the placeholder build that `node helper/build.mjs --check
+   --no-signed` proves in CI.
    `release.sh` then removes the `.pkg` and `.msi` copies from that folder (by hand, or a plain `node
    helper/build.mjs` removes them and says so; a plain `--check` names them until then) and runs `node
    helper/build.mjs --check --no-signed` to prove the tracked build is back. `git status` must show
@@ -262,7 +288,10 @@ Windows, and `README.txt`; the default values of the Chrome and Edge `NativeMess
 `HKCU` set to the host file's full path), signs the MSI, and leaves `beethoven-bridge-windows.msi` and
 `beethoven-bridge-windows.msi.json` in `helper/signed/`. On the Mac, type steps 1 to 3 of the order
 above by hand, copy the Windows pair into `helper/signed/` beside the Mac pair (four files, nothing
-else in that folder), then type steps 5 to 9.
+else in that folder), then type steps 5 to 9. Step 1's check is read, not passed, on this route: its
+lines for the Windows tools on the Mac (mingw-w64, msitools, osslsigncode, azure-cli, jsign, the Rust
+target `x86_64-pc-windows-gnu` and the Azure sign-in) may stay missing; every other line must say ok
+before step 2.
 
 ## The sidecar
 

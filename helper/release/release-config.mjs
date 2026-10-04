@@ -49,8 +49,10 @@ const FIELDS = [
   {
     key: 'windows.azure_endpoint',
     env: 'RC_AZURE_ENDPOINT',
-    ok: (v) => /^(https:\/\/)?[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+\/?$/.test(v),
-    want: "the Artifact Signing account's endpoint, like https://<region>.codesigning.azure.net, with no path",
+    // the host pattern windows/build-msi-mac.sh applies once https:// and a trailing "/" are off, so a
+    // name that passes here is never refused there, after the Mac package is already notarized
+    ok: (v) => /^(https:\/\/)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+\/?$/.test(v),
+    want: "the Artifact Signing account's endpoint in lower case, like https://<region>.codesigning.azure.net, with no path",
   },
   {
     key: 'windows.azure_account',
@@ -61,8 +63,8 @@ const FIELDS = [
   {
     key: 'windows.azure_profile',
     env: 'RC_AZURE_PROFILE',
-    ok: (v) => /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(v),
-    want: 'the certificate profile\'s name under that account (letters, digits, "_" and "-")',
+    ok: (v) => /^[A-Za-z0-9][A-Za-z0-9-]{0,99}$/.test(v),
+    want: 'the certificate profile\'s name under that account (letters, digits and "-")',
   },
 ];
 const SHAPE = { '': ['_comment', 'store_id', 'publisher_id', 'mac', 'windows'], mac: ['app_identity', 'installer_identity', 'notary_profile'], windows: ['azure_endpoint', 'azure_account', 'azure_profile'] };

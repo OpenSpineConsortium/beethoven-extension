@@ -24,7 +24,8 @@
 // executable), CRLF only for the Windows text files.
 //
 // The signed installers are not built here. helper/release/ builds them on the maintainer's own Mac
-// and Windows machine (no identity, certificate, token or key ever enters the repository or CI) and
+// (the .msi too, cross-built and signed through Azure Artifact Signing, not yet measured; a Windows
+// machine is the fallback; no identity, certificate, token or key ever enters the repository or CI) and
 // leaves each in helper/signed/ (gitignored) beside a sidecar <name>.json: name, os, kind, helper,
 // protocol, size, sha256, allowed_origins, signed. This build takes a package only on its sidecar's
 // word checked against the facts: helper equals helper/VERSION, protocol is 1, size and sha256 are

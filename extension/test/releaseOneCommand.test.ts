@@ -23,6 +23,8 @@ const SETUP = path.join(DIR, 'setup-mac.sh');
 const CONFIG_JS = path.join(DIR, 'release-config.mjs');
 const EXAMPLE = path.join(DIR, 'release.example.json');
 const README = path.join(DIR, 'README.md');
+// written by another stream; the tests that put a check here side by side with it run once it is in the checkout
+const MSI_MAC = path.join(DIR, 'windows', 'build-msi-mac.sh');
 const VERSION = (JSON.parse(readFileSync(path.join(ROOT, 'extension', 'package.json'), 'utf8')) as { version: string }).version;
 
 const works = (cmd: string, args: string[]) => spawnSync(cmd, args, { encoding: 'utf8' }).status === 0;
@@ -72,14 +74,14 @@ function writeExec(p: string, body: string): void {
   chmodSync(p, 0o755);
 }
 
-/** a vendor folder holding release.json (an object is written as JSON, a string as it is, null: none) and, with token, the store sign-in's file */
+/** a vendor folder holding release.json (an object is written as JSON, a string as it is, null: none) and, with token, the store sign-in's two files */
 function vendor(label: string, names: unknown = NAMES, token = true): string {
   const v = path.join(T, label, 'vendor');
   mkdirSync(v, { recursive: true });
   if (names !== null) writeFileSync(path.join(v, 'release.json'), typeof names === 'string' ? names : JSON.stringify(names, null, 2));
   if (token) {
     mkdirSync(path.join(v, 'chrome-web-store'), { recursive: true });
-    writeFileSync(path.join(v, 'chrome-web-store', 'token.json'), '{"stand-in":true}\n');
+    for (const f of ['client.json', 'token.json']) writeFileSync(path.join(v, 'chrome-web-store', f), '{"stand-in":true}\n');
   }
   return v;
 }
@@ -122,7 +124,8 @@ ${LOGLINE}case "$*" in
   "run zip")
     v=$(node -p 'require("./package.json").version')
     rm -rf .output/stage && mkdir -p .output/stage && cp -R public/bridge .output/stage/bridge && printf '{}' > .output/stage/manifest.json
-    (cd .output/stage && zip -q -r -X "../beethoven-$v-chrome.zip" manifest.json bridge) ;;
+    (cd .output/stage && zip -q -r -X "../beethoven-$v-chrome.zip" manifest.json bridge)
+    if [ "\${SHIM_ZIP_STRAY:-0}" = 1 ]; then printf 'left by the build\n' > stray-from-zip.txt; fi ;;
   *) exit 9 ;;
 esac
 `,
@@ -130,7 +133,9 @@ esac
 ${LOGLINE}e=$(printf '\\033')
 case "$*" in
   "tsc --noEmit") ;;
-  "vitest run") printf ' %s[2mTest Files%s[22m  %s[32m45 passed%s[39m (45)\\n      Tests  530 passed (530)\\n' "$e" "$e" "$e" "$e" ;;
+  "vitest run")
+    if [ "\${SHIM_SUITE_STRAY:-0}" = 1 ]; then printf 'left by the suite\\n' > stray-from-suite.txt; fi
+    printf ' %s[2mTest Files%s[22m  %s[32m45 passed%s[39m (45)\\n      Tests  530 passed (530)\\n' "$e" "$e" "$e" "$e" ;;
   "vitest run test/hygiene.test.ts")
     if [ "\${SHIM_PACKAGE_FAIL:-0}" = 1 ]; then printf '      Tests  1 failed | 4 passed (5)\\n'; exit 1; fi
     printf ' Test Files  1 passed (1)\\n      Tests  5 passed (5)\\n' ;;
@@ -377,6 +382,50 @@ describe.skipIf(!RUN)('release.json refusals (one sentence, exit 2, never the va
     writeFileSync(file, JSON.stringify({ ...NAMES, store_id: '<32 letters a to p>' }));
     expect(spawnSync(process.execPath, [CONFIG_JS, '--current', file], { encoding: 'utf8' }).stdout.split('\n')[0]).toBe('');
   });
+
+  // windows/build-msi-mac.sh refuses these with exit 2 at step 9, after the Mac package's notarization,
+  // so release.json must refuse them at step 1 (and --write-config as they are typed)
+  it('--field refuses the Azure names windows/build-msi-mac.sh refuses, and takes the ones it takes', () => {
+    const field = (name: string, value: string) => spawnSync(process.execPath, [CONFIG_JS, '--field', name], { encoding: 'utf8', env: { ...process.env, RC_VALUE: value } });
+    const refused: Array<[string, string]> = [
+      ['windows.azure_profile', 'test_profile'],
+      ['windows.azure_endpoint', 'https://EUS.codesigning.azure.net'],
+      ['windows.azure_endpoint', 'https://-eus.codesigning.azure.net'],
+      ['windows.azure_endpoint', 'https://eus-.codesigning.azure.net'],
+    ];
+    for (const [name, value] of refused) {
+      const r = field(name, value);
+      expect(r.status, `${name}=${value}`).toBe(2);
+      expect(r.stderr.trim().split('\n')).toHaveLength(1);
+      expect(r.stderr).not.toContain(value);
+    }
+    const taken: Array<[string, string]> = [
+      ['windows.azure_profile', CERT],
+      ['windows.azure_profile', 'Test-Profile-2'],
+      ['windows.azure_endpoint', EP],
+      ['windows.azure_endpoint', `${EP}/`],
+      ['windows.azure_endpoint', 'eus.codesigning.azure.net'],
+    ];
+    for (const [name, value] of taken) {
+      const r = field(name, value);
+      expect(r.status, `${name}=${value}: ${r.stderr}`).toBe(0);
+    }
+  });
+
+  it.skipIf(!existsSync(MSI_MAC))('every Azure name release.json takes, windows/build-msi-mac.sh takes too', () => {
+    // past its argument checks it looks for its tools, and finds none on this PATH: exit 3, not 2
+    const empty = path.join(T, 'msi-names-bin');
+    mkdirSync(empty, { recursive: true });
+    const pairs: Array<[string, string]> = [[EP, CERT], [`${EP}/`, 'Test-Profile-2'], ['eus.codesigning.azure.net', 'a1']];
+    for (const [endpoint, profile] of pairs) {
+      expect(spawnSync(process.execPath, [CONFIG_JS, '--field', 'windows.azure_endpoint'], { env: { ...process.env, RC_VALUE: endpoint } }).status).toBe(0);
+      expect(spawnSync(process.execPath, [CONFIG_JS, '--field', 'windows.azure_profile'], { env: { ...process.env, RC_VALUE: profile } }).status).toBe(0);
+      const r = spawnSync(BASH, [MSI_MAC, '--store-id', ID, '--azure-endpoint', endpoint, '--azure-account', ACCOUNT, '--azure-profile', profile], {
+        encoding: 'utf8', timeout: 30_000, env: { HOME: path.join(T, 'home'), PATH: `${empty}:/usr/bin:/bin`, BEETHOVEN_VENDOR_DIR: path.join(T, 'msi-names-vendor') },
+      });
+      expect(r.status, `${endpoint} ${profile}: ${r.stderr}`).toBe(3);
+    }
+  });
 });
 
 describe.skipIf(!ZIPS)('release.sh, a whole run against stand-ins for the Mac, Apple, Azure and the store', () => {
@@ -454,6 +503,7 @@ describe.skipIf(!ZIPS)('release.sh, a whole run against stand-ins for the Mac, A
     expect(md).not.toContain(ID);
     expect(md).not.toContain(PUB);
     expect(md).not.toMatch(/\x1b/);
+    expect(md.replace(/\s+/g, ' ')).toContain('so `.gitignore` keeps them out of the repository');
   });
 
   it('puts the tracked bridge files back, leaves only the record untracked, and keeps the signed pair in helper/signed/', () => {
@@ -482,6 +532,20 @@ describe.skipIf(!ZIPS)('release.sh, a whole run against stand-ins for the Mac, A
     const again = release(r, vendor('full'), ['--dry-run']);
     expect(again.code).toBe(4);
     expect(again.err).toContain(`${REL}/ is already there`);
+  });
+
+  // last in this block: it stages the record
+  it('the git add it prints commits the README, the guides and the sums, and nothing that names the store or carries a certificate', () => {
+    expect(git(r, 'add', REL).status).toBe(0);
+    const staged = git(r, 'diff', '--cached', '--name-only').stdout.trim().split('\n').sort();
+    const guides = readdirSync(path.join(r, REL, 'guides')).map((n) => `${REL}/guides/${n}`);
+    expect(staged).toEqual([`${REL}/README.md`, `${REL}/SHA256SUMS.txt`, `${REL}/bridge/SHA256SUMS.txt`, ...guides].sort());
+    expect(git(r, 'grep', '--cached', '-l', ID).stdout).toBe('');
+    // the files left out are still there, and the committed sums pin them
+    for (const n of SIX) expect(existsSync(path.join(r, REL, 'bridge', n)), n).toBe(true);
+    expect(existsSync(path.join(r, REL, ZIP_NAME))).toBe(true);
+    expect(readFileSync(path.join(r, REL, 'SHA256SUMS.txt'), 'utf8')).toContain(`  ${ZIP_NAME}\n`);
+    expect(res.out).toContain("Its zip and bridge/ name the store's extension, so .gitignore keeps them out");
   });
 });
 
@@ -529,6 +593,45 @@ describe.skipIf(!ZIPS)('release.sh when a step fails', () => {
     expect(calls(res.log).map((c) => c[0])).not.toContain('publish-store.mjs');
   });
 
+  it('a tracked file the checks rewrote, or a file they left, stops right after them, before either installer is built', () => {
+    const r = makeRepo('fail-suite-stray', true);
+    withOrigin(r);
+    const res = release(r, vendor('fail-suite-stray'), [], { SHIM_SUITE_STRAY: '1' });
+    expect(res.code).toBe(5);
+    expect(res.err.trim().split('\n').pop()).toBe('Stopped at step 7 (Running the whole test suite, on the tracked bridge build): after the checks git status lists ?? extension/stray-from-suite.txt; they must change nothing, or the zip would not be this commit\'s. Commit what they write (or remove what they left), then run again.');
+    expect(calls(res.log).map((c) => c[0])).not.toContain('build-pkg.sh');
+  });
+
+  it('a check the script makes itself that fails (unzip, here) stops with the step named and exit 5, not the tool\'s status', () => {
+    const r = makeRepo('fail-unzip', true);
+    withOrigin(r);
+    const real = spawnSync('bash', ['-c', 'command -v unzip'], { encoding: 'utf8' }).stdout.trim();
+    const bin = path.join(T, 'fail-unzip', 'bin');
+    writeExec(path.join(bin, 'unzip'), `#!/bin/bash\nif [ "$1" = -Z1 ]; then printf 'unzip: -Z not supported (stand-in)\\n' >&2; exit 10; fi\nexec ${JSON.stringify(real)} "$@"\n`);
+    const res = release(r, vendor('fail-unzip'), [], { PATH: `${bin}:${SHIMS}:${process.env.PATH ?? ''}` });
+    expect(res.code).toBe(5);
+    expect(res.err).toContain('unzip: -Z not supported (stand-in)');
+    expect(res.err.trim().split('\n').pop()).toBe('Stopped at step 11 (Packaging the extension): a command this step runs itself exited with status 10; its own message is above.');
+    expect(res.out).toContain('(the tracked extension/public/bridge/ is back');
+    expect(git(r, 'status', '--porcelain').stdout).toBe('');
+  });
+
+  it('a stop at step 14 removes the record it began, and once the cause is gone the same version runs again', () => {
+    const r = makeRepo('fail-record', true);
+    withOrigin(r);
+    const res = release(r, vendor('fail-record'), [], { SHIM_ZIP_STRAY: '1' });
+    expect(res.code).toBe(5);
+    expect(res.err.trim().split('\n').pop()).toBe(`Stopped at step 14 (Putting the tracked bridge files back): besides ${REL}/, git status lists ?? extension/stray-from-zip.txt, so the zip may not be this commit's; nothing was uploaded.`);
+    expect(res.out).toContain(`(the unfinished record ${REL}/ is removed: nothing was uploaded, so ${VERSION} can simply run again)`);
+    expect(existsSync(path.join(r, REL))).toBe(false);
+    expect(calls(res.log).map((c) => c[0])).not.toContain('publish-store.mjs');
+    rmSync(path.join(r, 'extension', 'stray-from-zip.txt'));
+    expect(git(r, 'status', '--porcelain').stdout).toBe('');
+    const again = release(r, vendor('fail-record'), []);
+    expect(again.code, again.out + again.err).toBe(0);
+    expect(untracked(r)).toBe(true);
+  });
+
   it('a failed upload leaves the whole record and says how to upload that same file', () => {
     const r = makeRepo('fail-upload', true);
     withOrigin(r);
@@ -556,6 +659,7 @@ describe.skipIf(!RUN)('setup-mac.sh', () => {
   const run = (args: string[], pathDir: string, v: string, env: Record<string, string> = {}, input?: string) =>
     spawnSync(BASH, [SETUP, ...args], { encoding: 'utf8', timeout: 30_000, input, env: { HOME: path.join(T, 'home'), PATH: pathDir, BEETHOVEN_VENDOR_DIR: v, ...SENTINELS, ...env } });
   const missingLines = (out: string) => out.split('\n').filter((l) => l.startsWith('  missing  ')).map((l) => l.slice('  missing  '.length));
+  const AZ_CHECK = 'account get-access-token --resource https://codesigning.azure.net --output none';
 
   it('with PATH holding nothing, lists every prerequisite as missing, each with its fix, then the hand steps, and exits 3', () => {
     const empty = path.join(T, 'empty-bin');
@@ -605,7 +709,9 @@ describe.skipIf(!RUN)('setup-mac.sh', () => {
     writeExec(path.join(dir, 'xcode-select'), `${ok}printf '/Library/Developer/CommandLineTools\\n'\n`);
     writeExec(path.join(dir, 'xcrun'), `${ok}[ "$1 $2 $3 $4" = "notarytool history --keychain-profile ${PROFILE}" ] || exit 1\n`);
     writeExec(path.join(dir, 'brew'), `${ok}[ "$1" = --prefix ] && printf '/opt/homebrew\\n'\nexit 0\n`);
-    writeExec(path.join(dir, 'az'), `${ok}[ "$*" = "account show" ] || exit 1\nprintf '{"name":"stand-in"}\\n'\n`);
+    // the sign-in check asks az for a token for Artifact Signing and must keep it off the screen: the
+    // stand-in answers only with --output none, and prints nothing then, as az does
+    writeExec(path.join(dir, 'az'), `${ok}[ "$*" = "${AZ_CHECK}" ] || exit 1\n`);
     writeExec(path.join(dir, 'rustup'), `${ok}[ "$*" = "target list --installed" ] && printf '%s\\n' \${SHIM_TARGETS:-aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-gnu}\nexit 0\n`);
     writeExec(path.join(dir, 'security'), `${ok}case "$*" in
   "find-identity -v -p codesigning") printf '  1) 0000 "%s"\\n' "$SHIM_APP" ;;
@@ -629,7 +735,8 @@ esac
     expect(res.stdout.trim().split('\n').pop()).toBe('Everything a release needs is on this Mac.');
     const seen = calls(log).map((c) => c.join(' '));
     expect(seen.filter((c) => c.startsWith('xcrun'))).toEqual([`xcrun notarytool history --keychain-profile ${PROFILE}`]);
-    expect(seen).toContain('az account show');
+    expect(seen).toContain(`az ${AZ_CHECK}`);
+    expect(seen.filter((c) => c.startsWith('az '))).toEqual([`az ${AZ_CHECK}`]);
     // a check changes nothing
     expect(seen.filter((c) => /^(brew install|rustup target add)/.test(c))).toEqual([]);
   });
@@ -643,6 +750,90 @@ esac
     expect(res.stdout).toContain('release.json names it, but security find-identity -v does not list it');
   });
 
+  // jsign as windows/build-msi-mac.sh finds it: JSIGN, then jsign on PATH, then a jar in the vendor folder
+  // (jsign.jar, else the first jsign/*.jar) with a java that runs. A check that took anything that step
+  // refuses would pass a Mac whose release stops at step 9, after the notarization.
+  const JSIGN_LAYOUTS: Array<{ label: string; jar?: string; java?: 'runs' | 'stub'; jsign?: boolean; JSIGN?: string; found: boolean }> = [
+    { label: 'jsign.jar in the vendor folder', jar: 'jsign.jar', java: 'runs', found: true },
+    { label: 'a jar in the vendor folder\'s jsign/', jar: 'jsign/jsign-7.5.jar', java: 'runs', found: true },
+    { label: 'jsign.jar and a java that is only a stub', jar: 'jsign.jar', java: 'stub', found: false },
+    { label: 'a jar in another folder', jar: 'tools/jsign.jar', java: 'runs', found: false },
+    { label: 'jsign on PATH', jsign: true, found: true },
+    { label: 'JSIGN naming a command that is there', JSIGN: 'MY_JSIGN --quiet', found: true },
+    { label: 'JSIGN naming nothing that is there, beside a good jar', jar: 'jsign.jar', java: 'runs', JSIGN: 'no-such-jsign', found: false },
+    { label: 'JSIGN running java -jar on a file that is not there', java: 'runs', JSIGN: 'java -jar /nonexistent/jsign.jar', found: false },
+    { label: 'nothing', found: false },
+  ];
+  /** a vendor folder and a bin folder (beside the stand-ins in base) laid out as one JSIGN_LAYOUTS row */
+  function jsignLayout(base: string, i: number, l: (typeof JSIGN_LAYOUTS)[number]) {
+    const v = vendor(`jsign-layout-${i}`);
+    const bin = path.join(T, `jsign-layout-${i}`, 'bin');
+    mkdirSync(bin, { recursive: true });
+    if (l.jar) {
+      mkdirSync(path.dirname(path.join(v, l.jar)), { recursive: true });
+      writeFileSync(path.join(v, l.jar), 'a jar (stand-in)\n');
+    }
+    if (l.java) writeExec(path.join(bin, 'java'), l.java === 'runs' ? '#!/bin/bash\n[ "$1" = -version ] && exit 0\nexit 1\n' : '#!/bin/bash\necho "No Java runtime present (stand-in)" >&2\nexit 1\n');
+    if (l.jsign) writeExec(path.join(bin, 'jsign'), '#!/bin/bash\nexit 0\n');
+    const mine = path.join(T, `jsign-layout-${i}`, 'my-jsign');
+    writeExec(mine, '#!/bin/bash\nexit 0\n');
+    const env: Record<string, string> = l.JSIGN ? { JSIGN: l.JSIGN.replace('MY_JSIGN', mine) } : {};
+    return { v, path: `${bin}:${base}`, env, mine };
+  }
+  const jsignLine = (out: string) => out.split('\n').find((l) => /^ {2}(ok|missing) +jsign( \(|$)/.test(l)) ?? '';
+
+  it('finds jsign exactly where the Windows step looks for it, and nowhere else', () => {
+    const base = path.join(T, 'mac-bin-jsign');
+    const log = macShims(base);
+    rmSync(path.join(base, 'jsign'));
+    JSIGN_LAYOUTS.forEach((l, i) => {
+      const { v, path: p, env, mine } = jsignLayout(base, i, l);
+      const res = run([], p, v, { SHIM_LOG: log, SHIM_APP: APP, SHIM_INST: INST, ...env });
+      expect(jsignLine(res.stdout).startsWith(l.found ? '  ok       jsign (' : '  missing  jsign'), `${l.label}: ${jsignLine(res.stdout)}`).toBe(true);
+      expect(res.status, l.label).toBe(l.found ? 0 : 3);
+      if (l.label === 'a jar in the vendor folder\'s jsign/') expect(jsignLine(res.stdout)).toBe(`  ok       jsign (the jar ${v}/jsign/jsign-7.5.jar, run with java)`);
+      if (l.label === 'JSIGN naming a command that is there') expect(jsignLine(res.stdout)).toBe(`  ok       jsign (JSIGN, ${mine})`);
+      if (l.label.startsWith('JSIGN naming nothing')) expect(res.stdout).toContain('JSIGN names no-such-jsign, which was not found; the Windows step runs what JSIGN names, so correct JSIGN or unset it');
+      if (l.label.startsWith('JSIGN running java -jar')) expect(res.stdout).toContain('JSIGN runs java -jar /nonexistent/jsign.jar, which is not a file');
+      if (l.java === 'stub') expect(res.stdout).toContain('java is on PATH but does not run');
+      if (l.label === 'nothing') expect(res.stdout).toContain(`save jsign's jar (net.jsign:jsign 7.5, on Maven Central) as ${v}/jsign.jar`);
+    });
+  });
+
+  // windows/build-msi-mac.sh comes from another stream; once it is in this checkout, every layout above
+  // is put to it too, so that the check and the step can never drift apart again
+  it.skipIf(!RUN || !existsSync(MSI_MAC))('agrees with windows/build-msi-mac.sh itself on every one of those layouts', () => {
+    // the step's own tool checks, all passed by stand-ins, then its jsign lookup, then its az token
+    // check, which fails here: reaching it means jsign was found, and nothing is built
+    const base = path.join(T, 'msi-bin-jsign');
+    const ok = '#!/bin/bash\nexit 0\n';
+    for (const t of ['cargo', 'x86_64-w64-mingw32-gcc', 'x86_64-w64-mingw32-objdump', 'wixl', 'msiinfo', 'osslsigncode']) writeExec(path.join(base, t), ok);
+    writeExec(path.join(base, 'rustup'), '#!/bin/bash\n[ "$*" = "target list --installed" ] && printf \'x86_64-pc-windows-gnu\\n\'\nexit 0\n');
+    writeExec(path.join(base, 'az'), '#!/bin/bash\nexit 1\n');
+    JSIGN_LAYOUTS.forEach((l, i) => {
+      const { v, path: p, env } = jsignLayout(`${base}:/usr/bin:/bin`, i, l);
+      const res = spawnSync(BASH, [MSI_MAC, '--store-id', ID, '--azure-endpoint', EP, '--azure-account', ACCOUNT, '--azure-profile', CERT], {
+        encoding: 'utf8', timeout: 30_000, env: { HOME: path.join(T, 'home'), PATH: p, BEETHOVEN_VENDOR_DIR: v, ...env },
+      });
+      const reachedAz = (res.stdout + res.stderr).includes('az could not get a token');
+      expect(reachedAz, `${l.label}: exit ${res.status}\n${res.stdout}${res.stderr}`).toBe(l.found);
+      expect(res.status, l.label).toBe(l.found ? 5 : 3);
+    });
+  });
+
+  it('wants both files of the store sign-in, the OAuth client\'s and the saved sign-in\'s', () => {
+    const bin = path.join(T, 'mac-bin-store');
+    const log = macShims(bin);
+    const v = vendor('setup-store-half');
+    rmSync(path.join(v, 'chrome-web-store', 'client.json'));
+    const res = run([], bin, v, { SHIM_LOG: log, SHIM_APP: APP, SHIM_INST: INST });
+    expect(res.status).toBe(3);
+    expect(missingLines(res.stdout)).toEqual(['the Chrome Web Store sign-in']);
+    const hand = res.stdout.slice(res.stdout.indexOf('What only you can do, once, and where:')).replace(/\s+/g, ' ');
+    expect(hand).toContain('Google drops the saved sign-in after seven days');
+    expect(hand).toContain('make it on this Mac (Keychain Access, Certificate Assistant');
+  });
+
   it('--install runs the brew installs and rustup target adds that are missing, and nothing else', () => {
     const bin = path.join(T, 'mac-bin-3');
     const log = macShims(bin);
@@ -650,7 +841,7 @@ esac
     const res = run(['--install'], bin, vendor('setup-install'), { SHIM_LOG: log, SHIM_APP: APP, SHIM_INST: INST, SHIM_TARGETS: 'aarch64-apple-darwin' });
     // the stand-in brew installs nothing, so the check after it still finds them missing
     expect(res.status).toBe(3);
-    const changing = calls(log).map((c) => c.join(' ')).filter((c) => !/^(xcode-select -p|brew --prefix|rustup target list --installed|security find-identity|xcrun notarytool history|az account show)/.test(c));
+    const changing = calls(log).map((c) => c.join(' ')).filter((c) => !/^(xcode-select -p|brew --prefix|rustup target list --installed|security find-identity|xcrun notarytool history|az account get-access-token)/.test(c));
     expect(changing).toEqual(['brew install msitools osslsigncode', 'brew install jsign', 'rustup target add x86_64-apple-darwin x86_64-pc-windows-gnu']);
   });
 

@@ -15,14 +15,15 @@
 # Windows installer on a Mac (mingw-w64, msitools, osslsigncode, azure-cli, jsign) and node 22 or later;
 # rustup with the two Apple targets and the Windows one; the two Developer ID identities in the keychain;
 # the notarytool keychain profile (one call to Apple's notary service); the Azure sign-in (az account
-# show); <vendor>/release.json; the Chrome Web Store sign-in (<vendor>/chrome-web-store/token.json is
-# there; it is never opened here). The vendor folder is BEETHOVEN_VENDOR_DIR, else ASHLEY_VENDOR_DIR,
-# else ~/.beethoven-vendor.
+# get-access-token for Artifact Signing, the call windows/build-msi-mac.sh makes, with --output none);
+# <vendor>/release.json; the Chrome Web Store sign-in (<vendor>/chrome-web-store/client.json and
+# token.json are there; neither is opened here). The vendor folder is BEETHOVEN_VENDOR_DIR, else
+# ASHLEY_VENDOR_DIR, else ~/.beethoven-vendor.
 #
 # Nothing here reads a password, a key or a token: the identities are certificate names, the notary
-# profile is the name of a keychain entry, az is asked only whether it is signed in, and the store
-# sign-in is checked by its file's presence alone. --write-config reads names at the terminal, never
-# from arguments or a pipe, and writes them mode 0600 in a 0700 folder.
+# profile is the name of a keychain entry, az is asked only whether it can get a token and prints none,
+# and the store sign-in is checked by its files' presence alone. --write-config reads names at the
+# terminal, never from arguments or a pipe, and writes them mode 0600 in a 0700 folder.
 #
 # Written for the bash 3.2 that macOS ships: no associative arrays, no mapfile, no ${x,,}, no |&. The
 # check calls nothing outside the shell until it has found the tool it asks, so it still answers on a
@@ -41,6 +42,7 @@ HERE=$(cd "$HERE" && pwd -P)
 CONFIG_JS="$HERE/release-config.mjs"
 VENDOR=${BEETHOVEN_VENDOR_DIR:-${ASHLEY_VENDOR_DIR:-${HOME:-}/.beethoven-vendor}}
 CONFIG="$VENDOR/release.json"
+CLIENT_FILE="$VENDOR/chrome-web-store/client.json"
 TOKEN_FILE="$VENDOR/chrome-web-store/token.json"
 TARGETS="aarch64-apple-darwin x86_64-apple-darwin x86_64-pc-windows-gnu"
 NL='
@@ -118,11 +120,48 @@ node_bin() {
     printf '/opt/homebrew/opt/node@22/bin'
   fi
 }
-jsign_jar() {
+# jsign where windows/build-msi-mac.sh looks for it, in its order and with its checks: the command
+# JSIGN names (split at spaces; it may be "java -jar /path/jsign.jar"), else jsign on PATH, else a jar
+# in the vendor folder run with java (jsign.jar there, else the first jsign/*.jar). A check that took
+# anything that step refuses would pass a Mac whose release stops there, after the Mac package's
+# notarization; extension/test/releaseOneCommand.test.ts puts each layout to both once both are in the
+# checkout. JSIGN_HOW says what was found; JSIGN_WHY, when it is set, what is wrong and its fix.
+JSIGN_HOW=
+JSIGN_WHY=
+jsign_found() {
+  JSIGN_HOW=
+  JSIGN_WHY=
+  jar=
   for j in "$VENDOR/jsign.jar" "$VENDOR"/jsign/*.jar; do
-    if [ -f "$j" ]; then printf '%s' "$j"; return 0; fi
+    if [ -f "$j" ]; then jar=$j; break; fi
   done
-  return 1
+  if [ -n "${JSIGN:-}" ]; then
+    set -f; set -- $JSIGN; set +f
+    if [ -z "${1:-}" ] || ! have "$1"; then
+      JSIGN_WHY="JSIGN names ${1:-nothing}, which was not found; the Windows step runs what JSIGN names, so correct JSIGN or unset it"
+      return 1
+    fi
+    if [ "${2:-}" = -jar ] && [ ! -f "${3:-}" ]; then
+      JSIGN_WHY="JSIGN runs java -jar ${3:-}, which is not a file (JSIGN is split at spaces, so a path with a space cannot be named there); correct JSIGN, or unset it and save the jar as $VENDOR/jsign.jar"
+      return 1
+    fi
+    first=$1
+    JSIGN_HOW="JSIGN, $1"
+  elif have jsign; then
+    first=jsign
+    JSIGN_HOW="the jsign command"
+  elif [ -n "$jar" ] && have java; then
+    first=java
+    JSIGN_HOW="the jar $jar, run with java"
+  else
+    return 1
+  fi
+  # macOS's /usr/bin/java is on PATH even with no Java installed, a stub that only says so
+  if [ "${first##*/}" = java ] && ! "$first" -version >/dev/null 2>&1; then
+    JSIGN_WHY="java is on PATH but does not run (macOS's /usr/bin/java is only a stub until a Java runtime is installed): brew install openjdk${after:-}, then put openjdk's bin folder first on PATH as brew says"
+    return 1
+  fi
+  return 0
 }
 # security find-identity prints each identity's name in double quotes
 listed() { case "$1" in *"\"$2"*) return 0 ;; esac; return 1; }
@@ -166,10 +205,10 @@ check() {
     missing "node 22 or later (node, npm, npx)" "brew install node@22$after, then put it first on PATH: echo 'export PATH=\"$(node_bin):\$PATH\"' >> ~/.zprofile$intel, and open a new Terminal window"
   fi
 
-  if have jsign; then
-    ok "jsign (the jsign command)"
-  elif jar=$(jsign_jar) && have java && java -version >/dev/null 2>&1; then
-    ok "jsign (the jar $jar, run with java)"
+  if jsign_found; then
+    ok "jsign ($JSIGN_HOW)"
+  elif [ -n "$JSIGN_WHY" ]; then
+    missing "jsign" "$JSIGN_WHY"
   else
     missing "jsign" "brew install jsign$after (whether Homebrew carries a jsign formula is not yet measured); if it has none: brew install openjdk, put openjdk's bin folder on PATH as brew says, and save jsign's jar (net.jsign:jsign 7.5, on Maven Central) as $VENDOR/jsign.jar"
   fi
@@ -218,8 +257,10 @@ check() {
     fi
   fi
 
-  if have az && az account show >/dev/null 2>&1; then
-    ok "signed in to Azure (az account show)"
+  # az account show only reads a local file, and answers for a sign-in that has lapsed; a token for
+  # Artifact Signing is what the Windows step asks for, and --output none keeps it off the screen
+  if have az && az account get-access-token --resource https://codesigning.azure.net --output none >/dev/null 2>&1; then
+    ok "signed in to Azure (az can get a token for Artifact Signing)"
   else
     if have az; then azfix="az login (a browser opens; step 5 below)"; else azfix="az login once azure-cli is there (a browser opens; step 5 below)"; fi
     missing "signed in to Azure" "$azfix"
@@ -232,7 +273,8 @@ check() {
     *) missing "release.json ($CONFIG)" "$CONFIG_WHY Run bash helper/release/setup-mac.sh --write-config" ;;
   esac
 
-  if [ -f "$TOKEN_FILE" ]; then
+  # publish-store.mjs needs both files, the OAuth client's and the saved sign-in's, and stops without either
+  if [ -f "$CLIENT_FILE" ] && [ -f "$TOKEN_FILE" ]; then
     ok "the Chrome Web Store sign-in (saved in $VENDOR/chrome-web-store/)"
   else
     missing "the Chrome Web Store sign-in" "node helper/release/publish-store.mjs sign-in --client <the Desktop OAuth client's JSON file> (step 8 below)"
@@ -259,8 +301,11 @@ What only you can do, once, and where:
   1. Join the Apple Developer Program as yourself (or, later, the LLC): developer.apple.com/programs.
   2. Make the two certificates, Developer ID Application and Developer ID Installer (only the account
      holder can): developer.apple.com/account, Certificates, Identifiers & Profiles, Certificates, +.
-     Download each and double-click it, so that it lands in the login keychain. Then
-     security find-identity -v lists both.
+     Each asks for a certificate signing request: make it on this Mac (Keychain Access, Certificate
+     Assistant, Request a Certificate From a Certificate Authority, Saved to disk), since its private
+     key stays in this Mac's login keychain, and a request made on another computer leaves the
+     certificate here without it (Xcode, Settings, Accounts, Manage Certificates, + makes both on this
+     Mac in one go). Download each and double-click it. Then security find-identity -v lists both.
   3. The notarization profile: in Terminal, xcrun notarytool store-credentials <a name you choose>.
      It asks for your Apple ID, your team ID and an app-specific password (account.apple.com,
      Sign-In and Security, App-Specific Passwords); they stay in the keychain under that name.
@@ -274,9 +319,14 @@ What only you can do, once, and where:
      measured from here; publish-store.mjs's own help says what it expects.
   7. Write the names: bash helper/release/setup-mac.sh --write-config.
   8. The store upload's Google sign-in: in the Google Cloud console (console.cloud.google.com), a
-     project with the Chrome Web Store API on and an OAuth client of type Desktop app; download its
-     JSON, then node helper/release/publish-store.mjs sign-in --client <that file>. The sign-in is kept
-     in $VENDOR/chrome-web-store/.
+     project with the Chrome Web Store API on. Its OAuth consent screen: user type External, and
+     either published or with the Google account that owns the item added as a test user. While the
+     app stays in Testing, Google drops the saved sign-in after seven days, and a release after that
+     stops at its upload until you sign in again (whether a published app keeps it longer is not yet
+     measured). Then an OAuth client of type Desktop app; download its JSON, and
+     node helper/release/publish-store.mjs sign-in --client <that file>, signed in as the account that
+     owns the item. The sign-in is kept in $VENDOR/chrome-web-store/. helper/release/README.md,
+     "Uploading to the Chrome Web Store", has the details.
 EOF
 }
 
@@ -297,7 +347,8 @@ do_install() {
     say "\$ brew install$list"
     brew install $list || return 3
   fi
-  if ! have jsign && ! { jsign_jar >/dev/null && have java && java -version >/dev/null 2>&1; }; then
+  # a JSIGN that names nothing is the check's to report: installing jsign would not change what runs
+  if ! jsign_found && [ -z "${JSIGN:-}" ]; then
     say "\$ brew install jsign"
     if ! brew install jsign; then
       say "Homebrew did not install jsign, so openjdk instead, to run jsign's jar; the jar itself is yours to save as $VENDOR/jsign.jar."
