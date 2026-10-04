@@ -829,7 +829,7 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 | `host_permissions` | none | |
 | `action` / `browser_action` | `{ default_title: "Beethoven" }`, no `default_popup` | a click runs the steps and opens the panel |
 | `options_ui` | the setup page | the agreement, the portal by address, the statement, the settings, the audit log, the Drive step |
-| never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger`, `identity`, `clipboardRead`, any `claude.ai`, `anthropic.com` or `claude.com` origin | stated in the negative in the listing and the privacy policy |
+| never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`, `clipboardRead`, any `claude.ai`, `anthropic.com` or `claude.com` origin (`nativeMessaging` is requested since 12.0.0, for Beethoven's own bundled bridge only) | stated in the negative in the listing and the privacy policy |
 | `minimum_chrome_version` | `"148"` | `browser.*` namespace, Promise-returning `onMessage` |
 | `browser_specific_settings.gecko` | `id` `beethoven@openspineconsortium.com`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }` | the approval check sends the institutional account name the portal shows (with the portal hostname, product and version); no crash reports and no usage data |
 | `content_security_policy` | MV3 default; no remote script sources | remote code: no |

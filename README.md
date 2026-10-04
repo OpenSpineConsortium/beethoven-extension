@@ -162,11 +162,15 @@ From the report's "deliberately absent" list and its security controls:
   standard input. `SECURITY.md` records the incident of 2026-09-28 behind this rule.
 - No install-time host permission. Access to the one portal origin is requested from the click on
   the icon (or the *Connect* button on the setup page).
-- No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission. The portal cookie is
-  carried by the browser's network stack and never read.
-- No automated login and no touch on the MFA step: a redirect to the identity provider means "sign
-  in to your portal in a tab".
+- No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`,
+  `identity` or `clipboardRead` permission. `nativeMessaging` is requested since 12.0.0 for one host
+  only, Beethoven's own bundled bridge (`helper/`), which carries bytes to the grid's ssh port and
+  nothing else; since 15.0.0 it reaches Windows and macOS as a signed installer inside the package,
+  and Linux as a script. The portal cookie is carried by the browser's network stack and never read.
+- No automated login of the portal: a redirect to the identity provider means "sign in to your
+  portal in a tab", and the university's sign-in pages are never filled in. On the direct way the
+  student types the grid password and one-time code into Beethoven's own sign-in sheet, which sends
+  them only to the grid inside the encrypted ssh session and never keeps them.
 - No remote code: no `eval`, no fetched scripts. The kill-list is JSON, verified with WebCrypto against
   a public key compiled into the bundle, and the extension works offline on the last good list.
 - Nothing persistent on the login node: one `sbatch --parsable` through the shell, then the shell is

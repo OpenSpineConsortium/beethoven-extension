@@ -1,16 +1,24 @@
-# Accounts and subscriptions for Beethoven 12.0.0
+# Accounts and subscriptions for Beethoven 15.0.0
 
 For Greg. Written 2026-10-02 by the texts stream of the 12.0.0 build and completed by fixer B from
 the three explorations of that day (A: store extensions and Secure Shell; B: relays, web ssh and
-accounts; C: the script helper). Each price says where it came from. **Secondary source** means
-the vendor's own page built its prices with a script and showed none when fetched, so the figure
-comes from a third-party summary; check it on the vendor's page before paying. Nothing here was
-bought, registered or signed up for.
+accounts; C: the script helper); updated 2026-10-04 by the texts stream of 15.0.0, after Greg
+decided that day to sign the helper's installers for Windows and macOS. Each price says where it
+came from. **Secondary source** means the vendor's own page built its prices with a script and
+showed none when fetched, so the figure comes from a third-party summary; check it on the vendor's
+page before paying. Nothing here was bought, registered or signed up for by the streams that wrote
+it.
 
-The short answer: **12.0.0 as built needs no new account and no new subscription.** The helper is a
-script that every operating system already runs, shipped inside the extension, so there is nothing
-to compile, sign or notarize. Everything in section 2 is optional, and each item says what students
-live with if it is skipped.
+The short answer: **15.0.0 needs two paid memberships that 12.0.0 did not: the Apple Developer
+Program, US$99 a year, and Azure Artifact Signing's Basic plan, US$9.99 a month** (Greg's decision,
+2026-10-04; both figures with their sources in 2.1). On Windows and macOS the helper is now a
+compiled program in a signed installer, and these two sign it; on Linux it stays the script, which
+needs neither. Nothing else is new: everything else in section 2 is optional, and each item says
+what students live with if it is skipped.
+
+Up to 14.0.0 the helper was a script that every operating system already runs, shipped inside the
+extension, with nothing to compile, sign or notarize, so 12.0.0 to 14.0.0 needed no new account and
+no new subscription.
 
 ## 1. What the lab needs and already has
 
@@ -24,6 +32,8 @@ live with if it is skipped.
 | The domain `openspineconsortium.com` (DNS at Spaceship) and the website on GitHub Pages | Greg | the renewal price was not established | Unchanged. The site hosts **no** helper: it ships inside the extension (D1). | No support or privacy pages. |
 | The lab's shared copy on the grid (framework 11) | the lab's CephFS volume, `/rs/rs_grp_oschome/shared/beethoven/hpcworker` | as today | Needs framework 11 published, and every folder from `/` to the copy writable by its owner alone or sticky (`LAB_LEAD.md`, section 2). | No direct way: `browser-key add` refuses, and a framework 10 copy has no gate. |
 | Signing key for the withdrawn-versions list | Greg, offline | free | Unchanged. | No signed kill-list. |
+| Apple Developer Program membership (the Developer ID identities and notarization, for the Mac installer) | Greg | US$99 per membership year (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs and notarizes `beethoven-bridge-mac.pkg`. | No signed Mac installer: the package offers the Mac script zip, as up to 14.0.0, with the warnings in 2.1. |
+| Azure Artifact Signing, Basic plan (the Windows signature) | Greg, behind his own Microsoft Entra sign-in | US$9.99 a month for 5,000 signatures (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs the program inside `beethoven-bridge-windows.msi` and the MSI. | No signed Windows installer: the package offers the Windows script zip, as up to 14.0.0, with the warnings in 2.1. |
 
 What each **student** needs, and already has or gets free:
 
@@ -39,14 +49,26 @@ What each **student** needs, and already has or gets free:
 
 ## 2. What is optional, what it costs, and what students see without it
 
-### 2.1 Signing the helper (only if a compiled helper is ever shipped)
+### 2.1 Signing the helper (in force since 15.0.0)
 
-12.0.0's helper is a script: a `.cmd` launcher and a PowerShell script on Windows, an installer
-script and a Perl script on macOS and Linux. Apple notarizes apps, disk images and installer
-packages, not a loose script, and a `.cmd` file cannot carry an Authenticode signature at all
-(exploration C), so signing buys nothing for 12.0.0 as it is packaged. It matters only if the
-optional compiled variant (D1: Go binaries, "for later") is ever shipped. Exploration C built that
-variant for six systems in scratch (about 21 MB in all, unsigned) and did not ship it.
+Since 15.0.0 (Greg's decision, 2026-10-04) the helper for Windows and macOS is a compiled program,
+the Rust edition in `helper/src/rust` (nothing in it but Rust's standard library), and both of its
+installers are signed: the Mac's `beethoven-bridge-mac.pkg` with Developer ID identities from the
+Apple Developer Program, then notarized by Apple and stapled; the Windows
+`beethoven-bridge-windows.msi`, and the program inside it, through Azure Artifact Signing. Both are
+built only on Greg's own Mac and Windows machines (`helper/release/`); no identity, certificate,
+profile or account name is in the repository or in CI (`SECURITY.md`, release pipeline). Linux keeps
+the script. Neither installer has been built, signed or opened on a real machine yet: what a
+student's Mac or Windows shows is not yet measured.
+
+Up to 14.0.0 the helper was a script: a `.cmd` launcher and a PowerShell script on Windows, an
+installer script and a Perl script on macOS and Linux. Apple notarizes apps, disk images and
+installer packages, not a loose script, and a `.cmd` file cannot carry an Authenticode signature at
+all (exploration C), so signing bought nothing for the script as it was packaged. It mattered only
+if a compiled variant was ever shipped (D1: Go binaries, "for later"). Exploration C built that
+variant for six systems in scratch (about 21 MB in all, unsigned) and did not ship it; 15.0.0 ships
+the Rust edition instead, for Windows and macOS only. The two memberships follow, with the figures
+as the 12.0.0 explorations found them.
 
 **Apple Developer Program** (to sign with a Developer ID and notarize a compiled macOS helper, or a
 signed installer package): **US$99 per membership year** (developer.apple.com/programs/enroll,
@@ -56,7 +78,8 @@ accredited educational institutions or government entities, not to individuals
 legal binding authority, a D-U-N-S number and an e-mail address on the organization's domain.
 Whether Wayne State's own Apple developer team would sign a lab's helper was not asked.
 
-*Skipped (12.0.0 as built):* macOS warns the first time the student opens the installer. On macOS 15
+*Without it (up to 14.0.0, and still for any copy of Beethoven that is not the store item, which is
+offered the script zip):* macOS warns the first time the student opens the installer. On macOS 15
 (Sequoia) and later the student clicks **Done**, then **System Settings**, **Privacy & Security**,
 **Open Anyway** (available for about an hour after the attempt), and types the Mac login password
 (support.apple.com, "Open a Mac app from an unknown developer"; Apple removed the Control-click
@@ -64,31 +87,43 @@ override in macOS 15). On macOS 14 and earlier: Control-click, **Open**, **Open*
 and the file in Terminal reads the script as data and is expected to skip the warning, but that was
 not tried on a Mac. One time per computer. Nothing about the helper was run on a Mac.
 
+*With it (15.0.0):* a package signed with a Developer ID, notarized and stapled is expected to open
+in the macOS Installer without that warning, which is what the panel's steps assume ("Open the file
+you downloaded. The macOS Installer opens."). Not yet measured on a real Mac.
+
 **Windows code signing** (an Authenticode signature on a compiled `.exe`; a PowerShell script can be
 signed too, but the `.cmd` launcher cannot):
 
 | Option | Cost | Notes |
 |---|---|---|
-| Microsoft Azure Artifact Signing (formerly Trusted Signing) | Basic plan US$9.99 a month for 5,000 signatures, then US$0.005 a signature (secondary sources: Microsoft's pricing page rendered "$-" without scripts) | Open to individuals in the United States and Canada and to organizations in the United States, Canada, the EU and the UK (secondary sources). |
+| Microsoft Azure Artifact Signing (formerly Trusted Signing) | Basic plan US$9.99 a month for 5,000 signatures, then US$0.005 a signature (secondary sources: Microsoft's pricing page rendered "$-" without scripts) | Open to individuals in the United States and Canada and to organizations in the United States, Canada, the EU and the UK (secondary sources). Chosen for 15.0.0 (2026-10-04). |
 | An OV or EV code-signing certificate from a commercial certificate authority | not priced by the explorations | A subscription from the authority; not compared. |
 
-*Skipped (12.0.0 as built):* the student sees a warning the first time they open the installer. On
-Greg's Windows 11 (Smart App Control off) it was **Open File - Security Warning**, "Publisher:
-Unknown Publisher", with **Run** and **Cancel** (exploration C, observed); other machines are
-reported to show SmartScreen's **Windows protected your PC**, then **More info**, **Run anyway**
-(Microsoft Q&A, not observed here). Where Smart App Control is on, Windows blocks a downloaded script
-with no override until the student right-clicks the zip, chooses **Properties**, ticks **Unblock**
-and extracts it again (textslashplain.com, 2026-04-28; not run here). A Group Policy execution
-policy, App Control or AppLocker, or a security product that stops PowerShell scripts, stops the
-helper outright: the student uses GlobalProtect. A signature from a known publisher would change
-some of that, and only once Windows has seen enough downloads of the file.
+*Without it (up to 14.0.0, and still for any copy that is not the store item):* the student sees a
+warning the first time they open the installer. On Greg's Windows 11 (Smart App Control off) it was
+**Open File - Security Warning**, "Publisher: Unknown Publisher", with **Run** and **Cancel**
+(exploration C, observed); other machines are reported to show SmartScreen's **Windows protected
+your PC**, then **More info**, **Run anyway** (Microsoft Q&A, not observed here). Where Smart App
+Control is on, Windows blocks a downloaded script with no override until the student right-clicks
+the zip, chooses **Properties**, ticks **Unblock** and extracts it again (textslashplain.com,
+2026-04-28; not run here). A Group Policy execution policy, App Control or AppLocker, or a security
+product that stops PowerShell scripts, stops the helper outright: the student uses GlobalProtect. A
+signature from a known publisher would change some of that, and only once Windows has seen enough
+downloads of the file.
+
+*With it (15.0.0):* the MSI and the program inside it are signed, so Windows is expected to name a
+publisher instead of "Unknown Publisher". A new publisher whose file few people have downloaded may
+still meet SmartScreen's **Windows protected your PC**, which is why the panel's second step says
+"If Windows asks you to confirm, choose Install (or More info, then Run anyway)." Whether it does,
+and for how long, is not yet measured. A managed computer's App Control, AppLocker or security
+product may still stop it; then the student uses GlobalProtect.
 
 ### 2.2 A relay host (only if one is chosen)
 
 A relay is a server that carries the browser's encrypted ssh bytes to `grid.wayne.edu:22`, so no
 helper is needed on the student's computer. 12.0.0 can use one only if the site profile names it
-(D3); **none is named**, and the privacy statement (version 10) says one would be disclosed there
-first. Exploration B's verdict, with its sources:
+(D3); **none is named**, and the privacy statement (since version 10) says one would be disclosed
+there first. Exploration B's verdict, with its sources:
 
 - **A Cloudflare Worker relay: not without Cloudflare's written permission, and advised against even
   then.** Section 2.2.1(j) of Cloudflare's self-serve agreement forbids using the services "to
@@ -156,8 +191,10 @@ in 12.0.0.
 ### 2.6 Things that are not needed
 
 - No Google Cloud project, no OAuth client, no API key.
-- No Cloudflare Workers paid plan for 12.0.0.
-- No code-signing certificate, Apple membership or notarization for 12.0.0 (2.1).
+- No Cloudflare Workers paid plan for 12.0.0; 15.0.0 adds nothing that would need one.
+- No code-signing certificate from a commercial certificate authority: since 15.0.0 the Windows
+  signature comes from Azure Artifact Signing and the Mac's from the Apple Developer Program (2.1);
+  up to 14.0.0 nothing was signed.
 - No new e-mail service, analytics or crash-reporting account: Beethoven has none.
 - No account with Palo Alto Networks, Google or Microsoft for GlobalProtect, Google Authenticator or
   Microsoft Authenticator: all are free to the student, through Wayne State.
@@ -166,7 +203,7 @@ in 12.0.0.
 
 | If you add | Change before it ships |
 |---|---|
-| A compiled, signed helper | `THIRD_PARTY_NOTICES.md` (the Go standard library's notice, for Go), `LICENSE.txt` 5(b)(i) and `PRIVACY.md` "The Bridge on your computer" (what runs it), `INSTALL.md` (the warnings change), the store's package file list. |
+| A compiled, signed helper (done in 15.0.0, for Windows and macOS) | `THIRD_PARTY_NOTICES.md` (the Rust standard library's notice), `LICENSE.txt` 5(b)(i) and section 15 and `PRIVACY.md` "The Bridge on your computer" (what runs it, the signed installers), `INSTALL.md` (the installers' steps), the store's package file list. All done in LICENSE version 10 and PRIVACY version 11 (`docs/TEXTS_V10_V11.md`). |
 | A relay | `PRIVACY.md` "Relays and the pilot app" must name its operator and what it sees, in a new version shown for acceptance; the store's privacy answers; the site profile's `ssh_relay`; a note to C&IT. |
 | Secure Shell as the student's terminal | `PRIVACY.md` and `LICENSE.txt` 5(b) (the first password typed into Secure Shell's terminal), `INSTALL.md` and `USE.md`, the store's privacy answers, a gate change in the framework. |
-| The pilot app for a named student | Nothing in the texts (version 10 already describes it); a note to C&IT and the student's own instructions (`scratchpad/v12/iwa/STUDENT_STEPS.md`). |
+| The pilot app for a named student | Nothing in the texts (the privacy statement has described it since version 10); a note to C&IT and the student's own instructions (`scratchpad/v12/iwa/STUDENT_STEPS.md`). |
