@@ -20,6 +20,8 @@
   The component GUIDs and the UpgradeCode are fixed and committed: Windows Installer identifies a
   component by its GUID across versions, and MajorUpgrade removes the old package by the UpgradeCode
   before the new one installs. Change neither.
+
+  bridge.wxs beside this file is the same package for msitools' wixl on the Mac; change both together.
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Beethoven bridge"

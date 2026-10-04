@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Beethoven bridge for Windows as a per-user MSI, in the WiX v3 schema that msitools' wixl reads,
+  so the Windows installer is built and signed on the maintainer's Mac with no Windows machine.
+  build-msi-mac.sh passes StageDir (the folder holding the three payload files) and Version
+  (helper/VERSION), as build-msi.ps1 does for Package.wxs.
+
+  Package.wxs and this file are one package written twice and must change together: the UpgradeCode,
+  every component's Id and GUID, the three files, every registry key, name and value, the Add or
+  Remove Programs properties, the per-user scope and the two folders removed on uninstall are the
+  same in both, and extension/test/releaseWindowsMac.test.ts reads the two files and holds them equal.
+  Package.wxs says everything about why the package is shaped this way; what follows is only where
+  this file has to be written differently for wixl.
+
+  - The source paths use "/": wixl on macOS opens the path as it is written, and there a backslash
+    is part of the file name.
+  - wixl's RemoveFolder has no Directory attribute (wixl warns that it has no such property and
+    drops it, which would leave the folder named by the component instead), so each RemoveFolder sits
+    in a component inside the folder it removes: FolderCleanup lives in the Beethoven folder and
+    removes it, and BridgeExe carries the entry that removes the bridge folder. On uninstall every
+    component goes together, so the same two empty folders are removed as with Package.wxs.
+  - wixl takes no ComponentGroup inside Product, so each component sits in its folder and the feature
+    names all five.
+  - The architecture is wixl's -a x64 rather than an attribute here; per-user is InstallScope.
+
+  build-msi-mac.sh refuses the build when wixl prints any warning, since a dropped attribute leaves an
+  MSI that looks right and is not.
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="Beethoven bridge"
+           Manufacturer="OpenSpineConsortium"
+           Version="$(var.Version)"
+           UpgradeCode="DD6AAE9E-C919-4C53-AFA7-EA2FB05C831A"
+           Language="1033">
+
+    <Package Description="Beethoven bridge"
+             Manufacturer="OpenSpineConsortium"
+             InstallerVersion="500"
+             InstallScope="perUser"
+             Compressed="yes"/>
+
+    <!-- An older bridge is replaced in place; a newer one already installed stays. -->
+    <MajorUpgrade DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
+    <MediaTemplate EmbedCab="yes"/>
+
+    <Property Id="ARPNOMODIFY" Value="1"/>
+    <Property Id="ARPCOMMENTS" Value="Carries Beethoven's encrypted connection to the grid and nothing else. Installed for your own account only."/>
+    <Property Id="ARPURLINFOABOUT" Value="https://openspineconsortium.com/beethoven/"/>
+    <Property Id="ARPHELPLINK" Value="https://openspineconsortium.com/beethoven/"/>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="BeethovenFolder" Name="Beethoven">
+
+          <!-- Removes the Beethoven folder on uninstall, when it is empty (ICE64). -->
+          <Component Id="FolderCleanup" Guid="B0F5C761-C3FC-48AB-919D-7B822367F404">
+            <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="FolderCleanup" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+            <RemoveFolder Id="RemoveBeethovenFolder" On="uninstall"/>
+          </Component>
+
+          <Directory Id="BridgeFolder" Name="bridge">
+
+            <!-- One component per file, each keyed by a marker value under HKCU (ICE38). The bridge
+                 folder's own removal rides with the program it holds. -->
+            <Component Id="BridgeExe" Guid="708A35A8-1276-404C-9571-75FFD326866A">
+              <File Id="BridgeExeFile" Source="$(var.StageDir)/beethoven-bridge.exe" KeyPath="no"/>
+              <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="BridgeExe" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+              <RemoveFolder Id="RemoveBridgeFolder" On="uninstall"/>
+            </Component>
+
+            <Component Id="HostManifest" Guid="2B1DFC4E-73F8-445D-84F6-5B99A0E07826">
+              <File Id="HostManifestFile" Source="$(var.StageDir)/com.openspineconsortium.beethoven.bridge.json" KeyPath="no"/>
+              <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="HostManifest" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+            </Component>
+
+            <Component Id="ReadMe" Guid="D865D1C0-B684-4B15-BB66-1A1FFD96853A">
+              <File Id="ReadMeFile" Source="$(var.StageDir)/README.txt" KeyPath="no"/>
+              <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="ReadMe" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+            </Component>
+
+            <!-- The two values Chrome and Edge read: each key's default value (no Name), the
+                 manifest's full path in this account's folder. -->
+            <Component Id="HostRegistration" Guid="100F6E73-ABA9-4F05-B556-6E4EF951EE28">
+              <RegistryValue Root="HKCU" Key="Software\Google\Chrome\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge" Value="[BridgeFolder]com.openspineconsortium.beethoven.bridge.json" Type="string" KeyPath="yes"/>
+              <RegistryValue Root="HKCU" Key="Software\Microsoft\Edge\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge" Value="[BridgeFolder]com.openspineconsortium.beethoven.bridge.json" Type="string"/>
+            </Component>
+
+          </Directory>
+        </Directory>
+      </Directory>
+    </Directory>
+
+    <Feature Id="Bridge" Title="Beethoven bridge" Level="1">
+      <ComponentRef Id="BridgeExe"/>
+      <ComponentRef Id="HostManifest"/>
+      <ComponentRef Id="ReadMe"/>
+      <ComponentRef Id="HostRegistration"/>
+      <ComponentRef Id="FolderCleanup"/>
+    </Feature>
+
+  </Product>
+</Wix>
