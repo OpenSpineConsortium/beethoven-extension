@@ -22,9 +22,10 @@ and Details says so to the lab lead while `LOGIN_SETUP_PROVEN` is `false`.
 Where the spec was silent or could be read two ways, I decided. Each decision names the section that
 carries it out.
 
-- **D1. Every Claude sign-in goes through `connect`.** Connect, "Sign in to Claude", "Sign in again"
-  and "Use another account" all type one `connect` line (with `--login auto`, `always` or `fresh`).
-  `claude login --plain` stays exactly as in framework 9, for the 10.0.0 extension only. (§4, §5)
+- **D1. Every Claude sign-in goes through `connect`.** Connect, "Sign in to Claude" and "Sign in again"
+  all type one `connect` line (with `--login auto` or `always`; the `fresh` that "Use another account"
+  typed is refused since framework 17, §5.1). `claude login --plain` stays exactly as in framework 9,
+  for the 10.0.0 extension only. (§4, §5)
 - **D2. `connect` is typed into an open shell with `exec`.** It reads the pasted code from standard
   input, so it cannot go through the framed `runShellCommand`; `exec` replaces the login shell, so
   the ssh session, and with it the WebSocket, end when connect ends. Nothing is left on the login
@@ -36,9 +37,11 @@ carries it out.
   yet, and an account still on a pre-8.0.0 copy of its own must not run old code. (§4)
 - **D4. `connect` takes three flags the spec does not list:** `--profile SITE` (setting up an account
   needs the site profile's name), `--permission-mode` (Settings' "Ask before each command" / "Accept
-  edits" / "Plan only" must reach the worker) and `--no-chain` ("Keep my worker running" off). And
-  one more login mode, `--login fresh`: sign out of Claude Code on the grid, then sign in, which is
-  what "Use another account" needs and the spec gives no mechanism for. (§5)
+  edits" / "Plan only" must reach the worker) and `--no-chain` ("Keep my worker running" off). The
+  login mode `--login fresh` it also took (sign out of Claude Code on the grid, then sign in, for "Use
+  another account", which the spec gave no mechanism for) is withdrawn in framework 17: Beethoven's
+  software never signs anyone out of Claude, and connect refuses the value with one sentence (§5.1);
+  the student signs out themselves, and the panel says so (§5.3). (§5)
 - **D5. `--login auto` skips the sitting when the newest `status.json` of any run in the state
   directory says `claude_login.loggedIn: true`,** whatever its age. The spec says "the run's last
   status.json"; the sign-in belongs to the account, not to one worker, so a second worker name would
@@ -160,7 +163,8 @@ carries it out.
 6. **Two writers of status.json** (`worker status` on the login node and the job) with no rule (D11).
 7. **`LAST_KNOWN_KEY` holding a tab id "kept across browser restarts"** (D15).
 8. **The spec's `connect` synopsis** cannot set up an account, carry the permission mode or switch the
-   chain off, and "Use another account" has no mechanism (D4).
+   chain off, and "Use another account" has no mechanism (D4; since framework 17 none of ours either:
+   the student signs out of Claude Code themselves, §5.3).
 9. **"the run's last status.json"** for skipping the sign-in, when the sign-in belongs to the account
    (D5).
 
@@ -189,7 +193,7 @@ characters; `<name>` matches `^[A-Za-z0-9_-]{1,32}$`.
 
 | Builder | The exact line | Transport | Audit class |
 |---|---|---|---|
-| `commands.connect` | `exec bash '<shared>/bin/hpcworker' connect --name '<name>' --profile '<site>' --consent '<id>' --login '<auto\|always\|fresh\|never>' --permission-mode '<default\|acceptEdits\|plan>'` and ` --no-chain` at the end when "Keep my worker running" is off; ` --consent '<id>'` only when the data statement for this worker is in force | `openShell` (interactive) | scheduler (60 s floor) |
+| `commands.connect` | `exec bash '<shared>/bin/hpcworker' connect --name '<name>' --profile '<site>' --consent '<id>' --login '<auto\|always\|never>' --permission-mode '<default\|acceptEdits\|plan>'` and ` --no-chain` at the end when "Keep my worker running" is off; ` --consent '<id>'` only when the data statement for this worker is in force (`--login` takes `auto`, `always` or `never` from the 15.0.0 extension; the framework still parses an older build's `fresh`, only to refuse it, §5.1) | `openShell` (interactive) | scheduler (60 s floor) |
 | `commands.statusJson` | `bash '<shared>/bin/hpcworker' worker status --name '<name>' --json` | `runShellCommand` | scheduler (60 s floor) |
 | `commands.stop` | `bash '<shared>/bin/hpcworker' worker stop --name '<name>'` | `runShellCommand`, 90 s timeout | scheduler |
 | `commands.restrict` | `bash '<shared>/bin/hpcworker' worker restrict --name '<name>'` | `runShellCommand` | shell (15 s floor) |
@@ -225,7 +229,7 @@ timer (lines 246, 257), which is why the framework's own keepalive line exists.
 
 ```
 hpcworker connect [--name NAME] [--profile SITE] [--consent INSTALL_ID]
-                  [--login auto|always|fresh|never] [--permission-mode default|acceptEdits|plan]
+                  [--login auto|always|never] [--permission-mode default|acceptEdits|plan]
                   [--no-chain]
 ```
 
@@ -234,7 +238,7 @@ hpcworker connect [--name NAME] [--profile SITE] [--consent INSTALL_ID]
 | `--name` | `worker` | the worker; `^[A-Za-z0-9_-]{1,32}$` |
 | `--profile` | the account's `~/.hpcworker/profile.json` | the site profile used when the account must be set up; required when there is none |
 | `--consent` | none | write the Remote Control answer (§5.2 step 3); `^[0-9a-f]{32}$` |
-| `--login` | `auto` | `auto`: skip the sitting when D5's rule says signed in; `always`: run the sitting (Claude Code answers at once when it is signed in); `fresh`: run the sitting after `claude auth logout` inside it; `never`: no sitting |
+| `--login` | `auto` | `auto`: skip the sitting when D5's rule says signed in; `always`: run the sitting (Claude Code answers at once when it is signed in); `never`: no sitting. The 15.0.0 extension sends one of these three. `fresh` (framework 10 to 16: the sitting after `claude auth logout` inside it), which an older build still sends for "Use another account", is parsed only to be refused (framework 17; Beethoven never signs anyone out of Claude): `HPCW-STEP failed usage --login fresh is no longer offered: Beethoven never signs anyone out of Claude; to use another account, sign out of Claude Code yourself on a compute node, then sign in again`, exit 2, nothing done |
 | `--permission-mode` | the profile's `worker_defaults.permission_mode` | passed to `worker start` |
 | `--no-chain` | chain on | passed to `worker start` |
 
@@ -267,8 +271,8 @@ Unknown flags and bad values: `HPCW-STEP failed usage <sentence>`, exit 2, nothi
 6. **Sign-in.** By `--login` (D5 for `auto`). When the sitting is skipped under `auto`, print
    `HPCW-STEP signed-in <email> <plan>` from that status.json's `claude_login`. Otherwise print
    `HPCW-STEP signin`, then run the sitting (§5.4) with the keepalive (§5.5) inside the budget (§5.6);
-   on its `SIGNED-IN <email> <plan>` print `HPCW-STEP signed-in <email> <plan>`. Under `always` and
-   `fresh` the 15-minute "a worker confirmed it" shortcut of `plain_login` is not used. A failure
+   on its `SIGNED-IN <email> <plan>` print `HPCW-STEP signed-in <email> <plan>`. Under `always` the
+   15-minute "a worker confirmed it" shortcut of `plain_login` is not used. A failure
    prints the sitting's own `HPCW-LOGIN-FAILED: …` line and then `HPCW-STEP failed <code>
    <sentence>` with the code from this table, and the worker keeps its place:
 
@@ -320,7 +324,7 @@ HPCW-STEP failed <code> <sentence>
 | `consent` | sets Acknowledgement v3 `consent_recorded_at` |
 | `queued <job> new\|kept <run dir>` | records the run (state dir = the run dir's parent, name = its last part, job); lists the run folder at once; the hero leaves "Asking…" |
 | `signin` | "Getting your Claude sign-in ready…"; after 2 minutes without `signin-node` or `auth-url`, "The grid is busy. Still finding a computer for the sign-in…" |
-| `signed-in <email> <plan>` | "Signed in as <email> · <Plan>" with the drawn check for 3 s; refuses the plan per D33 ("This Claude account has no Pro or Max plan. Remote Control needs one." [Use another account]); closes the Anthropic tab per §17 |
+| `signed-in <email> <plan>` | "Signed in as <email> · <Plan>" with the drawn check for 3 s; refuses the plan per D33 ("This Claude account has no Pro or Max plan. Remote Control needs one. To use another Claude account, sign out of Claude on the grid first (your lab lead's guide shows how), then press Sign in again." [Sign in again]); closes the Anthropic tab per §17 |
 | `done` | the sitting is over; the files take it from here |
 | `failed <code> …` | `setup`: "Your grid account can't use the lab's copy yet. Ask your lab lead." [Copy details]; `restricted`: "This workspace is marked restricted. Choose another under More about your data."; `refused`: "The grid didn't take the request." [Try again]; `signin-node`: "The grid didn't find a computer for the sign-in. Your worker keeps its place in line." [Try again]; `signin-code`: "That code didn't work. Copy it again from the Claude tab." [Sign in again]; `signin-timeout`: "The sign-in timed out." [Sign in again]; `signin-billed`: "Beethoven signs in only with a Claude subscription, on Claude's own sign-in page. This sign-in offered a different page, so Beethoven didn't open it." [Sign in again]; `signin-method`: "Claude on the grid is signed in, but not with a Claude subscription, and Beethoven runs only on your own subscription. Ask your lab lead to help you sign in again with your Claude account." [Copy details]; `signin`, `usage`, `other`: "The grid didn't take the request." [Try again] |
 | the socket closes with no `done` or `failed` | "The grid didn't take the request." [Try again]; the transcript's last 20 lines go to Details only |
@@ -345,8 +349,10 @@ HPCW-LOGIN-FAILED: <one plain sentence>
 HPCW-LOGIN: still waiting                                              (the keepalive, connect only)
 ```
 
-Under `--login fresh` the sitting runs `claude auth logout` before `claude auth login` and prints no
-extra line. The extension's reading (`parseConnectLine`): `requesting a compute node` starts the
+The sitting never runs a sign-out (framework 17; until framework 16 `--login fresh` ran `claude auth
+logout` before `claude auth login`, and connect now refuses `fresh` at the flag check, §5.1): a
+student who wants another account signs out of Claude Code themselves on a compute node, then signs
+in again. The extension's reading (`parseConnectLine`): `requesting a compute node` starts the
 2-minute clock; `on <host>;` stops it; `AUTH-URL:` opens Anthropic's page only when
 `isClaudeAuthUrl` passes (https, claude.ai or claude.com, never `platform.claude.com` or a subdomain
 of it, the Console's sign-in, which bills by use) and otherwise reads it as `refused-url`: nothing is
