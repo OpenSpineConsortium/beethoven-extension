@@ -13,8 +13,10 @@ The short answer: **15.0.0 needs two paid memberships that 12.0.0 did not: the A
 Program, US$99 a year, and Azure Artifact Signing's Basic plan, US$9.99 a month** (Greg's decision,
 2026-10-04; both figures with their sources in 2.1). On Windows and macOS the helper is now a
 compiled program in a signed installer, and these two sign it; on Linux it stays the script, which
-needs neither. Nothing else is new: everything else in section 2 is optional, and each item says
-what students live with if it is skipped.
+needs neither. One more thing is new, with no fee named for it: a Google Cloud project with a
+Desktop OAuth client, Greg's own, through which the release command uploads the package to the store
+(section 1). Nothing else is new: everything else in section 2 is optional, and each item says what
+students live with if it is skipped.
 
 Up to 14.0.0 the helper was a script that every operating system already runs, shipped inside the
 extension, with nothing to compile, sign or notarize, so 12.0.0 to 14.0.0 needed no new account and
@@ -34,6 +36,7 @@ no new subscription.
 | Signing key for the withdrawn-versions list | Greg, offline | free | Unchanged. | No signed kill-list. |
 | Apple Developer Program membership (the Developer ID identities and notarization, for the Mac installer) | Greg | US$99 per membership year (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs and notarizes `beethoven-bridge-mac.pkg`. | No signed Mac installer: the package offers the Mac script zip, as up to 14.0.0, with the warnings in 2.1. |
 | Azure Artifact Signing, Basic plan (the Windows signature) | Greg, behind his own Microsoft Entra sign-in | US$9.99 a month for 5,000 signatures (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs the program inside `beethoven-bridge-windows.msi` and the MSI. | No signed Windows installer: the package offers the Windows script zip, as up to 14.0.0, with the warnings in 2.1. |
+| A Google Cloud project with the Chrome Web Store API and a Desktop OAuth client (the release command's upload) | Greg, the Google account that owns the store item; the saved sign-in stays in his vendor folder on the Mac, never in the repository or in CI | no fee is named on the store's API page; not yet set up, so what the console asks for is not yet measured | Not needed for 12.0.0. Used since 15.0.0 (Greg, 2026-10-04): `helper/release/publish-store.mjs` uploads the release's zip and submits it for review (`helper/release/README.md`, "Uploading to the Chrome Web Store"). While the consent screen stays in "Testing", Google drops the saved sign-in after seven days. | The upload is done by hand in the developer dashboard, as up to 14.0.0. |
 
 What each **student** needs, and already has or gets free:
 
@@ -56,7 +59,10 @@ the Rust edition in `helper/src/rust` (nothing in it but Rust's standard library
 installers are signed: the Mac's `beethoven-bridge-mac.pkg` with Developer ID identities from the
 Apple Developer Program, then notarized by Apple and stapled; the Windows
 `beethoven-bridge-windows.msi`, and the program inside it, through Azure Artifact Signing. Both are
-built only on Greg's own Mac and Windows machines (`helper/release/`); no identity, certificate,
+built and signed on Greg's own Mac by one command (`bash helper/release/release.sh`,
+`helper/release/README.md`), the `.msi` cross-built there; whether Artifact Signing accepts a
+request from a Mac is not yet measured, so a Windows machine of his (`build-msi.ps1`) stays the
+fallback for the `.msi` until one release has gone through from the Mac. No identity, certificate,
 profile or account name is in the repository or in CI (`SECURITY.md`, release pipeline). Linux keeps
 the script. Neither installer has been built, signed or opened on a real machine yet: what a
 student's Mac or Windows shows is not yet measured.
@@ -190,7 +196,9 @@ in 12.0.0.
 
 ### 2.6 Things that are not needed
 
-- No Google Cloud project, no OAuth client, no API key.
+- No API key, and no Google Cloud project or OAuth client for the product itself. The one Google
+  Cloud project, with its Desktop OAuth client, is Greg's own release tool's, for the store upload
+  only (section 1); students never meet it.
 - No Cloudflare Workers paid plan for 12.0.0; 15.0.0 adds nothing that would need one.
 - No code-signing certificate from a commercial certificate authority: since 15.0.0 the Windows
   signature comes from Azure Artifact Signing and the Mac's from the Apple Developer Program (2.1);

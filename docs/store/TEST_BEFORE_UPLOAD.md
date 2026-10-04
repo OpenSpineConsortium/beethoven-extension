@@ -10,9 +10,12 @@ Forget this computer; and brought up to date on 2026-10-04 for 15.0.0, whose hel
 macOS is a compiled program in a signed installer (`beethoven-bridge-windows.msi`,
 `beethoven-bridge-mac.pkg`), made out to the store item's ID when it is built. The agreement is
 version 10 and the privacy statement version 11. The build is in `extension/.output/chrome-mv3/`;
-the zip beside it is what the store gets. To rebuild: Node 22, `npm ci`, `npm run build`, `npm run
-zip` in `extension/` (after `node helper/build.mjs` from the repository root, which puts the signed
-installers in place; `SUBMISSION.md`, section 0, item 1).
+the zip beside it is what the store gets. To build it with the signed installers: on the Mac, `bash
+helper/release/release.sh --no-upload` from the repository root, which builds and signs both
+installers, merges them, runs the checks, zips, records `release/15.0.0/` and prints the upload
+command to run after this pass (`SUBMISSION.md`, section 0, item 1; a Windows machine builds the
+`.msi` only as the fallback). A build without them, enough for every step but the signed installers
+themselves: Node 22, `npm ci`, `npm run build`, `npm run zip` in `extension/`.
 
 This is the pass only you can make: it signs in to the real grid with your own account, and it opens
 the signed installers on a real Windows computer and a real Mac. Nothing in it was run by the

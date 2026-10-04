@@ -8,10 +8,13 @@ files:
 
 - **On the Mac (the usual way):** `build-msi-mac.sh` cross-builds the exe with Rust and the
   mingw-w64 linker, builds the MSI from `bridge.wxs` with msitools' `wixl`, and signs both files
-  with `jsign` through the same Artifact Signing account. No Windows machine is needed.
-- **On a Windows machine (the alternative):** `build-msi.ps1` builds the exe with the MSVC
-  toolchain, the MSI from `Package.wxs` with WiX v5, and signs with `signtool` and the Artifact
-  Signing client.
+  with `jsign` through the same Artifact Signing account. `bash helper/release/release.sh` runs it
+  with the names from `release.json` in the vendor folder (`../README.md`). It needs no Windows
+  machine, but whether Artifact Signing accepts a signature request from a Mac is not yet measured,
+  so keep the Windows machine until one release has gone through this way.
+- **On a Windows machine (the fallback):** `build-msi.ps1` builds the exe with the MSVC toolchain,
+  the MSI from `Package.wxs` with WiX v5, and signs with `signtool` and the Artifact Signing client,
+  with the names from the gitignored `signing.json` beside it.
 
 `Package.wxs` and `bridge.wxs` are one package written twice, once for WiX v5 and once in the WiX v3
 schema `wixl` reads; they change together, and `extension/test/releaseWindowsMac.test.ts` holds them
@@ -209,9 +212,12 @@ written to the script's own temp work folder, never printed, and removed with th
 - An Azure subscription with an Artifact Signing account, identity validation completed, and a
   certificate profile (public trust) in it; the signing identity holds the Certificate Profile
   Signer role on that account.
-- The account's names (endpoint, account, certificate profile) are the maintainer's own: in the
-  vendor folder for the Mac route, in the gitignored `signing.json` beside `build-msi.ps1` for the
-  Windows route (`signing.example.json` shows the shape with placeholders).
+- The account's names (endpoint, account, certificate profile) are the maintainer's own: in
+  `release.json` in the vendor folder for the Mac route (`windows.azure_endpoint`,
+  `windows.azure_account`, `windows.azure_profile`; `../release.example.json` shows the shape), in
+  the gitignored `signing.json` beside `build-msi.ps1` for the Windows route (`Endpoint`,
+  `CodeSigningAccountName`, `CertificateProfileName`; `signing.example.json` shows the shape). Both
+  examples hold placeholders only, and each names the other.
 
 ## What neither script does
 

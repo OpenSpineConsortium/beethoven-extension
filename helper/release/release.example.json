@@ -1,5 +1,5 @@
 {
-  "_comment": "The shape of release.json, which lives in the vendor folder (BEETHOVEN_VENDOR_DIR, else ASHLEY_VENDOR_DIR, else ~/.beethoven-vendor) and never in this repository. bash helper/release/setup-mac.sh --write-config asks for each name and writes it. Names only: never a password, key or token.",
+  "_comment": "The shape of release.json, which lives in the vendor folder (BEETHOVEN_VENDOR_DIR, else ASHLEY_VENDOR_DIR, else ~/.beethoven-vendor) and never in this repository. release.sh on the Mac reads it, and bash helper/release/setup-mac.sh --write-config asks for each name and writes it. The three windows names are the same ones the fallback route on a Windows machine reads from the gitignored helper/release/windows/signing.json (Endpoint, CodeSigningAccountName, CertificateProfileName; signing.example.json beside it shows that file). Names only: never a password, key or token.",
   "store_id": "<32 letters a to p>",
   "publisher_id": "<publisher id>",
   "mac": {

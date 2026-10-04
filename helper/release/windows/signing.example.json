@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy this file to signing.json (gitignored) beside build-msi.ps1 and fill in the maintainer's own Azure Artifact Signing names; nothing secret belongs in it, the sign-in is the maintainer's own Entra sign-in (for example az login).",
+  "_comment": "The fallback route only. On a Windows machine, copy this file to signing.json (gitignored) beside build-msi.ps1 and fill in the maintainer's own Azure Artifact Signing names. The usual route, release.sh on the Mac, never reads this file: it takes the same three names from release.json in the vendor folder (windows.azure_endpoint, windows.azure_account, windows.azure_profile; helper/release/release.example.json shows that file). Names only, never a password, key or token: the sign-in is the maintainer's own Entra sign-in (for example az login).",
   "Endpoint": "https://<region>.codesigning.azure.net",
   "CodeSigningAccountName": "<account>",
   "CertificateProfileName": "<profile>"

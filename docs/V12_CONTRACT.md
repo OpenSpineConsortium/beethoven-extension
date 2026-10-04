@@ -106,9 +106,11 @@ and written into the installer as its `allowed_origins`, `["chrome-extension://<
   `beethoven-bridge` under the home, `"type":"stdio"` and `allowed_origins` read from
   `allowed_origins.json` (refusing anything that does not match the origin pattern). It deletes
   nothing.
-- `beethoven-bridge-windows.msi`: x64 (`x86_64-pc-windows-msvc`), WiX v5, `Scope="perUser"`, no
-  administrator. The exe and then the MSI are Authenticode-signed through Azure Artifact Signing
-  (SHA-256 digests, timestamped). Files in `%LOCALAPPDATA%\Beethoven\bridge\`:
+- `beethoven-bridge-windows.msi`: x64, `Scope="perUser"`, no administrator; built on the Mac
+  (`x86_64-pc-windows-gnu`, msitools' `wixl` from `bridge.wxs`) or, as the fallback, on a Windows
+  machine (`x86_64-pc-windows-msvc`, WiX v5 from `Package.wxs`), with the same files and registry
+  values either way. The exe and then the MSI are Authenticode-signed through Azure Artifact
+  Signing (SHA-256 digests, timestamped). Files in `%LOCALAPPDATA%\Beethoven\bridge\`:
   `beethoven-bridge.exe`, `com.openspineconsortium.beethoven.bridge.json` (its `path` is the
   relative `beethoven-bridge.exe`, which Chrome resolves beside the manifest on Windows) and
   `README.txt`; the default value of

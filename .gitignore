@@ -23,3 +23,6 @@ helper/release/windows/signing.json
 release/*/beethoven-*-chrome.zip
 release/*/bridge/*
 !release/*/bridge/SHA256SUMS.txt
+# the store kit's copy of that zip, and the kit's own zip that holds it (docs/store/PASTE.md)
+release/*/store-kit/00-beethoven-*-chrome.zip
+release/*/store-kit-*.zip

@@ -8,9 +8,10 @@
 //   node helper/release/publish-store.mjs upload  --publisher ID --item ID --zip FILE [--publish] [--require-signed]
 //   node helper/release/publish-store.mjs publish --publisher ID --item ID
 //
-// Never in CI: from 15.0.0 the package carries the bridge installers only the maintainer's Mac and
-// Windows machine sign, so the zip the store gets exists only there; and a Google sign-in held as a CI
-// secret is the standing credential this project keeps out of CI altogether.
+// Never in CI: from 15.0.0 the package carries the bridge installers only the maintainer's own machines
+// sign (his Mac, with a Windows machine as the fallback for the .msi), so the zip the store gets exists
+// only there; and a Google sign-in held as a CI secret is the standing credential this project keeps
+// out of CI altogether.
 //
 // The sign-in is Google's installed-app loopback flow: a "Desktop app" OAuth client, a one-shot listener
 // on 127.0.0.1 at an ephemeral port, PKCE (S256) and a random state. The store's API page reaches a

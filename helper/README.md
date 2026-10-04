@@ -31,20 +31,20 @@ The signed installers (the binary edition; in the package of a store build only)
 | macOS   | `beethoven-bridge-mac.pkg`, an installer package for the current user's home only (`enable_currentUserHome="true"`, so no administrator password) | the universal binary (aarch64 and x86_64 joined with `lipo`) with "Developer ID Application", the hardened runtime and a timestamp; the package with "Developer ID Installer", notarized and stapled | `~/Library/Application Support/Beethoven/bridge/` (`beethoven-bridge`, `uninstall.command`, `README.txt`, `allowed_origins.json`); a postinstall writes the host manifest for Chrome, and for Edge and Chromium when their folders exist, with the absolute path under the home, and deletes nothing |
 
 How they come to be: the scripts under `helper/release/` build, sign and package the binary edition
-on the maintainer's own Mac (the `.msi` cross-built and signed through Azure Artifact Signing there,
-not yet measured), with `build-msi.ps1` on a Windows machine as the fallback, each with
-`--store-id <id>`, which bakes `allowed_origins = ["chrome-extension://<id>/"]` into the package. No
-identity, certificate, token, key file or account secret enters the repository or CI; CI's rust lane
-builds unsigned binaries for maintainers only. Each package lands in `helper/signed/` (gitignored)
-beside a sidecar `<name>.json` (name, os, kind, helper, protocol, size, sha256, allowed_origins,
-signed, built_at, tools).
-`node helper/build.mjs` verifies every sidecar against the file and against `helper/VERSION`,
-copies the package into `extension/public/bridge/` unchanged and lists it in `manifest.json` after
-the script zips: `{"os","kind":"binary","name","size","sha256","allowed_origins":[...],"signed"}`,
-with no `open`, since the file itself is the installer. The picker's rule in the extension: the
-binary is offered only when its origins name the running extension (`chrome.runtime.id`), else the
-script zip; so a development build, whose identifier the signed packages do not name, gets the zip
-as today. `helper/release/README.md` is the runbook.
+on the maintainer's own Mac, in one command, `bash helper/release/release.sh` (the `.msi`
+cross-built and signed through Azure Artifact Signing there, not yet measured), with `build-msi.ps1`
+on a Windows machine as the fallback for the `.msi`, each with `--store-id <id>`, which bakes
+`allowed_origins = ["chrome-extension://<id>/"]` into the package. No identity, certificate, token,
+key file or account secret enters the repository or CI; CI's rust lane builds unsigned binaries for
+maintainers only. Each package lands in `helper/signed/` (gitignored) beside a sidecar `<name>.json`
+(name, os, kind, helper, protocol, size, sha256, allowed_origins, signed, built_at, tools). `node
+helper/build.mjs` verifies every sidecar against the file and against `helper/VERSION`, copies the
+package into `extension/public/bridge/` unchanged and lists it in `manifest.json` after the script
+zips: `{"os","kind":"binary","name","size","sha256","allowed_origins":[...],"signed"}`, with no
+`open`, since the file itself is the installer. The picker's rule in the extension: the binary is
+offered only when its origins name the running extension (`chrome.runtime.id`), else the script zip;
+so a development build, whose identifier the signed packages do not name, gets the zip as today.
+`helper/release/README.md` is the runbook.
 
 None of them needs administrator rights. Every script installer says in one sentence what it will
 do and waits for Enter or Return before doing it, then says in one sentence how it went, after
@@ -278,8 +278,9 @@ Not yet measured, each in those words until a real machine has shown it:
 - Nothing of the bridge has run on a real Mac: not the script zip, not the binary edition, not the
   installer package. Gatekeeper's behaviour and whether the current-user-home package installs with
   no prompt are not yet measured.
-- The signed installers have not been built or opened anywhere: neither release script has run on a
-  machine with the identities, and no `.pkg` or `.msi` of the bridge has been opened. Not yet measured.
+- The signed installers have not been built or opened anywhere: none of the release scripts has run
+  on a machine with the identities, and no `.pkg` or `.msi` of the bridge has been opened. Not yet
+  measured.
 - SmartScreen's reaction to a new publisher is not yet measured; a signature without reputation may
   still show "Windows protected your PC" for a time, which the panel's words allow for.
 - The Edge and Chromium host manifests the Mac postinstall writes, and the Edge value on Windows,
@@ -287,13 +288,16 @@ Not yet measured, each in those words until a real machine has shown it:
 
 ## The signed installers (`helper/release/`)
 
-The binary edition is what Mac and Windows students get on a store build, as `beethoven-bridge-mac.pkg`
-and `beethoven-bridge-windows.msi`. They are built, signed, notarized and packaged only on the
-maintainer's own Mac by `helper/release/mac/build-pkg.sh` and
-`helper/release/windows/build-msi-mac.sh` (or, as the alternative for the MSI, on a Windows machine
-by `helper/release/windows/build-msi.ps1`), then merged into the package by `node helper/build.mjs
---store-id <id>`. `helper/release/README.md` is the runbook: the prerequisites per machine, the
-order, the sidecar, what never enters the repository or CI, and what is not yet measured.
+The binary edition is what Mac and Windows students get on a store build, as
+`beethoven-bridge-mac.pkg` and `beethoven-bridge-windows.msi`. They are built, signed, notarized and
+packaged only on the maintainer's own machines: on his Mac by `helper/release/mac/build-pkg.sh` and
+`helper/release/windows/build-msi-mac.sh` (or, as the fallback for the MSI, on a Windows machine of
+his by `helper/release/windows/build-msi.ps1`), then merged into the package by `node
+helper/build.mjs --store-id <id>`; `bash helper/release/release.sh` runs the Mac route whole, with
+the checks, the zip, the release record and the store upload, in one command, with the names from
+`release.json` in the maintainer's vendor folder. `helper/release/README.md` is the runbook: the
+prerequisites per machine, the order, the sidecar, what never enters the repository or CI, and what
+is not yet measured.
 
 ## The binary edition (rust)
 

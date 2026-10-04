@@ -30,20 +30,31 @@ being shared casually, and the agreement makes sharing a breach.
 
 Have these in hand, and check each once:
 
-1. The package, built from a clean tree with Node 22, after the signed installers are in place. On
-   the maintainer's own Mac and Windows machines, the scripts in `helper/release/mac/` and
-   `helper/release/windows/` build `beethoven-bridge-mac.pkg` and `beethoven-bridge-windows.msi` for
-   the item's ID (`--store-id <the item's ID>`; section 1, item 4 says when it is known) and leave
-   each, with its sidecar record, in `helper/signed/`; then, from the repository root, `node
-   helper/build.mjs --store-id <the item's ID>` checks each against its record and copies it into
-   `extension/public/bridge/`. Then, in `extension/`: `npm ci && npm run typecheck && npm test &&
-   npm run build && npm run zip`. The build writes `.output/beethoven-15.0.0-chrome.zip`; the file
-   to upload is its copy in the release folder, `release/15.0.0/beethoven-15.0.0-chrome.zip`, whose
-   SHA-256 must match `release/15.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`). The same
-   command also writes a Firefox zip and a sources zip; neither is uploaded or sent to anyone. A
-   reviewer who asks for the mock portal gets `release/15.0.0/reviewer/beethoven-mock-portal.zip`,
-   which holds the mock and no extension code (section 4). Confirm it is a release build: `unzip -p
-   release/15.0.0/beethoven-15.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
+1. The package, made on the maintainer's own Mac by one command once the version is raised,
+   committed on `main` and pushed: `bash helper/release/release.sh` from the repository root
+   (`helper/release/README.md`, "Your release, start to finish"; once per Mac, `bash
+   helper/release/setup-mac.sh` until it ends with "Everything a release needs is on this Mac.").
+   With the names in `release.json` in the vendor folder, the item's ID among them (section 1, item
+   4 says when it is known), it runs the extension's checks (`npm ci`, `npx tsc --noEmit`, `npx
+   vitest run`), builds `beethoven-bridge-mac.pkg` (Developer ID, notarized and stapled) and
+   `beethoven-bridge-windows.msi` (cross-built on the Mac and signed through Azure Artifact Signing)
+   for that ID, merges both with `node helper/build.mjs --store-id`, zips the extension (`npm run
+   zip`), runs the package tests on that zip, records `release/15.0.0/` with its checksums, and then
+   uploads the recorded zip and submits it for review. With `--no-upload` it stops after the record
+   and prints the upload command for later: use that for the first submission (section 1, item 4)
+   and whenever the hand test (`TEST_BEFORE_UPLOAD.md`) comes before the upload. Whether Artifact
+   Signing accepts a signature request from a Mac is not yet measured, so keep the Windows machine
+   until one release has gone through from the Mac: on the fallback route `build-msi.ps1` builds the
+   `.msi` there and the Mac's steps are typed by hand (the runbook's "The Windows machine (the
+   fallback)"). The file to upload is `release/15.0.0/beethoven-15.0.0-chrome.zip`, whose SHA-256
+   must match `release/15.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`); it names the item
+   and carries the signed installers, so it stays on the Mac and only the record's `README.md`,
+   `guides/` and checksums are committed. `npm run zip` also writes a Firefox zip and a sources zip;
+   neither is uploaded or sent to anyone. A reviewer who asks for the mock portal gets
+   `release/15.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no extension code
+   (section 4); `release.sh` does not make it, so make it by hand after the record, as 12.0.0's was
+   (`release/12.0.0/README.md`, "The reviewers' mock portal"). Confirm it is a release build: `unzip
+   -p release/15.0.0/beethoven-15.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
    `"version":"15.0.0"`, the 128-character `description` in `LISTING.md`,
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
    `"optional_host_permissions":["https://*/*"]` and no `localhost`, the permissions `storage`,
@@ -97,7 +108,10 @@ Have these in hand, and check each once:
    managers. Add each student approved for Beethoven by the Google account they gave on the request
    form. A student approved for lab membership only is not added.
 7. The developer account, one person, with a hardware security key or an authenticator app as the
-   second factor. Nothing else should hold an OAuth grant on it. No store API key goes into any CI.
+   second factor. The one OAuth grant on it is the maintainer's own upload tool
+   (`helper/release/publish-store.mjs`: a Desktop OAuth client in his own Google Cloud project, its
+   saved sign-in in the vendor folder on his Mac; the runbook's "Uploading to the Chrome Web
+   Store"); nothing else should hold one. No store sign-in or API key goes into any CI.
 8. The name. Beethoven runs Claude Code and is not an Anthropic product; the name carries no
    Anthropic mark, and "Claude" and "Claude Code" appear in the listing only to say what it runs.
 9. **New in 12.0.0: the grid side.** Framework 11 or later (14 since 14.0.0, `LAB_LEAD.md`, section
@@ -109,10 +123,11 @@ Have these in hand, and check each once:
    the note in `LAB_LEAD.md`, section 3, before the listing goes live.
 10. **New in 15.0.0: the two signing memberships.** The Apple Developer Program (the Developer ID
     identities and notarization, for the Mac installer) and Azure Artifact Signing (the Windows
-    signature), both current (`docs/guides/ACCOUNTS.md`, 2.1). Their identities, certificates,
-    keychain profile and account names stay in the maintainer's own keychain, his own Entra sign-in
-    and the gitignored `helper/release/windows/signing.json`, never in the repository or in CI
-    (`SECURITY.md`).
+    signature), both current (`docs/guides/ACCOUNTS.md`, 2.1). Their identities, certificates and
+    keychain profile stay in the login keychain of the maintainer's Mac and behind his own Entra
+    sign-in; their names, with the item's ID and the publisher ID, are in `release.json` in his
+    vendor folder (on the Windows fallback, the Azure names are in the gitignored
+    `helper/release/windows/signing.json`), never in the repository or in CI (`SECURITY.md`).
 
 ## 1. The Chrome Web Store item
 
@@ -132,22 +147,25 @@ Registration (once, about ten minutes):
 The item (about thirty minutes):
 
 4. The item ID. The signed installers are built for it, so it must be known before them. If the item
-   exists already (a draft or an earlier version), its ID is in its dashboard address: build the
-   signed installers with it (section 0, item 1) and upload under its **Package** tab. If not:
+   exists already (a draft or an earlier version), its ID is in its dashboard address. If not:
    Dashboard, **Items**, **New item**, and drag in a package of this version built without the
-   signed installers (`node helper/build.mjs --no-signed`, then `npm run build && npm run zip`). The
-   item ID appears in the URL and in the item header at once; note it: it is the link approved
-   students get (section 5), and it goes nowhere public. Then build the signed installers for that
-   ID, rebuild the package (section 0, item 1) and upload it under the draft's **Package** tab
-   before anything is submitted: a package without them gives every student on Windows and macOS the
-   unsigned scripts. The zips under `bridge/` need nothing for the ID: they carry a placeholder, and
-   the page that offers the download writes the running extension's own ID into the copy it saves
-   (`core/bridgeZip.ts`). After the item is live, install it from the listing once and look at the
-   panel's download: on Windows and macOS it must offer the `.msi` or `.pkg` (a zip offered there
-   means the package has no signed installer for that system, or one made out to another ID), and on
-   Linux the saved zip's `allowed_origins.json` must name `chrome-extension://<item-id>/`. A helper
-   made out to another extension installs cleanly but Chrome refuses to start it for Beethoven, and
-   the panel says "The helper is there but did not answer."
+   signed installers (`node helper/build.mjs --no-signed`, then `npm run build && npm run zip` in
+   `extension/`). The item ID appears in the URL and in the item header at once; note it: it is the
+   link approved students get (section 5), and it goes nowhere public. Either way, give the ID and
+   the publisher ID to `bash helper/release/setup-mac.sh --write-config`, which keeps them in
+   `release.json` in the vendor folder, then run `bash helper/release/release.sh --no-upload`
+   (section 0, item 1) and upload the recorded zip under the draft's **Package** tab (or with the
+   upload command it prints, without `--publish`) before anything is submitted: a package without
+   the installers gives every student on Windows and macOS the unsigned scripts. Submitting comes
+   last, at item 9, once every tab below is filled. The zips under `bridge/` need nothing for the
+   ID: they carry a placeholder, and the page that offers the download writes the running
+   extension's own ID into the copy it saves (`core/bridgeZip.ts`). After the item is live, install
+   it from the listing once and look at the panel's download: on Windows and macOS it must offer the
+   `.msi` or `.pkg` (a zip offered there means the package has no signed installer for that system,
+   or one made out to another ID), and on Linux the saved zip's `allowed_origins.json` must name
+   `chrome-extension://<item-id>/`. A helper made out to another extension installs cleanly but
+   Chrome refuses to start it for Beethoven, and the panel says "The helper is there but did not
+   answer."
 5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,650 characters);
    Category Developer Tools; Language English (United States); the store icon; the promo video field
    empty; the small promo tile; the five screenshots captured from 15.0.0, in the order given; the
@@ -179,11 +197,13 @@ The item (about thirty minutes):
     allow up to a few weeks. The decision comes by e-mail; a rejection names the policy and can be
     appealed from the dashboard with a written explanation (section 4).
 
-Updating later: **Package**, upload the new zip, submit. Every update is reviewed; students receive
-it through Chrome's own update mechanism within hours of publication. The helper installed on a
-student's computer is not updated by Chrome: a later version that needs a newer helper must say so
-and offer it from its own package (LICENSE section 17). A later package whose signed installers are
-rebuilt builds them for the same item ID.
+Updating later: raise the version, commit and push, then `bash helper/release/release.sh` on the Mac
+(section 0, item 1), which uploads the recorded zip and submits it for review; by hand, **Package**,
+upload the new zip, submit. Every update is reviewed; students receive it through Chrome's own
+update mechanism within hours of publication. The helper installed on a student's computer is not
+updated by Chrome: a later version that needs a newer helper must say so and offer it from its own
+package (LICENSE section 17). A later package whose signed installers are rebuilt builds them for
+the same item ID.
 
 ## 2. The deploy order with the access service
 

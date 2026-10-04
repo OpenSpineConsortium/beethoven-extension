@@ -17,7 +17,9 @@
 # -SkipSign builds the MSI unsigned to try the packaging on a machine without the signing account.
 # It writes no sidecar, so the build cannot pick the file up, and the output must never ship.
 #
-# On a Mac, build-msi-mac.sh builds and signs the same package from bridge.wxs, with no Windows machine.
+# The usual route is the Mac: build-msi-mac.sh, run by release.sh, builds and signs the same package
+# from bridge.wxs with no Windows machine. This script is the fallback until a release has gone
+# through that way (Artifact Signing's answer to a Mac is not yet measured; helper/release/README.md).
 
 [CmdletBinding()]
 param(

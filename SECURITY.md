@@ -161,22 +161,30 @@ Release pipeline and keys:
 - Lockfile and `npm ci`; GitHub Actions pinned by commit SHA; a build attestation from a hosted builder
   (SLSA level 2 at minimum; signing material inaccessible to build steps as the level 3 target);
   reproducible-build instructions published for all stores.
-- No long-lived store API key in CI. The publisher accounts and the kill-list signing key sit behind a
-  hardware security key with no third-party OAuth grants; private keys never enter the repository.
-  The access service's admin token lives in the vendor folder and is never on a command line.
+- No long-lived store API key in CI. The publisher accounts and the kill-list signing key sit behind
+  a hardware security key with no third-party OAuth grants; private keys never enter the repository.
+  The access service's admin token lives in the vendor folder and is never on a command line. Since
+  15.0.0 the store upload is the maintainer's own tool (`helper/release/publish-store.mjs`): a
+  Desktop OAuth client in his own Google Cloud project, whose client file and refresh token sit in
+  the vendor folder on his Mac (mode 0600), never on a command line, in a log or in CI.
 - The bridge's signing identities (15.0.0) stay on the maintainer's own machines and out of every
   build service. The Developer ID Application and Developer ID Installer certificates, with their
   private keys, sit in the login keychain of the maintainer's Mac, and so do the notarization
   credentials, stored there as a `notarytool` keychain profile that the release script names by its
   profile name only. The Windows signatures come from an Azure Artifact Signing account and
-  certificate profile reached through the maintainer's own Entra sign-in; there is no key file, and
-  the account names sit in the gitignored `helper/release/windows/signing.json`. None of them is in
-  CI, which builds unsigned binaries for maintainers only. What the signatures say is that the
-  maintainer's identity signed these bytes; the sidecar beside each package records its SHA-256,
-  size, origins and the versions of the tools that built it, and that record is the maintainer's
-  own. It does not show that the signed bytes were built from a given commit: a build attestation
-  from a hosted builder (a signed statement naming the source commit, the build steps and the
-  output's digest) would add that later, with the signing itself still kept off the builder.
+  certificate profile reached through the maintainer's own Entra sign-in (`az login` on the Mac,
+  where `helper/release/windows/build-msi-mac.sh`, run by `release.sh`, signs the `.msi` with jsign
+  and an access token it passes through an environment variable, never a command line; on the
+  fallback Windows machine, `signtool` with the service's client); there is no key file. The names
+  of all of these, with the store item and the publisher ID, sit in `release.json` in the
+  maintainer's vendor folder on the Mac, and on the fallback route the Azure names in the gitignored
+  `helper/release/windows/signing.json`. None of them is in CI, which builds unsigned binaries for
+  maintainers only. What the signatures say is that the maintainer's identity signed these bytes;
+  the sidecar beside each package records its SHA-256, size, origins and the versions of the tools
+  that built it, and that record is the maintainer's own. It does not show that the signed bytes
+  were built from a given commit: a build attestation from a hosted builder (a signed statement
+  naming the source commit, the build steps and the output's digest) would add that later, with the
+  signing itself still kept off the builder.
 
 ## Incident record
 

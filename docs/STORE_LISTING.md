@@ -1,6 +1,6 @@
 # Store listing and compliance
 
-**12.0.0 (2026-10-02).** Superseded for 12.0.0 by `store/LISTING.md`, `store/PASTE.md`, `store/SUBMISSION.md` and `store/TEST_BEFORE_UPLOAD.md`, which add the `nativeMessaging` permission, the helper inside the package and the Authentication information data type. Kept for its history.
+**12.0.0 (2026-10-02).** Superseded for 12.0.0 by `store/LISTING.md`, `store/PASTE.md`, `store/SUBMISSION.md` and `store/TEST_BEFORE_UPLOAD.md`, which add the `nativeMessaging` permission, the helper inside the package and the Authentication information data type. Kept for its history. **15.0.0 (2026-10-04).** The same four files are current for 15.0.0, whose package also carries the helper's two signed installers for Windows and macOS (below, "One store, one listing").
 
 What the Chrome Web Store will be told, in the words it will be told it, and the checklist that has
 to be green before submission. Sources: the report's "Extension architecture and permission
@@ -16,10 +16,13 @@ OpenSpineConsortium.
 One store, one listing (decided 2026-09-30 for 8.0.0). Beethoven is offered only as a **Private**
 item on the Chrome Web Store, visible to the trusted testers the maintainer names: a Google Group he
 keeps with his personal Google account, to which he adds the Google account of each student he
-approves for Beethoven. There is no Edge Add-ons, Firefox Add-ons or Safari edition, no signed file
-and no download from the website. The code still builds for Firefox (`npm run build`), because
-nothing in it depends on the browser; nothing submits that build. Earlier plans for the other stores
-are in the history of this file (7.0.0 and before).
+approves for Beethoven. There is no Edge Add-ons, Firefox Add-ons or Safari edition and no download
+from the website or anywhere else. Since 15.0.0 the only signed files offered are the helper's two
+installers, `beethoven-bridge-windows.msi` and `beethoven-bridge-mac.pkg`, which travel inside the
+package, are offered by the extension's own page, and are never put on the website
+(`store/LISTING.md`); up to 14.0.0 there were none. The code still builds for Firefox (`npm run
+build`), because nothing in it depends on the browser; nothing submits that build. Earlier plans
+for the other stores are in the history of this file (7.0.0 and before).
 
 ## Single-purpose statement
 

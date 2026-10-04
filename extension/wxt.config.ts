@@ -62,7 +62,7 @@ export default defineConfig({
       author: 'OpenSpineConsortium',
       homepage_url: 'https://openspineconsortium.com/beethoven/',
       // nativeMessaging on the Chromium builds only: the helper's installers register it for Chrome and
-      // Edge (and Chromium and Brave), never for Firefox or Safari, so those builds would carry the
+      // Edge (and Chromium on macOS and Linux), never for Firefox or Safari, so those builds would carry the
       // permission's install warning for a host they can never reach (they take the GlobalProtect way)
       permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['nativeMessaging', 'sidePanel'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),

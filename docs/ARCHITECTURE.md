@@ -4,6 +4,8 @@ Public name Beethoven since 7.0.0; the repository is `OpenSpineConsortium/beetho
 
 **12.0.0 (2026-10-02).** This document describes the portal path as built up to 11.0.0, which 12.0.0 keeps as its fallback. 12.0.0 first tries a direct way: ssh to the login node with no VPN, through a helper that ships inside the extension, a sign-in sheet for the first password-and-code sign-in, and a key in the browser whose one line on the grid runs only framework 11's gate. For that, read `V12_CONTRACT.md` (the contract), `V12_STATUS.md` (where the build stands) and `guides/` (install, use, accounts, lab lead).
 
+**15.0.0 (2026-10-04).** On Windows and macOS the helper a student installs from a store build is the bridge's compiled edition (`helper/src/rust`) in a signed, per-user installer that travels inside the package, `beethoven-bridge-windows.msi` (Authenticode through Azure Artifact Signing) and `beethoven-bridge-mac.pkg` (Developer ID, notarized), offered only to the store item whose identifier they name; any other copy, and Linux, keep the script zips. Both are built on the maintainer's own Mac by one command, `bash helper/release/release.sh`, with a Windows machine as the fallback for the `.msi`. For that, read `V12_CONTRACT.md` ("Signed installers (15.0.0)"), `../helper/README.md` and `../helper/release/README.md` (the runbook).
+
 Distilled from the research report's "Build specification for the week of 28 September 2026"
 (`RESEARCH_REPORT.md`). Where this document and the report differ, the report governs; where the
 report is silent, the fact is marked not yet measured. Written for the engineers building the two
@@ -384,7 +386,7 @@ the terminal's text and stored nowhere durable. It opens an `AUTH-URL` only when
 `platform.claude.com` or a subdomain of it, the Console's sign-in, which bills API usage
 (`isClaudeAuthUrl`; no API key anywhere, greg 2026-10-04: Beethoven signs in only with a Claude
 subscription); any other address is reported as refused, not opened, and the sitting continues so the
-student can read what happened. From the release after 14.0.0 the connect sitting instead closes on a
+student can read what happened. From 15.0.0 the connect sitting instead closes on a
 refused address, since no code can come, and the panel says that Beethoven signs in only with a Claude
 subscription, with *Sign in again*. A redrawn `AUTH-URL` line is not a second page. It sends the code
 as keystrokes on the port (the pasted line, then Enter) after the framework's paste line, counts the

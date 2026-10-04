@@ -1,15 +1,16 @@
 # Paste sheet: Beethoven 15.0.0 on the Chrome Web Store
 
 Every field of the dashboard, in the order it asks for them, with the text to paste (in a block:
-copy all of it) or the file to upload. Paths are from the repository root,
-`C:\Users\grego\OneDrive\Desktop\ashley-bridge`. The texts and the reasons behind them are in
-`LISTING.md`; registration, the testers' group and the review are in `SUBMISSION.md`. Written
-2026-09-30 for 9.0.0, brought up to date for 10.0.0 on 2026-10-01, rewritten on 2026-10-02 for
-12.0.0 (11.0.0 was built and never submitted; its changes are carried here too: the welcome page, no
-`activeTab`, the window-wide panel), and brought up to date on 2026-10-04 for 15.0.0. 12.0.0 added
-the `nativeMessaging` permission, the helper's installers inside the package, and the Authentication
-information data type. 15.0.0 adds the signed installers of the helper for Windows and macOS, with a
-compiled program inside, beside the script zips; no permission and no data type.
+copy all of it) or the file to upload. Paths are from the repository root of the checkout on the Mac
+that makes the release (`SUBMISSION.md`, section 0, item 1), where the package and the kit are. The
+texts and the reasons behind them are in `LISTING.md`; registration, the testers' group and the
+review are in `SUBMISSION.md`. Written 2026-09-30 for 9.0.0, brought up to date for 10.0.0 on
+2026-10-01, rewritten on 2026-10-02 for 12.0.0 (11.0.0 was built and never submitted; its changes
+are carried here too: the welcome page, no `activeTab`, the window-wide panel), and brought up to
+date on 2026-10-04 for 15.0.0. 12.0.0 added the `nativeMessaging` permission, the helper's
+installers inside the package, and the Authentication information data type. 15.0.0 adds the signed
+installers of the helper for Windows and macOS, with a compiled program inside, beside the script
+zips; no permission and no data type.
 
 **Everything in one folder.** `release/15.0.0/store-kit/` (also zipped, as
 `release/15.0.0/store-kit-15.0.0.zip`) holds a copy of every file this sheet names, with the number
@@ -19,7 +20,10 @@ the package is `00`, and the Test instructions tab (`12`, after Distribution) ha
 and one for the fuller reply text. The kit was assembled for 12.0.0 on 2026-10-02 with that release
 (`release/12.0.0/README.md`); for 15.0.0 it is to be assembled again, with the 15.0.0 package as
 `00` and the texts of this sheet as they are now. Its screenshots are still 9.0.0's until field 7's
-captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which).
+captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which). From 15.0.0 the `00`
+zip, and the kit's own zip that holds it, name the store item and carry the signed installers, so
+`.gitignore` keeps both out of the repository like the record's zip, and the whole kit stays on the
+Mac (`helper/release/README.md`, "What never enters the repository or CI").
 
 | File in the kit | Field | Copy of |
 |---|---|---|
@@ -40,16 +44,18 @@ captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which).
 
 **Package first.** Upload `release/15.0.0/beethoven-15.0.0-chrome.zip` (the same bytes as the kit's
 `00-beethoven-15.0.0-chrome.zip`; check it against `release/15.0.0/SHA256SUMS.txt`, because a later
-`npm run build` rewrites the copy in `extension/.output/`): under **New item** for a new item, or
-under the old draft's **Package** tab. The name (Beethoven) and the summary (the 128-character
-sentence in `LISTING.md`) come from the package and are not typed. Before uploading, `unzip -l` on
-it must list `bridge/beethoven-bridge-windows.msi`, `bridge/beethoven-bridge-mac.pkg`,
-`bridge/beethoven-bridge-windows.zip`, `bridge/beethoven-bridge-mac.zip`,
-`bridge/beethoven-bridge-linux.zip` and `bridge/manifest.json`, and the two signed entries in
-`bridge/manifest.json` must name `chrome-extension://<the item's ID>/` and no other origin
-(`SUBMISSION.md`, section 1, item 4: the signed installers are built for the item's ID, so a new
-item is created first). Those files are what the extension offers the student, and the store reviews
-them with the rest of the package.
+`npm run build` rewrites the copy in `extension/.output/`): under the draft's **Package** tab, once
+the item exists (`SUBMISSION.md`, section 1, item 4), or with the upload command that `bash
+helper/release/release.sh --no-upload` printed, without its `--publish`. For an update of a live
+item, `release.sh` without `--no-upload` has already uploaded and submitted it. The name (Beethoven)
+and the summary (the 128-character sentence in `LISTING.md`) come from the package and are not
+typed. Before uploading, `unzip -l` on it must list `bridge/beethoven-bridge-windows.msi`,
+`bridge/beethoven-bridge-mac.pkg`, `bridge/beethoven-bridge-windows.zip`,
+`bridge/beethoven-bridge-mac.zip`, `bridge/beethoven-bridge-linux.zip` and `bridge/manifest.json`,
+and the two signed entries in `bridge/manifest.json` must name `chrome-extension://<the item's ID>/`
+and no other origin (`SUBMISSION.md`, section 1, item 4: the signed installers are built for the
+item's ID, so a new item is created first). Those files are what the extension offers the student,
+and the store reviews them with the rest of the package.
 
 **Check the image files before you upload them**, from inside the store kit folder. The line prints
 each PNG with its size and colour mode. The store icon is 128x128 `RGBA` (its padding is transparent).

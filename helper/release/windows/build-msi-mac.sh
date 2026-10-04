@@ -4,7 +4,8 @@
 # Rust cross-builds the exe with the mingw-w64 linker, msitools' wixl builds the MSI from bridge.wxs
 # (the package Package.wxs describes, in the WiX v3 schema wixl reads), and jsign signs both files
 # through Azure Artifact Signing (formerly Trusted Signing; jsign still calls its store type
-# TRUSTEDSIGNING). build-msi.ps1 remains the route on a Windows machine; both leave the same two files.
+# TRUSTEDSIGNING). release.sh runs it; build-msi.ps1 on a Windows machine is the fallback, and both
+# leave the same two files.
 #
 # Nothing here runs in CI, and nothing here is a secret. The three Azure names are the account's
 # endpoint host, the account and its certificate profile, kept in the maintainer's vendor folder and

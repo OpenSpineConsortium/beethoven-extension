@@ -105,10 +105,12 @@ build streams and the four reviews):
 - The package is `release/15.0.0/beethoven-15.0.0-chrome.zip`, a copy of
   `extension/.output/beethoven-15.0.0-chrome.zip` (`npm run zip`, after `node helper/build.mjs
   --store-id <the item's ID>` has put the signed installers into `extension/public/bridge/`; the
-  Firefox zip the same command writes is not submitted anywhere). Besides the fonts of 9.0.0 it
-  holds `bridge/`: `beethoven-bridge-windows.msi` and `beethoven-bridge-mac.pkg` (the signed
-  installers with the compiled helper inside, built on the maintainer's own Windows and Mac machines
-  from `helper/src/rust`); `beethoven-bridge-windows.zip`, `beethoven-bridge-mac.zip` and
+  Firefox zip the same command writes is not submitted anywhere). `bash helper/release/release.sh`
+  on the maintainer's Mac runs those steps and records the copy (`SUBMISSION.md`, section 0, item
+  1). Besides the fonts of 9.0.0 it holds `bridge/`: `beethoven-bridge-windows.msi` and
+  `beethoven-bridge-mac.pkg` (the signed installers with the compiled helper inside, both built from
+  `helper/src/rust` and signed on the maintainer's own Mac, with a Windows machine as the fallback
+  for the `.msi`); `beethoven-bridge-windows.zip`, `beethoven-bridge-mac.zip` and
   `beethoven-bridge-linux.zip` (the helper's scripts, installer, uninstaller and a README for each
   system, from `helper/src/`); and `bridge/manifest.json`, which names each file with its name, size
   and SHA-256 and the native host's name (`com.openspineconsortium.beethoven.bridge`), each zip with
