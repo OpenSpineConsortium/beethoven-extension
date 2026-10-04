@@ -133,6 +133,104 @@ the size and SHA-256, and `build.mjs` refuses a file that does not match them).
    them (it says so), and a plain `--check` names them until then. `git status` must show nothing
    under `extension/public/bridge/` before the commit.
 
+## Uploading to the Chrome Web Store
+
+`helper/release/publish-store.mjs` uploads the Chrome zip to Beethoven's item on the Chrome Web Store
+and submits it for review, so a release ends with one command on the Mac (greg, 2026-10-04: "i want
+the chrome extension to automatically upload the newest version to the chrome marketplace when its
+ready"). It runs on the maintainer's own machine only: the zip it uploads carries the signed
+installers, which exist only there, and its Google sign-in lives in the vendor folder beside the
+signing keys. Node 22 and nothing else; it has no dependency.
+
+### Once, by hand
+
+1. In the Google Cloud console, make a project for this (any name) and enable the **Chrome Web Store
+   API** in it.
+2. Set up the project's OAuth consent screen with user type **External**, and either add the Google
+   account that owns the Beethoven item as a test user (the app stays in "Testing") or publish the
+   app. Google expires the refresh tokens of an app in "Testing" after seven days (see "Not yet
+   measured" below).
+3. Create an OAuth client ID of type **Desktop app** and download its JSON (`client_secret_....json`).
+   Not a "Web application" client: the tool refuses one.
+4. On the Mac, from the repository root:
+   `node helper/release/publish-store.mjs sign-in --client ~/Downloads/client_secret_....json`.
+   It copies the client's id and secret into `~/.beethoven-vendor/chrome-web-store/client.json`,
+   prints a Google address and opens it in the browser. Sign in with the account that owns the item
+   and allow access to the Chrome Web Store; the tab says "Signed in. You can close this tab." and the
+   refresh token is saved in `token.json` beside `client.json` (both mode 0600, their folder 0700).
+   Then delete the downloaded file: nothing in it is needed again.
+5. Note the two identifiers every upload takes: the **publisher ID** (developer dashboard,
+   Publisher > Settings) and the **item ID** (the 32 letters `a` to `p`, the same identifier as
+   `--store-id` above).
+
+The vendor folder is `BEETHOVEN_VENDOR_DIR`, else `ASHLEY_VENDOR_DIR`, else `~/.beethoven-vendor`, as
+for the signing keys; a vendor folder inside the repository checkout is refused. The sign-in is
+Google's loopback flow for installed apps: a listener on 127.0.0.1 at a free port, PKCE and a random
+state, five minutes at most, and an answer whose state is not this sign-in's is refused. The store's
+own documentation reaches a refresh token through the OAuth 2.0 Playground instead, which hands it to a
+third-party page; this tool never does. When Google stops accepting the saved sign-in, the next run
+says so in one sentence and exits 3; `node helper/release/publish-store.mjs sign-in` again (the saved
+client is reused, no `--client` needed) is one visit in the browser.
+
+### Every release
+
+Once the package is built with the signed installers in it (step 6 of "The order"), from the
+repository root:
+
+```
+node helper/release/publish-store.mjs upload --publisher <publisher id> --item <item id> \
+  --zip extension/.output/beethoven-<version>-chrome.zip --require-signed --publish
+```
+
+Before any request it checks the zip: it is a zip, its `manifest.json` is Manifest V3 with
+`extension/package.json`'s version, no `"key"` field and no localhost or 127.0.0.1 origin (a
+development build); with `--require-signed`, `bridge/beethoven-bridge-mac.pkg` and
+`bridge/beethoven-bridge-windows.msi` are in it, each listed once in `bridge/manifest.json` as kind
+`"binary"` with the size and SHA-256 of the file in the zip and with this item's origin among its
+`allowed_origins`. A refusal is one sentence and exit 2, and nothing is sent. Then it prints the zip's
+SHA-256 (the same as the release record's, step 7), renews the access token, uploads, prints the
+answer, and with `--publish` submits the item and prints that answer.
+
+Every upload is reviewed by Google. `--publish` submits it for review, and the new version goes out to
+the item's testers when the review passes. The tool sends no listing setting with the submission. Two more commands, with the same `--publisher` and
+`--item`: `status` prints where the item stands, and `publish` alone submits an item already
+uploaded (after an upload without `--publish`, or a submission that failed).
+
+| Exit | Meaning |
+|---|---|
+| 0 | every request answered with HTTP 2xx |
+| 1 | a request failed, was cut off, or answered 2xx with a state that reads as a failure |
+| 2 | refused before any request: the arguments, the zip, the vendor folder, its file modes, or a test base other than 127.0.0.1 |
+| 3 | a sign-in is needed: none is saved, or Google answered `invalid_grant` |
+
+### What never enters the repository or CI here
+
+The downloaded client file, `client.json` and `token.json` are on the maintainer's Mac only, the last
+two in the vendor folder. The command line takes paths and identifiers only: the client secret, the
+refresh token, the access token and the authorization code are never an argument, a log line or
+printed, and any of them an answer echoes is printed as `[redacted]`. Nothing of this is a GitHub
+secret, and CI never uploads: the zip it would upload exists only on the maintainer's machines.
+`extension/test/publishStore.test.ts` runs the tool against a stand-in for Google on 127.0.0.1, through
+`BEETHOVEN_CWS_TEST_BASE`, which the tool takes only as `http://127.0.0.1:<port>` so that a stray
+variable can never send the saved sign-in anywhere else.
+
+### Not yet measured here
+
+- The answers of upload, fetchStatus and publish. The store's API page does not describe their
+  bodies, so the tool reads none of their fields: it takes HTTP 2xx as success, prints each answer
+  whole after its top-level keys and every field named like a state or status, and stops when a 2xx
+  answer has a state-like field reading as a failure or a non-empty field named like an error. The
+  first real run's output is the measurement; record it here.
+- Whether a refresh token of this unverified personal app lasts past seven days, in "Testing" or
+  published.
+- The whole flow against the real store: the consent screen, the upload sent as the page's `curl`
+  example sends it (the zip as the body, no content type), the submission sent with no body, whether
+  it keeps the item Private to its trusted testers as the dashboard sets it, how the review treats a
+  package that carries the two installers, and how long the review takes.
+- The format of the publisher ID: the tool takes letters, digits, `.`, `_` and `-`, and refuses
+  anything else.
+- Opening the browser on Windows (`cmd /c start`); the printed address works on any system.
+
 ## The sidecar
 
 Each script writes, beside its package, `<name>.json`:
