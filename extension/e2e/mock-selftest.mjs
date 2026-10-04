@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
+import { claudeState, setClaudeState } from '../mock-ood/lib/common.mjs';
 import { createMockPortal } from '../mock-ood/server.mjs';
 
 register('./lib/ts-hooks.mjs', import.meta.url);
@@ -378,9 +379,15 @@ if (section('failures')) {
   console.log('\n# sign-in failures and modes (environment knobs per sitting)');
   const m = await mock({ sharedInstall: '/lab/shared/hpcworker/current', seedShared: true, claudeSignedIn: false, keepaliveS: 1 });
   const line = (login = 'always', name = 'worker') => C.commands.connect('/lab/shared/hpcworker/current', { name, site: 'mock', login, permissionMode: 'default', chain: true });
-  // 15.0.0's builder refuses --login fresh (framework 17 refuses the line: Beethoven never signs anyone out of Claude), so the
-  // cases below that need the sitting to start signed out type an older build's line by hand; the mock still honours it
+  // 15.0.0's builder never types --login fresh and framework 17 refuses the line before anything runs (Beethoven never signs
+  // anyone out of Claude), as does the stand-in; a build before 15.0.0 still types it for "Use another account", so one case
+  // below types that line by hand. The cases that need a sitting to start signed out write the state the student's own
+  // `claude auth logout` on a compute node leaves behind (the mock has no stand-in for the claude command itself).
   const olderFresh = (name) => line('always', name).replace("--login 'always'", "--login 'fresh'");
+  const signedOut = async (name) => {
+    await setClaudeState({ loggedIn: false, email: '', subscriptionType: '' }, m.home);
+    return line('always', name);
+  };
   const withEnv = async (vars, fn) => {
     const old = Object.fromEntries(Object.keys(vars).map((k) => [k, process.env[k]]));
     Object.assign(process.env, vars);
@@ -402,16 +409,19 @@ if (section('failures')) {
   };
   let r = await withEnv({ MOCK_CODE_REJECT: '1' }, () => connectTranscript(m, line('always', 'a1'), { onEvent: paste(['FIRST1234567', 'SECOND123456']) }));
   check('MOCK_CODE_REJECT=1: "that code was not accepted; paste it again", then the next code signs in', r.events.some((e) => e.kind === 'code-rejected') && steps(r.events).some((s) => s.step === 'signed-in'), r.events.map((e) => e.kind).join(' '));
-  r = await withEnv({ MOCK_PLAN: 'free' }, () => connectTranscript(m, olderFresh('a2'), { onEvent: paste(['THIRD1234567']) }));
-  const fr = steps(r.events).find((s) => s.step === 'signed-in');
-  check('an older build\'s --login fresh: the mock signs out first and asks again; MOCK_PLAN=free says "free" (the panel refuses it)', fr?.plan === 'free' && r.events.some((e) => e.kind === 'auth-url') && !C.planAllowsRemoteControl(fr.plan), JSON.stringify(fr));
-  r = await withEnv({ MOCK_LOGIN_FAIL: '1' }, () => connectTranscript(m, olderFresh('a3'), { onEvent: paste(['FOURTH123456']) }));
+  r = await connectTranscript(m, olderFresh('a2'));
   let f = steps(r.events).pop();
+  check("an older build's --login fresh (Use another account) is refused before anything runs: failed usage with framework 17's sentence, no sign-in link, still signed in", steps(r.events).length === 1 && f?.step === 'failed' && f.code === 'usage' && f.detail === '--login fresh is no longer offered: Beethoven never signs anyone out of Claude; to use another account, sign out of Claude Code yourself on a compute node, then sign in again' && !r.events.some((e) => e.kind === 'auth-url') && claudeState(m.home).loggedIn === true, JSON.stringify(f));
+  r = await withEnv({ MOCK_PLAN: 'free' }, async () => connectTranscript(m, await signedOut('a2'), { onEvent: paste(['THIRD1234567']) }));
+  const fr = steps(r.events).find((s) => s.step === 'signed-in');
+  check('signed out (the student\'s own sign-out on a compute node), the sitting asks again; MOCK_PLAN=free says "free" (the panel refuses it)', fr?.plan === 'free' && r.events.some((e) => e.kind === 'auth-url') && !C.planAllowsRemoteControl(fr.plan), JSON.stringify(fr));
+  r = await withEnv({ MOCK_LOGIN_FAIL: '1' }, async () => connectTranscript(m, await signedOut('a3'), { onEvent: paste(['FOURTH123456']) }));
+  f = steps(r.events).pop();
   check('MOCK_LOGIN_FAIL=1: HPCW-LOGIN-FAILED, then HPCW-STEP failed signin-code', f?.step === 'failed' && f.code === 'signin-code' && r.events.some((e) => e.kind === 'login-failed'), JSON.stringify(f));
-  r = await withEnv({ MOCK_SIGNIN_WAIT_S: '5', MOCK_ALLOC_WAIT_S: '3' }, () => connectTranscript(m, olderFresh('a4')));
+  r = await withEnv({ MOCK_SIGNIN_WAIT_S: '5', MOCK_ALLOC_WAIT_S: '3' }, () => connectTranscript(m, line('always', 'a4')));
   f = steps(r.events).pop();
   check('no computer for the sign-in within the budget: failed signin-node, with keepalives meanwhile', f?.code === 'signin-node' && r.events.filter((e) => e.kind === 'keepalive').length >= 2, `${JSON.stringify(f)} keepalives ${r.events.filter((e) => e.kind === 'keepalive').length}`);
-  r = await withEnv({ MOCK_CODE_WAIT_S: '3' }, () => connectTranscript(m, olderFresh('a5')));
+  r = await withEnv({ MOCK_CODE_WAIT_S: '3' }, async () => connectTranscript(m, await signedOut('a5')));
   f = steps(r.events).pop();
   check('no code within the budget: failed signin-timeout', f?.code === 'signin-timeout', JSON.stringify(f));
   r = await withEnv({ MOCK_SBATCH_FAIL: '1' }, () => connectTranscript(m, line('never', 'a6')));

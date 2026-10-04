@@ -4,7 +4,7 @@
 // the same field names. It submits nothing to a real scheduler; the job table (lib/jobs.mjs) and the
 // job simulator (lib/jobsim.mjs, driven by the mock portal's clock) play the cluster.
 //
-//   connect [--name N] [--profile SITE] [--consent ID] [--login auto|always|fresh|never]
+//   connect [--name N] [--profile SITE] [--consent ID] [--login auto|always|never]
 //           [--permission-mode default|acceptEdits|plan] [--no-chain]          (contract section 5)
 //   start  --name N [--permission-mode M] [--no-chain]   worker start, framework 10 (the queued file)
 //   status --name N [--json] [--details]                 worker status (section 6)
@@ -323,7 +323,10 @@ async function connect(args) {
   if (f.profile !== undefined && !/^[a-z0-9-]{1,32}$/.test(f.profile)) return usage('the site profile name is lower-case letters, digits or -');
   if (f.consent !== undefined && !/^[0-9a-f]{32}$/.test(f.consent)) return usage("--consent needs this installation's 32-character id");
   const login = f.login ?? 'auto';
-  if (!['auto', 'always', 'fresh', 'never'].includes(login)) return usage('--login is auto, always, fresh or never');
+  // framework 17: a build before 15.0.0 still types `fresh` for "Use another account"; it is refused before anything runs,
+  // in the framework's own words, and nothing here ever signs the account out of Claude
+  if (login === 'fresh') return usage('--login fresh is no longer offered: Beethoven never signs anyone out of Claude; to use another account, sign out of Claude Code yourself on a compute node, then sign in again');
+  if (!['auto', 'always', 'never'].includes(login)) return usage('--login must be auto, always or never');
   let profile = profileNow();
   const mode = f['permission-mode'] ?? profile?.worker_defaults?.permission_mode ?? 'default';
   if (!['default', 'acceptEdits', 'plan'].includes(mode)) return usage('--permission-mode is default, acceptEdits or plan');
@@ -409,11 +412,10 @@ async function sitting(login, keepMs, t0) {
   }
   await waitAlive(allocWait, keepMs);
   say('HPCW-LOGIN: on node02; checking whether you are signed in already');
-  if (login === 'fresh') await setClaudeState({ loggedIn: false, email: '', subscriptionType: '' });
   const email = env('MOCK_EMAIL', `${user()}@wayne.edu`);
   const plan = env('MOCK_PLAN', 'max');
   const already = claudeState();
-  if (login !== 'fresh' && already.loggedIn) {
+  if (already.loggedIn) {
     say(`SIGNED-IN ${already.email || email} ${already.subscriptionType || plan}`);
     return { ok: true, email: already.email || email, plan: already.subscriptionType || plan };
   }
