@@ -7,11 +7,19 @@ can. The bridge carries bytes and nothing else: the ssh session inside them is m
 checked by Beethoven itself (the host key is pinned there), so the bridge never sees a password, a
 code, a key or a command, and it could not read them if it tried.
 
-The bridge ships **inside the extension package** (`extension/public/bridge/`), one zip per
-operating system, so nothing is downloaded from the website. An extension cannot run a program it
-contains, so the student saves the zip from a Beethoven page and runs its installer once. The hosts
-are scripts in languages each system already has, so there is nothing to compile, sign or
-notarize:
+The bridge ships **inside the extension package** (`extension/public/bridge/`), so nothing is
+downloaded from the website. An extension cannot run a program it contains, so the student saves
+the file from a Beethoven page and runs its installer once. The same host exists in four editions,
+all protocol 1: three script hosts in languages each system already has, and the binary edition
+(`src/rust/`, Rust, `kind: "binary"`, `runtime: "rust"`). On a store build Windows and macOS
+students get the binary edition as a signed installer; Linux, and a development build on any
+system, get the script zips.
+
+Why the bridge is a native messaging host (the scripts, and since 15.0.0 the signed binary) and not a
+relay, a loopback daemon, an Isolated Web App or the portal, checked against Greg's transport
+analysis of 2026-10-04: `docs/BRIDGE_TRANSPORT.md`.
+
+The script hosts (the three zips, always in the package):
 
 | System  | Host Chrome starts                                    | Installer          | Installs to                                   |
 |---------|-------------------------------------------------------|--------------------|-----------------------------------------------|
@@ -19,14 +27,38 @@ notarize:
 | macOS   | `bridge.pl` run by `/usr/bin/perl`                    | `install.command`  | `~/Library/Application Support/Beethoven/bridge`, manifest in `~/Library/Application Support/Google/Chrome/NativeMessagingHosts` (and Edge, Chromium when installed) |
 | Linux   | `bridge` (a two-line launcher) running `bridge.pl` with perl, or `bridge.py` with python3 where perl is missing | `install.sh` | `~/.local/share/beethoven/bridge`, manifest in `~/.config/google-chrome/NativeMessagingHosts` (and chromium, microsoft-edge when present) |
 
-None of them needs administrator rights. Every installer says in one sentence what it will do and
-waits for Enter or Return before doing it, then says in one sentence how it went, after starting
-the installed bridge once and checking that it answers. Each has an uninstaller that removes
-exactly what it installed, by name. Apple said in the macOS Catalina 10.15 release notes (2019)
-that scripting runtimes such as Perl are included "for compatibility with legacy software" and
-that future versions of macOS might not include them by default; `/usr/bin/perl` has shipped with
-every release since, but if it ever goes, the Mac installer says so and Beethoven uses the VPN
-route. A compiled variant is the answer then (see the end of this file).
+The signed installers (the binary edition; in the package of a store build only):
+
+| System  | Package                        | Signed                                                    | Installs to                                   |
+|---------|--------------------------------|-----------------------------------------------------------|-----------------------------------------------|
+| Windows | `beethoven-bridge-windows.msi`, a per-user MSI (built with msitools' `wixl` from `bridge.wxs` on the Mac, or with WiX v5 from `Package.wxs` on a Windows machine; per user), x64 | Authenticode, the executable and then the MSI, through Azure Artifact Signing (formerly Trusted Signing) | `%LOCALAPPDATA%\Beethoven\bridge\` (`beethoven-bridge.exe`, the host manifest whose `path` is the relative `beethoven-bridge.exe`, `README.txt`); the default value of the Chrome and Edge `NativeMessagingHosts` keys under `HKCU`. Uninstall: Settings > Apps > "Beethoven bridge" > Uninstall |
+| macOS   | `beethoven-bridge-mac.pkg`, an installer package for the current user's home only (`enable_currentUserHome="true"`, so no administrator password) | the universal binary (aarch64 and x86_64 joined with `lipo`) with "Developer ID Application", the hardened runtime and a timestamp; the package with "Developer ID Installer", notarized and stapled | `~/Library/Application Support/Beethoven/bridge/` (`beethoven-bridge`, `uninstall.command`, `README.txt`, `allowed_origins.json`); a postinstall writes the host manifest for Chrome, and for Edge and Chromium when their folders exist, with the absolute path under the home, and deletes nothing |
+
+How they come to be: the scripts under `helper/release/` build, sign and package the binary edition
+on the maintainer's own Mac, in one command, `bash helper/release/release.sh` (the `.msi`
+cross-built and signed through Azure Artifact Signing there, not yet measured), with `build-msi.ps1`
+on a Windows machine as the fallback for the `.msi`, each with `--store-id <id>`, which bakes
+`allowed_origins = ["chrome-extension://<id>/"]` into the package. No identity, certificate, token,
+key file or account secret enters the repository or CI; CI's rust lane builds unsigned binaries for
+maintainers only. Each package lands in `helper/signed/` (gitignored) beside a sidecar `<name>.json`
+(name, os, kind, helper, protocol, size, sha256, allowed_origins, signed, built_at, tools). `node
+helper/build.mjs --store-id <id>`, the release build, verifies every sidecar against the file and against `helper/VERSION`, copies the
+package into `extension/public/bridge/` unchanged and lists it in `manifest.json` after the script
+zips: `{"os","kind":"binary","name","size","sha256","allowed_origins":[...],"signed"}`, with no
+`open`, since the file itself is the installer. The picker's rule in the extension: the binary is
+offered only when its origins name the running extension (`chrome.runtime.id`), else the script zip;
+so a development build, whose identifier the signed packages do not name, gets the zip as today.
+`helper/release/README.md` is the runbook.
+
+None of them needs administrator rights. Every script installer says in one sentence what it will
+do and waits for Enter or Return before doing it, then says in one sentence how it went, after
+starting the installed bridge once and checking that it answers. Each has an uninstaller that
+removes exactly what it installed, by name (the MSI's is Windows' own Settings > Apps). Apple said
+in the macOS Catalina 10.15 release notes (2019) that scripting runtimes such as Perl are included
+"for compatibility with legacy software" and that future versions of macOS might not include them
+by default; `/usr/bin/perl` has shipped with every release since, but if it ever goes, the Mac
+script installer says so and Beethoven uses the VPN route. The binary edition is the answer then,
+and on a store build it already is what Mac and Windows students get.
 
 ## The wire contract (protocol 1)
 
@@ -83,7 +115,9 @@ read it. Behaviour every host shares (the test suite checks each of these on eac
   once with `chrome.runtime.lastError` set ("Specified native messaging host not found."); if it is,
   `hello` answers in about 2 s on Windows (PowerShell starts slowly) and well under a second
   elsewhere. Compare `hello.helper` with `helper` in `extension/public/bridge/manifest.json` to
-  offer a reinstall when the installed bridge is older.
+  offer a reinstall when the installed bridge is older; Settings then says "Installed · version
+  <v>. This Beethoven brings version <n>: download and open it once more." (LICENSE section 17
+  promises this).
 
 ## Adding an allowed host
 
@@ -108,15 +142,37 @@ entry, edit `BUILTIN_ALLOW` / `@BUILTIN_ALLOW` / `$BuiltinAllow` in the three ho
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH     # Node 22, nothing to install
-node helper/build.mjs                             # writes extension/public/bridge/
+node helper/build.mjs                             # writes extension/public/bridge/ (the tracked placeholder build; helper/signed/ is left out)
 node helper/build.mjs --check                     # fails if the files there differ from a fresh build
+node helper/build.mjs --check --no-signed         # the same, saying so: what CI runs against the tracked files
+node helper/build.mjs --store-id <id>             # a release build: the store identifier in the zips, helper/signed/'s packages merged
+node helper/build.mjs --signed DIR                # merge the signed packages in DIR
 ```
 
-The build checks that every host and installer carries the version in `helper/VERSION`, that the
-sources are LF-only printable ASCII, and writes reproducible zips (fixed timestamps, sorted entries,
-Unix modes so macOS keeps `install.command` executable, CRLF only for the Windows `.cmd`, `.ps1`
-and `.txt` files) and `manifest.json` (name, size and SHA-256 of each zip, the helper version, the
-protocol, the allowed origins and whether they are filled).
+The build checks that every script host and installer carries the version in `helper/VERSION`, that
+the script sources are LF-only printable ASCII (the Rust crate is cargo's to read, and answers for
+the banned word only), and writes reproducible zips (fixed timestamps, sorted entries, Unix modes so
+macOS keeps `install.command` executable, CRLF only for the Windows `.cmd`, `.ps1` and `.txt`
+files) and `manifest.json`: `name`, `host_name`, `helper`, `protocol`, `allowed_origins` and
+`origins_filled`, then `files`, each with `os`, `kind`, `name`, `size` and `sha256`; a script entry
+adds `open` (the installer inside the zip), a binary entry adds `allowed_origins` and `signed`
+(`developer-id-notarized` or `authenticode`) and has no `open`. Script entries come first, in the
+order above; signed entries follow, by system.
+
+A signed package enters only on its sidecar's word checked against the facts. The build refuses,
+naming the sidecar and the reason in one sentence: a `helper` other than `helper/VERSION`, a
+`protocol` other than 1, a `size` or `sha256` that is not the file's, a `name` outside letters,
+digits, `.`, `_` and `-` or not ending in `.pkg` (mac) or `.msi` (windows), origins that are empty
+or not each `chrome-extension://<32 letters a to p>/` or (with `--store-id`) not that identifier, a
+`signed` that is not one of the two values or not the one for that system, a second package for the
+same system, and a package in the folder with no sidecar beside it. With no `helper/signed/`, or
+with `--no-signed`, the output is byte for byte the three zips and their manifest, so `--check
+--no-signed` in CI proves the tracked files are a fresh build of `helper/src`. A `.pkg` or `.msi`
+left in the output folder by an earlier release build, which this build would not write, is removed
+(the folder is the build's own, and an installer the manifest does not list must never ship by
+accident); `--check` names it instead. One `NOTE: signed installer ...` line is printed per package
+taken: name, system, the first twelve hex digits of the SHA-256 and the number of origins.
+`extension/test/bridgeBuild.test.ts` runs all of this with fabricated packages.
 
 ### The extension identifier: written in at download time, no release step
 
@@ -139,6 +195,13 @@ Building a zip by hand for another purpose still works: `node helper/build.mjs -
 names a published extension; `--unpacked-id <id>` (a development build) is refused unless `--dev` is
 given as well, and such a build must not be shipped. `helper/extension-ids.json`
 (`{"store": "<id>", "unpacked": ["<id>"]}`) is read the same way.
+
+The signed installers are the exception to "written in at download time": a signed file cannot be
+changed after signing, so their origins are baked when the release scripts build them, from the
+`--store-id` the maintainer reads in the Chrome Web Store developer dashboard, and `build.mjs
+--store-id` refuses a sidecar whose origins are any other. The extension page compares the entry's
+origins with `chrome.runtime.id` before offering the file; a Beethoven they do not name (a
+development build) is offered the script zip instead, exactly as before.
 
 ## Tests
 
@@ -194,70 +257,63 @@ saved zip came from `blob:chrome-extension://<id>/`, was the packaged zip with o
 
 Not tested here: a real Mac (Gatekeeper's prompts, `xattr`, the bash 3.2 that macOS ships,
 `/usr/bin/perl` there), Edge, branded Chrome, Windows on ARM, and a computer where policy restricts
-PowerShell.
+PowerShell. The signed-package merge in `build.mjs` is covered by `extension/test/bridgeBuild.test.ts`
+(17 cases on fabricated `.pkg` and `.msi` files: the merge, every refusal, `--no-signed`, and the
+tracked build against the sources); the real packages are "Not yet measured" below.
 
 ## Known limits
 
-- Windows: a computer whose PowerShell is restricted by policy (an execution policy set by Group
-  Policy, Constrained Language Mode, AppLocker) cannot run the bridge; the installer's own check
-  notices and says to use GlobalProtect. Antivirus may take a scripted relay for something worse; on
-  the test machine Microsoft Defender, with real-time protection on, did not object.
-- Windows: PowerShell takes about 2 s to start and about 2.3 s to exit; the bridge moves 2 to 3 MiB/s,
-  far more than an ssh control session needs.
-- macOS: the zip is not signed, so the first open of `install.command` needs Control-click, Open
-  (on macOS 15 and later: System Settings, Privacy & Security, Open Anyway). The installer removes
-  `com.apple.quarantine` from the copies it makes, and says so before it does.
+- Windows (script zip): a computer whose PowerShell is restricted by policy (an execution policy
+  set by Group Policy, Constrained Language Mode, AppLocker) cannot run the script bridge; the
+  installer's own check notices and says to use GlobalProtect. Antivirus may take a scripted relay
+  for something worse; on the test machine Microsoft Defender, with real-time protection on, did not
+  object. The signed installer does not depend on PowerShell.
+- Windows (script zip): PowerShell takes about 2 s to start and about 2.3 s to exit; the bridge
+  moves 2 to 3 MiB/s, far more than an ssh control session needs.
+- macOS (script zip, a development build): the zip is not signed, so the first open of
+  `install.command` needs Control-click, Open (on macOS 15 and later: System Settings, Privacy &
+  Security, Open Anyway). The installer removes `com.apple.quarantine` from the copies it makes, and
+  says so before it does. A store build offers the signed, notarized package instead.
 - Linux: Chrome or Chromium installed as a Snap or Flatpak cannot start programs outside its
   sandbox, so the bridge does not work there.
 
-## A compiled variant later (optional)
+Not yet measured, each in those words until a real machine has shown it:
 
-Compiled binaries would remove the dependence on PowerShell and Perl but bring back signing and
-notarization. If they are ever added (a Go toolchain unpacked into a scratch folder is enough to
-build them), these are the commands; none of them has been run for this project.
+- Nothing of the bridge has run on a real Mac: not the script zip, not the binary edition, not the
+  installer package. Gatekeeper's behaviour and whether the current-user-home package installs with
+  no prompt are not yet measured.
+- The signed installers have not been built or opened anywhere: none of the release scripts has run
+  on a machine with the identities, and no `.pkg` or `.msi` of the bridge has been opened. Not yet
+  measured.
+- SmartScreen's reaction to a new publisher is not yet measured; a signature without reputation may
+  still show "Windows protected your PC" for a time, which the panel's words allow for.
+- The Edge and Chromium host manifests the Mac postinstall writes, and the Edge value on Windows,
+  have not been exercised by either browser. Not yet measured.
 
-```
-# Build (Go, static, no cgo)
-#   GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o beethoven-bridge.exe ./cmd/bridge
-#   GOOS=windows GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o beethoven-bridge-arm64.exe ./cmd/bridge
-#   GOOS=darwin  GOARCH=arm64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bridge-arm64 ./cmd/bridge
-#   GOOS=darwin  GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o bridge-amd64 ./cmd/bridge
-#   lipo -create -output beethoven-bridge bridge-arm64 bridge-amd64          # on a Mac
-#   GOOS=linux   GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o beethoven-bridge ./cmd/bridge
-#
-# Windows Authenticode (signtool from the Windows SDK; the certificate's key must sit on a hardware
-# token or in a cloud signing service, so for example with Azure Trusted Signing):
-#   signtool sign /v /fd SHA256 /tr http://timestamp.acs.microsoft.com /td SHA256 ^
-#     /dlib Azure.CodeSigning.Dlib.dll /dmdf metadata.json beethoven-bridge.exe
-#   signtool verify /pa /v beethoven-bridge.exe
-#
-# macOS Developer ID signing with the hardened runtime, then notarization (Apple Developer Program):
-#   codesign --force --options runtime --timestamp \
-#     --sign "Developer ID Application: <Name> (<TEAMID>)" beethoven-bridge
-#   ditto -c -k --keepParent beethoven-bridge beethoven-bridge-notarize.zip
-#   xcrun notarytool submit beethoven-bridge-notarize.zip --keychain-profile <profile> --wait
-#   (a bare binary cannot be stapled; to staple, ship it in a signed disk image, which needs no
-#    administrator rights to use:
-#    hdiutil create -volname "Beethoven bridge" -srcfolder payload -ov -format UDZO beethoven-bridge.dmg
-#    codesign --sign "Developer ID Application: <Name> (<TEAMID>)" --timestamp beethoven-bridge.dmg
-#    xcrun notarytool submit beethoven-bridge.dmg --keychain-profile <profile> --wait
-#    xcrun stapler staple beethoven-bridge.dmg)
-#   spctl --assess --type execute -vv beethoven-bridge
-```
+## The signed installers (`helper/release/`)
+
+The binary edition is what Mac and Windows students get on a store build, as
+`beethoven-bridge-mac.pkg` and `beethoven-bridge-windows.msi`. They are built, signed, notarized and
+packaged only on the maintainer's own machines: on his Mac by `helper/release/mac/build-pkg.sh` and
+`helper/release/windows/build-msi-mac.sh` (or, as the fallback for the MSI, on a Windows machine of
+his by `helper/release/windows/build-msi.ps1`), then merged into the package by `node
+helper/build.mjs --store-id <id>`; `bash helper/release/release.sh` runs the Mac route whole, with
+the checks, the zip, the release record and the store upload, in one command, with the names from
+`release.json` in the maintainer's vendor folder. `helper/release/README.md` is the runbook: the
+prerequisites per machine, the order, the sidecar, what never enters the repository or CI, and what
+is not yet measured.
 
 ## The binary edition (rust)
 
 `src/rust/` builds the same bridge as a single static-ish binary: protocol 1, the same 17 suite
 checks, `kind: "binary"`, `runtime: "rust"`, no dependencies beyond the Rust standard library.
-CI builds it for Linux, macOS and Windows and runs the suite against each build; the binaries land
-as run artifacts beside the extension's.
+CI builds it for Linux, macOS and Windows and runs the suite against each build; those binaries are
+unsigned on purpose, since signing identities never enter CI, and land as run artifacts for
+maintainers and collaborators, verified by checksum from the run that built them.
 
-It is not offered to students, for two honest reasons: the download picker prefers a script host
-while one is listed (`helperDownloadFor`), and an **unsigned** binary draws exactly the warnings
-the script hosts avoid — macOS quarantines it ("the developer cannot be verified") and Windows
-SmartScreen flags it, while the scripts run on the system's own perl and PowerShell with nothing
-unsigned executed from a download. Flipping that requires identities no repository may hold: an
-Apple Developer ID with notarization and a Windows code-signing certificate. With those in hand,
-sign and notarize the CI artifacts, add the binary to `extension/public/bridge/manifest.json`, and
-the picker's preference is the one line left to change. Until then the binary edition is for
-maintainers and collaborators, verified by checksum from the CI run that built it.
+Students get it on a store build, through the signed packages above: the same sources, built on
+the maintainer's machines, signed and (on the Mac) notarized, with the store extension's origin
+baked in. In the manifest such an entry is `kind: "binary"` with `signed` and `allowed_origins`;
+the hello of the installed bridge says `"kind":"binary","runtime":"rust"`. The picker offers it
+only to the Beethoven its origins name and falls back to the script zip for any other, so a
+development build never sees an installer that would refuse it, and Linux keeps the zip.

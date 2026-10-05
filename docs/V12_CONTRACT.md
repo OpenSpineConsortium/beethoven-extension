@@ -1,5 +1,8 @@
 # Beethoven 12.0.0 and framework 11: the contract
 
+The canonical copy of this contract lives in `OpenSpineConsortium/hpcworker`
+(`docs/V12_CONTRACT.md`); this copy and that one change together, in the same words.
+
 2026-10-02. What the extension, the helper and the grid tool agree on for the direct way (ssh to the
 login node with no VPN). The Open OnDemand path is 11.0.0's and is unchanged: `docs/V11_CONTRACT.md`.
 Section names here are the ones the code cites (`extension/src/core/*.ts`). Versions: extension
@@ -36,9 +39,15 @@ byte stream to `grid.wayne.edu:22` by the first bridge this browser has, in this
    that answers "not available".
 2. **relay**: a WebSocket to a relay the site profile names in `ssh_relay`. Wayne State names none,
    so it answers "not configured" and no ticket is ever asked for.
-3. **helper**: the native messaging host `com.openspineconsortium.beethoven.bridge`, a script that
-   ships inside the extension (`extension/public/bridge/`, built from `helper/`), installed once by
-   the student without administrator rights.
+3. **helper**: the native messaging host `com.openspineconsortium.beethoven.bridge`, which ships
+   inside the extension (`extension/public/bridge/`, built from `helper/`) and is installed once by
+   the student without administrator rights. What the host is depends on the system. On Windows and
+   macOS, from 15.0.0, the store item offers the binary edition (`helper/src/rust`: one program, the
+   Rust standard library and nothing else; `"kind":"binary"`, `"runtime":"rust"`) in a signed
+   installer (section "Signed installers (15.0.0)"). On Linux, and on every system for a build the
+   signed installers do not name, it is the script edition in a zip: Windows PowerShell 5.1 on
+   Windows (`"runtime":"powershell"`), `/usr/bin/perl` on macOS (`"perl"`), perl or else python3 on
+   Linux (`"perl"` or `"python"`); all `"kind":"script"`.
 
 If none is available, Beethoven offers the helper once and, under it, **Use GlobalProtect instead**:
 the 11.0.0 path. None of the bridges sees inside the ssh session.
@@ -54,7 +63,7 @@ browser at most 1 MiB (Chrome's cap, observed exact); data payloads at most 64 K
 | | `{"t":"open","id":"<id>","host":"grid.wayne.edu","port":22}` |
 | | `{"t":"data","id":"<id>","b64":"<base64>"}` |
 | | `{"t":"close","id":"<id>"}` |
-| helper to extension | `{"t":"hello","v":1,"helper":"1.0.0","os":"windows\|mac\|linux","kind":"script|binary","allow":["grid.wayne.edu:22"],"runtime":"powershell\|perl\|python"}` |
+| helper to extension | `{"t":"hello","v":1,"helper":"1.0.0","os":"windows\|mac\|linux","kind":"script\|binary","allow":["grid.wayne.edu:22"],"runtime":"powershell\|perl\|python\|rust"}` |
 | | `{"t":"opened","id":"<id>"}` |
 | | `{"t":"data","id":"<id>","b64":"..."}` |
 | | `{"t":"closed","id":"<id>","reason":"eof\|reset\|local"}` |
@@ -71,9 +80,70 @@ host not found." means not installed; any other Chrome error means broken.
 **Allowed origins.** Chrome starts the host only for the extensions its manifest names. The zips in
 the package carry a placeholder their installers refuse; the extension page that offers the download
 writes the extension's own `chrome-extension://<id>/` into a copy of the zip in memory
-(`core/bridgeZip.ts`) and saves that copy, so the store, Edge or a development build each get a helper
-made out to themselves. Where the copy cannot be made, the packaged zip is saved unchanged and its
-installer refuses with its own sentence.
+(`core/bridgeZip.ts`) and saves that copy, so the store, Edge or a development build each get a
+helper made out to themselves. Where the copy cannot be made, the packaged zip is saved unchanged
+and its installer refuses with its own sentence. The signed installers are never rewritten: they
+name the store item only, from the moment they are built (next section).
+
+## Signed installers (15.0.0)
+
+From 15.0.0 the package's `bridge/` holds two signed installers beside the three script zips, which
+stay as they were. They are built only on the maintainer's own machines (`helper/release/mac/`,
+`helper/release/windows/`), with the store item's identifier given as `--store-id <32 letters a-p>`
+and written into the installer as its `allowed_origins`, `["chrome-extension://<id>/"]`.
+
+- `beethoven-bridge-mac.pkg`: a universal binary (aarch64 and x86_64 joined with `lipo`), codesigned
+  with a Developer ID Application identity, the hardened runtime and a timestamp; the package signed
+  with a Developer ID Installer identity, notarized and stapled. It installs into the current user's
+  home only
+  (`<domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>`),
+  so no administrator password is asked. Payload, relative to the home:
+  `Library/Application Support/Beethoven/bridge/` with `beethoven-bridge`, `uninstall.command`,
+  `README.txt` and `allowed_origins.json` (a JSON array of one origin, as in the zips). Its
+  postinstall writes `com.openspineconsortium.beethoven.bridge.json` into
+  `Library/Application Support/Google/Chrome/NativeMessagingHosts/` always, and into the Microsoft
+  Edge and Chromium folders only when they exist, with `name`, `description`, an absolute `path` to
+  `beethoven-bridge` under the home, `"type":"stdio"` and `allowed_origins` read from
+  `allowed_origins.json` (refusing anything that does not match the origin pattern). It deletes
+  nothing.
+- `beethoven-bridge-windows.msi`: x64, `Scope="perUser"`, no administrator; built on the Mac
+  (`x86_64-pc-windows-gnu`, msitools' `wixl` from `bridge.wxs`) or, as the fallback, on a Windows
+  machine (`x86_64-pc-windows-msvc`, WiX v5 from `Package.wxs`), with the same files and registry
+  values either way. The exe and then the MSI are Authenticode-signed through Azure Artifact
+  Signing (SHA-256 digests, timestamped). Files in `%LOCALAPPDATA%\Beethoven\bridge\`:
+  `beethoven-bridge.exe`, `com.openspineconsortium.beethoven.bridge.json` (its `path` is the
+  relative `beethoven-bridge.exe`, which Chrome resolves beside the manifest on Windows) and
+  `README.txt`; the default value of
+  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge` and of
+  `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge` is
+  that manifest's full path. Removed from Settings, Apps, "Beethoven bridge", Uninstall.
+
+`bridge/manifest.json` lists each signed installer as one entry, with no `open` (the file itself is
+the installer):
+
+```
+{"os":"mac","kind":"binary","name":"beethoven-bridge-mac.pkg","size":<bytes>,"sha256":"<64 lower-case hex>","allowed_origins":["chrome-extension://<id>/"],"signed":"developer-id-notarized"}
+{"os":"windows","kind":"binary","name":"beethoven-bridge-windows.msi","size":<bytes>,"sha256":"<64 lower-case hex>","allowed_origins":["chrome-extension://<id>/"],"signed":"authenticode"}
+```
+
+The script entries are unchanged (`"kind":"script"`, an `open`, no `signed`). The signed installers
+are offered as they are and never rewritten at download time: the identifier is in them from the
+build, and a rewrite would break the signature. **The picker's rule:** a signed entry for this
+system is offered in place of the system's script zip only when its `allowed_origins` contains
+`chrome-extension://<chrome.runtime.id>/`; otherwise it is never offered, so a development build, or
+any copy that is not the store item, gets the script zip as before. Linux has no signed entry.
+
+`node helper/build.mjs` takes each package from `helper/signed/` (gitignored) with its sidecar
+`<name>.json`,
+`{"name","os","kind":"binary","helper","protocol":1,"size","sha256","allowed_origins","signed","built_at","tools"}`,
+and refuses (exit 1, naming the sidecar and the reason) one whose `helper` differs from
+`helper/VERSION`, whose `protocol` is not 1, whose size or SHA-256 differ from the file's, whose
+name does not match `^[A-Za-z0-9._-]+$` or does not end in `.pkg` for `mac` or `.msi` for `windows`,
+whose origins are empty or do not each match `^chrome-extension://[a-p]{32}/$` (or, with
+`--store-id`, are not exactly that one), or whose `signed` is not `developer-id-notarized` or
+`authenticode`. `--no-signed` ignores `helper/signed/`; without that folder the build is
+byte-identical to 14.0.0's. Nothing in this section has been built, signed or opened on a real Mac
+or Windows machine: not yet measured.
 
 ## The sign-in sheet
 

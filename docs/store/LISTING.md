@@ -1,13 +1,14 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 12.0.0, and the answers to
-its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 15.0.0, and the answers
+to its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 to 10.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven; a **Private** item whose
 trusted testers are the Google Group of approved students; one installation per approved account;
-the site's theme; an Anthropic address refused before any permission request), and rewritten on
-2026-10-02 for 12.0.0. 11.0.0 (2026-10-01) was built but never submitted, and its store documents
-were never brought up to date (`docs/V11_STATUS.md`, section 5), so this rewrite carries both:
+the site's theme; an Anthropic address refused before any permission request), rewritten on
+2026-10-02 for 12.0.0, and brought up to date on 2026-10-04 for 15.0.0 (13.0.0 and 14.0.0 left these
+texts as they were). 11.0.0 (2026-10-01) was built but never submitted, and its store documents were
+never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
 - **11.0.0**: a welcome page with one tick and "Agree and continue" replaces the setup page with its
   scroll gate and typed name; the panel is window-wide and opens from the toolbar button;
@@ -25,8 +26,20 @@ were never brought up to date (`docs/V11_STATUS.md`, section 5), so this rewrite
   used. New permission: `nativeMessaging`. New data type: authentication information. Agreement
   version 9, privacy statement version 10.
 
-There is no other store, no signed file and no download: the helper's installers are files inside
-the package, offered by the extension's own page.
+**15.0.0** changes the helper on Windows and macOS: there it is a small compiled program (Rust, with
+no code of anyone else's but its standard library and the runtime support code its compiler links
+in, listed in `THIRD_PARTY_NOTICES.md`; its source is `helper/src/rust`), in an installer
+signed by the maintainer that ships inside the package beside the script zips:
+`beethoven-bridge-windows.msi` (Authenticode, through Azure Artifact Signing) and
+`beethoven-bridge-mac.pkg` (Developer ID, notarized by Apple). Both install into the user's own
+account with no administrator rights, and both name the store item's ID, written into them when they
+are built; a copy of the extension with another ID is offered the script zip, as before. Linux keeps
+the script. No new permission and no new data type. Agreement version 10, privacy statement version
+11.
+
+There is no other store and no download: the helper's installers are files inside the package,
+offered by the extension's own page. The only signed files are two of those installers, the ones for
+Windows and macOS (since 15.0.0), and none of them is ever on the website.
 
 **`PASTE.md` beside this file is the paste sheet**: every dashboard field in the dashboard's order,
 with the text to paste or the file to upload. This file holds the texts and the reasons behind them;
@@ -90,13 +103,28 @@ build streams and the four reviews):
   `https://openspineconsortium.com/beethoven/support.html`, request page
   `https://openspineconsortium.com/beethoven/request.html`. None of them links the listing or offers
   a download.
-- The package is `release/12.0.0/beethoven-12.0.0-chrome.zip`, a copy of
-  `extension/.output/beethoven-12.0.0-chrome.zip` (`npm run zip`; the Firefox zip the same command
-  writes is not submitted anywhere). Besides the fonts of 9.0.0 it holds `bridge/`:
-  `beethoven-bridge-windows.zip`, `beethoven-bridge-mac.zip` and `beethoven-bridge-linux.zip` (the
-  helper's scripts, installer, uninstaller and a README for each system, from `helper/src/`) and
-  `bridge/manifest.json`, which names each file with its name, size, SHA-256, the installer to open
-  and the native host's name (`com.openspineconsortium.beethoven.bridge`). Each zip in the package carries `allowed_origins.json` with a placeholder its installer refuses; the extension page that offers the download writes the extension's own ID (`chrome-extension://<id>/`, from `chrome.runtime.id`) into a copy of that zip in memory and saves the copy (`extension/src/core/bridgeZip.ts`), so the helper is made out to whichever build saved it: the store item, or an unpacked test copy. Nothing is fetched; where the copy cannot be made, the packaged zip is saved unchanged and its installer refuses with its own sentence.
+- The package is `release/15.0.0/beethoven-15.0.0-chrome.zip`, a copy of
+  `extension/.output/beethoven-15.0.0-chrome.zip` (`npm run zip`, after `node helper/build.mjs
+  --store-id <the item's ID>` has put the signed installers into `extension/public/bridge/`; the
+  Firefox zip the same command writes is not submitted anywhere). `bash helper/release/release.sh`
+  on the maintainer's Mac runs those steps and records the copy (`SUBMISSION.md`, section 0, item
+  1). Besides the fonts of 9.0.0 it holds `bridge/`: `beethoven-bridge-windows.msi` and
+  `beethoven-bridge-mac.pkg` (the signed installers with the compiled helper inside, both built from
+  `helper/src/rust` and signed on the maintainer's own Mac, with a Windows machine as the fallback
+  for the `.msi`); `beethoven-bridge-windows.zip`, `beethoven-bridge-mac.zip` and
+  `beethoven-bridge-linux.zip` (the helper's scripts, installer, uninstaller and a README for each
+  system, from `helper/src/`); and `bridge/manifest.json`, which names each file with its name, size
+  and SHA-256 and the native host's name (`com.openspineconsortium.beethoven.bridge`), each zip with
+  the installer to open inside it, and each signed installer with the kind of its signature and the
+  one extension origin it names. The signed installers name the store item's ID from the moment they
+  are built and are offered unchanged, only to an extension whose own ID (`chrome.runtime.id`) is
+  that one: rewriting them would break their signatures. Each zip in the package carries
+  `allowed_origins.json` with a placeholder its installer refuses; the extension page that offers
+  the download writes the extension's own ID (`chrome-extension://<id>/`) into a copy of that zip in
+  memory and saves the copy (`extension/src/core/bridgeZip.ts`), so a zip's helper is made out to
+  whichever build saved it: the store item on Linux, an unpacked test copy on any system. Nothing is
+  fetched; where the copy cannot be made, the packaged zip is saved unchanged and its installer
+  refuses with its own sentence.
 - Beethoven runs Claude Code and is not an Anthropic product. The name carries no Anthropic mark;
   "Claude" and "Claude Code" appear in the texts only to say what it runs.
 - Publisher, until the LLC exists: Gregory Schwing, trading as OpenSpineConsortium. The product
@@ -115,9 +143,9 @@ Starts, watches and stops a Claude Code worker on your university's Open OnDeman
 ```
 
 Unchanged since 8.0.0 (`extension/wxt.config.ts` and `extension/package.json`;
-`extension/test/hygiene.test.ts` fails above 132). It stays true of 12.0.0: the cluster is still an
-Open OnDemand cluster, and the portal path is still there; the direct way is how it reaches the
-same cluster.
+`extension/test/hygiene.test.ts` fails above 132). It stays true of 12.0.0 and 15.0.0: the cluster
+is still an Open OnDemand cluster, and the portal path is still there; the direct way is how it
+reaches the same cluster.
 
 ## Detailed description (the one to paste; plain text; 1,650 characters; under Chrome's limit of 16,000)
 
@@ -125,7 +153,8 @@ Rewritten 2026-10-02 for 12.0.0 in the voice of 9.0.0's text, for a student who 
 seconds. Counted with Python as Unicode characters without a trailing newline: 1,650 (1,671 if the
 dashboard counts each of its 21 line breaks as two characters). ASCII only. Every sentence rests on
 the facts above: the data paragraph names what the approval check carries about the person and says
-where the password and code go.
+where the password and code go. Unchanged for 15.0.0: "a small helper that comes inside Beethoven",
+installed "with no administrator rights", is as true of the signed installers as of the scripts.
 
 ```
 Your grid. From claude.ai.
@@ -152,13 +181,14 @@ To check your approval, Beethoven sends our access service the account name the 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.
 ```
 
-## Reviewed description (reviewer-facing; plain text; 6,106 characters; not pasted into the dashboard)
+## Reviewed description (reviewer-facing; plain text; 6,197 characters; not pasted into the dashboard)
 
 Rewritten 2026-10-02 for 12.0.0 from 10.0.0's reviewed text, sentence by sentence against the facts
-above. If a reviewer asks what the extension does, never does or keeps, reply with it (with the
-reviewer recipe below and `SUBMISSION.md`, section 4). The detailed description above is condensed
-from it and narrowed to Wayne State (the only site profile with a shared copy and an ssh host), and
-makes no claim this one does not support.
+above, and on 2026-10-04 for 15.0.0 in one place: the helper's sentence in step 2 (on Windows and
+macOS a signed installer, on Linux a script). If a reviewer asks what the extension does, never does
+or keeps, reply with it (with the reviewer recipe below and `SUBMISSION.md`, section 4). The
+detailed description above is condensed from it and narrowed to Wayne State (the only site profile
+with a shared copy and an ssh host), and makes no claim this one does not support.
 
 ```
 Beethoven starts, watches and stops a Claude Code worker in your own account on your university's cluster, and hands you the link that shows that worker at claude.ai/code and in the Claude app (Anthropic's Remote Control feature).
@@ -171,7 +201,7 @@ WHAT YOU NEED
 
 HOW IT WORKS
 1. Accept the agreement on the welcome page that opens on install: one tick and "Agree and continue". The full text is one click away, and can be saved and printed.
-2. The direct way. If the small helper is not on your computer yet, the panel offers it ("One small download, once"): a short script inside Beethoven that you save and open once, with no administrator rights, and that carries Beethoven's encrypted connection to the cluster's ssh port and nowhere else. Then Beethoven's own sign-in sheet asks for your account name, password and Google Authenticator code, exactly as the cluster asks for them, and sends them only to the cluster, inside the encrypted session, after the cluster proved its identity. Beethoven keeps a key of its own in your browser and adds one restricted line to your cluster account, so later connections ask for nothing. Protecting that key with Windows Hello or Touch ID is optional and off unless you turn it on.
+2. The direct way. If the small helper is not on your computer yet, the panel offers it ("One small download, once"): it comes inside Beethoven, you save its installer and open it once, with no administrator rights (on Windows and macOS an installer signed by the maintainer, on Linux a short script), and it carries Beethoven's encrypted connection to the cluster's ssh port and nowhere else. Then Beethoven's own sign-in sheet asks for your account name, password and Google Authenticator code, exactly as the cluster asks for them, and sends them only to the cluster, inside the encrypted session, after the cluster proved its identity. Beethoven keeps a key of its own in your browser and adds one restricted line to your cluster account, so later connections ask for nothing. Protecting that key with Windows Hello or Touch ID is optional and off unless you turn it on.
 3. Or the portal path: "Use GlobalProtect instead" uses your university's Open OnDemand portal, on its VPN, as before; you sign in in the browser's own box, which Beethoven never reads.
 4. Where your work goes: read the four lines, tick, Connect. Sign in to Claude once, when the panel asks: it opens Anthropic's sign-in page in a new tab; you sign in with your own account and paste the code the page shows into the panel's one box. The code is typed once into your own job's terminal and is not kept.
 
@@ -208,10 +238,10 @@ Start, monitor and stop a Claude Code worker on your university's Open OnDemand 
 
 ## Permission justifications (one sentence or two each, as the dashboard asks for them)
 
-12.0.0's Chrome manifest asks for `storage`, `alarms`, `scripting`, `nativeMessaging` and `sidePanel`
-(all required; `extension/wxt.config.ts`), and the one optional host permission `https://*/*`;
-`activeTab` left with 11.0.0. The Firefox build, which is not submitted anywhere, has neither
-`nativeMessaging` nor `sidePanel`.
+15.0.0's Chrome manifest asks, as 12.0.0's did, for `storage`, `alarms`, `scripting`,
+`nativeMessaging` and `sidePanel` (all required; `extension/wxt.config.ts`), and the one optional
+host permission `https://*/*`; `activeTab` left with 11.0.0. The Firefox build, which is not
+submitted anywhere, has neither `nativeMessaging` nor `sidePanel`.
 
 | Permission | Justification |
 |---|---|
@@ -219,15 +249,17 @@ Start, monitor and stop a Claude Code worker on your university's Open OnDemand 
 | `alarms` | Reads your running worker's status no more than once a minute, renews the approval check and fetches the signed withdrawn-versions list once a day, and keeps doing so after the browser suspends the extension. |
 | `scripting` | Loads the extension's page script only into a tab the extension opened itself on the one portal site you allowed: where your portal does not share its sign-in with the extension's own requests, and on the portal's terminal page for its one-time key step, where it reads only the page's title and types one line. No page script is registered or loaded anywhere else. |
 | `sidePanel` | Opens the extension's panel at the side of the window when you click the toolbar button; there is no popup. |
-| `nativeMessaging` | Talks to Beethoven's own helper, a small script that ships inside the extension and that you install once (no administrator rights), so you can reach your university cluster without a VPN. The helper opens a connection only to the cluster's ssh port (grid.wayne.edu:22) and carries the extension's encrypted ssh session there and back; its registration names only this extension, and it holds no credential, runs no shell, keeps no log of what it carries and talks to nothing else. |
+| `nativeMessaging` | Talks to Beethoven's own helper, a small program that ships inside the extension and that you install once, with no administrator rights (on Windows and macOS from an installer signed by the developer, on Linux from a script), so you can reach your university cluster without a VPN. The helper opens a connection only to the cluster's ssh port (grid.wayne.edu:22) and carries the extension's encrypted ssh session there and back; its registration names only this extension, and it holds no credential, runs no shell, keeps no log of what it carries and talks to nothing else. |
 | Optional host permission `https://*/*` (requested at runtime for one origin) | Your university's Open OnDemand portal has an address the extension cannot know in advance, so no site is granted at install. The extension asks the browser for one origin at a time, and only inside a click: "Agree and continue" on its welcome page (your university's portal, filled in from the site profile, or the address you typed under "Use another portal"), "Allow again" in its panel if the grant was removed, or "Change" in its Settings. It refuses to work through a portal until that one site is granted. An address on claude.ai, claude.com or anthropic.com, or on any of their subdomains, is refused before any request, so the extension never requests an Anthropic origin. |
 
 `nativeMessaging` is new in 12.0.0: 11.0.0's texts listed it among the permissions never requested.
 Chrome lets an extension reach a native program only when that program's registration names the
 extension's ID, so the permission reaches the helper and nothing else; and the helper exists only
-after the user saved and ran its installer. It is a required permission, so Chrome's install dialog
-reads "Communicate with cooperating native applications" (`INSTALL.md` explains it); the listing has
-no users yet, so no installed copy is disabled by the new permission.
+after the user saved and opened its installer. It is a required permission, so Chrome's install
+dialog reads "Communicate with cooperating native applications" (`INSTALL.md` explains it); the
+listing had no users yet when 12.0.0 added it, so no installed copy was disabled by the new
+permission. 15.0.0 adds no permission; its justification changes only in what the helper is (a
+compiled program in a signed installer on Windows and macOS).
 
 The host-permission sentence is 11.0.0's: the request now comes from the welcome page's "Agree and
 continue", the panel's "Allow again" or Settings' "Change", never from the toolbar button (which only
@@ -243,7 +275,7 @@ Never requested: `activeTab`, `cookies`, `tabs`, `webRequest`, `webRequestBlocki
 Answer: **No.** Justification if a field asks for one:
 
 ```
-No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a script inside the package, offered by the extension's own page; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
+No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a file inside the package, offered by the extension's own page: on Windows and macOS an installer signed by the developer that carries a small compiled program built from the developer's own source (Rust, with no third-party code but its standard library and the runtime support code its compiler links in), on Linux a script; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
 ```
 
 ## Privacy practices
@@ -251,7 +283,7 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Question | Answer |
 |---|---|
 | Does the extension collect or transmit user data? | Yes, two kinds. **Personally identifiable information**: the institutional account name the cluster accepted and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: the cluster password and one-time verification code the user types into the extension's own sign-in sheet for the direct way's first sign-in; handled on the device and sent only to the user's own university cluster, inside the encrypted ssh session, after the server's host key matched the key pinned in the extension; never stored, logged or sent to the developer. The private key the extension makes for the cluster account stays on the device, encrypted. Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 10 names the approval check, what the developer records from it, the sign-in sheet, the helper, the browser's key and its optional passkey, and what stays on the device). |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 11 names the approval check, what the developer records from it, the sign-in sheet, the helper and its signed installers, the browser's key and its optional passkey, and what stays on the device). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
 | Limited Use statement (on the landing page and the reviewers page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
@@ -279,17 +311,17 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Ask for access (in the description) | `https://openspineconsortium.com/` (the form is on the home page; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
-The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0.
-`terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 9 and `PRIVACY.md`
-version 10 before submission (`docs/PUBLISHING_SITE.md`).
+The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0
+or 15.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 10 and
+`PRIVACY.md` version 11 before submission (`docs/PUBLISHING_SITE.md`).
 
 ## Images and the promo video
 
 **Out of date, not redone in this pass.** The five screenshots, the tiles and the promo video were
 captured from 9.0.0 (`extension/store-assets/`): the setup page, the toolbar-button start, the old
 panel. None shows 11.0.0's welcome page, journey, home or tour, or 12.0.0's helper, sign-in sheet or
-Settings' Connection section. A screenshot of 9.0.0's setup page is a screen 12.0.0 does not have;
-redo at least the screenshots from the 12.0.0 release build before submitting, to the rules below.
+Settings' Connection section. A screenshot of 9.0.0's setup page is a screen 15.0.0 does not have;
+redo at least the screenshots from the 15.0.0 release build before submitting, to the rules below.
 
 The rules (from 9.0.0): the store icon is the package icon flattened on the site's cream; every
 product screen is a real capture of the release build, framed, never a drawn screen; a diagram may
@@ -309,18 +341,19 @@ Additional instructions (500 characters).
 
 If the review asks for test access, answer with the letter in `SUBMISSION.md`, section 4, followed
 by the fuller text from `PASTE.md`'s Test instructions section, and attach
-`release/12.0.0/reviewer/beethoven-mock-portal.zip`. The recipe below is the same mock flow with more
-explanation, for a follow-up question.
+`release/15.0.0/reviewer/beethoven-mock-portal.zip` (made with the release, as 12.0.0's was). The
+recipe below is the same mock flow with more explanation, for a follow-up question.
 
 ## Reviewer recipe (for a reply to the review)
 
 For a reviewer who has the item installed from the store and the mock-portal-only zip
-(`release/12.0.0/reviewer/beethoven-mock-portal.zip`): no build and no extension source. **The direct
-way is not part of the mock.** The core tries it first whatever the portal (`core/steps.ts`
+(`release/15.0.0/reviewer/beethoven-mock-portal.zip`): no build and no extension source. **The
+direct way is not part of the mock.** The core tries it first whatever the portal (`core/steps.ts`
 `connectionMode` reads the bridge and the key, not the portal), so on the mock too the panel first
 offers "One small download, once"; the recipe has the reviewer press "Use GlobalProtect instead",
-after which the mock carries the portal path as in 11.0.0. The helper's own source is in the package
-under `bridge/`.
+after which the mock carries the portal path as in 11.0.0. The helper's scripts, for every system,
+are in the package under `bridge/`, and the Linux one is what Linux is offered; the compiled helper
+in the Windows and macOS installers is built from `helper/src/rust`, which is not in the package.
 
 ```
 Beethoven starts, watches and stops a Claude Code job in the user's own account on their university's cluster and shows the user the link Claude Code prints when it registers with Anthropic's Remote Control feature. It reaches the cluster directly over ssh, through a small helper the user installs from inside the extension, or through the university's Open OnDemand web portal.
@@ -345,10 +378,11 @@ What the extension never does: no code, host permission or content script on cla
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. It is not provided by or on behalf of any university, Anthropic or the Open OnDemand project.
 ```
 
-The recipe's steps 5 and 6 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal",
-13 presses, `docs/V11_STATUS.md`). They were not walked on a 12.0.0 build: the 12.0.0 harness ran
-the direct way's scenarios 13 to 16 against a local grid stand-in, not 11.0.0's scenarios 0 to 12
-against the mock (`docs/V12_STATUS.md`). Walk them once on the release build and correct any word.
+The recipe's steps 5 and 6 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal", 13
+presses, `docs/V11_STATUS.md`). They were not walked on a 12.0.0 build: the 12.0.0 harness ran the
+direct way's scenarios 13 to 16 against a local grid stand-in, not 11.0.0's scenarios 0 to 12
+against the mock (`docs/V12_STATUS.md`); nor on a 15.0.0 build. Walk them once on the release build
+and correct any word.
 
 ## No other store
 

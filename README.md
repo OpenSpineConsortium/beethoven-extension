@@ -36,7 +36,9 @@ that is the browser's permanent price for an install from outside the Web Store.
 The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
 reviewer sees say Beethoven, and it is not an Anthropic product. The repository is
-`OpenSpineConsortium/beethoven` (it was called ashley-bridge until 2026-09-30), and a few internal
+`OpenSpineConsortium/beethoven-extension` since the split of 2026-10-03 (before that
+`OpenSpineConsortium/beethoven`, called ashley-bridge until 2026-09-30, which is now the project's
+hub and holds no code), and a few internal
 names stay because changing them would break something installed or show nothing: the kill-list's
 format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster (never shown
 to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the extension sends to
@@ -162,11 +164,15 @@ From the report's "deliberately absent" list and its security controls:
   standard input. `SECURITY.md` records the incident of 2026-09-28 behind this rule.
 - No install-time host permission. Access to the one portal origin is requested from the click on
   the icon (or the *Connect* button on the setup page).
-- No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `nativeMessaging`, `debugger`, `identity` or `clipboardRead` permission. The portal cookie is
-  carried by the browser's network stack and never read.
-- No automated login and no touch on the MFA step: a redirect to the identity provider means "sign
-  in to your portal in a tab".
+- No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`,
+  `identity` or `clipboardRead` permission. `nativeMessaging` is requested since 12.0.0 for one host
+  only, Beethoven's own bundled bridge (`helper/`), which carries bytes to the grid's ssh port and
+  nothing else; since 15.0.0 it reaches Windows and macOS as a signed installer inside the package,
+  and Linux as a script. The portal cookie is carried by the browser's network stack and never read.
+- No automated login of the portal: a redirect to the identity provider means "sign in to your
+  portal in a tab", and the university's sign-in pages are never filled in. On the direct way the
+  student types the grid password and one-time code into Beethoven's own sign-in sheet, which sends
+  them only to the grid inside the encrypted ssh session and never keeps them.
 - No remote code: no `eval`, no fetched scripts. The kill-list is JSON, verified with WebCrypto against
   a public key compiled into the bundle, and the extension works offline on the last good list.
 - Nothing persistent on the login node: one `sbatch --parsable` through the shell, then the shell is
@@ -233,9 +239,10 @@ downloaded at run time by the product; the build needs the network only for `npm
 site pages; `bash`; `pandoc` only for the site pages; `unzip`/`sha256sum` (Git Bash has both). No
 cluster account is needed for any test: the tests run against the mock portal in `extension/mock-ood`.
 
-**Clone.** `git clone https://github.com/OpenSpineConsortium/beethoven.git` (the organisation's
-private repository, the only remote since 2026-09-30; the personal copy
-`GregorySchwing/ashley-bridge` is retired). Keep the line endings as they are in the repository
+**Clone.** `git clone https://github.com/OpenSpineConsortium/beethoven-extension.git` (the
+organisation's private repository, the only remote since the split of 2026-10-03; the personal copy
+`GregorySchwing/ashley-bridge` is retired, and `OpenSpineConsortium/beethoven` is now the project's
+hub, not a code repository). Keep the line endings as they are in the repository
 (LF); Windows Git may warn about CRLF and is harmless.
 
 **Extension.**
@@ -314,20 +321,30 @@ that sends no installation identifier (before 8.0.0) is refused once the service
    move to the next whole number; a changed agreement or privacy statement moves its own "Version N"
    line and, for the agreement, `TERMS_VERSION`/`TERMS_DATE` in `src/core/terms.ts`; a changed framework
    moves `framework/VERSION` and the `VERSION=` line at the top of `framework/bin/hpcworker`.
-2. `npm run typecheck && npm run build && npm run zip && npm test` in `extension/` (the test run
-   after the zips also checks the packages themselves), and the framework tests. A changed framework is then published to each site's shared copy with
-   `bash tools/deploy_shared.sh`, before the extension that needs it reaches students: the extension
-   runs whatever the lab's copy is.
-3. Copy the Chrome zip (the only package from 8.0.0) into `release/<version>/`, write `SHA256SUMS.txt`
-   (`sha256sum *.zip > SHA256SUMS.txt`) and a short `README.md` there (see `release/10.0.0/`, which also holds the store kit and the reviewers' mock-portal zip), commit, tag `v<version>`, push both remotes:
-   `bash tools/push_via_grid.sh` (the personal copy, through the grid's token) and `bash tools/push_org.sh`
-   (the organisation's copy, from a shell whose git credential can push to OpenSpineConsortium; on the
-   maintainer's machine that is WSL). Attach the zip and `SHA256SUMS.txt` to a GitHub release named
-   `v<version>` on the organisation's private copy, for the record; it is not a download page for
-   students, who install only from the private listing.
-4. Test by hand (`docs/store/TEST_BEFORE_UPLOAD.md`), then upload the chrome zip to the private
-   Chrome Web Store item (`docs/store/SUBMISSION.md`, texts in `docs/store/LISTING.md`), then rebuild and push the site pages if
-   a text changed.
+2. Since 15.0.0 the package carries the bridge's two signed installers, so it is made on the
+   maintainer's Mac by one command, from the repository root on a clean `main` equal to
+   `origin/main`: `bash helper/release/release.sh` (`helper/release/README.md` is the runbook; once
+   per Mac, `bash helper/release/setup-mac.sh`; a Windows machine builds the `.msi` only as the
+   fallback). It runs `npm ci`, the type check and the tests in `extension/`, builds and signs
+   `beethoven-bridge-mac.pkg` and `beethoven-bridge-windows.msi`, merges them, zips, runs the package
+   tests on that zip, records `release/<version>/` and uploads the zip to the private Chrome Web Store
+   item, submitted for review; `--no-upload` stops after the record and prints the upload command
+   (step 4). `npm run typecheck && npm run build && npm run zip && npm test` in `extension/` still
+   builds and checks a package, without the signed installers: never the one the store gets. The framework's tests and its deploy to each site's
+   shared copy (`tools/deploy_shared.sh`) are the server repository's, `OpenSpineConsortium/hpcworker`;
+   a changed framework reaches the lab's copy before the extension that needs it reaches students:
+   the extension runs whatever the lab's copy is.
+3. The record: the release's zip and its `bridge/` name the store item and carry the signed
+   installers, so `.gitignore` keeps them out and they stay on the Mac; commit what `release.sh`'s
+   summary lists (the record's `README.md`, `guides/` and its two `SHA256SUMS.txt` files), tag
+   `v<version>` and push. A GitHub release named `v<version>` on the organisation's private copy, if
+   one is made, carries those checksums and no zip; it is never a download page for students, who
+   install only from the private listing. Records up to 14.0.0 hold their zips and were made by hand
+   (`release/10.0.0/` also holds the store kit and the reviewers' mock-portal zip).
+4. For a first submission, or whenever the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) comes
+   before the upload, run step 2 with `--no-upload`, make the test, then upload the recorded zip as
+   `docs/store/SUBMISSION.md` says (texts in `docs/store/LISTING.md`). Then rebuild and push the site
+   pages if a text changed.
 
 ## Documents
 

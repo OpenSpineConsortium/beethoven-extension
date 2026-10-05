@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Beethoven bridge for Windows as a per-user MSI (WiX v5; schema v4), built by build-msi.ps1,
+  which passes StageDir (the folder holding the three payload files) and Version (helper/VERSION).
+
+  Everything installs for the one Windows account that runs it, with no administrator rights:
+  Scope="perUser" puts the files under %LOCALAPPDATA%\Beethoven\bridge and every registry value
+  under HKEY_CURRENT_USER, exactly where install.ps1 of the script edition puts them, so a student
+  on a managed laptop can install it and Windows asks for no password. Nothing touches the
+  machine-wide hive, there is no custom action, no service and no shortcut: the package copies three
+  files and writes a few registry values, and uninstall takes them away again.
+
+  Chrome and Edge find a native messaging host through the default value of their per-user key
+  Software\<browser>\NativeMessagingHosts\<host name>, which must hold the full path of the host's
+  manifest. The manifest's own path to the program is relative, the bare file name, which Chrome
+  resolves against the manifest's folder on Windows (and only on Windows); build-msi.ps1 writes
+  that manifest when it stages the payload, so it carries no user name and the package is the same
+  for every account.
+
+  The component GUIDs and the UpgradeCode are fixed and committed: Windows Installer identifies a
+  component by its GUID across versions, and MajorUpgrade removes the old package by the UpgradeCode
+  before the new one installs. Change neither.
+
+  bridge.wxs beside this file is the same package for msitools' wixl on the Mac; change both together.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Beethoven bridge"
+           Manufacturer="OpenSpineConsortium"
+           Version="$(var.Version)"
+           UpgradeCode="DD6AAE9E-C919-4C53-AFA7-EA2FB05C831A"
+           Scope="perUser"
+           Language="1033"
+           Compressed="yes">
+
+    <SummaryInformation Description="Beethoven bridge" Manufacturer="OpenSpineConsortium"/>
+
+    <!-- An older bridge is replaced in place; a newer one already installed stays. The package
+         version is helper/VERSION, a whole number release (1.0.0, 2.0.0), which stays the same from
+         one extension release to the next while the helper does not change, and every build gets a
+         new ProductCode: without AllowSameVersionUpgrades a later build of the same version would
+         install beside the earlier one as a second "Beethoven bridge" in Apps, and uninstalling one
+         would leave the shared files and registry values to the other. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
+    <MediaTemplate EmbedCab="yes"/>
+
+    <!-- Settings > Apps shows one Uninstall button and no Modify; the words beside it are the
+         student's, and both links go to the product page. -->
+    <Property Id="ARPNOMODIFY" Value="1"/>
+    <Property Id="ARPCOMMENTS" Value="Carries Beethoven's encrypted connection to the grid and nothing else. Installed for your own account only."/>
+    <Property Id="ARPURLINFOABOUT" Value="https://openspineconsortium.com/beethoven/"/>
+    <Property Id="ARPHELPLINK" Value="https://openspineconsortium.com/beethoven/"/>
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="BeethovenFolder" Name="Beethoven">
+        <Directory Id="BridgeFolder" Name="bridge"/>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- One component per file. Every file lives under the user profile, and Windows Installer's
+         ICE38 requires such a component to have a registry value under HKCU as its KeyPath rather
+         than the file itself (a per-user file is not a reliable key when several accounts share the
+         machine), so each component carries one marker value under the product's own key and marks
+         its File KeyPath="no". -->
+    <ComponentGroup Id="BridgeFiles" Directory="BridgeFolder">
+
+      <Component Id="BridgeExe" Guid="708A35A8-1276-404C-9571-75FFD326866A">
+        <File Id="BridgeExeFile" Source="$(var.StageDir)\beethoven-bridge.exe" KeyPath="no"/>
+        <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="BridgeExe" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+      </Component>
+
+      <!-- The script edition of 12.0.0 to 14.0.0 writes a manifest of the same name in the same folder,
+           naming its bridge.cmd. Windows Installer keeps an unversioned file on disk that was changed
+           after it was made (a second run of that installer rewrites it), so the manifest carries a
+           version of its own: a versioned file always replaces an unversioned one, and the bridge
+           this package installs is the one Chrome starts. -->
+      <Component Id="HostManifest" Guid="2B1DFC4E-73F8-445D-84F6-5B99A0E07826">
+        <File Id="HostManifestFile" Source="$(var.StageDir)\com.openspineconsortium.beethoven.bridge.json" KeyPath="no" DefaultVersion="1.0.0.0"/>
+        <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="HostManifest" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+      </Component>
+
+      <Component Id="ReadMe" Guid="D865D1C0-B684-4B15-BB66-1A1FFD96853A">
+        <File Id="ReadMeFile" Source="$(var.StageDir)\README.txt" KeyPath="no"/>
+        <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="ReadMe" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+      </Component>
+
+      <!-- The two values Chrome and Edge read: the default value of the host's key under each
+           browser's per-user NativeMessagingHosts (no Name attribute means the key's default value),
+           set to the manifest's full path in this account's folder. Uninstall removes both, so the
+           browsers forget the bridge the moment it is gone. -->
+      <Component Id="HostRegistration" Guid="100F6E73-ABA9-4F05-B556-6E4EF951EE28">
+        <RegistryValue Root="HKCU" Key="Software\Google\Chrome\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge" Value="[BridgeFolder]com.openspineconsortium.beethoven.bridge.json" Type="string" KeyPath="yes"/>
+        <RegistryValue Root="HKCU" Key="Software\Microsoft\Edge\NativeMessagingHosts\com.openspineconsortium.beethoven.bridge" Value="[BridgeFolder]com.openspineconsortium.beethoven.bridge.json" Type="string"/>
+      </Component>
+
+      <!-- Folders created under the user profile are not removed by Windows Installer unless a
+           component says so (ICE64); these two entries take the bridge folder and the Beethoven
+           folder away on uninstall, and only then, and only when they are empty. -->
+      <Component Id="FolderCleanup" Guid="B0F5C761-C3FC-48AB-919D-7B822367F404">
+        <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="FolderCleanup" Value="$(var.Version)" Type="string" KeyPath="yes"/>
+        <RemoveFolder Id="RemoveBridgeFolder" Directory="BridgeFolder" On="uninstall"/>
+        <RemoveFolder Id="RemoveBeethovenFolder" Directory="BeethovenFolder" On="uninstall"/>
+      </Component>
+
+    </ComponentGroup>
+
+    <Feature Id="Bridge" Title="Beethoven bridge" Level="1">
+      <ComponentGroupRef Id="BridgeFiles"/>
+    </Feature>
+
+  </Package>
+</Wix>

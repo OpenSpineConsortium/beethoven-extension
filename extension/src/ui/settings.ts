@@ -148,7 +148,8 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         el(
           'div',
           { class: 'btns' },
-          !c.helper.installed && c.helper.download
+          // 15.0.0: the download stays beside an installed helper too, so an older one can be replaced from here (LICENSE section 17)
+          c.helper.download
             ? el('a', { class: 'btn btn-outline', href: c.helper.download.url, download: c.helper.download.file, onClick: (e: Event) => saveHelper(e, c.helper.download!, () => void opts.act({ kind: 'bridge-downloaded', os: c.helper.download!.os })) }, icon('download', 14), el('span', { text: WORDS.direct.installHelper.download(c.helper.download.osLabel) }))
             : null,
           el('button', { type: 'button', class: 'btn btn-outline', text: c.helper.checkAgain.label, onClick: () => c.helper.checkAgain.action && void opts.act(c.helper.checkAgain.action) }),

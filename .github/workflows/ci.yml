@@ -12,9 +12,11 @@ on:
 jobs:
   bridge-binary:
     # the bridge's binary edition: built per platform and held to the same wire contract the script
-    # hosts answer to (helper/test/suite.mjs, host-agnostic). Unsigned on purpose — signing needs
-    # identities no repository may hold — so these artifacts are for maintainers and collaborators;
-    # students' bridge stays the script zips inside the extension.
+    # hosts answer to (helper/test/suite.mjs, host-agnostic). Unsigned on purpose: signing identities
+    # never enter CI or the repository, so these artifacts are for maintainers and collaborators only.
+    # The signed installers students get on Windows and macOS are built from the same sources on the
+    # maintainer's own machines by helper/release/ and merged by helper/build.mjs; Linux and a
+    # development build keep the script zips inside the extension.
     name: bridge (rust, ${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -66,6 +68,8 @@ jobs:
       - name: asyncssh, for the grid stand-in the ssh tests run against
         run: pip install asyncssh
       - run: npm ci
+      - name: the tracked bridge zips and manifest are a fresh build of helper/src (no signed packages here)
+        run: node ../helper/build.mjs --check --no-signed
       - name: profiles and agreement texts into public/ (the tests read them)
         run: npm run sync-profiles
       - run: npm run typecheck

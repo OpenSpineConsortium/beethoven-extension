@@ -12,3 +12,17 @@ __pycache__/
 .pytest_cache/
 helper/src/rust/target/
 helper/src/*/allow.txt
+# the signed installers and their sidecars, built on the maintainer's machines (helper/release/)
+helper/signed/
+# the maintainer's Azure Artifact Signing account names; the committed example beside it stays
+helper/release/windows/signing.json
+# the files of a release record that name the store's extension or carry a signing certificate: the
+# Chrome zip, and bridge/'s three zips, two signed installers and manifest.json. They stay on the
+# maintainer's Mac; the record's committed SHA256SUMS.txt files pin them (helper/release/README.md).
+# The records made before release.sh named no store and carried no installer; they stay tracked.
+release/*/beethoven-*-chrome.zip
+release/*/bridge/*
+!release/*/bridge/SHA256SUMS.txt
+# the store kit's copy of that zip, and the kit's own zip that holds it (docs/store/PASTE.md)
+release/*/store-kit/00-beethoven-*-chrome.zip
+release/*/store-kit-*.zip

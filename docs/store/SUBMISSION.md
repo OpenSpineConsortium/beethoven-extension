@@ -1,20 +1,23 @@
 # Submitting Beethoven to the Chrome Web Store, click by click
 
 For the maintainer. `PASTE.md` beside this file is the paste sheet: every dashboard field in the
-dashboard's order, with the text to paste or the file to upload. `LISTING.md` holds the texts and the
-reasons behind them; this file says what to do around the paste, in what order. Written 2026-09-29
-for 4.0.0, rewritten on 2026-09-30 for 8.0.0, brought up to date for 9.0.0 and 10.0.0, and brought up
-to date for 12.0.0 on 2026-10-02. Neither 9.0.0, 10.0.0 nor 11.0.0 was submitted for review; 12.0.0
-carries 11.0.0's changes (the welcome page with one tick, the window-wide panel, no `activeTab`) and
-its own (the direct way over ssh through the helper inside the package, the `nativeMessaging`
-permission, the Authentication information data type, agreement version 9 and privacy statement
-version 10). Beethoven is offered in one place only: a **Private** item on the Chrome Web Store,
-visible to the trusted testers the maintainer names, a Google Group he keeps with his personal Google
-account and to which he adds each student he approves for Beethoven. No other store, no signed file,
-no download from the website: the website shows no install link at all, the helper's installers are
-files inside the package, and the item's link goes to approved students only. Store dashboards move
-their fields around from time to time; the field names below are the ones in use at the time of
-writing, and the texts are what matter.
+dashboard's order, with the text to paste or the file to upload. `LISTING.md` holds the texts and
+the reasons behind them; this file says what to do around the paste, in what order. Written
+2026-09-29 for 4.0.0, rewritten on 2026-09-30 for 8.0.0, brought up to date for 9.0.0 and 10.0.0,
+brought up to date for 12.0.0 on 2026-10-02, and for 15.0.0 on 2026-10-04. Neither 9.0.0, 10.0.0 nor
+11.0.0 was submitted for review; 12.0.0 carries 11.0.0's changes (the welcome page with one tick,
+the window-wide panel, no `activeTab`) and its own (the direct way over ssh through the helper
+inside the package, the `nativeMessaging` permission, the Authentication information data type,
+agreement version 9 and privacy statement version 10). 15.0.0 adds the helper's signed installers
+for Windows and macOS, with a compiled program inside, beside the script zips in the package
+(agreement version 10, privacy statement version 11). Beethoven is offered in one place only: a
+**Private** item on the Chrome Web Store, visible to the trusted testers the maintainer names, a
+Google Group he keeps with his personal Google account and to which he adds each student he approves
+for Beethoven. No other store and no download from the website: the website shows no install link at
+all, the helper's installers are files inside the package (the only signed files are two of them,
+the ones for Windows and macOS, and they are never put on the website), and the item's link goes to
+approved students only. Store dashboards move their fields around from time to time; the field names
+below are the ones in use at the time of writing, and the texts are what matter.
 
 What one private listing does and does not do, so nobody is told more than is true: only the Google
 accounts in the group can open the listing and install from it, and the extension then works only
@@ -27,36 +30,55 @@ being shared casually, and the agreement makes sharing a breach.
 
 Have these in hand, and check each once:
 
-1. The package, built from a clean tree with Node 22 in `extension/`:
-   `npm ci && npm run typecheck && npm test && npm run build && npm run zip`. The build writes
-   `.output/beethoven-12.0.0-chrome.zip`; the file to upload is its copy in the release folder,
-   `release/12.0.0/beethoven-12.0.0-chrome.zip`, whose SHA-256 must match
-   `release/12.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`). The same command also writes a
-   Firefox zip and a sources zip; neither is uploaded or sent to anyone. A reviewer who asks for the
-   mock portal gets `release/12.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no
-   extension code (section 4). Confirm it is a release build: `unzip -p
-   release/12.0.0/beethoven-12.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
-   `"version":"12.0.0"`, the 128-character `description` in `LISTING.md`,
+1. The package, made on the maintainer's own Mac by one command once the version is raised,
+   committed on `main` and pushed: `bash helper/release/release.sh` from the repository root
+   (`helper/release/README.md`, "Your release, start to finish"; once per Mac, `bash
+   helper/release/setup-mac.sh` until it ends with "Everything a release needs is on this Mac.").
+   With the names in `release.json` in the vendor folder, the item's ID among them (section 1, item
+   4 says when it is known), it runs the extension's checks (`npm ci`, `npx tsc --noEmit`, `npx
+   vitest run`), builds `beethoven-bridge-mac.pkg` (Developer ID, notarized and stapled) and
+   `beethoven-bridge-windows.msi` (cross-built on the Mac and signed through Azure Artifact Signing)
+   for that ID, merges both with `node helper/build.mjs --store-id`, zips the extension (`npm run
+   zip`), runs the package tests on that zip, records `release/15.0.0/` with its checksums, and then
+   uploads the recorded zip and submits it for review. With `--no-upload` it stops after the record
+   and prints the upload command for later: use that for the first submission (section 1, item 4)
+   and whenever the hand test (`TEST_BEFORE_UPLOAD.md`) comes before the upload. Whether Artifact
+   Signing accepts a signature request from a Mac is not yet measured, so keep the Windows machine
+   until one release has gone through from the Mac: on the fallback route `build-msi.ps1` builds the
+   `.msi` there and the Mac's steps are typed by hand (the runbook's "The Windows machine (the
+   fallback)"). The file to upload is `release/15.0.0/beethoven-15.0.0-chrome.zip`, whose SHA-256
+   must match `release/15.0.0/SHA256SUMS.txt` (a later build rewrites `.output/`); it names the item
+   and carries the signed installers, so it stays on the Mac and only the record's `README.md`,
+   `guides/` and checksums are committed. `npm run zip` also writes a Firefox zip and a sources zip;
+   neither is uploaded or sent to anyone. A reviewer who asks for the mock portal gets
+   `release/15.0.0/reviewer/beethoven-mock-portal.zip`, which holds the mock and no extension code
+   (section 4); `release.sh` does not make it, so make it by hand after the record, as 12.0.0's was
+   (`release/12.0.0/README.md`, "The reviewers' mock portal"). Confirm it is a release build: `unzip
+   -p release/15.0.0/beethoven-15.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
+   `"version":"15.0.0"`, the 128-character `description` in `LISTING.md`,
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
    `"optional_host_permissions":["https://*/*"]` and no `localhost`, the permissions `storage`,
    `alarms`, `scripting`, `nativeMessaging` and `sidePanel`, all under `permissions`, and nothing
-   else (no `activeTab` since 11.0.0), and no `host_permissions` key. `unzip -l` must list `fonts/` (eight
-   `.woff2` files and two `-OFL.txt` texts) and `bridge/` (`beethoven-bridge-windows.zip`,
-   `beethoven-bridge-mac.zip`, `beethoven-bridge-linux.zip` and `bridge/manifest.json`, whose SHA-256
-   values must match the files beside it). Unzip one: its `allowed_origins.json` holds the placeholder
-   `chrome-extension://REPLACE_WITH_EXTENSION_ID_SEE_HELPER_README/`, as it should: the page that offers
-   the download writes the extension's own ID into the copy it saves (`core/bridgeZip.ts`), so no
-   build needs the store item's ID. No page of the built extension may show the product's old name
-   (`grep -ril` over the unpacked zip; the kill-list's format tag inside the bundle is the one allowed
-   exception).
+   else (no `activeTab` since 11.0.0), and no `host_permissions` key. `unzip -l` must list `fonts/`
+   (eight `.woff2` files and two `-OFL.txt` texts) and `bridge/` (`beethoven-bridge-windows.msi`,
+   `beethoven-bridge-mac.pkg`, `beethoven-bridge-windows.zip`, `beethoven-bridge-mac.zip`,
+   `beethoven-bridge-linux.zip` and `bridge/manifest.json`, whose SHA-256 values must match the
+   files beside it). In `bridge/manifest.json` the two signed entries carry `"signed"`
+   (`"developer-id-notarized"` for the Mac, `"authenticode"` for Windows) and `allowed_origins`
+   naming `chrome-extension://<the item's ID>/` and nothing else. Unzip one of the zips: its
+   `allowed_origins.json` holds the placeholder
+   `chrome-extension://REPLACE_WITH_EXTENSION_ID_SEE_HELPER_README/`, as it should: the page that
+   offers a zip writes the extension's own ID into the copy it saves (`core/bridgeZip.ts`). No page
+   of the built extension may show the product's old name (`grep -ril` over the unpacked zip; the
+   kill-list's format tag inside the bundle is the one allowed exception).
 2. The images named in `PASTE.md` (all under `extension/store-assets/`; its `manifest.txt` says how
-   each was made). **The five screenshots must be captured again from the 12.0.0 build**
-   (`LISTING.md`, "Images and the promo video"); the promo video field stays empty until a 12.0.0
+   each was made). **The five screenshots must be captured again from the 15.0.0 build**
+   (`LISTING.md`, "Images and the promo video"); the promo video field stays empty until a 15.0.0
    video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a one-line check).
    Look at each one before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
-   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 10), `.../beethoven/terms.html`
-   (the text of `LICENSE.txt` version 9), `.../beethoven/support.html` and
+   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 11), `.../beethoven/terms.html`
+   (the text of `LICENSE.txt` version 10), `.../beethoven/support.html` and
    `.../beethoven/request.html` (which must fill its AccessID field from `?access_id=<account>`,
    since the panel's *Ask for access* button opens it that way, and which asks for the Google
    account the invitation goes to). The pages show one install card, "Private listing, by
@@ -69,7 +91,7 @@ Have these in hand, and check each once:
    `https://beethoven-access.openspineconsortium.workers.dev/access_check`, and the mock's username
    `st1234` must answer yes **from any installation**, at portal `localhost` only. From WSL (Windows
    sockets flake), two checks with two different installation identifiers:
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"12.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
+   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"15.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
    and the same with `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
    `access-control-allow-origin: *`. If the second answers `"reason":"other_installation"`, the
    exemption is missing: `node tools/intake/admin.mjs seat-rule st1234 any` in the repository of
@@ -77,24 +99,35 @@ Have these in hand, and check each once:
    command line). Never run this check with a real student's AccessID: the first identifier that
    asks binds that account. The access service of 2026-10-01 (st1234 only at `localhost`, a public
    `GET /allowlist` that names nobody) must be deployed under both names first, in the order the
-   10.0.0 text of this file gave (git history of this file, section 0, item 5). 12.0.0 changes
-   nothing in the check: no new field, and it is sent only after the cluster accepted a sign-in.
+   10.0.0 text of this file gave (git history of this file, section 0, item 5). 12.0.0 and 15.0.0
+   change nothing in the check: no new field, and it is sent only after the cluster accepted a
+   sign-in.
 6. The Google Group of testers, made once at `https://groups.google.com` with the personal Google
    account that owns the developer account: the name "Beethoven-users"; who can search for the group:
    only members; who can join: only invited users; who can view members and who can post: group
    managers. Add each student approved for Beethoven by the Google account they gave on the request
    form. A student approved for lab membership only is not added.
 7. The developer account, one person, with a hardware security key or an authenticator app as the
-   second factor. Nothing else should hold an OAuth grant on it. No store API key goes into any CI.
+   second factor. The one OAuth grant on it is the maintainer's own upload tool
+   (`helper/release/publish-store.mjs`: a Desktop OAuth client in his own Google Cloud project, its
+   saved sign-in in the vendor folder on his Mac; the runbook's "Uploading to the Chrome Web
+   Store"); nothing else should hold one. No store sign-in or API key goes into any CI.
 8. The name. Beethoven runs Claude Code and is not an Anthropic product; the name carries no
    Anthropic mark, and "Claude" and "Claude Code" appear in the listing only to say what it runs.
-9. **New in 12.0.0: the grid side.** Framework 11, with the gate and `browser-key`, deployed to the
-   lab's shared copy, and `hpcworker browser-key check` answering `ok` there
-   (`docs/guides/LAB_LEAD.md`, section 2: every folder above the copy too). A reviewer never reaches
-   the grid, but every student does: against framework 10 a student sees "The lab's copy of the tool on
-   the grid is older than this Beethoven", and a student whose key the framework refuses sees "The
-   grid's own tool said no:" with its reason. Send C&IT the note in `LAB_LEAD.md`, section 3, before
-   the listing goes live.
+9. **New in 12.0.0: the grid side.** Framework 11 or later (14 since 14.0.0, `LAB_LEAD.md`, section
+   11), with the gate and `browser-key`, deployed to the lab's shared copy, and `hpcworker
+   browser-key check` answering `ok` there (`docs/guides/LAB_LEAD.md`, section 2: every folder above
+   the copy too). A reviewer never reaches the grid, but every student does: against framework 10 a
+   student sees "The lab's copy of the tool on the grid is older than this Beethoven", and a student
+   whose key the framework refuses sees "The grid's own tool said no:" with its reason. Send C&IT
+   the note in `LAB_LEAD.md`, section 3, before the listing goes live.
+10. **New in 15.0.0: the two signing memberships.** The Apple Developer Program (the Developer ID
+    identities and notarization, for the Mac installer) and Azure Artifact Signing (the Windows
+    signature), both current (`docs/guides/ACCOUNTS.md`, 2.1). Their identities, certificates and
+    keychain profile stay in the login keychain of the maintainer's Mac and behind his own Entra
+    sign-in; their names, with the item's ID and the publisher ID, are in `release.json` in his
+    vendor folder (on the Windows fallback, the Azure names are in the gitignored
+    `helper/release/windows/signing.json`), never in the repository or in CI (`SECURITY.md`).
 
 ## 1. The Chrome Web Store item
 
@@ -113,18 +146,29 @@ Registration (once, about ten minutes):
 
 The item (about thirty minutes):
 
-4. Dashboard, **Items**, **New item**. Drag `beethoven-12.0.0-chrome.zip` in. The item ID appears in
-   the URL and in the item header at once; note it: it is the link approved students get (section 5),
-   and it goes nowhere public. It is also the ID the helper's registration names, and nothing has to
-   be rebuilt for it: the zips under `bridge/` carry a placeholder, and the page that offers the
-   download writes the running extension's own ID into the copy it saves (`core/bridgeZip.ts`). After
-   the item is live, install it from the listing once and download the helper from its panel: the
-   saved zip's `allowed_origins.json` must name `chrome-extension://<item-id>/`. A zip made out to
-   another extension installs cleanly but Chrome refuses to start it for Beethoven, and the panel says
-   "The helper is there but did not answer."
+4. The item ID. The signed installers are built for it, so it must be known before them. If the item
+   exists already (a draft or an earlier version), its ID is in its dashboard address. If not:
+   Dashboard, **Items**, **New item**, and drag in a package of this version built without the
+   signed installers (`node helper/build.mjs --no-signed`, then `npm run build && npm run zip` in
+   `extension/`). The item ID appears in the URL and in the item header at once; note it: it is the
+   link approved students get (section 5), and it goes nowhere public. Either way, give the ID and
+   the publisher ID to `bash helper/release/setup-mac.sh --write-config`, which keeps them in
+   `release.json` in the vendor folder, then run `bash helper/release/release.sh --no-upload`
+   (section 0, item 1) and upload the recorded zip under the draft's **Package** tab (or with the
+   upload command it prints, without `--publish`) before anything is submitted: a package without
+   the installers gives every student on Windows and macOS the unsigned scripts. Submitting comes
+   last, at item 9, once every tab below is filled. The zips under `bridge/` need nothing for the
+   ID: they carry a placeholder, and the page that offers the download writes the running
+   extension's own ID into the copy it saves (`core/bridgeZip.ts`). After the item is live, install
+   it from the listing once and look at the panel's download: on Windows and macOS it must offer the
+   `.msi` or `.pkg` (a zip offered there means the package has no signed installer for that system,
+   or one made out to another ID), and on Linux the saved zip's `allowed_origins.json` must name
+   `chrome-extension://<item-id>/`. A helper made out to another extension installs cleanly but
+   Chrome refuses to start it for Beethoven, and the panel says "The helper is there but did not
+   answer."
 5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,650 characters);
    Category Developer Tools; Language English (United States); the store icon; the promo video field
-   empty; the small promo tile; the five screenshots captured from 12.0.0, in the order given; the
+   empty; the small promo tile; the five screenshots captured from 15.0.0, in the order given; the
    marquee; Official URL (empty until the site is verified); Homepage URL
    `https://openspineconsortium.com/beethoven/`; Support URL
    `https://openspineconsortium.com/beethoven/support.html`; Mature content No. Save draft.
@@ -133,28 +177,33 @@ The item (about thirty minutes):
    host-permission justification for `https://*/*`; "Are you using remote code?" No; Data usage:
    tick "Personally identifiable information" and "Authentication information", with the sentences
    from `PASTE.md`, and leave every other category unticked; tick the three certifications; Privacy
-   policy URL `https://openspineconsortium.com/beethoven/privacy.html` (version 10 live). Save draft.
+   policy URL `https://openspineconsortium.com/beethoven/privacy.html` (version 11 live). Save
+   draft.
 7. **Distribution** tab: Payments Free; Visibility **Private**, and add the address of the
    Beethoven-users group from section 0, item 6. Regions: United States only. Save draft. Chrome's
    documentation (`https://developer.chrome.com/docs/webstore/cws-dashboard-distribution`, read
    2026-09-30) says that Private lets trusted testers install the item and that "you can also include
    any Google Groups that you own or manage". Never choose Unlisted or Public.
 8. **Test instructions** tab (under **Access** in the left menu), from `PASTE.md`: the username
-   sentence, the password box left empty, and the Additional instructions (487 characters, within the
-   box's 500). Save changes. Before pasting, walk the instructions on the 12.0.0 build
+   sentence, the password box left empty, and the Additional instructions (493 characters, within
+   the box's 500). Save changes. Before pasting, walk the instructions on the 15.0.0 build
    (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"). The fuller text below them in `PASTE.md` is
    not pasted: it goes into a reply if a reviewer asks (section 4).
 9. **Submit for review** (top right). A Private item is reviewed like a public one.
 10. Expected review time: a wildcard optional host permission puts the item into in-depth review, a
-    native-messaging permission and executable scripts inside the package invite a closer look, and a
-    new developer account with a first item adds to that, so allow up to a few weeks. The decision
-    comes by e-mail; a rejection names the policy and can be appealed from the dashboard with a
-    written explanation (section 4).
+    native-messaging permission and, inside the package, executable scripts and two signed
+    installers carrying a compiled program invite a closer look (how the review treats the
+    installers is not yet measured), and a new developer account with a first item adds to that, so
+    allow up to a few weeks. The decision comes by e-mail; a rejection names the policy and can be
+    appealed from the dashboard with a written explanation (section 4).
 
-Updating later: **Package**, upload the new zip, submit. Every update is reviewed; students receive
-it through Chrome's own update mechanism within hours of publication. The helper installed on a
-student's computer is not updated by Chrome: a later version that needs a newer helper must say so
-and offer it from its own package (LICENSE section 17).
+Updating later: raise the version, commit and push, then `bash helper/release/release.sh` on the Mac
+(section 0, item 1), which uploads the recorded zip and submits it for review; by hand, **Package**,
+upload the new zip, submit. Every update is reviewed; students receive it through Chrome's own
+update mechanism within hours of publication. The helper installed on a student's computer is not
+updated by Chrome: a later version that needs a newer helper must say so and offer it from its own
+package (LICENSE section 17). A later package whose signed installers are rebuilt builds them for
+the same item ID.
 
 ## 2. The deploy order with the access service
 
@@ -201,7 +250,7 @@ plainly and offer the next best thing. Reply with this:
 Thank you for reviewing Beethoven. The extension works only against a university's cluster, which requires a university account with its password and a second factor (and, on its portal path, a VPN). We cannot issue such an account to a reviewer, and we cannot lend ours: one person, one account is a term of the university and of Anthropic's Claude service the worker uses.
 
 What we can offer:
-1. A mock portal, attached as beethoven-mock-portal.zip: a small Node 22 server that serves the same routes the extension uses on its portal path, with a stand-in scheduler and a stand-in cluster tool; it contains no extension code. The recipe below runs it with the item you installed from the store; it needs Node 22, bash and openssl, and we have run it end to end only on Windows, with Git for Windows. The mock's username, st1234, is approved on our access service for a portal at localhost and accepted from any installation. The direct (ssh) way is not part of the mock; its helper is a plain script inside the package (bridge/) that you can read, and we ask you not to try it against the university's real server, where a test sign-in is a failed sign-in on a real account.
+1. A mock portal, attached as beethoven-mock-portal.zip: a small Node 22 server that serves the same routes the extension uses on its portal path, with a stand-in scheduler and a stand-in cluster tool; it contains no extension code. The recipe below runs it with the item you installed from the store; it needs Node 22, bash and openssl, and we have run it end to end only on Windows, with Git for Windows. The mock's username, st1234, is approved on our access service for a portal at localhost and accepted from any installation. The direct (ssh) way is not part of the mock; its helper is inside the package (bridge/): on Linux a plain script you can read, on Windows and macOS a small compiled program built from our own source (Rust, with no third-party code but its standard library and the runtime support code its compiler links in) in an installer signed by us. We ask you not to try it against the university's real server, where a test sign-in is a failed sign-in on a real account.
 2. [Only if recorded by then: a walk-through of the same flow against the mock, and one against the real cluster with the AccessID, the codes and the key fingerprint blurred. Delete this item if there is no recording.]
 3. A live screen-share at a time of your choosing, during which you may direct every click.
 
@@ -212,14 +261,16 @@ Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude
 
 Then paste under it the fuller text from `PASTE.md` (section "Test instructions tab", the block
 after "The fuller text, for a reply to a reviewer"), and attach
-`release/12.0.0/reviewer/beethoven-mock-portal.zip`: the mock, its stand-in scheduler and cluster
+`release/15.0.0/reviewer/beethoven-mock-portal.zip`: the mock, its stand-in scheduler and cluster
 tool and its one dependency (`ws`), and no extension code. Never attach
 `.output/beethoven-<version>-sources.zip`: it holds the extension's full source, which is not handed
-out (the helper's scripts are in the package anyway, as the store requires of everything it runs).
-The recipe in `LISTING.md` is the same flow at more length, for a follow-up question. The mock flow
-of 11.0.0 (scenarios 0 to 12) was not run on a 12.0.0 build; the 12.0.0 harness ran the direct way's
-scenarios 13 to 16 against a local grid stand-in (`docs/V12_STATUS.md`). Walk the recipe once on the
-release build before quoting it, and say so if a reviewer names another system.
+out. The helper's scripts are in the package; the compiled helper inside the Windows and macOS
+installers cannot be read there, and its source (`helper/src/rust`) is the maintainer's to share if
+the review asks for it; whether it does is not yet measured. The recipe in `LISTING.md` is the same
+flow at more length, for a follow-up question. The mock flow of 11.0.0 (scenarios 0 to 12) was not
+run on a 12.0.0 build, nor on a 15.0.0 build; the 12.0.0 harness ran the direct way's scenarios 13
+to 16 against a local grid stand-in (`docs/V12_STATUS.md`). Walk the recipe once on the release
+build before quoting it, and say so if a reviewer names another system.
 
 ## 5. After publication: how students install
 

@@ -42,7 +42,7 @@ import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/chan
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectOptions, type GateFile, type LoginMode, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
@@ -171,7 +171,7 @@ interface Sitting {
   id: number;
   /** direct: the portal's shell from here; tab: a page script in a portal tab; ssh: 12.0.0's direct way (the held sign-in session, or connect through the gate) */
   mode: 'direct' | 'tab' | 'ssh';
-  login: LoginMode;
+  login: ConnectLogin;
   gate: CodeGate;
   close(): void;
   /** Anthropic's authorize link, in memory only, for "Open the Claude tab again" */
@@ -1061,7 +1061,7 @@ async function actInner(a: Action): Promise<unknown> {
     case 'stop':
       return pressStop();
     case 'sign-in-claude':
-      return pressSignInClaude(!!a.fresh);
+      return pressSignInClaude();
     case 'paste-code':
       return pasteCode(a.code);
     case 'reopen-claude-tab': {
@@ -1982,7 +1982,7 @@ async function carryPress(): Promise<void> {
     if (!r.go) return;
     await session.remove(PRESS_KEY);
     if (p.kind === 'connect') await startConnect('auto');
-    else if (p.kind === 'sign-in-claude') await startConnect(p.fresh ? 'fresh' : 'always');
+    else if (p.kind === 'sign-in-claude') await startConnect('always');
     else if (p.kind === 'stop') await doStop();
     else if (p.kind === 'restrict') await doRestrict((await loadPrefs()).worker_name);
     else if (p.kind === 'open-files') await openFiles();
@@ -2014,8 +2014,13 @@ async function pressConnect(statement?: { tick: string; lines: string[]; buttonL
   return { started: await startConnect('auto') };
 }
 
-/** "Sign in to Claude" / "Sign in again" / "Use another account": the same connect line, with the sitting asked for */
-async function pressSignInClaude(fresh: boolean): Promise<ActionResults['sign-in-claude']> {
+/**
+ * "Sign in to Claude" / "Sign in again": the same connect line, with the sitting asked for (--login
+ * always). 14.0.0's "Use another account" asked for --login fresh, a sign-out first; framework 17 refuses
+ * it, since Beethoven never signs anyone out of Claude (greg, 2026-10-04 16:24Z), so the switch is the
+ * student's own and the panel says how (WORDS.claude.switchAccount).
+ */
+async function pressSignInClaude(): Promise<ActionResults['sign-in-claude']> {
   // a sitting (or the start of one) already under way gives way to this one
   cancelStart();
   if (mem.sitting) {
@@ -2024,7 +2029,7 @@ async function pressSignInClaude(fresh: boolean): Promise<ActionResults['sign-in
     mem.sitting = undefined;
   }
   mem.connect = { ...freshConnect() };
-  await session.set(PRESS_KEY, { kind: 'sign-in-claude', ...(fresh ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+  await session.set(PRESS_KEY, { kind: 'sign-in-claude', at: nowIso() } satisfies PendingPress);
   const r = await readyForPress('sign-in-claude');
   if (r.drop) {
     await session.remove(PRESS_KEY);
@@ -2032,7 +2037,7 @@ async function pressSignInClaude(fresh: boolean): Promise<ActionResults['sign-in
   }
   if (!r.go) return { started: false, ...(r.waiting === 'grid' || r.waiting === 'login-setup' ? { waiting: r.waiting } : {}) };
   await session.remove(PRESS_KEY);
-  return { started: await startConnect(fresh ? 'fresh' : 'always') };
+  return { started: await startConnect('always') };
 }
 
 /** a connect line not typed yet is not typed at all (its floor wait ends; a shell it opened is closed before the line) */
@@ -2060,7 +2065,7 @@ async function cancelPress(): Promise<ActionResults['cancel']> {
 async function retry(): Promise<ActionResults['retry']> {
   const f = await buildFacts();
   const failure = mem.connect.failure;
-  if (failure === 'signin-node' || failure === 'signin-code' || failure === 'signin-timeout') return { started: (await pressSignInClaude(false)).started };
+  if (failure === 'signin-node' || failure === 'signin-code' || failure === 'signin-timeout') return { started: (await pressSignInClaude()).started };
   if (failure || f.run.phase === 'error' || f.run.phase === 'stopped' || f.run.phase === 'ended' || !f.run.present) {
     if (!f.access.ok) {
       await checkAccessNow('retry');
@@ -2081,7 +2086,7 @@ async function retry(): Promise<ActionResults['retry']> {
  * Type the one connect line and hold its sitting: here (direct), or behind CONNECT_PORT in a portal
  * tab's page script (tab mode). The code is typed through the gate, once, and never kept.
  */
-async function startConnect(login: LoginMode): Promise<boolean> {
+async function startConnect(login: ConnectLogin): Promise<boolean> {
   // claimed before the first await: a second caller in the same moment (the press, the tick carrying
   // it, "Keep my worker running") finds it taken and types nothing
   if (mem.sitting || mem.startId) return true;
@@ -2094,7 +2099,7 @@ async function startConnect(login: LoginMode): Promise<boolean> {
   }
 }
 
-async function startConnectClaimed(id: number, login: LoginMode): Promise<boolean> {
+async function startConnectClaimed(id: number, login: ConnectLogin): Promise<boolean> {
   const s = await settingsNow();
   if (!s || mem.sitting) return false;
   const prefs = await loadPrefs();
@@ -2130,7 +2135,7 @@ async function startConnectClaimed(id: number, login: LoginMode): Promise<boolea
   // never there); a Claude sign-in runs connect in the student's own signed-in session (held from a
   // sign-in a moment ago, or the sheet first)
   if ((await modeNow()) === 'direct') {
-    const needsClaude = login === 'always' || login === 'fresh' || (login === 'auto' && mem.direct.claude === 'no');
+    const needsClaude = login === 'always' || (login === 'auto' && mem.direct.claude === 'no');
     const held = !!mem.direct.sheet?.holding();
     if (!needsClaude && !(login === 'auto' && held && mem.direct.claude !== 'yes')) {
       dbg('connect', `start ${id}: the direct way, through the gate (no Claude sign-in; Claude Code on the grid signed in: ${mem.direct.claude ?? '?'})`);
@@ -2145,7 +2150,7 @@ async function startConnectClaimed(id: number, login: LoginMode): Promise<boolea
   return ch?.mode === 'tab' ? startTabSitting(id, s, opts, dir, login) : startDirectSitting(id, line, login);
 }
 
-async function startDirectSitting(id: number, line: string, login: LoginMode): Promise<boolean> {
+async function startDirectSitting(id: number, line: string, login: ConnectLogin): Promise<boolean> {
   const c = await directClient();
   if (!c) return false;
   // events that arrive before the sitting is registered (none should: the line is typed after the
@@ -2168,7 +2173,7 @@ async function startDirectSitting(id: number, line: string, login: LoginMode): P
       // the grid sign-in lapsed: the press waits for it, as any press does (the sign-in tab, then on by itself)
       mem.connect = { ...freshConnect() };
       await writeGrid({ session: 'signed-out' });
-      await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', ...(login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+      await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', at: nowIso() } satisfies PendingPress);
       await openSigninTab('press');
       schedulePush();
       return false;
@@ -2194,7 +2199,7 @@ async function startDirectSitting(id: number, line: string, login: LoginMode): P
   return true;
 }
 
-async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptions, dir: string, login: LoginMode): Promise<boolean> {
+async function startTabSitting(id: number, s: PortalSettings, opts: ConnectOptions, dir: string, login: ConnectLogin): Promise<boolean> {
   const host = tabHost(s.origin);
   let tabId = mem.keptTabId;
   let ownTab = false;
@@ -2380,7 +2385,7 @@ async function onSittingEnd(id: number, reason: string, tail: string[]): Promise
   if (reason === 'password') {
     mem.connect = { ...freshConnect(), failure: 'password' };
     await setShellWord('password');
-    await session.set(PRESS_KEY, { kind: sit.login === 'auto' || sit.login === 'never' ? 'connect' : 'sign-in-claude', ...(sit.login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+    await session.set(PRESS_KEY, { kind: sit.login === 'auto' || sit.login === 'never' ? 'connect' : 'sign-in-claude', at: nowIso() } satisfies PendingPress);
     offerLoginSetup();
   } else if (mem.connect.inFlight) {
     // the socket closed with no done or failed
@@ -3158,14 +3163,20 @@ async function directFacts(prefs: Prefs, profile: SiteProfile | undefined, setti
   };
 }
 
-/** this computer's installer from the package's bridge manifest */
+/** this computer's installer from the package's bridge manifest (15.0.0: a signed one only when it is made out to this very extension) */
 async function helperDownloadNow(): Promise<HelperDownload | undefined> {
   if (mem.direct.download !== undefined) return mem.direct.download || undefined;
   const os = await helperOs();
   const m = await bridgeManifest();
-  const dl = helperDownloadFor(m, os, (p) => assetUrl(p));
+  const dl = helperDownloadFor(m, os, (p) => assetUrl(p), browser.runtime.id);
   mem.direct.download = dl ?? null;
   return dl;
+}
+
+/** the integer before the first dot of a version ("1.0.0" -> 1); undefined when there is none */
+function majorOf(version: string | undefined): number | undefined {
+  const m = /^(\d+)/.exec(version ?? '');
+  return m ? Number(m[1]) : undefined;
 }
 
 /** the direct portal: the gate's verbs over ssh with this computer's key */
@@ -3398,7 +3409,7 @@ async function forgetComputer(): Promise<ActionResults['forget-computer']> {
 }
 
 /** the Claude sign-in sitting on the direct way: in the held session of a sign-in that just happened, else the sheet first */
-async function startSshSitting(id: number, line: string, login: LoginMode): Promise<boolean> {
+async function startSshSitting(id: number, line: string, login: ConnectLogin): Promise<boolean> {
   const flow = mem.direct.sheet;
   if (!flow || !flow.holding()) {
     // a sign-in first; the press waits for it and carries on by itself
@@ -3406,7 +3417,7 @@ async function startSshSitting(id: number, line: string, login: LoginMode): Prom
     mem.direct.claudeWanted = true;
     mem.direct.sheetWanted = true;
     dbg('sitting', `${id}: a Claude sign-in needs the grid sign-in sheet first; the press waits for it`);
-    await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', ...(login === 'fresh' ? { fresh: true } : {}), at: nowIso() } satisfies PendingPress);
+    await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', at: nowIso() } satisfies PendingPress);
     const f = sheetFlow('claude');
     if (f.state.phase === 'done' || f.state.phase === 'failed' || f.state.phase === 'stopped') f.cancel();
     schedulePush();
@@ -3555,13 +3566,30 @@ async function connectionSettings(prefs: Prefs): Promise<ConnectionSettingsView>
   const B = await session.get<BridgeNote>(BRIDGE_KEY);
   const download = await helperDownloadNow();
   const installed = B?.helper === 'available';
+  // 15.0.0: an installed helper of an older major than the package brings: LICENSE section 17 promises that the
+  // extension says so and offers the newer installer (the download link stays beside the line, ui/settings.ts).
+  // Versions that cannot be read, or the same major, read as today; a newer helper than ours is left alone.
+  const shipped = (await bridgeManifest())?.helper;
+  const installedMajor = majorOf(B?.helper_version);
+  const shippedMajor = majorOf(shipped);
+  const outdated = installed && installedMajor !== undefined && shippedMajor !== undefined && installedMajor < shippedMajor;
+  // 15.0.0: on Windows the script helper of 12.0.0 to 14.0.0 shares the signed installer's folder, manifest and
+  // registry values, and its uninstall.cmd, which the installer cannot take away, would remove them: so the student
+  // removes it before using the installer offered beside it (docs/guides/INSTALL.md, "Remove the helper")
+  const scriptFirst = installed && B?.helper_kind === 'script' && download?.os === 'windows' && download.signed;
   return {
     title: W.title,
     mode: { label: W.modeLabel, value: prefs.connection ?? 'direct', options: [{ value: 'direct', label: W.modes.direct }, { value: 'vpn', label: W.modes.vpn }] },
     protectKey: { label: W.protectKey, note: W.protectKeyNote, value: k.wrapped, available: mem.direct.protectOutcome !== 'unsupported', present: k.present, ...(k.present && !k.wrapped ? { laterNote: W.protectLaterNote } : {}) },
     keyLine: !k.present ? W.keyNone : k.wrapped ? W.keyProtected : W.keyPlain,
     forget: { label: W.forget, note: W.forgetNote, confirm: W.forgetConfirm, button: { label: W.forgetButton, tone: 'text', action: { kind: 'forget-computer' } }, disabled: !k.present, ...(k.locked && k.enrolled ? { locked: true } : {}) },
-    helper: { label: W.helper, text: installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing, installed, ...(download ? { download } : {}), checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } } },
+    helper: {
+      label: W.helper,
+      text: outdated && B?.helper_version && shipped ? W.helperOutdated(B.helper_version, shipped) : scriptFirst && B?.helper_version ? W.helperScriptFirst(B.helper_version) : installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing,
+      installed,
+      ...(download ? { download } : {}),
+      checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } },
+    },
   };
 }
 
@@ -3582,7 +3610,7 @@ async function directDetails(): Promise<DirectDetails> {
     key: k.present ? `${k.keyType ?? k.alg ?? '?'} ${k.fingerprint ?? ''}, protected: ${k.wrapped ? 'yes' : 'no'}${k.locked ? ' (locked)' : ''}, enrolled: ${k.enrolledAt ?? 'no'}` : 'none',
     reach: B ? `${B.reach22} (${B.checked_at})` : 'not checked',
     ...(D.account ? { account: D.account } : {}),
-    ...(dl ? { helperFile: `${dl.file}${dl.bytes ? ` ${dl.bytes} bytes` : ''}${dl.sha256 ? ` sha256 ${dl.sha256}` : ''}` } : {}),
+    ...(dl ? { helperFile: `${dl.file}${dl.bytes ? ` ${dl.bytes} bytes` : ''}${dl.sha256 ? ` sha256 ${dl.sha256}` : ''}${dl.signed ? ' signed' : ''}` } : {}),
     unproven: WORDS.details.directUnproven,
   };
 }

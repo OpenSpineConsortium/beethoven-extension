@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the macOS Installer shows and does for beethoven-bridge-mac.pkg. build-pkg.sh copies this
+  file into its work folder with @COMPONENT_PKG@ replaced by the component package's file name and
+  @VERSION@ by helper/VERSION, and hands the copy to productbuild with the resources folder it
+  writes beside it; the Installer reads the welcome pane's text from welcome.txt there, because it
+  takes that text from a file and not from this document.
+
+  The domains line is the point of the package: the current user's home only, so the Installer asks
+  for no administrator password and the payload lands under Library/Application Support in the home
+  of whoever runs it; "anywhere" and the system volume are closed. What the Installer shows between
+  Continue and Install with these domains on a real Mac is not yet measured.
+-->
+<installer-gui-script minSpecVersion="2">
+  <title>Beethoven bridge</title>
+  <options customize="never" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+  <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="false"/>
+  <welcome file="welcome.txt" mime-type="text/plain"/>
+  <choices-outline>
+    <line choice="default">
+      <line choice="com.openspineconsortium.beethoven.bridge"/>
+    </line>
+  </choices-outline>
+  <choice id="default"/>
+  <choice id="com.openspineconsortium.beethoven.bridge" visible="false">
+    <pkg-ref id="com.openspineconsortium.beethoven.bridge"/>
+  </choice>
+  <pkg-ref id="com.openspineconsortium.beethoven.bridge" version="@VERSION@" onConclusion="none">@COMPONENT_PKG@</pkg-ref>
+</installer-gui-script>

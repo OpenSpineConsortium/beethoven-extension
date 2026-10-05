@@ -1,6 +1,11 @@
 # Use Beethoven
 
-For Beethoven 14.0.0. Written 2026-10-02, updated 2026-10-03.
+For Beethoven 15.0.0. Written 2026-10-02, updated 2026-10-04.
+
+**New in 15.0.0.** On Windows and on a Mac, the helper now comes as a signed installer: open the
+file you downloaded and your computer's own installer puts it in your account ([Install
+Beethoven](INSTALL.md), part 2). A helper you already have keeps working. Beethoven asks you to
+accept its terms once more, because they now describe the signed helper.
 
 **New in 14.0.0.** When your worker picks up a conversation you had earlier, Claude gives it a link of
 another kind, the link to that conversation itself. Beethoven 13.0.0 knew only the usual link, so it

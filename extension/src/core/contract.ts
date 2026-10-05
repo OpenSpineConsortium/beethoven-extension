@@ -109,8 +109,16 @@ export function toolPath(sharedDir: string): string {
   return `${sharedDir}/bin/hpcworker`;
 }
 
-/** how `connect` treats the Claude sign-in (V11_CONTRACT.md, "connect") */
+/**
+ * How `connect` treats the Claude sign-in (V11_CONTRACT.md, "connect"), as a line may read. `fresh` is
+ * here for the parser only (CONNECT_LINE_RE reads a line an older build typed for "Use another
+ * account"): framework 17 refuses it with a usage failure, since Beethoven never signs anyone out of
+ * Claude (greg, 2026-10-04), so no 15.0.0 line asks for it (ConnectLogin).
+ */
 export type LoginMode = 'auto' | 'always' | 'fresh' | 'never';
+
+/** the modes a connect line may ask for: never `fresh` (framework 17 refuses it; the account switch is the student's own, see WORDS.claude.switchAccount) */
+export type ConnectLogin = Exclude<LoginMode, 'fresh'>;
 
 export type PermissionMode = 'default' | 'acceptEdits' | 'plan';
 
@@ -122,7 +130,7 @@ export interface ConnectOptions {
   site: string;
   /** this installation's 32 hex characters; given only when the data statement for this worker is in force (writes the Remote Control answer) */
   installId?: string;
-  login: LoginMode;
+  login: ConnectLogin;
   permissionMode: PermissionMode;
   /** "Keep my worker running": false adds --no-chain */
   chain: boolean;
@@ -132,7 +140,7 @@ const WORKER_NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
 const SITE_RE = /^[a-z0-9-]{1,32}$/;
 const INSTALL_RE = /^[0-9a-f]{32}$/;
 const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
-const LOGINS: readonly LoginMode[] = ['auto', 'always', 'fresh', 'never'];
+const LOGINS: readonly ConnectLogin[] = ['auto', 'always', 'never'];
 
 /**
  * The only line the portal page script will ever type into a terminal page (AM2): the login-setup
@@ -273,7 +281,7 @@ export const commands = {
     if (!WORKER_NAME_RE.test(o.name)) throw new Error('worker name must be letters, digits, _ or -');
     if (!SITE_RE.test(o.site)) throw new Error('site profile name must be lower-case letters, digits or -');
     if (o.installId !== undefined && !INSTALL_RE.test(o.installId)) throw new Error('installation id must be 32 hex characters');
-    if (!LOGINS.includes(o.login)) throw new Error('unknown login mode');
+    if (!LOGINS.includes(o.login)) throw new Error('unknown login mode'); // `fresh` too: framework 17 refuses it
     if (!MODES.includes(o.permissionMode)) throw new Error('unknown permission mode');
     return `exec bash '${toolPath(sharedDir)}' connect --name '${o.name}' --profile '${o.site}'${o.installId ? ` --consent '${o.installId}'` : ''} --login '${o.login}' --permission-mode '${o.permissionMode}'${o.chain ? '' : ' --no-chain'}`;
   },
@@ -1125,6 +1133,13 @@ export const gate = {
 export const GATE_REFUSED = 'HPCW-GATE refused';
 export const GATE_KEY_EXPIRED = 'HPCW-KEY expired';
 
+/**
+ * The connect line as commands.connect types it (groups: name, site, consent, login, permission mode,
+ * --no-chain). `fresh` stays in the login group so a line an older build typed is still read as a
+ * connect line (and, as any Claude sign-in, never carried by the gate); no 15.0.0 line asks for it.
+ */
+export const CONNECT_LINE_RE = /^exec bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' connect --name '([A-Za-z0-9_-]{1,32})' --profile '([a-z0-9-]{1,32})'(?: --consent '([0-9a-f]{32})')? --login '(auto|always|fresh|never)' --permission-mode '(default|acceptEdits|plan)'( --no-chain)?$/;
+
 /** the line the gate carries in place of an 11.0.0 line, or undefined (the gate has no such verb, or the line asks for a Claude sign-in) */
 export function gateLineFor(line: string): string | undefined {
   const l = String(line ?? '').trim();
@@ -1132,7 +1147,7 @@ export function gateLineFor(line: string): string | undefined {
   if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker status --name '([A-Za-z0-9_-]{1,32})' --json$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.status(m[1]!) : undefined;
   if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker stop --name '([A-Za-z0-9_-]{1,32})'$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.stop(m[1]!) : undefined;
   if ((m = /^bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' worker restrict --name '([A-Za-z0-9_-]{1,32})'$/.exec(l))) return GATE_NAME_RE.test(m[1]!) ? gate.restrict(m[1]!) : undefined;
-  m = /^exec bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' connect --name '([A-Za-z0-9_-]{1,32})' --profile '([a-z0-9-]{1,32})'(?: --consent '([0-9a-f]{32})')? --login '(auto|always|fresh|never)' --permission-mode '(default|acceptEdits|plan)'( --no-chain)?$/.exec(l);
+  m = CONNECT_LINE_RE.exec(l);
   if (m) {
     if (m[4] !== 'never') return undefined;
     try {

@@ -1,4 +1,4 @@
-# Beethoven 12.0.0 for the lab lead
+# Beethoven 15.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it stands in the working
@@ -12,6 +12,19 @@ resumed an earlier session (Claude Code prints that session's own link, `https:/
 and no environment link) is read as online, which needs framework 14 on the grid for the direct way; and
 the panel keeps a debug log in memory that a student copies for you with **⋯** (More), **Copy debug log**.
 Publish framework 14 with the two commands of section 2 (`--dry-run` first), as for 11 and 13.
+
+**15.0.0 and framework 17 (2026-10-04).** On the grid, Beethoven never signs anyone out of Claude:
+framework 17 refuses the `--login fresh` that earlier builds typed for **Use another account**, 15.0.0
+never asks for it, and a student who needs another Claude account signs out of Claude Code themselves,
+then presses **Sign in again** (section 13). On Windows and macOS the helper students install is now a
+compiled program in a signed installer, built only on Greg's own machines:
+`beethoven-bridge-windows.msi`, signed through Azure Artifact Signing and removed from Windows'
+Settings, Apps, "Beethoven bridge"; and `beethoven-bridge-mac.pkg`, signed with a Developer ID and
+notarized by Apple (`ACCOUNTS.md`, 2.1). Linux keeps the script. A helper a student already has
+keeps working; it is the same version, 1.0.0. The agreement is now version 10 and the privacy
+statement version 11, so every student accepts once more. Neither installer has been opened on a
+real computer yet: what students see on the way is not yet measured, and `INSTALL.md` asks them to
+tell you, in the window's own words; keep what they report (section 8).
 
 ## 1. What changes for you
 
@@ -243,9 +256,14 @@ Beethoven says which in plain words and offers GlobalProtect for that action.
   has no grid code yet; Beethoven asks the student which. Only a student with no code at all should
   run 2FA Setup (`USE.md`, part 2): running it twice destroys the existing code. Beethoven warns
   before each step that could lead there.
-- **"Windows (or my Mac) says the helper is unsafe."** Expected: it is an unsigned script
-  (`ACCOUNTS.md`, 2.1). `INSTALL.md` has the clicks for each system, Smart App Control's **Unblock**
-  included.
+- **"Windows (or my Mac) says the helper is unsafe."** Since 15.0.0 the Windows and Mac installers
+  are signed (`ACCOUNTS.md`, 2.1), so the warnings of the unsigned script are not expected any more.
+  On Windows, SmartScreen may still warn while a new publisher has little reputation; **More info**,
+  then **Run anyway** is the panel's own second step. Whether and how often that happens is not yet
+  measured: ask for the window's exact words or a photo, and keep them. A warning on Windows that
+  names no publisher, or any warning on a Mac, is not expected: have the student stop, use
+  GlobalProtect, and send you the file's name and where it came from. On Linux the helper is still
+  the script, and `INSTALL.md` has its steps.
 - **"Can't reach the grid directly."** Their network blocks outbound port 22 (some hospital and hotel
   networks do). They use **Use GlobalProtect instead**.
 - **"Stopped: the grid's identity didn't match."** The grid's host key did not match the pin.
@@ -259,6 +277,9 @@ Beethoven says which in plain words and offers GlobalProtect for that action.
 - **"The grid lets this computer's key use only a few worker names."** The names cap (section 7).
   Signing in again with the password and code clears it; so does waiting a week.
 - **"I lost my laptop."** Section 5.
+- **"This Claude account has no Pro or Max plan."** The Claude account they signed in with has no
+  Remote Control. To use another one they sign out of Claude on the grid themselves, then press
+  **Sign in again**; Beethoven never does the sign-out (section 13).
 - **"Your grid account can't use the lab's copy yet."** and **Copy details** shows `setup: failed (the
   setup line ended with exit 126: bash: /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker:
   Permission denied)`. Their AccessID is not on the list yet (section 9).
@@ -506,3 +527,23 @@ before a line is kept (`extension/src/core/debuglog.ts`). It is in the backgroun
 background again: a browser restart, an update, and Chrome stopping an idle service worker, which it
 does about 30 seconds after the last event while the panel is closed. So ask for it while the panel
 still shows the problem.
+
+## 13. Switching Claude accounts (15.0.0, framework 17)
+
+Beethoven never signs a student out of Claude. Its own tooling has no command for it, on purpose:
+earlier builds' **Use another account** typed `connect --login fresh`, which signed out of Claude Code
+on the grid before signing in again; framework 17 refuses that line, and 15.0.0 never types it. So when
+a student needs to use another Claude account (the panel said "This Claude account has no Pro or Max
+plan. Remote Control needs one.", or they have a second account of their own), the sign-out is theirs:
+
+1. In a terminal on a compute node, inside the lab's worker image, with the student's own sign-in
+   folder (`~/.beethoven/claude`) as `CLAUDE_CONFIG_DIR`, the student runs Claude Code's own
+   `claude auth logout`. The exact way to open that terminal depends on the site; your own notes hold
+   the one that works on your grid.
+2. Back in Beethoven, the student presses **Sign in again**. The sitting runs as on the first day: a
+   Claude tab, the code, **Continue**, and the new account's plan is checked the same way.
+
+The panel's sentence under "no Pro or Max plan" sends the student here: "To use another Claude
+account, sign out of Claude on the grid first (your lab lead's guide shows how), then press Sign in
+again." Nothing of Beethoven's reads or changes the sign-in folder; what `claude auth logout` removes
+is Claude Code's own, run by the student.

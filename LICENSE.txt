@@ -1,11 +1,11 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 9, 2026-10-02. Applies to the Trial Edition of Beethoven 12.0.0 and later versions that ship
-this text, as distributed through its private listing on the Chrome Web Store, which only the Google
-accounts Licensor has invited can open. You can read, copy, save and print this text at any time: it
-is in the file LICENSE.txt inside the extension and inside the framework (in your computing account,
-or in your institution's shared copy), on Beethoven's welcome page ("Show terms", "Open in a tab",
-"Save a copy", "Print") and on its settings page, at
+Version 10, 2026-10-04. Applies to the Trial Edition of Beethoven 15.0.0 and later versions that
+ship this text, as distributed through its private listing on the Chrome Web Store, which only the
+Google accounts Licensor has invited can open. You can read, copy, save and print this text at any
+time: it is in the file LICENSE.txt inside the extension and inside the framework (in your computing
+account, or in your institution's shared copy), on Beethoven's welcome page ("Show terms", "Open in
+a tab", "Save a copy", "Print") and on its settings page, at
 https://openspineconsortium.com/beethoven/terms.html, and from the support page at
 https://openspineconsortium.com/beethoven/support.html. You may ask for a paper copy at the notice
 address there.
@@ -165,25 +165,33 @@ starts. Beethoven gives Claude Code no answer you have not given.
 (b) Your sign-in to your cluster. The Extension reaches your cluster in one of two ways and tries
 the first before the second: the ssh path, which needs no VPN, and the portal path, which may need
 your institution's VPN (at Wayne State, GlobalProtect). It never signs in to Claude for you on
-either path (see (a)). The ssh path is new in this version and has been tried only against ssh
-servers that Licensor ran itself, set up like your institution's, not yet with a real account on a
-real cluster.
+either path (see (a)). The ssh path came with version 12.0.0 of the Extension; it has been tried
+mostly against ssh servers that Licensor ran itself, set up like your institution's, and has had
+little use yet with real accounts on a real cluster.
 
 (i) The Bridge. A browser extension cannot open an ssh connection by itself, so the ssh path needs a
 bridge that carries the Extension's encrypted connection to your cluster's ssh port and back. In
 this version that is the Bridge: a small helper program that ships inside the Extension, which you
 install once on your computer, in your own user account and without administrator rights, by saving
-the installer the Extension offers you from its own package and running it (the Extension cannot run
-a program for you). Your browser starts the Bridge only when the Extension asks for it, and the
-Bridge ends when the Extension lets it go. The Bridge opens a network connection only to your
-cluster's ssh port (at Wayne State, grid.wayne.edu, port 22, and another address only if its
-installer wrote one into its settings), carries bytes both ways without reading, keeping or logging
-them, holds no password, key or other credential, offers no shell and runs no other program. The
-uninstaller placed beside it removes it. The Extension can also carry the ssh path through a relay
-server, but only one that your institution's site profile names; none is named in this version, and
-if one ever is, the privacy statement will name who runs it and what it sees before any version uses
-it. If no Bridge is installed and you do not install one, or your cluster's ssh port cannot be
-reached from your network, the Extension uses the portal path.
+the installer the Extension offers you from its own package and opening it (the Extension cannot run
+a program for you). On Windows and macOS the Bridge is a compiled program of Licensor's, and its
+installer is a package that Licensor has signed, whose signature your system can check before it
+installs anything; on Linux the Bridge is a script, run by Perl or by Python 3, which come with your
+system, and its installer is a script too. A Bridge you installed from a zip file with Beethoven
+14.0.0 or earlier keeps working until you remove it: it is a script, run by Windows PowerShell on
+Windows and by Perl on macOS, it is not signed, and the uninstaller placed beside it removes it.
+Your browser starts the Bridge only when the Extension asks for it, and the Bridge ends when the
+Extension lets it go. The Bridge opens a network connection only to your cluster's ssh port (at
+Wayne State, grid.wayne.edu, port 22, and another address only if a settings file placed beside it
+names one; the installers in the Extension's package bring none), carries bytes both ways without
+reading, keeping or logging them, holds no password, key or other credential, offers no shell and
+runs no other program. On Windows you remove it from Windows' own list of installed apps, where it
+is called "Beethoven bridge"; on macOS and Linux the uninstaller placed beside it removes it. The
+Extension can also carry the ssh path through a relay server, but only one that your institution's
+site profile names; none is named in this version, and if one ever is, the privacy statement will
+name who runs it and what it sees before any version uses it. If no Bridge is installed and you do
+not install one, or your cluster's ssh port cannot be reached from your network, the Extension uses
+the portal path.
 
 (ii) Your password and code. The first time you use the ssh path in this browser, again whenever the
 key of (iii) is missing or refused, and when you sign in to Claude on the ssh path (see (a)), the
@@ -491,19 +499,24 @@ promptly and let Licensor control the defence.
 
 Beethoven is protected by copyright and other laws; Licensor and its licensors keep all right, title
 and interest in it. Beethoven bundles open-source packages listed in THIRD_PARTY_NOTICES.md; each is
-licensed to you under its own license, which this agreement does not limit. Claude Code, Node.js,
-the container image, the container runtime, the Open OnDemand portal, your cluster's ssh service,
-the programs your computer already has that the Bridge runs on (Windows PowerShell, Perl or Python),
-your authenticator app and the passkey service of your system or browser are not part of Beethoven:
-they are provided by their own publishers or by your institution under their own terms. If you send
-Licensor suggestions about Beethoven, Licensor may use them without obligation. Beethoven runs
-Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used
-here to say what it runs; "Open OnDemand" is the mark of its publisher. Your institution's names and
-marks belong to it: Beethoven uses its name only in plain words, to say where your worker runs (for
-example, "Wayne State grid"), and carries none of its logos or other marks. "GlobalProtect" is the
-mark of Palo Alto Networks, named only to say which VPN program to turn on; "Google Authenticator"
-is Google's mark, "Windows Hello" Microsoft's and "Touch ID" Apple's, each named only to say which
-of your own tools to use.
+licensed to you under its own license, which this agreement does not limit. On Windows and macOS the
+Bridge is a compiled program of Licensor's that includes the Rust standard library and the start-up
+and runtime support code its compiler links in (on Windows, that of MinGW-w64 and GCC, or
+Microsoft's C runtime when it is built on Windows), each licensed to you under its own notice in
+THIRD_PARTY_NOTICES.md. Claude Code, Node.js, the container image, the container runtime, the Open
+OnDemand portal, your cluster's ssh service, the programs your computer already has that the
+Bridge's scripts run on (Perl or Python under Linux, and Windows PowerShell or Perl for a Bridge
+installed from a zip file with Beethoven 14.0.0 or earlier), your authenticator app and the passkey
+service of your system or browser are not part of Beethoven: they are provided by their own
+publishers or by your institution under their own terms. If you send Licensor suggestions about
+Beethoven, Licensor may use them without obligation. Beethoven runs Claude Code and is not an
+Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs;
+"Open OnDemand" is the mark of its publisher. Your institution's names and marks belong to it:
+Beethoven uses its name only in plain words, to say where your worker runs (for example, "Wayne
+State grid"), and carries none of its logos or other marks. "GlobalProtect" is the mark of Palo Alto
+Networks, named only to say which VPN program to turn on; "Google Authenticator" is Google's mark,
+"Windows" and "Windows Hello" Microsoft's, and "macOS" and "Touch ID" Apple's, each named only to
+say which of your own tools or systems to use.
 
 16. SECURITY AND BREACH NOTICE
 

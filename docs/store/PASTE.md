@@ -1,33 +1,40 @@
-# Paste sheet: Beethoven 12.0.0 on the Chrome Web Store
+# Paste sheet: Beethoven 15.0.0 on the Chrome Web Store
 
 Every field of the dashboard, in the order it asks for them, with the text to paste (in a block:
-copy all of it) or the file to upload. Paths are from the repository root,
-`C:\Users\grego\OneDrive\Desktop\ashley-bridge`. The texts and the reasons behind them are in
-`LISTING.md`; registration, the testers' group and the review are in `SUBMISSION.md`. Written
-2026-09-30 for 9.0.0, brought up to date for 10.0.0 on 2026-10-01, and rewritten on 2026-10-02 for
-12.0.0 (11.0.0 was built and never submitted; its changes are carried here too: the welcome page, no
-`activeTab`, the window-wide panel). 12.0.0 adds the `nativeMessaging` permission, the helper's
-installers inside the package, and the Authentication information data type.
+copy all of it) or the file to upload. Paths are from the repository root of the checkout on the Mac
+that makes the release (`SUBMISSION.md`, section 0, item 1), where the package and the kit are. The
+texts and the reasons behind them are in `LISTING.md`; registration, the testers' group and the
+review are in `SUBMISSION.md`. Written 2026-09-30 for 9.0.0, brought up to date for 10.0.0 on
+2026-10-01, rewritten on 2026-10-02 for 12.0.0 (11.0.0 was built and never submitted; its changes
+are carried here too: the welcome page, no `activeTab`, the window-wide panel), and brought up to
+date on 2026-10-04 for 15.0.0. 12.0.0 added the `nativeMessaging` permission, the helper's
+installers inside the package, and the Authentication information data type. 15.0.0 adds the signed
+installers of the helper for Windows and macOS, with a compiled program inside, beside the script
+zips; no permission and no data type.
 
-**Everything in one folder.** `release/12.0.0/store-kit/` (also zipped, as
-`release/12.0.0/store-kit-12.0.0.zip`) holds a copy of every file this sheet names, with the number of
-its field below in front of the name, so the folder lists in the order of this sheet. Fields 2, 3 and
-9 to 11 are typed, so they have no file, and so are the Privacy practices and Distribution tabs; the
-package is `00`, and the Test instructions tab (`12`, after Distribution) has one file per box and one
-for the fuller reply text. The folder was assembled on 2026-10-02 with the release
-(`release/12.0.0/README.md`); its screenshots are still 9.0.0's until field 7's captures replace them
-(`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which).
+**Everything in one folder.** `release/15.0.0/store-kit/` (also zipped, as
+`release/15.0.0/store-kit-15.0.0.zip`) holds a copy of every file this sheet names, with the number
+of its field below in front of the name, so the folder lists in the order of this sheet. Fields 2, 3
+and 9 to 11 are typed, so they have no file, and so are the Privacy practices and Distribution tabs;
+the package is `00`, and the Test instructions tab (`12`, after Distribution) has one file per box
+and one for the fuller reply text. The kit was assembled for 12.0.0 on 2026-10-02 with that release
+(`release/12.0.0/README.md`); for 15.0.0 it is to be assembled again, with the 15.0.0 package as
+`00` and the texts of this sheet as they are now. Its screenshots are still 9.0.0's until field 7's
+captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which). From 15.0.0 the `00`
+zip, and the kit's own zip that holds it, name the store item and carry the signed installers, so
+`.gitignore` keeps both out of the repository like the record's zip, and the whole kit stays on the
+Mac (`helper/release/README.md`, "What never enters the repository or CI").
 
 | File in the kit | Field | Copy of |
 |---|---|---|
-| `00-beethoven-12.0.0-chrome.zip` | Package | `release/12.0.0/beethoven-12.0.0-chrome.zip` (built as `extension/.output/beethoven-12.0.0-chrome.zip`) |
+| `00-beethoven-15.0.0-chrome.zip` | Package | `release/15.0.0/beethoven-15.0.0-chrome.zip` (built as `extension/.output/beethoven-15.0.0-chrome.zip`) |
 | `01-description.txt` | 1. Description | the block under field 1 (no newline at the end) |
 | `04-store-icon-128.png` | 4. Store icon | `extension/store-assets/store-icon-128.png` |
 | `05-promo-video-1280x720.mp4` | 5. Global promo video (to YouTube first) | `extension/store-assets/promo/beethoven-promo.mp4` (9.0.0's; see field 5) |
 | `05-promo-video-thumbnail.png` | 5. the video's YouTube thumbnail | `extension/store-assets/promo/beethoven-promo-poster.png` |
 | `06-promo-tile-440x280.png` | 6. Small promo tile | `extension/store-assets/promo-tile-440x280.png` |
-| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | **to be captured from the 12.0.0 build** (field 7) |
-| `07-SCREENSHOTS-OUT-OF-DATE.txt` | 7. not a field | which of the kit's 9.0.0 images and video no longer match 12.0.0's screens |
+| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | **to be captured from the 15.0.0 build** (field 7) |
+| `07-SCREENSHOTS-OUT-OF-DATE.txt` | 7. not a field | which of the kit's 9.0.0 images and video no longer match 15.0.0's screens |
 | `08-marquee-1400x560.png` | 8. Marquee promo tile | `extension/store-assets/marquee-1400x560.png` |
 | `12-test-username.txt` | 12. Test instructions: Username | the block under **Username** (no newline at the end) |
 | `12-test-password.txt` | 12. Test instructions: Password | empty, as the box stays |
@@ -35,14 +42,20 @@ for the fuller reply text. The folder was assembled on 2026-10-02 with the relea
 | `12-test-instructions-long-reply.txt` | 12. not a box: the fuller text for a reply to a reviewer | the block under **The fuller text** (no newline at the end) |
 | `PASTE.md` | | this sheet |
 
-**Package first.** Upload `release/12.0.0/beethoven-12.0.0-chrome.zip` (the same bytes as the kit's
-`00-beethoven-12.0.0-chrome.zip`; check it against `release/12.0.0/SHA256SUMS.txt`, because a later
-`npm run build` rewrites the copy in `extension/.output/`): under **New item** for a new item, or
-under the old draft's **Package** tab. The name (Beethoven) and the summary (the 128-character
-sentence in `LISTING.md`) come from the package and are not typed. Before uploading,
-`unzip -l` on it must list `bridge/beethoven-bridge-windows.zip`, `bridge/beethoven-bridge-mac.zip`,
-`bridge/beethoven-bridge-linux.zip` and `bridge/manifest.json`; those files are what the extension
-offers the student, and the store reviews them with the rest of the package.
+**Package first.** Upload `release/15.0.0/beethoven-15.0.0-chrome.zip` (the same bytes as the kit's
+`00-beethoven-15.0.0-chrome.zip`; check it against `release/15.0.0/SHA256SUMS.txt`, because a later
+`npm run build` rewrites the copy in `extension/.output/`): under the draft's **Package** tab, once
+the item exists (`SUBMISSION.md`, section 1, item 4), or with the upload command that `bash
+helper/release/release.sh --no-upload` printed, without its `--publish`. For an update of a live
+item, `release.sh` without `--no-upload` has already uploaded and submitted it. The name (Beethoven)
+and the summary (the 128-character sentence in `LISTING.md`) come from the package and are not
+typed. Before uploading, `unzip -l` on it must list `bridge/beethoven-bridge-windows.msi`,
+`bridge/beethoven-bridge-mac.pkg`, `bridge/beethoven-bridge-windows.zip`,
+`bridge/beethoven-bridge-mac.zip`, `bridge/beethoven-bridge-linux.zip` and `bridge/manifest.json`,
+and the two signed entries in `bridge/manifest.json` must name `chrome-extension://<the item's ID>/`
+and no other origin (`SUBMISSION.md`, section 1, item 4: the signed installers are built for the
+item's ID, so a new item is created first). Those files are what the extension offers the student,
+and the store reviews them with the rest of the package.
 
 **Check the image files before you upload them**, from inside the store kit folder. The line prints
 each PNG with its size and colour mode. The store icon is 128x128 `RGBA` (its padding is transparent).
@@ -106,7 +119,7 @@ English (United States)
 
 The field takes a YouTube address, not a file. The file, `extension/store-assets/promo/beethoven-promo.mp4`
 (28 seconds, 1280x720), was made from 9.0.0 and shows its toolbar-button start; **leave this field
-empty** until a video of 12.0.0 is made. To add one later: YouTube Studio, **Create**, **Upload
+empty** until a video of 15.0.0 is made. To add one later: YouTube Studio, **Create**, **Upload
 videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; paste the
 `https://youtu.be/...` link here.
 
@@ -116,7 +129,7 @@ videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; p
 
 ### 7. Screenshots (up to 5, 1280x800), in this order
 
-**To be captured from the 12.0.0 release build before submission** (`LISTING.md`, "Images and the
+**To be captured from the 15.0.0 release build before submission** (`LISTING.md`, "Images and the
 promo video"): 9.0.0's five show its setup page and old panel. Suggested order, each a real capture
 on the mock account `st1234`:
 
@@ -169,7 +182,7 @@ Start, monitor and stop a Claude Code worker on your university's Open OnDemand 
 
 The texts are in `LISTING.md`, "Permission justifications"; each block below is the same sentence.
 The dashboard shows one field per permission in the uploaded manifest: `nativeMessaging` is a
-required permission in 12.0.0's Chrome manifest, so it gets a field of its own.
+required permission in the Chrome manifest since 12.0.0, so it gets a field of its own.
 
 `storage`
 
@@ -198,7 +211,7 @@ Opens the extension's panel at the side of the window when you click the toolbar
 `nativeMessaging`
 
 ```
-Talks to Beethoven's own helper, a small script that ships inside the extension and that you install once (no administrator rights), so you can reach your university cluster without a VPN. The helper opens a connection only to the cluster's ssh port (grid.wayne.edu:22) and carries the extension's encrypted ssh session there and back; its registration names only this extension, and it holds no credential, runs no shell, keeps no log of what it carries and talks to nothing else.
+Talks to Beethoven's own helper, a small program that ships inside the extension and that you install once, with no administrator rights (on Windows and macOS from an installer signed by the developer, on Linux from a script), so you can reach your university cluster without a VPN. The helper opens a connection only to the cluster's ssh port (grid.wayne.edu:22) and carries the extension's encrypted ssh session there and back; its registration names only this extension, and it holds no credential, runs no shell, keeps no log of what it carries and talks to nothing else.
 ```
 
 Host permission (`https://*/*`, optional, requested at a click for one origin); 681 characters:
@@ -212,7 +225,7 @@ Your university's Open OnDemand portal has an address the extension cannot know 
 **No.** If a box asks why:
 
 ```
-No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a script inside the package, offered by the extension's own page; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
+No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a file inside the package, offered by the extension's own page: on Windows and macOS an installer signed by the developer that carries a small compiled program built from the developer's own source (Rust, with no third-party code but its standard library and the runtime support code its compiler links in), on Linux a script; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
 ```
 
 ### Data usage
@@ -244,7 +257,7 @@ creditworthiness or for lending.
 https://openspineconsortium.com/beethoven/privacy.html
 ```
 
-It must show version 10 (2026-10-02) before the submission. Then **Save draft**.
+It must show version 11 (2026-10-04) before the submission. Then **Save draft**.
 
 ## Distribution tab
 
@@ -265,13 +278,13 @@ for Additional instructions (Google's screenshot of the tab,
 without a trailing newline, ASCII only; the second number is the count if the form counts each line
 break as two characters.
 
-**Partly seen on the 12.0.0 release build.** Every quoted word below is in the release build's
-sources (checked 2026-10-02), and the browser harness walked these screens on that build: the welcome
-page's tick and **Agree and continue** with Chrome's prompt for the one portal (scenario 13), **One
-small download, once** with no helper and **Use GlobalProtect instead** leading to 11.0.0's way on the
-mock (scenario 15). Nobody has walked the text by hand, as a reviewer would, in a fresh profile: do
-that before pasting (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"), and correct the text and its
-count here if a word differs. The direct way must not be tried against the
+**Partly seen on the 12.0.0 release build, not yet on 15.0.0's.** Every quoted word below was in
+12.0.0's sources (checked 2026-10-02), and the browser harness walked these screens on that build:
+the welcome page's tick and **Agree and continue** with Chrome's prompt for the one portal (scenario
+13), **One small download, once** with no helper and **Use GlobalProtect instead** leading to
+11.0.0's way on the mock (scenario 15). Nobody has walked the text by hand, as a reviewer would, in
+a fresh profile: do that before pasting (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"), and
+correct the text and its count here if a word differs. The direct way must not be tried against the
 real grid with an invented AccessID: every refused sign-in is a failed sign-in on the university's
 server.
 
@@ -287,23 +300,23 @@ None: Beethoven has no account, password or licence key of its own. See Addition
 Not applicable: see Additional instructions
 ```
 
-**Additional instructions** (487 characters; 490 if each of its 3 line breaks counts as two):
+**Additional instructions** (493 characters; 496 if each of its 3 line breaks counts as two):
 
 ```
 Beethoven runs Claude Code in a Wayne State grid account. Needs the user's AccessID, password, 2FA code, Claude Pro/Max and our approval; we cannot lend accounts.
 1. Install: welcome page. Tick, Agree and continue. Chrome asks for ondemand.grid.wayne.edu only.
-2. Panel: One small download, once offers the helper inside the package (bridge/), a script relaying only to grid.wayne.edu:22. Please don't sign in to the real grid. Use GlobalProtect instead skips it.
+2. Panel: One small download, once offers the package's helper (bridge/: signed installer, Linux script) relaying only to grid.wayne.edu:22. Don't sign in to the real grid. Use GlobalProtect instead skips it.
 Mock portal on request.
 ```
 
 Then **Save changes**.
 
-**The fuller text, for a reply to a reviewer** (not for this form; 4,792 characters, 4,818 if each
-of its 26 line breaks counts as two). If a reviewer asks for test
-access or for the mock portal, reply with the letter in `SUBMISSION.md`, section 4, and this text
-under it, and attach `release/12.0.0/reviewer/beethoven-mock-portal.zip` (the mock portal, its
-stand-in scheduler and cluster tool and its one dependency, `ws`; no extension code). The mock was run
-end to end only on Windows, with Git for Windows.
+**The fuller text, for a reply to a reviewer** (not for this form; 5,014 characters, 5,040 if each
+of its 26 line breaks counts as two). If a reviewer asks for test access or for the mock portal,
+reply with the letter in `SUBMISSION.md`, section 4, and this text under it, and attach
+`release/15.0.0/reviewer/beethoven-mock-portal.zip` (the mock portal, its stand-in scheduler and
+cluster tool and its one dependency, `ws`; no extension code). The mock was run end to end only on
+Windows, with Git for Windows.
 
 ```
 WHAT IT IS
@@ -314,7 +327,7 @@ It has no account, password or licence key of its own; the user's own cluster si
 
 WITHOUT A CLUSTER
 1. Install: the welcome page opens ("Claude, on your grid."). Tick the box and press "Agree and continue". Chrome asks to allow https://ondemand.grid.wayne.edu, that one site only. The panel opens at the side of the window.
-2. The panel tries the direct way. With no helper installed it shows "One small download, once" and a "Download for ..." button for your system, with the file's name and size: the file is inside the package (bridge/), served from the extension's own address; nothing is fetched from the web. bridge/manifest.json lists each file with its SHA-256. The helper is a plain script (PowerShell on Windows, Perl on macOS and Linux) that opens TCP only to grid.wayne.edu:22, carries bytes and exits when Chrome closes it; you can read it in the package.
+2. The panel tries the direct way. With no helper installed it shows "One small download, once" and a "Download for ..." button for your system, with the file's name and size: the file is inside the package (bridge/), served from the extension's own address; nothing is fetched from the web. bridge/manifest.json lists each file with its SHA-256. On Windows and macOS the file is an installer signed by us (an .msi with an Authenticode signature; a .pkg signed with a Developer ID and notarized by Apple) that carries a small compiled program built from our own source in Rust; on Linux it is a plain script (Perl, or Python 3) that you can read in the package. Either way the helper opens TCP only to grid.wayne.edu:22, carries bytes and exits when Chrome closes it.
 3. Please do not type an AccessID into "Sign in to the grid": the direct way talks to the university's real server, and a test sign-in there is a failed sign-in on a real account.
 4. "Use GlobalProtect instead" leaves the direct way: the panel says "Using GlobalProtect" and then waits for the university's VPN ("Turn on GlobalProtect."), which a reviewer cannot reach.
 

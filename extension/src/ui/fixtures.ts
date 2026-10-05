@@ -303,7 +303,24 @@ const download = (os: HelperOs): HelperDownload & { label: string; fileLine: str
   const file = `beethoven-bridge-${os}.zip`;
   const { bytes, open } = BRIDGE_FILES[os];
   const size = `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return { os, osLabel, url: `/bridge/${file}`, file, open, size, bytes, kind: 'script', version: '1.0.0', label: D.installHelper.download(osLabel), fileLine: D.installHelper.fileLine(file, size) };
+  return { os, osLabel, url: `/bridge/${file}`, file, open, size, bytes, kind: 'script', version: '1.0.0', signed: false, label: D.installHelper.download(osLabel), fileLine: D.installHelper.fileLine(file, size) };
+};
+
+/**
+ * 15.0.0: the signed installers (helper/release), as the manifest names them when the maintainer's packages are
+ * in the build: one file, nothing inside it to open. The sizes are a stand-in: a real package's size is not yet
+ * measured (no Mac or Windows build has been made).
+ */
+const SIGNED_FILES: Record<'windows' | 'mac', { file: string; bytes: number }> = {
+  windows: { file: 'beethoven-bridge-windows.msi', bytes: 1_258_291 },
+  mac: { file: 'beethoven-bridge-mac.pkg', bytes: 1_468_006 },
+};
+
+const signedDownload = (os: 'windows' | 'mac'): HelperDownload & { label: string; fileLine: string } => {
+  const osLabel = os === 'windows' ? 'Windows' : 'macOS';
+  const { file, bytes } = SIGNED_FILES[os];
+  const size = `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return { os, osLabel, url: `/bridge/${file}`, file, size, bytes, kind: 'binary', version: '1.0.0', signed: true, label: D.installHelper.download(osLabel), fileLine: D.installHelper.fileLine(file, size) };
 };
 
 const helperMoment = (os: HelperOs, status: Extract<JourneyView, { moment: 'install-helper' }>['status'], extra: Partial<Extract<JourneyView, { moment: 'install-helper' }>> = {}): JourneyView => ({
@@ -318,6 +335,19 @@ const helperMoment = (os: HelperOs, status: Extract<JourneyView, { moment: 'inst
   checkAgain: ink(D.installHelper.checkAgain, { kind: 'check-bridge' }),
   useVpn: textBtn(D.installHelper.useVpn(APP), { kind: 'use-vpn' }),
   ...extra,
+});
+
+/** 15.0.0: the same moment with a signed installer: its own steps, no Unblock note, the signed note in the warning's place */
+const signedHelperMoment = (os: 'windows' | 'mac', status: Extract<JourneyView, { moment: 'install-helper' }>['status']): JourneyView => ({
+  moment: 'install-helper',
+  title: D.installHelper.title,
+  body: D.installHelper.body,
+  download: signedDownload(os),
+  steps: [...(D.installHelper.installerSteps[os] ?? [])],
+  signedNote: D.installHelper.signedNote,
+  status,
+  checkAgain: ink(D.installHelper.checkAgain, { kind: 'check-bridge' }),
+  useVpn: textBtn(D.installHelper.useVpn(APP), { kind: 'use-vpn' }),
 });
 
 const PASSWORD: SheetPrompt = { text: 'Password: ', echo: false, kind: 'password' };
@@ -439,6 +469,8 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-helper-waiting', surface: 'panel', note: '12.0.0: downloaded; the steps, the warning, Beethoven looks by itself (not a failure)', view: journey(helperMoment('windows', { state: 'waiting', text: D.installHelper.waiting })) },
   { name: 'j-helper-looking', surface: 'panel', note: "12.0.0: the student's own Check again", view: journey(helperMoment('windows', { state: 'looking', text: D.installHelper.checking }, { checkAgain: ink(D.installHelper.checkAgain, { kind: 'check-bridge' }, { busy: true }) })) },
   { name: 'j-helper-mac', surface: 'panel', note: '12.0.0: the steps on a Mac (Gatekeeper)', view: journey(helperMoment('mac', { state: 'looking', text: D.installHelper.checking })) },
+  { name: 'j-helper-mac-pkg', surface: 'panel', note: '15.0.0: the signed installer on a Mac: its steps, "This installer is signed"', view: journey(signedHelperMoment('mac', { state: 'waiting', text: D.installHelper.waiting })) },
+  { name: 'j-helper-windows-msi', surface: 'panel', note: '15.0.0: the signed installer on Windows: its steps, no Unblock note', view: journey(signedHelperMoment('windows', { state: 'waiting', text: D.installHelper.waiting })) },
   { name: 'j-helper-linux', surface: 'panel', note: '12.0.0: the steps on Linux', view: journey(helperMoment('linux', { state: 'looking', text: D.installHelper.checking })) },
   { name: 'j-helper-not-found', surface: 'panel', note: '12.0.0: Check again found nothing yet', view: journey(helperMoment('windows', { state: 'not-found', text: D.installHelper.notFound })) },
   { name: 'j-helper-broken', surface: 'panel', note: '12.0.0: the helper is there but did not answer', view: journey(helperMoment('windows', { state: 'broken', text: D.installHelper.broken })) },
@@ -531,7 +563,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-claude-tab-closed', surface: 'panel', note: 'the Claude tab was closed', view: journey(claudeMoment({ problem: { body: WORDS.claude.tabClosed, button: ink(WORDS.claude.openAgain, { kind: 'reopen-claude-tab' }) } })) },
   { name: 'j-claude-interrupted', surface: 'panel', note: 'the background was stopped mid-sign-in', view: journey(claudeMoment({ problem: { body: WORDS.claude.interrupted, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
   { name: 'j-claude-not-subscription', surface: 'panel', note: "a sign-in link that is not a Claude subscription's (the Console's): nothing opened", view: journey(claudeMoment({ problem: { body: WORDS.claude.subscriptionOnly, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
-  { name: 'j-claude-no-plan', surface: 'panel', note: 'a plan without Remote Control', view: journey(claudeMoment({ problem: { body: WORDS.claude.noPlan, button: ink(WORDS.claude.useAnother, { kind: 'sign-in-claude', fresh: true }) } })) },
+  { name: 'j-claude-no-plan', surface: 'panel', note: 'a plan without Remote Control: how to switch accounts, then Sign in again', view: journey(claudeMoment({ problem: { body: `${WORDS.claude.noPlan} ${WORDS.claude.switchAccount}`, button: ink(WORDS.claude.signInAgain, { kind: 'sign-in-claude' }) } })) },
 
   // AM2: the one-time key step (unproven on the grid)
   { name: 'j-login-offer', surface: 'panel', note: 'AM2: One more thing, once.', view: journey(loginMoment('offer')) },
@@ -616,6 +648,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'settings-protect-busy', surface: 'settings', note: '12.0.0: the protection switch, Windows Hello up', view: settingsView(), local: { keyBusy: true } },
   { name: 'settings-forget', surface: 'settings', note: '12.0.0: Forget this computer? [Forget] [Keep it]', view: settingsView(), local: { confirmForget: true } },
   { name: 'settings-no-key', surface: 'settings', note: '12.0.0: no key yet, no helper (its download offered)', view: { ...settingsView(), connection: connectionView({ keyLine: D.settings.keyNone, forget: { label: D.settings.forget, note: D.settings.forgetNote, confirm: D.settings.forgetConfirm, button: { label: D.settings.forgetButton, tone: 'ink', action: { kind: 'forget-computer' } }, disabled: true }, helper: { label: D.settings.helper, text: D.settings.helperMissing, installed: false, download: download('windows'), checkAgain: { label: D.installHelper.checkAgain, tone: 'outline', action: { kind: 'check-bridge' } } } }, { present: false }) } },
+  { name: 'settings-helper-outdated', surface: 'settings', note: '15.0.0: an older helper answers; the newer signed installer is offered beside it (LICENSE section 17)', view: { ...settingsView(), connection: connectionView({ helper: { label: D.settings.helper, text: D.settings.helperOutdated('1.0.0', '2.0.0'), installed: true, download: signedDownload('windows'), checkAgain: { label: D.installHelper.checkAgain, tone: 'outline', action: { kind: 'check-bridge' } } } }) } },
   { name: 'settings-vpn-only', surface: 'settings', note: '12.0.0: GlobalProtect only; no Windows Hello here', view: { ...settingsView(), connection: connectionView({ mode: { label: D.settings.modeLabel, value: 'vpn', options: [{ value: 'direct', label: D.settings.modes.direct }, { value: 'vpn', label: D.settings.modes.vpn }] } }, { available: false }) } },
 ];
 

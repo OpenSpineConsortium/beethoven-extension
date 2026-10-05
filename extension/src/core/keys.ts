@@ -203,11 +203,14 @@ export interface GridNote {
   checked_at: string;
 }
 
-/** PRESS_KEY (session): a press that waits for the grid (sign-in, approval, setup, or the one-time key step) and goes ahead by itself */
+/**
+ * PRESS_KEY (session): a press that waits for the grid (sign-in, approval, setup, or the one-time key
+ * step) and goes ahead by itself. A press a build before 15.0.0 kept may still carry `fresh: true`
+ * ("Use another account", connect --login fresh): the read ignores fields it does not name, and the
+ * press goes ahead as a plain sign-in, the only kind 15.0.0 asks for (framework 17 refuses a sign-out).
+ */
 export interface PendingPress {
   kind: 'connect' | 'stop' | 'sign-in-claude' | 'restrict' | 'open-files';
-  /** "Use another account": connect --login fresh */
-  fresh?: boolean;
   at: string;
 }
 

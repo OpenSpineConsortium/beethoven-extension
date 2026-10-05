@@ -446,16 +446,22 @@ export async function chooseBridge(providers: BridgeProvider[]): Promise<BridgeC
  * not know are ignored): { "host_name": "com.openspineconsortium.beethoven.bridge", "helper": "<version>",
  * "protocol": 1, "files": [ { "os": "windows"|"mac"|"linux", "kind": "script"|"binary", "name": "<file under
  * bridge/>", "open": "<the installer inside it>", "size": n, "sha256": "<hex>" } ] }. The older spellings
- * "file" and "bytes" are read too.
+ * "file" and "bytes" are read too. Since 15.0.0 a "binary" entry is a signed installer (a .pkg, an .msi)
+ * made out to one extension at build time: "allowed_origins" names it, and "signed" says how it was signed.
  */
 export interface BridgeManifest {
   v?: number;
   helper?: string;
   host?: string;
-  files: Array<{ os: string; file: string; open?: string; bytes?: number; sha256?: string; kind?: string; version?: string }>;
+  files: Array<{ os: string; file: string; open?: string; bytes?: number; sha256?: string; kind?: string; version?: string; allowed_origins?: string[]; signed?: HelperSigned }>;
 }
 
+/** how a signed installer was signed (the sidecar's word; anything else is not read as signed) */
+export type HelperSigned = 'developer-id-notarized' | 'authenticode';
+
 const FILE_RE = /^[A-Za-z0-9._-]+$/;
+/** one Chrome extension origin, as a native messaging host's allowed_origins names it */
+const ORIGIN_RE = /^chrome-extension:\/\/[a-p]{32}\/$/;
 
 export function parseBridgeManifest(raw: unknown): BridgeManifest | undefined {
   const m = raw as { v?: unknown; protocol?: unknown; helper?: unknown; host?: unknown; host_name?: unknown; files?: unknown } | undefined;
@@ -471,6 +477,10 @@ export function parseBridgeManifest(raw: unknown): BridgeManifest | undefined {
       ...(typeof f.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(f.sha256) ? { sha256: f.sha256.toLowerCase() } : {}),
       ...(f.kind === 'script' || f.kind === 'binary' ? { kind: f.kind } : {}),
       ...(typeof f.version === 'string' ? { version: f.version } : {}),
+      // an origins list is kept whole or not at all: one member that is not an extension origin and the entry
+      // names no extension, so the picker below never offers it as made out to this one
+      ...(Array.isArray(f.allowed_origins) && f.allowed_origins.length > 0 && f.allowed_origins.every((o) => typeof o === 'string' && ORIGIN_RE.test(o)) ? { allowed_origins: f.allowed_origins.map(String) } : {}),
+      ...(f.signed === 'developer-id-notarized' || f.signed === 'authenticode' ? { signed: f.signed as HelperSigned } : {}),
     }));
   const v = typeof m.v === 'number' ? m.v : typeof m.protocol === 'number' ? m.protocol : undefined;
   const host = typeof m.host_name === 'string' ? m.host_name : typeof m.host === 'string' ? m.host : undefined;
@@ -503,13 +513,21 @@ export function sizeWords(bytes: number | undefined): string | undefined {
 }
 
 /**
- * This computer's file from the manifest, with the extension's own address of it. A script is preferred
- * over a binary (decision D1: the scripts need no compiler, no signing and no notarization account).
+ * This computer's file from the manifest, with the extension's own address of it. Since 15.0.0 the signed
+ * installers for Windows and macOS are preferred where they name this extension (`ownId`, chrome.runtime.id):
+ * a binary is made out to one extension when it is built, so one whose allowed_origins name another is never
+ * offered, because Chrome would refuse to start it and the panel would only say the helper did not answer.
+ * A binary that does not say how it was signed is not offered either: helper/build.mjs lets none through, and
+ * the panel would tell the student it is signed. Otherwise the first script (decision D1: the scripts need no
+ * compiler, no signing and no notarization account), which stays the way for Linux and for development
+ * builds, whose identifier no signed package names; the script's zip is made out to this extension when it
+ * is saved (ui/helperFile.ts).
  */
-export function helperDownloadFor(manifest: BridgeManifest | undefined, os: HelperOs | undefined, urlOf: (path: string) => string): HelperDownload | undefined {
+export function helperDownloadFor(manifest: BridgeManifest | undefined, os: HelperOs | undefined, urlOf: (path: string) => string, ownId?: string): HelperDownload | undefined {
   if (!manifest || !os) return undefined;
   const mine = manifest.files.filter((f) => f.os === os);
-  const f = mine.find((x) => x.kind !== 'binary') ?? mine[0];
+  const own = ownId && /^[a-p]{32}$/.test(ownId) ? `chrome-extension://${ownId}/` : undefined;
+  const f = (own ? mine.find((x) => x.kind === 'binary' && x.signed !== undefined && !!x.allowed_origins?.includes(own)) : undefined) ?? mine.find((x) => x.kind !== 'binary');
   if (!f) return undefined;
   const size = sizeWords(f.bytes);
   return {
@@ -523,5 +541,6 @@ export function helperDownloadFor(manifest: BridgeManifest | undefined, os: Help
     ...(f.sha256 ? { sha256: f.sha256 } : {}),
     ...(f.kind === 'script' || f.kind === 'binary' ? { kind: f.kind } : {}),
     ...(f.version ?? manifest.helper ? { version: f.version ?? manifest.helper } : {}),
+    signed: f.signed !== undefined,
   };
 }

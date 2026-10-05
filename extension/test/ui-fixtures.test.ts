@@ -90,6 +90,23 @@ describe('the fixtures of 12.0.0', () => {
     expect(new Set(h.flatMap((x) => (x.download ? [x.download.os] : [])))).toEqual(new Set(['windows', 'mac', 'linux']));
     for (const x of h) if (x.download) expect(x.download.fileLine).toContain(x.download.file);
     expect(h.some((x) => !x.download)).toBe(true);
+    // every moment says one thing about the file's signature, never both
+    for (const x of h) expect([x.signedNote, x.unsignedNote].filter(Boolean).length, x.title).toBe(1);
+  });
+
+  it('15.0.0: show the signed installer on a Mac and on Windows, with its own steps and the signed note, and Settings with an older helper', () => {
+    const signed = of('install-helper').filter((x) => x.download?.kind === 'binary');
+    expect(signed.map((x) => x.download!.file).sort()).toEqual(['beethoven-bridge-mac.pkg', 'beethoven-bridge-windows.msi']);
+    for (const x of signed) {
+      expect(x.download).toMatchObject({ signed: true });
+      expect(x.download!.open).toBeUndefined();
+      expect(x.steps).toHaveLength(3);
+      expect(x.steps[0]).toMatch(/^Open the file you downloaded\./);
+      expect(x.osNote).toBeUndefined();
+      expect(x.signedNote).toBe("This installer is signed, so your computer can check that it came from Beethoven's maker before it runs.");
+    }
+    const outdated = fixture('settings-helper-outdated');
+    expect(outdated?.surface === 'settings' ? outdated.view.connection?.helper : undefined).toMatchObject({ installed: true, text: 'Installed · version 1.0.0. This Beethoven brings version 2.0.0: download and open it once more.', download: { kind: 'binary', signed: true } });
   });
 
   it('show both routes of the grid code, and the optional protection in every outcome', () => {

@@ -218,7 +218,9 @@ describe('journey: the first run, moment by moment', () => {
     expect(p({ failure: 'signin-method' })).toEqual({ body: 'Claude on the grid is signed in, but not with a Claude subscription, and Beethoven runs only on your own subscription. Ask your lab lead to help you sign in again with your Claude account.', button: { label: 'Copy details', tone: 'ink', action: { kind: 'copy-details' } } });
     expect(momentOf(facts({ ...firstRun, connect: { inFlight: false, queued: true, failure: 'signin-method', pressedAt: NOW - 1 } }))).toBe('claude');
     expect(p({ claudeTabClosed: true })).toEqual({ body: 'The Claude tab was closed.', button: { label: 'Open it again', tone: 'ink', action: { kind: 'reopen-claude-tab' } } });
-    expect(p({ noPlan: true, signin: 'signed-in', signedIn: { email: 'a@b.c', plan: 'free', at: NOW } })).toEqual({ body: 'This Claude account has no Pro or Max plan. Remote Control needs one.', button: { label: 'Use another account', tone: 'ink', action: { kind: 'sign-in-claude', fresh: true } } });
+    // 15.0.0 (framework 17): Beethoven never signs anyone out of Claude, so no "Use another account" with --login fresh; the
+    // sentence says how the student switches accounts themselves, and the button is a plain Sign in again
+    expect(p({ noPlan: true, signin: 'signed-in', signedIn: { email: 'a@b.c', plan: 'free', at: NOW } })).toEqual({ body: "This Claude account has no Pro or Max plan. Remote Control needs one. To use another Claude account, sign out of Claude on the grid first (your lab lead's guide shows how), then press Sign in again.", button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-claude' } } });
     // no API key anywhere: a sign-in link that is not a subscription's was refused and its sitting closed; the moment stays, in plain words
     const refused = facts({ ...firstRun, connect: { inFlight: false, queued: true, signin: 'asked', notSubscription: true } });
     expect(momentOf(refused)).toBe('claude');
