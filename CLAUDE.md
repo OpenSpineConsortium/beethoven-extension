@@ -105,28 +105,34 @@ name and identifier carry no university name.
   (`beethoven-bridge-mac.pkg`, `beethoven-bridge-windows.msi`, since 15.0.0), which travel inside
   the extension's package and are never put on the website. The Firefox build script stays because
   the code builds for it; nothing submits it.
-- **Signed bridge installers, built only on the maintainer's machines (decided 2026-10-04,
-  15.0.0).** On Windows and macOS the bridge a student installs is the binary edition
-  (`helper/src/rust`, helper 1.0.0, protocol 1, its hello `"kind":"binary","runtime":"rust"`) in a
-  signed, per-user installer that asks for no administrator: `beethoven-bridge-mac.pkg`, a universal
-  binary (aarch64 and x86_64 joined with `lipo`) codesigned with a Developer ID Application
-  identity, the hardened runtime and a timestamp, in an installer package signed with a Developer ID
-  Installer identity, notarized (`xcrun notarytool submit --keychain-profile <name> --wait`) and
-  stapled, which installs into the user's home only; and `beethoven-bridge-windows.msi`, x64, WiX
-  v5, `Scope="perUser"`, the exe and then the MSI Authenticode-signed through Azure Artifact Signing
-  (formerly Trusted Signing) with `signtool` and its timestamp server, removed from Settings, Apps.
-  They are built only on the maintainer's own Mac and Windows machines, by the scripts in
-  `helper/release/mac/` and `helper/release/windows/`; the packages and their sidecar records go to
-  `helper/signed/` (gitignored), and `node helper/build.mjs --store-id <id>` copies each verified package into
-  `extension/public/bridge/` and lists it in its `manifest.json`. Identities, certificates, keychain
-  profiles, account names, tokens and key files never enter the repository or CI: the Windows
-  account names live in the gitignored `helper/release/windows/signing.json` (an example file is
-  committed), the Windows sign-in is the maintainer's own Entra sign-in, never a key file, and CI
-  keeps building unsigned binaries for maintainers only. The release scripts take `--store-id` and
-  bake `allowed_origins` for the Chrome Web Store item into each installer, so only the store item
-  is offered them; a development build, whose identifier they do not name, gets the script zips, and
-  Linux stays a script run by Perl or Python 3 in its zip. Nothing of this has been built, signed,
-  notarized or opened on a real Mac or Windows machine yet: not yet measured.
+- **Signed bridge installers, built only on the maintainer's Mac (decided 2026-10-04, 15.0.0).** On
+  Windows and macOS the bridge a student installs is the binary edition (`helper/src/rust`, helper
+  1.0.0, protocol 1, its hello `"kind":"binary","runtime":"rust"`) in a signed, per-user installer
+  that asks for no administrator: `beethoven-bridge-mac.pkg`, a universal binary (aarch64 and x86_64
+  joined with `lipo`) codesigned with a Developer ID Application identity, the hardened runtime and a
+  timestamp, in an installer package signed with a Developer ID Installer identity, notarized
+  (`xcrun notarytool submit --keychain-profile <name> --wait`) and stapled, which installs into the
+  user's home only; and `beethoven-bridge-windows.msi`, x64, per-user, the exe and then the MSI
+  Authenticode-signed through Azure Artifact Signing (formerly Trusted Signing), removed from
+  Settings, Apps. One command on the maintainer's Mac, `helper/release/release.sh`, builds and signs
+  both, merges them into the package and uploads it to the store: the `.msi` there is built with
+  Rust's `x86_64-pc-windows-gnu` target and msitools' `wixl` from `bridge.wxs` and signed with jsign
+  on the maintainer's own `az login`. A Windows machine is the fallback for the `.msi` only
+  (`helper/release/windows/build-msi.ps1`: the msvc target with the C runtime linked in, WiX v5 from
+  `Package.wxs`, `signtool`). The packages and their sidecar records go to `helper/signed/`
+  (gitignored), and only `node helper/build.mjs --store-id <id>` or `--signed <dir>` copies each
+  verified package into `extension/public/bridge/` and lists it in its `manifest.json`; a plain build
+  leaves `helper/signed/` out. Identities, certificates, keychain profiles, account names, the store
+  item and publisher IDs, tokens and key files never enter the repository or CI: the names live in
+  `release.json` in the vendor folder (Mac route) or the gitignored
+  `helper/release/windows/signing.json` (fallback; example files of both are committed), the
+  sign-ins are the maintainer's own (Apple keychain, Entra, the store upload's Google sign-in),
+  never a key file, and CI keeps building unsigned binaries for maintainers only. The release bakes
+  `allowed_origins` for the Chrome Web Store item into each installer, so only the store item is
+  offered them; a development build, whose identifier they do not name, gets the script zips, and
+  Linux stays a script run by Perl or Python 3 in its zip. A script helper installed from a zip by
+  14.0.0 or earlier keeps working. Nothing of this has been built, signed, notarized or opened on a
+  real Mac or Windows machine yet: not yet measured.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
   action; no container command on the login node and nothing of ours under its `/tmp`; container
   temp and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne

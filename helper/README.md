@@ -15,6 +15,10 @@ all protocol 1: three script hosts in languages each system already has, and the
 students get the binary edition as a signed installer; Linux, and a development build on any
 system, get the script zips.
 
+Why the bridge is a native messaging host (the scripts, and since 15.0.0 the signed binary) and not a
+relay, a loopback daemon, an Isolated Web App or the portal, checked against Greg's transport
+analysis of 2026-10-04: `docs/BRIDGE_TRANSPORT.md`.
+
 The script hosts (the three zips, always in the package):
 
 | System  | Host Chrome starts                                    | Installer          | Installs to                                   |

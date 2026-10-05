@@ -36,7 +36,9 @@ that is the browser's permanent price for an install from outside the Web Store.
 The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
 reviewer sees say Beethoven, and it is not an Anthropic product. The repository is
-`OpenSpineConsortium/beethoven` (it was called ashley-bridge until 2026-09-30), and a few internal
+`OpenSpineConsortium/beethoven-extension` since the split of 2026-10-03 (before that
+`OpenSpineConsortium/beethoven`, called ashley-bridge until 2026-09-30, which is now the project's
+hub and holds no code), and a few internal
 names stay because changing them would break something installed or show nothing: the kill-list's
 format tag `ASHLEYREV1`, the cluster utility `hpcworker` and its paths on the cluster (never shown
 to a student), the storage keys `bridge.*`, and the value `product: "bridge"` the extension sends to
@@ -237,9 +239,10 @@ downloaded at run time by the product; the build needs the network only for `npm
 site pages; `bash`; `pandoc` only for the site pages; `unzip`/`sha256sum` (Git Bash has both). No
 cluster account is needed for any test: the tests run against the mock portal in `extension/mock-ood`.
 
-**Clone.** `git clone https://github.com/OpenSpineConsortium/beethoven.git` (the organisation's
-private repository, the only remote since 2026-09-30; the personal copy
-`GregorySchwing/ashley-bridge` is retired). Keep the line endings as they are in the repository
+**Clone.** `git clone https://github.com/OpenSpineConsortium/beethoven-extension.git` (the
+organisation's private repository, the only remote since the split of 2026-10-03; the personal copy
+`GregorySchwing/ashley-bridge` is retired, and `OpenSpineConsortium/beethoven` is now the project's
+hub, not a code repository). Keep the line endings as they are in the repository
 (LF); Windows Git may warn about CRLF and is harmless.
 
 **Extension.**

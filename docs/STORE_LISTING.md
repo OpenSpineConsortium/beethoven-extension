@@ -9,8 +9,8 @@ and a signed kill-list", and the browser-platform and security research notes. T
 identifier carry no university name and no Anthropic mark: the public name is Beethoven (decided
 2026-09-29; a name beginning with Anthropic's mark was set aside because it could draw store and
 brand objections), and the listing says, in the same words as every other text, that Beethoven runs
-Claude Code and is not an Anthropic product. The repository is `OpenSpineConsortium/beethoven`. The
-named publisher is the LLC once it exists; until then, Gregory Schwing, trading as
+Claude Code and is not an Anthropic product. The repository is `OpenSpineConsortium/beethoven-extension`
+(`OpenSpineConsortium/beethoven` until the split of 2026-10-03). The named publisher is the LLC once it exists; until then, Gregory Schwing, trading as
 OpenSpineConsortium.
 
 One store, one listing (decided 2026-09-30 for 8.0.0). Beethoven is offered only as a **Private**
