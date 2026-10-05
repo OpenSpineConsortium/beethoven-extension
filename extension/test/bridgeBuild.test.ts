@@ -163,6 +163,63 @@ describe('helper/build.mjs with signed installers in helper/signed/', () => {
     expect(run(['--out', out, '--signed', f.dir, '--no-signed']).code).toBe(1);
   });
 
+  it('reads helper/signed/ only for a release build (--store-id) or --signed: a plain build after a release leaves the pair out and removes the copies it left', () => {
+    // a helper tree of its own (build.mjs, VERSION, the real sources), so the real helper/signed/ is never touched
+    const root = tmp('default-signed');
+    const helper = path.join(root, 'helper');
+    fs.mkdirSync(helper);
+    fs.copyFileSync(BUILD, path.join(helper, 'build.mjs'));
+    fs.copyFileSync(path.join(REPO, 'helper', 'VERSION'), path.join(helper, 'VERSION'));
+    fs.symlinkSync(path.join(REPO, 'helper', 'src'), path.join(helper, 'src'), 'dir');
+    const f = signedDir('default-signed-pair');
+    fs.cpSync(f.dir, path.join(helper, 'signed'), { recursive: true });
+    const bridge = path.join(root, 'extension', 'public', 'bridge');
+    const local = (a: string[]) => {
+      const r = spawnSync(process.execPath, [path.join(helper, 'build.mjs'), ...a], { encoding: 'utf8', timeout: 60_000 });
+      return { code: r.status, out: r.stdout, err: r.stderr };
+    };
+
+    const release = local(['--store-id', ID]);
+    expect(release.err).toBe('');
+    expect(release.out.split('\n').filter((l) => l.startsWith('NOTE: signed installer'))).toHaveLength(2);
+    expect(readManifest(bridge).files.filter((x) => x.kind === 'binary')).toHaveLength(2);
+
+    const plain = local([]);
+    expect(plain.err).toBe('');
+    expect(plain.code).toBe(0);
+    expect(plain.out).toContain('removed beethoven-bridge-mac.pkg: not in this build');
+    expect(plain.out).toContain('removed beethoven-bridge-windows.msi: not in this build');
+    expect(plain.out).toContain('NOTE: helper/signed/ holds signed installers, which this build leaves out; a release build (--store-id <id>) merges them.');
+    expect(plain.out).not.toContain('NOTE: signed installer');
+    expect(fs.readdirSync(bridge).sort()).toEqual([...SCRIPT_NAMES, 'manifest.json'].sort());
+    expect(fs.readFileSync(path.join(bridge, 'manifest.json'), 'utf8')).not.toContain(ID);
+    expect(local(['--check']).code).toBe(0);
+    if (!fs.existsSync(IDS_FILE)) expect(fs.readFileSync(path.join(bridge, 'manifest.json')).equals(fs.readFileSync(path.join(TRACKED, 'manifest.json')))).toBe(true);
+    // the signed pair itself is never touched
+    expect(fs.readdirSync(path.join(helper, 'signed')).sort()).toEqual(fs.readdirSync(f.dir).sort());
+  });
+
+  it('removes from an --out folder only an earlier build\'s copy under a release name, never another installer or one beside its sidecar', () => {
+    const out = tmp('foreign-out');
+    fs.writeFileSync(path.join(out, 'Zoom.pkg'), 'someone else\'s installer\n');
+    fs.writeFileSync(path.join(out, 'SomeApp.msi'), 'someone else\'s installer\n');
+    fs.writeFileSync(path.join(out, 'notes.txt'), 'kept\n');
+    const r = run(['--out', out, '--no-signed']);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).not.toContain('removed');
+    expect(r.out).toContain('NOTE: Zoom.pkg in');
+    expect(r.out).toContain('NOTE: SomeApp.msi in');
+    expect(fs.readdirSync(out).sort()).toEqual(['SomeApp.msi', 'Zoom.pkg', 'notes.txt', ...SCRIPT_NAMES, 'manifest.json'].sort());
+
+    // a folder laid out like helper/signed/: the sidecar marks the installer as a signed one, not an output
+    const f = signedDir('signed-as-out');
+    const s = run(['--out', f.dir, '--no-signed']);
+    expect(s.code, s.err).toBe(0);
+    expect(s.out).not.toContain('removed');
+    expect(fs.readFileSync(path.join(f.dir, 'beethoven-bridge-mac.pkg')).equals(f.mac)).toBe(true);
+    expect(fs.readFileSync(path.join(f.dir, 'beethoven-bridge-windows.msi')).equals(f.windows)).toBe(true);
+  });
+
   // label; what goes wrong, before the sidecars are written (or, in `after`, once everything is on disk); the sidecar named
   const refusals: Array<{ label: string; sidecar: string; mutate?: (f: Fixture) => void; after?: (f: Fixture) => void }> = [
     { label: 'helper mismatch', sidecar: 'beethoven-bridge-mac.pkg.json', mutate: (f) => { f.macSidecar.helper = '2.0.0'; } },

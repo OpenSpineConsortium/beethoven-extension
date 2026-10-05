@@ -27,7 +27,8 @@ never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrit
   version 9, privacy statement version 10.
 
 **15.0.0** changes the helper on Windows and macOS: there it is a small compiled program (Rust, with
-no code of anyone else's but its standard library; its source is `helper/src/rust`), in an installer
+no code of anyone else's but its standard library and the runtime support code its compiler links
+in, listed in `THIRD_PARTY_NOTICES.md`; its source is `helper/src/rust`), in an installer
 signed by the maintainer that ships inside the package beside the script zips:
 `beethoven-bridge-windows.msi` (Authenticode, through Azure Artifact Signing) and
 `beethoven-bridge-mac.pkg` (Developer ID, notarized by Apple). Both install into the user's own
@@ -274,7 +275,7 @@ Never requested: `activeTab`, `cookies`, `tabs`, `webRequest`, `webRequestBlocki
 Answer: **No.** Justification if a field asks for one:
 
 ```
-No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a file inside the package, offered by the extension's own page: on Windows and macOS an installer signed by the developer that carries a small compiled program built from the developer's own source (Rust, with no third-party code but its standard library), on Linux a script; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
+No remote code. No eval, no new Function, no fetched scripts, no interpreter for remote commands. The daily update check downloads one JSON document (a signed list of withdrawn versions) and verifies its Ed25519 signature with WebCrypto against a public key compiled into the package; JSON is data. Commands to the cluster are a small fixed vocabulary interpreted by shipped code, and the lines the cluster prints are parsed as text and never executed. The helper the user may install is a file inside the package, offered by the extension's own page: on Windows and macOS an installer signed by the developer that carries a small compiled program built from the developer's own source (Rust, with no third-party code but its standard library and the runtime support code its compiler links in), on Linux a script; Chrome starts it through native messaging, and it carries bytes only; the extension never downloads or runs code from anywhere. The cluster-side tool is the one shared copy the university's lab keeps on the cluster; nothing from the cluster is ever executed in the browser. Fonts are files inside the package.
 ```
 
 ## Privacy practices

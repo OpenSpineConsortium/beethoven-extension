@@ -75,7 +75,7 @@ are this pass's riskiest parts, cut small.
    **The signed installer.** The panel shows **One small download, once** with **Download for
    Windows** and `beethoven-bridge-windows.msi` with its size under it, and the three steps "Open
    the file you downloaded. Windows installs the Beethoven bridge into your own account; no
-   administrator rights are needed.", "If Windows asks you to confirm, choose Install (or More info,
+   administrator rights are needed.", "If Windows asks you to confirm, choose Run (or More info,
    then Run anyway)." and "When the window closes, come back here and press Check again." Download
    it, and note what Chrome's download list says about it (a warning, or none). Then:
    - Before opening it, in PowerShell:

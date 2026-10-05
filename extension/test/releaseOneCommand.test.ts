@@ -299,6 +299,18 @@ describe.skipIf(!RUN)('release.sh --dry-run', () => {
     expect(modified.code).toBe(4);
     expect(modified.err).toMatch(/not clean/);
     expect(plan(modified.out)).toEqual([PLAN[0]]); // stopped before anything after the setup check
+
+    // a run cut off after the merge leaves the merged bridge build, which names the store: put back, never committed
+    git(r, 'checkout', '--', 'extension/package.json');
+    mkdirSync(path.join(r, 'extension', 'public', 'bridge'), { recursive: true });
+    writeFileSync(path.join(r, 'extension', 'public', 'bridge', 'manifest.json'), '{"files":[]}\n');
+    git(r, 'add', '-A');
+    expect(git(r, 'commit', '-qm', 'a tracked bridge build').status).toBe(0);
+    writeFileSync(path.join(r, 'extension', 'public', 'bridge', 'manifest.json'), `{"files":[{"allowed_origins":["chrome-extension://${ID}/"]}]}\n`);
+    const merged = release(r, vendor('dirty'), ['--dry-run']);
+    expect(merged.code).toBe(4);
+    expect(merged.err.trim().split('\n')).toEqual(["extension/public/bridge/ still holds the merged build of a release run that was cut off; it names the store's extension and is never committed: put the tracked files back with git checkout -- extension/public/bridge/ and run again."]);
+    expect(plan(merged.out)).toEqual([PLAN[0]]);
   });
 
   it('refuses an existing record, a missing step script and an unknown argument', () => {
@@ -513,6 +525,13 @@ describe.skipIf(!ZIPS)('release.sh, a whole run against stand-ins for the Mac, A
     expect(readdirSync(path.join(r, 'extension', 'public', 'bridge')).sort()).toEqual(Object.keys(tracked).sort());
     expect(res.out).toContain('build --check: 4 files in');
     expect(readdirSync(path.join(r, 'helper', 'signed')).sort()).toEqual(['beethoven-bridge-mac.pkg', 'beethoven-bridge-mac.pkg.json', 'beethoven-bridge-windows.msi', 'beethoven-bridge-windows.msi.json']);
+    // with that pair still there, the plain build helper/README.md lists first leaves it out, so the tracked manifest never names the store
+    const plain = spawnSync(process.execPath, ['helper/build.mjs'], { cwd: r, encoding: 'utf8', timeout: 60_000 });
+    expect(plain.status, plain.stderr).toBe(0);
+    expect(plain.stdout).toContain('NOTE: helper/signed/ holds signed installers, which this build leaves out');
+    expect(plain.stdout).not.toContain('NOTE: signed installer');
+    expect(untracked(r)).toEqual(true);
+    for (const [n, h] of Object.entries(tracked)) expect(sha256(path.join(r, 'extension', 'public', 'bridge', n)), n).toBe(h);
   });
 
   it('ends with the plain summary: version, both installers\' hash prefixes, the store\'s answer, the review sentence and the git commands', () => {

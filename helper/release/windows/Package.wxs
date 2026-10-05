@@ -35,8 +35,12 @@
     <SummaryInformation Description="Beethoven bridge" Manufacturer="OpenSpineConsortium"/>
 
     <!-- An older bridge is replaced in place; a newer one already installed stays. The package
-         version is helper/VERSION, a whole number release (1.0.0, 2.0.0). -->
-    <MajorUpgrade DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
+         version is helper/VERSION, a whole number release (1.0.0, 2.0.0), which stays the same from
+         one extension release to the next while the helper does not change, and every build gets a
+         new ProductCode: without AllowSameVersionUpgrades a later build of the same version would
+         install beside the earlier one as a second "Beethoven bridge" in Apps, and uninstalling one
+         would leave the shared files and registry values to the other. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
     <MediaTemplate EmbedCab="yes"/>
 
     <!-- Settings > Apps shows one Uninstall button and no Modify; the words beside it are the
@@ -64,8 +68,13 @@
         <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="BridgeExe" Value="$(var.Version)" Type="string" KeyPath="yes"/>
       </Component>
 
+      <!-- The script edition of 12.0.0 to 14.0.0 writes a manifest of the same name in the same folder,
+           naming its bridge.cmd. Windows Installer keeps an unversioned file on disk that was changed
+           after it was made (a second run of that installer rewrites it), so the manifest carries a
+           version of its own: a versioned file always replaces an unversioned one, and the bridge
+           this package installs is the one Chrome starts. -->
       <Component Id="HostManifest" Guid="2B1DFC4E-73F8-445D-84F6-5B99A0E07826">
-        <File Id="HostManifestFile" Source="$(var.StageDir)\com.openspineconsortium.beethoven.bridge.json" KeyPath="no"/>
+        <File Id="HostManifestFile" Source="$(var.StageDir)\com.openspineconsortium.beethoven.bridge.json" KeyPath="no" DefaultVersion="1.0.0.0"/>
         <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="HostManifest" Value="$(var.Version)" Type="string" KeyPath="yes"/>
       </Component>
 

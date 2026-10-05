@@ -135,8 +135,11 @@ Nothing in this folder has run on a real Mac. In particular:
   Installer opens the downloaded file without a warning.
 - The Installer's handling of a home-only package: that it asks for no administrator password, what
   it shows between Continue and Install, that it passes the home as `$2` to `postinstall` (the
-  script falls back to `$HOME`), the ownership and modes it gives the installed files, and that it
-  runs `postinstall` as the user.
+  script falls back to `$HOME`), the ownership and modes it gives the installed files, whether it
+  applies the package's recorded modes to the home folder, `~/Library` and `~/Library/Application
+  Support` when they are already there (`build-pkg.sh` records them as 0750, 0700 and 0700, no wider
+  than macOS makes them, so either way no other account is let in), and that it runs `postinstall`
+  as the user.
 - Chrome starting the installed binary through the manifest `postinstall` writes, and the hello
   answering with `kind: "binary"`, `runtime: "rust"`, `os: "mac"`.
 - The Edge and Chromium folders: that `Library/Application Support/Microsoft Edge` and

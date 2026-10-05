@@ -60,6 +60,8 @@ while [ $# -gt 0 ]; do case "$1" in --root) root=$2; shift 2 ;; --scripts) scrip
 {
   printf 'component\\n'
   (cd "$root" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s %s\\n' "$(stat -c %a "$f")" "$(stat -c %s "$f")" "$f"; done)
+  printf 'folders\\n'
+  (cd "$root" && find . -type d | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s\\n' "$(stat -c %a "$f")" "$f"; done)
   printf 'scripts\\n'
   (cd "$scripts" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s\\n' "$(stat -c %a "$f")" "$f"; done)
 } > "$out"
@@ -229,6 +231,9 @@ describe.skipIf(!RUN)('build-pkg.sh, end to end against stand-ins for the tools'
     expect(listing).toMatch(/\n755 \d+ \.\/Library\/Application Support\/Beethoven\/bridge\/uninstall\.command\n/);
     expect(listing).toMatch(/\n644 \d+ \.\/Library\/Application Support\/Beethoven\/bridge\/README\.txt\n/);
     expect(listing).toContain('scripts\n755 ./postinstall\n');
+    // the folders above the bridge's land on the student's home, ~/Library and ~/Library/Application Support:
+    // recorded no wider than macOS makes them, so an Installer that applied them would let no other account in
+    expect(listing).toContain('folders\n750 .\n700 ./Library\n700 ./Library/Application Support\n755 ./Library/Application Support/Beethoven\n755 ./Library/Application Support/Beethoven/bridge\nscripts\n');
   });
 
   it('runs pkgbuild with the identifier, the helper version and the home-relative install location, then productbuild signed with the installer identity', () => {

@@ -117,7 +117,7 @@ name and identifier carry no university name.
   (formerly Trusted Signing) with `signtool` and its timestamp server, removed from Settings, Apps.
   They are built only on the maintainer's own Mac and Windows machines, by the scripts in
   `helper/release/mac/` and `helper/release/windows/`; the packages and their sidecar records go to
-  `helper/signed/` (gitignored), and `node helper/build.mjs` copies each verified package into
+  `helper/signed/` (gitignored), and `node helper/build.mjs --store-id <id>` copies each verified package into
   `extension/public/bridge/` and lists it in its `manifest.json`. Identities, certificates, keychain
   profiles, account names, tokens and key files never enter the repository or CI: the Windows
   account names live in the gitignored `helper/release/windows/signing.json` (an example file is

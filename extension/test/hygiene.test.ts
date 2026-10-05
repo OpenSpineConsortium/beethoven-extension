@@ -392,6 +392,8 @@ describe('the words a student reads', () => {
     // 15.0.0: the signed installer's first step on Windows names the Beethoven bridge (the contract's sentence); the
     // Mac's steps and the signed note use no restricted word
     D.installHelper.installerSteps.windows![0]!,
+    // 15.0.0: the folder of the script helper of 14.0.0 and earlier, removed before the signed installer on Windows
+    String(D.settings.helperScriptFirst('st1234')),
     // the browser's key: what the grid did with it, what this browser could not do, the later protection, Forget
     D.signin.wrongGrid,
     D.signin.keyNotTakenTitle,

@@ -394,8 +394,10 @@ for browser in 'Google\Chrome' 'Microsoft\Edge'; do
   grep -Fq -- "$row" <<<"$REGISTRY" \
     || die 4 "the MSI does not set the default value of the $browser NativeMessagingHosts key to the manifest's path."
 done
-# MajorUpgrade: one row finds an older bridge to replace, one finds a newer one and refuses.
-for prop in WIX_UPGRADE_DETECTED WIX_DOWNGRADE_DETECTED; do
+# MajorUpgrade: one row finds an older bridge to replace, one an earlier build of the same version
+# (AllowSameVersionUpgrades: every build has a new ProductCode at the same helper/VERSION, and without
+# it the two would sit side by side in Apps), and one finds a newer one and refuses.
+for prop in WIX_UPGRADE_DETECTED WIX_SAME_VERSION_UPGRADE_DETECTED WIX_DOWNGRADE_DETECTED; do
   grep -Eq "^\{$UPGRADE_CODE\}${TAB}(.*${TAB})?${prop}\$" <<<"$UPGRADE" \
     || die 4 "the MSI's Upgrade table has no $prop row for the UpgradeCode in bridge.wxs."
 done
@@ -416,7 +418,11 @@ for name in "$EXE_NAME" "$HOST_NAME.json" README.txt; do
   size=$(wc -c < "$STAGE/$name" | tr -d ' ')
   grep -Fxq "$name${TAB}$size" <<<"$COLS" || die 4 "the MSI does not carry $name as staged ($size bytes)."
 done
-say "   six HKCU values with both browsers' keys, the upgrade rows, per user, x64, three files"
+# The manifest is versioned (DefaultVersion), so it replaces the script edition's file of the same name
+# even when Windows Installer would keep that one as changed by its user.
+[ -n "$(printf '%s\n' "$FILES" | awk -F "$TAB" '$1 == "HostManifestFile" { print $5 }')" ] \
+  || die 4 "the MSI's host manifest carries no version, so an earlier script helper's manifest could stay in its place."
+say "   six HKCU values with both browsers' keys, the upgrade rows, per user, x64, three files, the manifest versioned"
 
 if [ "$SIGN" = 1 ]; then
   step "Signing $MSI_NAME the same way"

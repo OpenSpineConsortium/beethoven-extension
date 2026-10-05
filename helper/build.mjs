@@ -31,11 +31,15 @@
 // word checked against the facts: helper equals helper/VERSION, protocol is 1, size and sha256 are
 // the file's own, every origin is a Chrome extension origin (and the --store-id one when given) and
 // "signed" is one of the two ways a package is signed. It copies the file into OUT unchanged and lists
-// it after the script zips, with no "open" because the file itself is the installer. Without
-// helper/signed/, or with --no-signed, the output is byte for byte the three zips and their manifest.
-// A .pkg or .msi in OUT that this build did not write is an earlier release build's: it is removed,
-// since OUT is this build's own folder and an installer the manifest does not list must never ship by
-// accident, and --check reports it as a difference.
+// it after the script zips, with no "open" because the file itself is the installer. Only a release
+// build (--store-id) or --signed DIR reads a folder of signed installers: after a release
+// helper/signed/ still holds them, and a plain build that took them would write the store's identifier
+// into the tracked manifest.json. Without either, or with --no-signed, the output is byte for byte the
+// three zips and their manifest. An installer under one of the two names the release scripts give
+// theirs, left in OUT by an earlier release build, is removed, since an installer the manifest does
+// not list must never ship by accident; no other file is, and never one with a sidecar beside it,
+// which marks a folder of signed installers rather than an output. --check reports every .pkg and
+// .msi in OUT that this build would not write as a difference.
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
@@ -56,7 +60,9 @@ const DEV = args.includes('--dev');
 const NO_SIGNED = args.includes('--no-signed');
 const signedArg = one('--signed');
 if (NO_SIGNED && signedArg) fail('--signed and --no-signed contradict each other');
-const SIGNED = NO_SIGNED ? undefined : path.resolve(signedArg || path.join(HERE, 'signed'));
+const DEFAULT_SIGNED = path.join(HERE, 'signed');
+const MERGE = !NO_SIGNED && (Boolean(signedArg) || many('--store-id').length > 0);
+const SIGNED = MERGE ? path.resolve(signedArg || DEFAULT_SIGNED) : undefined;
 if (signedArg && !(fs.existsSync(SIGNED) && fs.statSync(SIGNED).isDirectory())) fail(`--signed ${SIGNED} is not a folder`);
 
 const VERSION = fs.readFileSync(path.join(HERE, 'VERSION'), 'utf8').trim();
@@ -299,9 +305,16 @@ const manifest = {
 };
 outputs.set('manifest.json', Buffer.from(JSON.stringify(manifest, null, 2) + '\n', 'utf8'));
 
-/** a .pkg or .msi in OUT that this build does not write: an earlier release build's, unlisted and so never to ship */
+/** a .pkg or .msi in OUT that this build does not write: unlisted, and so never to ship */
 const stale = () => (fs.existsSync(OUT) ? fs.readdirSync(OUT).filter((n) => /\.(pkg|msi)$/.test(n) && !outputs.has(n)) : []);
+// --out may name any folder, so only an earlier release build's copy is removed: one of the release
+// scripts' two names, with no sidecar beside it (one there marks a folder of signed installers)
+const RELEASE_NAMES = ['beethoven-bridge-mac.pkg', 'beethoven-bridge-windows.msi'];
+const removable = (n) => RELEASE_NAMES.includes(n) && !fs.existsSync(path.join(OUT, `${n}.json`));
 const notes = signed.map((s) => `NOTE: signed installer ${s.name} (${s.os}, sha256 ${s.sha256.slice(0, 12)}..., ${s.origins.length} origin${s.origins.length === 1 ? '' : 's'}) is in this build; the page offers it only to the extension its origins name.`);
+if (!MERGE && !NO_SIGNED && fs.existsSync(DEFAULT_SIGNED) && fs.readdirSync(DEFAULT_SIGNED).some((n) => /\.(pkg|msi)$/.test(n))) {
+  notes.push('NOTE: helper/signed/ holds signed installers, which this build leaves out; a release build (--store-id <id>) merges them.');
+}
 
 if (CHECK) {
   let same = true;
@@ -317,7 +330,10 @@ if (CHECK) {
 }
 
 fs.mkdirSync(OUT, { recursive: true });
-for (const n of stale()) { fs.rmSync(path.join(OUT, n)); console.log(`removed ${n}: not in this build`); }
+for (const n of stale()) {
+  if (removable(n)) { fs.rmSync(path.join(OUT, n)); console.log(`removed ${n}: not in this build`); }
+  else console.log(`NOTE: ${n} in ${OUT} is not this build's; it is left in place, and the manifest does not list it.`);
+}
 for (const [name, data] of outputs) fs.writeFileSync(path.join(OUT, name), data);
 for (const f of listing) console.log(`${f.name}  ${f.size} bytes  sha256 ${f.sha256}`);
 console.log(`manifest.json  bridge ${VERSION}, protocol 1, ${OUT}`);

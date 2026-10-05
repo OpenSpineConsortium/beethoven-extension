@@ -189,7 +189,15 @@ ORIGIN="chrome-extension://$STORE_ID/"
 printf '["%s"]\n' "$ORIGIN" > "$DEST/allowed_origins.json"
 chmod 755 "$DEST/beethoven-bridge" "$DEST/uninstall.command"
 chmod 644 "$DEST/README.txt" "$DEST/allowed_origins.json"
-find "$ROOT" -type d -exec chmod 755 {} +
+# The folders above the bridge's own land on the student's: the home folder itself (the root, "."),
+# ~/Library and ~/Library/Application Support. The package records a mode for each, and whether the
+# Installer applies it to a folder that is already there is not yet measured, so none is wider than
+# macOS makes it for a new account (0750 for the home folder, 0700 for the two below it; from macOS's
+# defaults as known, not read on a Mac here): no other account is ever let in. Only Beethoven/ and
+# bridge/, which are the package's own, are 0755.
+chmod 750 "$ROOT"
+chmod 700 "$ROOT/Library" "$ROOT/Library/Application Support"
+chmod 755 "$ROOT/Library/Application Support/Beethoven" "$DEST"
 
 SCRIPTS="$WORK/scripts"
 mkdir -p "$SCRIPTS"

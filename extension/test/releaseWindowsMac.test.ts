@@ -90,7 +90,7 @@ interface Summary {
 function summarize(els: El[]): Summary {
   const components: Summary['components'] = {};
   for (const c of named(els, 'Component')) components[c.attrs.Id ?? ''] = { guid: c.attrs.Guid ?? '', files: [], registry: [] };
-  for (const f of named(els, 'File')) components[componentOf(f)]?.files.push(`${f.attrs.Id} ${staged(f.attrs.Source ?? '')} KeyPath=${f.attrs.KeyPath}`);
+  for (const f of named(els, 'File')) components[componentOf(f)]?.files.push(`${f.attrs.Id} ${staged(f.attrs.Source ?? '')} KeyPath=${f.attrs.KeyPath}${f.attrs.DefaultVersion ? ` DefaultVersion=${f.attrs.DefaultVersion}` : ''}`);
   for (const r of named(els, 'RegistryValue')) {
     const { Root, Key, Name, Value, Type, KeyPath } = r.attrs;
     components[componentOf(r)]?.registry.push(`${Root}\\${Key} [${Name ?? '(default)'}] = ${Value} (${Type}) KeyPath=${KeyPath ?? 'no'}`);
@@ -139,7 +139,8 @@ describe('bridge.wxs and Package.wxs are one package', () => {
     expect(Object.keys(a.components).sort()).toEqual(['BridgeExe', 'FolderCleanup', 'HostManifest', 'HostRegistration', 'ReadMe']);
     expect(b.components).toEqual(a.components);
     const files = Object.values(a.components).flatMap((c) => c.files);
-    expect(files.sort()).toEqual([`BridgeExeFile beethoven-bridge.exe KeyPath=no`, `HostManifestFile ${HOST}.json KeyPath=no`, 'ReadMeFile README.txt KeyPath=no']);
+    // the manifest carries a version, so it replaces the script edition's unversioned one even when that was rewritten
+    expect(files.sort()).toEqual([`BridgeExeFile beethoven-bridge.exe KeyPath=no`, `HostManifestFile ${HOST}.json KeyPath=no DefaultVersion=1.0.0.0`, 'ReadMeFile README.txt KeyPath=no']);
     expect(Object.values(a.components).flatMap((c) => c.registry)).toHaveLength(6);
   });
 
@@ -167,6 +168,8 @@ describe('bridge.wxs and Package.wxs are one package', () => {
     expect(v3pkg.Description).toBe(named(V5, 'SummaryInformation')[0]?.attrs.Description);
     expect(v3pkg.Manufacturer).toBe(pkg.Manufacturer);
     expect(named(V3, 'MajorUpgrade')[0]?.attrs).toEqual(named(V5, 'MajorUpgrade')[0]?.attrs);
+    // every build has a new ProductCode at the same helper/VERSION: a later build replaces the earlier, never installs beside it
+    expect(named(V5, 'MajorUpgrade')[0]?.attrs.AllowSameVersionUpgrades).toBe('yes');
     expect(named(V3, 'MediaTemplate')[0]?.attrs).toEqual(named(V5, 'MediaTemplate')[0]?.attrs);
     expect(named(V3, 'Feature')[0]?.attrs).toEqual(named(V5, 'Feature')[0]?.attrs);
     expect(named(V3, 'ComponentRef').map((r) => r.attrs.Id).sort()).toEqual(Object.keys(a.components).sort());
@@ -607,6 +610,8 @@ describe.skipIf(!MSITOOLS)('a trial build (--no-sign) of a stand-in exe, with th
     expect(dirs).toMatchObject({ BridgeFolder: 'BeethovenFolder bridge', BeethovenFolder: 'LocalAppDataFolder Beethoven' });
     expect(dirs.LocalAppDataFolder?.startsWith('TARGETDIR')).toBe(true);
     const files = table(msi, 'File').map((r) => `${r[0]} ${r[1]} ${r[2]} ${r[3]}`).sort();
+    // only the manifest is versioned: Windows Installer always puts it in place of an unversioned one
+    expect(Object.fromEntries(table(msi, 'File').map((r) => [r[0], r[4]]))).toEqual({ BridgeExeFile: '', HostManifestFile: '1.0.0.0', ReadMeFile: '' });
     const manifest = `{\n  "name": "${HOST}",\n  "description": "The Beethoven bridge: carries Beethoven's encrypted ssh connection to the grid.",\n  "path": "beethoven-bridge.exe",\n  "type": "stdio",\n  "allowed_origins": ["${ORIGIN}"]\n}\n`;
     expect(files).toEqual([
       `BridgeExeFile BridgeExe beethoven-bridge.exe ${statSync(exe).size}`,
@@ -628,10 +633,15 @@ describe.skipIf(!MSITOOLS)('a trial build (--no-sign) of a stand-in exe, with th
   it('Upgrade, Property and the summary: MajorUpgrade on Package.wxs\'s UpgradeCode, per user, x64, no custom action', () => {
     const code = `{${summarize(V5).upgradeCode}}`;
     const up = table(msi, 'Upgrade');
-    expect(up.map((r) => [r[0], r[6]])).toEqual(expect.arrayContaining([[code, 'WIX_UPGRADE_DETECTED'], [code, 'WIX_DOWNGRADE_DETECTED']]));
-    expect(up).toHaveLength(2);
+    expect(up.map((r) => [r[0], r[6]])).toEqual(expect.arrayContaining([[code, 'WIX_UPGRADE_DETECTED'], [code, 'WIX_SAME_VERSION_UPGRADE_DETECTED'], [code, 'WIX_DOWNGRADE_DETECTED']]));
+    expect(up).toHaveLength(3);
     expect(up.find((r) => r[6] === 'WIX_UPGRADE_DETECTED')?.[2]).toBe(VERSION);
     expect(up.find((r) => r[6] === 'WIX_DOWNGRADE_DETECTED')?.[1]).toBe(VERSION);
+    // an installed build of the same version is found (both bounds inclusive) and removed (not OnlyDetect), so it is replaced
+    const same = up.find((r) => r[6] === 'WIX_SAME_VERSION_UPGRADE_DETECTED') ?? [];
+    expect([same[1], same[2]]).toEqual([VERSION, VERSION]);
+    expect(Number(same[4]) & 0x300).toBe(0x300);
+    expect(Number(same[4]) & 0x2).toBe(0);
     const props = Object.fromEntries(table(msi, 'Property').map((r) => [r[0], r[1]]));
     expect(props.ALLUSERS).toBeUndefined();
     expect(props.MSIINSTALLPERUSER).toBeUndefined();

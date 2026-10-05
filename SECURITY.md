@@ -64,18 +64,18 @@ Extension:
   `debugger` or `identity`. Since 12.0.0 it requests `nativeMessaging` for one host, its bundled
   bridge, which opens TCP only to the grid's ssh port from a built-in allowlist and holds no
   credential. Since 15.0.0 the bridge a student installs on Windows or macOS is the compiled edition
-  (Rust, the standard library and nothing else) in a signed installer that travels inside the
-  package: a per-user MSI Authenticode-signed through Azure Artifact Signing, and a per-user
-  installer package signed with a Developer ID, notarized and stapled. Each names only the Chrome
-  Web Store item in `allowed_origins`, written in when it is built and never rewritten afterwards (a
-  rewrite would break the signature), so a development build is offered the script zips, whose
-  origin the download page writes in as before; Linux keeps its script. `helper/build.mjs` copies a
-  signed package into the extension only when its size, SHA-256, helper version, protocol, name,
-  origins and signature kind match its sidecar record. Neither installer has been opened on a real
-  machine yet: not yet measured. The portal cookie is carried by the network stack and never read.
-  No automated login of the portal; on the direct way the student types the grid password and
-  one-time code into Beethoven's sign-in sheet, which sends them only to the grid inside the
-  encrypted ssh session and never keeps them.
+  (Rust, the standard library and the compiler's runtime support code, nothing else) in a signed
+  installer that travels inside the package: a per-user MSI Authenticode-signed through Azure
+  Artifact Signing, and a per-user installer package signed with a Developer ID, notarized and
+  stapled. Each names only the Chrome Web Store item in `allowed_origins`, written in when it is
+  built and never rewritten afterwards (a rewrite would break the signature), so a development build
+  is offered the script zips, whose origin the download page writes in as before; Linux keeps its
+  script. `helper/build.mjs` copies a signed package into the extension only when its size, SHA-256,
+  helper version, protocol, name, origins and signature kind match its sidecar record. Neither
+  installer has been opened on a real machine yet: not yet measured. The portal cookie is carried by
+  the network stack and never read. No automated login of the portal; on the direct way the student
+  types the grid password and one-time code into Beethoven's sign-in sheet, which sends them only to
+  the grid inside the encrypted ssh session and never keeps them.
 - No remote code: no `eval`, no fetched scripts, MV3 default CSP. The kill-list is JSON verified with
   `crypto.subtle.verify` (Ed25519; ECDSA P-256 fallback below Chrome 137, Firefox 130, Safari 17)
   against a public key compiled into the bundle; a revoked version refuses to send commands and says

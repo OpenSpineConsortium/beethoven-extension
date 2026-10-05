@@ -38,7 +38,7 @@ on a Windows machine as the fallback for the `.msi`, each with `--store-id <id>`
 key file or account secret enters the repository or CI; CI's rust lane builds unsigned binaries for
 maintainers only. Each package lands in `helper/signed/` (gitignored) beside a sidecar `<name>.json`
 (name, os, kind, helper, protocol, size, sha256, allowed_origins, signed, built_at, tools). `node
-helper/build.mjs` verifies every sidecar against the file and against `helper/VERSION`, copies the
+helper/build.mjs --store-id <id>`, the release build, verifies every sidecar against the file and against `helper/VERSION`, copies the
 package into `extension/public/bridge/` unchanged and lists it in `manifest.json` after the script
 zips: `{"os","kind":"binary","name","size","sha256","allowed_origins":[...],"signed"}`, with no
 `open`, since the file itself is the installer. The picker's rule in the extension: the binary is
@@ -138,11 +138,11 @@ entry, edit `BUILTIN_ALLOW` / `@BUILTIN_ALLOW` / `$BuiltinAllow` in the three ho
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH     # Node 22, nothing to install
-node helper/build.mjs                             # writes extension/public/bridge/ (plus helper/signed/'s packages, when that folder exists)
+node helper/build.mjs                             # writes extension/public/bridge/ (the tracked placeholder build; helper/signed/ is left out)
 node helper/build.mjs --check                     # fails if the files there differ from a fresh build
-node helper/build.mjs --check --no-signed         # the same, ignoring helper/signed/: what CI runs against the tracked files
-node helper/build.mjs --store-id <id>             # a release build: the store identifier in the zips, the signed packages merged
-node helper/build.mjs --signed DIR                # take the signed packages from DIR instead of helper/signed/
+node helper/build.mjs --check --no-signed         # the same, saying so: what CI runs against the tracked files
+node helper/build.mjs --store-id <id>             # a release build: the store identifier in the zips, helper/signed/'s packages merged
+node helper/build.mjs --signed DIR                # merge the signed packages in DIR
 ```
 
 The build checks that every script host and installer carries the version in `helper/VERSION`, that

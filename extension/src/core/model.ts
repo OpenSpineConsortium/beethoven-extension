@@ -423,7 +423,7 @@ export const WORDS = {
       installerSteps: {
         windows: [
           'Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no administrator rights are needed.',
-          'If Windows asks you to confirm, choose Install (or More info, then Run anyway).',
+          'If Windows asks you to confirm, choose Run (or More info, then Run anyway).',
           'When the window closes, come back here and press Check again.',
         ],
         mac: ['Open the file you downloaded. The macOS Installer opens.', 'Click Continue, then Install. It installs into your own account, so no administrator password is asked.', 'When it says the installation was successful, close it and press Check again here.'],
@@ -603,6 +603,8 @@ export const WORDS = {
       helperInstalled: (version: string) => `Installed · version ${version}`,
       /** 15.0.0: an older helper answers; LICENSE section 17 promises that Beethoven says so and offers the newer installer (the download link stays beside it) */
       helperOutdated: (installed: string, shipped: string) => `Installed · version ${installed}. This Beethoven brings version ${shipped}: download and open it once more.`,
+      /** 15.0.0: the Windows script helper of 14.0.0 and earlier answers and the signed installer is offered beside it; the two share a folder, so the old one goes first */
+      helperScriptFirst: (version: string) => `Installed · version ${version}, from a zip. To change to the signed installer, first double-click uninstall.cmd in %LOCALAPPDATA%\\Beethoven\\bridge, then download it here.`,
       helperMissing: 'Not installed',
       keyNone: 'No key on this computer yet',
       keyPlain: 'Key on this computer',

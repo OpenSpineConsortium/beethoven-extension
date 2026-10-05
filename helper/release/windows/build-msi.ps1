@@ -5,17 +5,20 @@
 # this repository. The only identifiers the script needs, the Endpoint and the two account names,
 # come from signing.json beside it, which is gitignored; signing.example.json shows the shape.
 #
-# In order: check the tools; read helper/VERSION; cargo build --release for the MSVC target into a
-# work folder under the temp directory; stage beethoven-bridge.exe, the native messaging manifest
-# (its "path" the relative "beethoven-bridge.exe", which Chrome resolves against the manifest's own
-# folder on Windows) and README.txt; sign the exe through the Dlib; build the MSI with WiX v5 from
-# Package.wxs; sign the MSI the same way; verify both; write the sidecar <msi>.json that
-# node helper/build.mjs checks before it copies the package into the extension.
+# In order: check the tools; read helper/VERSION; cargo build --release for the MSVC target, with
+# the C runtime linked in statically, into a work folder under the temp directory; stage
+# beethoven-bridge.exe, the native messaging manifest (its "path" the relative "beethoven-bridge.exe",
+# which Chrome resolves against the manifest's own folder on Windows) and README.txt; sign the exe
+# through the Dlib; build the MSI with WiX v5 from Package.wxs in the work folder; sign the MSI the
+# same way; verify both; only then copy the MSI to OutDir and write beside it the sidecar <msi>.json
+# that node helper/build.mjs checks before it copies the package into the extension. A failed step
+# leaves OutDir as it was.
 #
 # Windows PowerShell 5.1 (the one every Windows 10 and 11 carries): no ??, no ternary, no &&.
 #
 # -SkipSign builds the MSI unsigned to try the packaging on a machine without the signing account.
-# It writes no sidecar, so the build cannot pick the file up, and the output must never ship.
+# It goes to <OutDir>\trial with no sidecar, as the Mac scripts' trials do, so the build cannot pick
+# the file up and it never replaces a signed one; the output must never ship.
 #
 # The usual route is the Mac: build-msi-mac.sh, run by release.sh, builds and signs the same package
 # from bridge.wxs with no Windows machine. This script is the fallback until a release has gone
@@ -107,7 +110,8 @@ $Wxs = Join-Path $PSScriptRoot 'Package.wxs'
 $PayloadReadme = Join-Path $PSScriptRoot 'README.txt'
 if ($OutDir -eq '') { $OutDir = Join-Path $HelperRoot 'signed' }
 $OutDir = [IO.Path]::GetFullPath($OutDir)
-$Msi = Join-Path $OutDir $MsiName
+if ($SkipSign) { $OutDir = Join-Path $OutDir 'trial' }
+$FinalMsi = Join-Path $OutDir $MsiName
 
 foreach ($p in $Wxs, $PayloadReadme, (Join-Path $RustDir 'Cargo.toml'), (Join-Path $HelperRoot 'VERSION')) {
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "Missing $p; run this script from a complete checkout." }
@@ -178,17 +182,28 @@ $Work = Join-Path $TempRoot ('beethoven-bridge-msi-' + [Guid]::NewGuid().ToStrin
 $null = New-Item -ItemType Directory -Force -Path $Work
 $TargetDir = Join-Path $Work 'target'
 $Stage = Join-Path $Work 'stage'
+$Msi = Join-Path $Work $MsiName
 $null = New-Item -ItemType Directory -Force -Path $Stage
 
 try {
     # ---- build -----------------------------------------------------------------------------
 
     Step "Compiling with cargo (release) into the work folder $Work."
+    # The MSVC target links the C runtime as DLLs unless told otherwise, and one of them,
+    # VCRUNTIME140.dll, comes only with the Visual C++ Redistributable, which the MSI does not install
+    # and a fresh Windows lacks; crt-static links the runtime into the exe, as the Mac route's
+    # mingw-w64 build carries its own. RUSTFLAGS is extended, not replaced, and put back afterwards.
+    $savedRustFlags = $env:RUSTFLAGS
+    if ($Target -like '*-msvc') {
+        if ($env:CARGO_ENCODED_RUSTFLAGS) { throw 'CARGO_ENCODED_RUSTFLAGS is set, so cargo would ignore the static C runtime this build adds through RUSTFLAGS; unset it and run again.' }
+        $env:RUSTFLAGS = ("$savedRustFlags -C target-feature=+crt-static").Trim()
+    }
     Push-Location -LiteralPath $RustDir
     try {
         Run 'cargo build' 'cargo' @('build', '--release', '--target', $Target, '--target-dir', $TargetDir)
     } finally {
         Pop-Location
+        $env:RUSTFLAGS = $savedRustFlags
     }
     $BuiltExe = [IO.Path]::Combine($TargetDir, $Target, 'release', $ExeName)
     if (-not (Test-Path -LiteralPath $BuiltExe -PathType Leaf)) { throw "cargo build finished but $BuiltExe is not there." }
@@ -234,8 +249,7 @@ try {
     # ---- build the MSI ---------------------------------------------------------------------
     # WiX v5's command line; Package.wxs uses core elements only, so no WiX extension is needed.
 
-    $null = New-Item -ItemType Directory -Force -Path $OutDir
-    Step "Building $MsiName with WiX from Package.wxs into $OutDir."
+    Step "Building $MsiName with WiX from Package.wxs in the work folder."
     Run 'wix build' $Wix @('build', '-arch', 'x64', '-d', "StageDir=$Stage", '-d', "Version=$Version", $Wxs, '-o', $Msi)
     if (-not (Test-Path -LiteralPath $Msi -PathType Leaf)) { throw "wix build finished but $Msi is not there." }
 
@@ -248,13 +262,22 @@ try {
         Step 'Verifying both signatures against the Windows Authenticode policy.'
         Run 'verifying the exe' $SignTool @('verify', '/pa', '/v', $StagedExe)
         Run 'verifying the MSI' $SignTool @('verify', '/pa', '/v', $Msi)
+    }
 
+    # ---- output ----------------------------------------------------------------------------
+    # Only a signed and verified MSI (or a trial, into its own folder) reaches OutDir.
+
+    $null = New-Item -ItemType Directory -Force -Path $OutDir
+    Step "Copying $MsiName to $OutDir."
+    Copy-Item -LiteralPath $Msi -Destination $FinalMsi -Force
+
+    if (-not $SkipSign) {
         # ---- sidecar -----------------------------------------------------------------------
         # What node helper/build.mjs checks before the MSI enters the extension: the same helper
         # version and protocol, the file's own size and hash, the origins it was built for.
 
         Step "Writing the sidecar $MsiName.json."
-        $msiItem = Get-Item -LiteralPath $Msi
+        $msiItem = Get-Item -LiteralPath $FinalMsi
         $signToolVersion = ''
         try { $signToolVersion = [string]([Version](Get-Item -LiteralPath $SignTool).Directory.Parent.Name) } catch { $signToolVersion = '' }
         if ($signToolVersion -eq '') { $signToolVersion = [string](Get-Item -LiteralPath $SignTool).VersionInfo.ProductVersion }
@@ -265,7 +288,7 @@ try {
             helper = $Version
             protocol = [int]1
             size = [long]$msiItem.Length
-            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $Msi).Hash.ToLowerInvariant()
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $FinalMsi).Hash.ToLowerInvariant()
             allowed_origins = @($Origin)
             signed = 'authenticode'
             built_at = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
@@ -277,11 +300,11 @@ try {
             }
         }
         $json = (ConvertTo-Json -InputObject $sidecar -Depth 4).Replace("`r`n", "`n") + "`n"
-        [IO.File]::WriteAllText("$Msi.json", $json, $Utf8)
+        [IO.File]::WriteAllText("$FinalMsi.json", $json, $Utf8)
 
-        Step "Done: $Msi and its sidecar are ready for helper/signed; node helper/build.mjs picks them up from there."
+        Step "Done: $FinalMsi and its sidecar are ready for helper/signed; node helper/build.mjs --store-id picks them up from there."
     } else {
-        Step "Done: $Msi is built but unsigned and has no sidecar, so the extension's build will not take it; this file is for trying the installer here and must never ship."
+        Step "Done: $FinalMsi is built but unsigned and has no sidecar, in a folder of its own that the extension's build never reads; this file is for trying the installer here and must never ship."
     }
 } finally {
     # Only our own work folder, created above under the temp directory, is ever removed.

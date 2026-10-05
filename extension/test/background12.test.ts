@@ -276,6 +276,8 @@ describe('the signed installer, through the background', () => {
       if (msi) {
         expect(ih.download!.open).toBeUndefined();
         expect(ih.steps[0]).toBe('Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no administrator rights are needed.');
+        // the MSI has no dialogs of its own: the buttons Windows shows are the Open File warning's Run and SmartScreen's Run anyway
+        expect(ih.steps[1]).toBe('If Windows asks you to confirm, choose Run (or More info, then Run anyway).');
         expect(ih.signedNote).toBe("This installer is signed, so your computer can check that it came from Beethoven's maker before it runs.");
         expect(ih.unsignedNote).toBeUndefined();
         expect(ih.osNote).toBeUndefined();
@@ -326,6 +328,52 @@ describe("Settings' Helper line, through the background, when the installed help
       const helper = () => (settings.last()?.view as { connection?: { helper?: { text: string; installed: boolean; download?: { file: string } } } } | undefined)?.connection?.helper;
       await until(settings, () => helper()?.installed === true);
       expect(helper()).toMatchObject({ installed: true, text: c.text, download: { file: 'beethoven-bridge-windows.zip', version: c.shipped } });
+    }, 30_000);
+  }
+});
+
+// 15.0.0: the script helper of 14.0.0 and earlier answers (the fake's hello says kind "script", os "windows") while the
+// package offers the signed .msi made out to this extension: the two share a folder, so Settings says to remove the old one first
+describe("Settings' Helper line when a Windows script helper answers and the signed installer is offered", () => {
+  const OWN = 'abcdefghijklmnopabcdefghijklmnop';
+  let world: World;
+  beforeEach(() => {
+    vi.resetModules();
+    world = install();
+    world.files.set('/profiles/wayne.json', JSON.stringify({ ...PROFILE, ssh_relay: null }));
+    world.chrome.runtime.id = OWN;
+  });
+
+  for (const c of [
+    { name: 'the .msi named for this extension: remove the zip\'s helper first', origin: OWN, file: 'beethoven-bridge-windows.msi', text: 'Installed · version 1, from a zip. To change to the signed installer, first double-click uninstall.cmd in %LOCALAPPDATA%\\Beethoven\\bridge, then download it here.' },
+    { name: 'the zip offered (the .msi names another extension): the plain line', origin: 'ponmlkjihgfedcbaponmlkjihgfedcba', file: 'beethoven-bridge-windows.zip', text: 'Installed · version 1' },
+  ]) {
+    it(c.name, async () => {
+      world.files.set('/bridge/manifest.json', JSON.stringify({
+        host_name: 'com.openspineconsortium.beethoven.bridge', helper: '1.0.0', protocol: 1,
+        files: [
+          { os: 'windows', kind: 'script', name: 'beethoven-bridge-windows.zip', open: 'install.cmd', size: 12663, sha256: 'c'.repeat(64) },
+          { os: 'windows', kind: 'binary', name: 'beethoven-bridge-windows.msi', size: 1_258_291, sha256: 'b'.repeat(64), allowed_origins: [`chrome-extension://${c.origin}/`], signed: 'authenticode' },
+        ],
+      }));
+      nativeHelperToTcp(world, 1);
+      await boot(world);
+      // the background answers only its own pages, so these speak as OWN (the fake's openPort says "ext")
+      const portAs = (surface: 'panel' | 'settings'): ReturnType<typeof openPort> => {
+        const views: unknown[] = [];
+        const msg = ev();
+        const disc = ev();
+        world.chrome.runtime.onConnect.fire({ name: 'beethoven-view', sender: { id: OWN }, postMessage: (m: unknown) => views.push(m), onMessage: msg, onDisconnect: disc });
+        msg.fire({ type: 'subscribe', surface, windowId: 1 });
+        return { views, tick: () => msg.fire({ type: 'tick' }), close: () => disc.fire(), last: () => (views[views.length - 1] as { view?: unknown } | undefined)?.view };
+      };
+      const panel = portAs('panel');
+      world.chrome.runtime.onMessage.fire({ type: 'panel.opened', windowId: 1 }, { id: OWN });
+      await until(panel, () => view(panel)?.journey?.moment === 'sign-in-sheet');
+      const settings = portAs('settings');
+      const helper = () => (settings.last() as { view?: { connection?: { helper?: { text: string; installed: boolean; download?: { file: string } } } } } | undefined)?.view?.connection?.helper;
+      await until(settings, () => helper()?.installed === true);
+      expect(helper()).toMatchObject({ installed: true, text: c.text, download: { file: c.file } });
     }, 30_000);
   }
 });

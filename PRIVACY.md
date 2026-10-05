@@ -82,7 +82,8 @@ downloaded from Licensor or anyone else. You save the installer and open it once
 account; it needs no administrator rights. What the Bridge is depends on your system:
 
 - On Windows and on a Mac, the Bridge is a compiled program of Licensor's (written in Rust, with no
-  code of anyone else's but the Rust standard library), and its installer is a signed package. On
+  code of anyone else's but the Rust standard library and the start-up and runtime support code its
+  compiler links in, which THIRD_PARTY_NOTICES.md lists), and its installer is a signed package. On
   Windows it is a Windows Installer file (`beethoven-bridge-windows.msi`) signed by Licensor; it
   installs into your own account, and Windows' Settings list it afterwards, under Apps, as
   "Beethoven bridge". On a Mac it is an installer package (`beethoven-bridge-mac.pkg`) signed by
@@ -90,6 +91,10 @@ account; it needs no administrator rights. What the Bridge is depends on your sy
   installs into your own home folder only.
 - On Linux, the Bridge is a script run by Perl, or by Python 3 where Perl is absent; these come with
   your system. Its installer is a script in a zip file.
+- A Bridge you installed from a zip file with Beethoven 14.0.0 or earlier keeps working until you
+  remove it: a script, run by Windows PowerShell on Windows or by Perl on a Mac, not signed and not
+  listed under Apps; the uninstaller placed beside it removes it. On Windows it uses the same folder
+  as the signed installer, so Beethoven's settings ask you to remove it before you install that one.
 
 When you open a signed installer, your Mac or your Windows computer may check the installer's
 signature with Apple or Microsoft, as it does for any signed program it is asked to open. That check
@@ -108,8 +113,9 @@ installers in the package bring none) and carries bytes between the extension an
 carries is the ssh connection, which is encrypted between the extension and your cluster: the Bridge
 does not read it, keep it or log it, holds no password, key or other credential, offers no shell,
 runs no other program and sends nothing to Licensor. On Windows, Settings, Apps, "Beethoven bridge",
-Uninstall removes its files and the registration; on a Mac and on Linux, the uninstaller placed
-beside it does. If you do not install the Bridge, the extension uses the portal path.
+Uninstall removes its files and the registration; on a Mac and on Linux, and for a Bridge installed
+from a zip file with Beethoven 14.0.0 or earlier, the uninstaller placed beside it does. If you do
+not install the Bridge, the extension uses the portal path.
 
 ## When you sign in to your cluster over ssh
 
@@ -473,13 +479,14 @@ by Licensor.
 Remove the site permission or uninstall the extension at any time; turn the passkey protection of
 the browser's key on or off in Settings; use *Forget this computer* to delete the browser's key and
 remove its line from your cluster (or remove the line with `hpcworker browser-key remove` on the
-cluster); remove the Bridge (on Windows from Settings, Apps; on a Mac or on Linux with its
-uninstaller); remove the key of the portal path's one-time step from your cluster account with
-`hpcworker login-setup --remove`; ask Licensor to move your approval to another installation, or for
-a copy or deletion of your access records (deletion of your access record ends your approval and
-with it the license). Michigan residents and residents of other states may have further rights under
-their state's laws; Licensor honours requests it is obliged to honour and answers others where it
-reasonably can. Beethoven is offered in the United States.
+cluster); remove the Bridge (on Windows from Settings, Apps; on a Mac or on Linux, and for a Bridge
+installed from a zip file with Beethoven 14.0.0 or earlier, with its uninstaller); remove the key of
+the portal path's one-time step from your cluster account with `hpcworker login-setup --remove`; ask
+Licensor to move your approval to another installation, or for a copy or deletion of your access
+records (deletion of your access record ends your approval and with it the license). Michigan
+residents and residents of other states may have further rights under their state's laws; Licensor
+honours requests it is obliged to honour and answers others where it reasonably can. Beethoven is
+offered in the United States.
 
 ## Children
 
@@ -495,10 +502,11 @@ program of Licensor's, offered from inside the extension as a signed installer t
 your own account without administrator rights: on Windows a Windows Installer file signed by
 Licensor, removed from Settings, Apps; on a Mac an installer package signed by Licensor and
 notarized by Apple, removed with the uninstaller beside the Bridge. On Linux the Bridge is the
-script it was. When you open a signed installer, your system may check its signature with Apple or
-Microsoft; that is your system's own behaviour and tells Licensor nothing. The Bridge does what it
-did: it reaches only your cluster's ssh port, carries the encrypted connection and keeps nothing.
-Nothing new reaches Licensor.
+script it was. A Bridge installed from a zip file with an earlier version keeps working until you
+remove it with the uninstaller beside it. When you open a signed installer, your system may check
+its signature with Apple or Microsoft; that is your system's own behaviour and tells Licensor
+nothing. The Bridge does what it did: it reaches only your cluster's ssh port, carries the encrypted
+connection and keeps nothing. Nothing new reaches Licensor.
 
 Version 10 (2026-10-02, Beethoven 12.0.0): the extension now tries the ssh path first: an ssh
 connection to your cluster's login node, with no VPN, carried by the Bridge, a small helper program

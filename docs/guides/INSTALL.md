@@ -112,7 +112,7 @@ went smoothly or not.
    - "Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no
      administrator rights are needed." Click the file in Chrome's download list, or double-click it
      in **Downloads**.
-   - "If Windows asks you to confirm, choose Install (or More info, then Run anyway)." If your
+   - "If Windows asks you to confirm, choose Run (or More info, then Run anyway)." If your
      organization's security software stops it, this computer can't run the helper: use
      GlobalProtect instead ([Using Beethoven](USE.md), part 6), and tell your lab lead.
    - "When the window closes, come back here and press Check again." The panel has been saying

@@ -3573,6 +3573,10 @@ async function connectionSettings(prefs: Prefs): Promise<ConnectionSettingsView>
   const installedMajor = majorOf(B?.helper_version);
   const shippedMajor = majorOf(shipped);
   const outdated = installed && installedMajor !== undefined && shippedMajor !== undefined && installedMajor < shippedMajor;
+  // 15.0.0: on Windows the script helper of 12.0.0 to 14.0.0 shares the signed installer's folder, manifest and
+  // registry values, and its uninstall.cmd, which the installer cannot take away, would remove them: so the student
+  // removes it before using the installer offered beside it (docs/guides/INSTALL.md, "Remove the helper")
+  const scriptFirst = installed && B?.helper_kind === 'script' && download?.os === 'windows' && download.signed;
   return {
     title: W.title,
     mode: { label: W.modeLabel, value: prefs.connection ?? 'direct', options: [{ value: 'direct', label: W.modes.direct }, { value: 'vpn', label: W.modes.vpn }] },
@@ -3581,7 +3585,7 @@ async function connectionSettings(prefs: Prefs): Promise<ConnectionSettingsView>
     forget: { label: W.forget, note: W.forgetNote, confirm: W.forgetConfirm, button: { label: W.forgetButton, tone: 'text', action: { kind: 'forget-computer' } }, disabled: !k.present, ...(k.locked && k.enrolled ? { locked: true } : {}) },
     helper: {
       label: W.helper,
-      text: outdated && B?.helper_version && shipped ? W.helperOutdated(B.helper_version, shipped) : installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing,
+      text: outdated && B?.helper_version && shipped ? W.helperOutdated(B.helper_version, shipped) : scriptFirst && B?.helper_version ? W.helperScriptFirst(B.helper_version) : installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing,
       installed,
       ...(download ? { download } : {}),
       checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } },

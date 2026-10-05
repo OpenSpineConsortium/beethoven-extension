@@ -12,8 +12,9 @@ files:
   with the names from `release.json` in the vendor folder (`../README.md`). It needs no Windows
   machine, but whether Artifact Signing accepts a signature request from a Mac is not yet measured,
   so keep the Windows machine until one release has gone through this way.
-- **On a Windows machine (the fallback):** `build-msi.ps1` builds the exe with the MSVC toolchain,
-  the MSI from `Package.wxs` with WiX v5, and signs with `signtool` and the Artifact Signing client,
+- **On a Windows machine (the fallback):** `build-msi.ps1` builds the exe with the MSVC toolchain
+  (the C runtime linked in statically, `-C target-feature=+crt-static`, so the exe needs no
+  `VCRUNTIME140.dll`, which the MSI does not install), the MSI from `Package.wxs` with WiX v5, and signs with `signtool` and the Artifact Signing client,
   with the names from the gitignored `signing.json` beside it.
 
 `Package.wxs` and `bridge.wxs` are one package written twice, once for WiX v5 and once in the WiX v3
@@ -39,8 +40,17 @@ Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of
   per-user key paths Windows Installer wants for files under the user profile, ICE38). Nothing
   under HKLM; no custom action; no service, shortcut or startup entry.
 - Uninstall: Settings > Apps > "Beethoven bridge" > Uninstall removes the three files, the folder
-  and every value above. An older bridge is replaced in place (`MajorUpgrade`); a newer one already
+  and every value above. An older bridge is replaced in place (`MajorUpgrade`), and so is an
+  earlier build of the same version (`AllowSameVersionUpgrades`: every build has a new ProductCode
+  while `helper/VERSION` stays the same, and without it the two would install side by side, so that
+  uninstalling one would leave the shared files and values to the other); a newer one already
   installed refuses the downgrade.
+- The script edition of 12.0.0 to 14.0.0 uses the same folder, manifest name and registry values.
+  The MSI's manifest carries a version (`DefaultVersion`), so Windows Installer always puts it in
+  place of the script edition's unversioned one, even one a second run of `install.cmd` rewrote;
+  the script edition's other files stay, and so does its `uninstall.cmd`, which would remove the
+  shared manifest and values, so Settings asks a student who has it to remove it first. `wixl` has
+  no `RemoveFile`, so the package cannot take them away itself. Not yet measured on Windows.
 
 The payload's `README.txt` here is the student text installed beside the exe.
 
@@ -95,8 +105,8 @@ hyphens, the profile's may also hold `_`, as the release's config accepts; which
 allows is not yet measured.
 
 Each step prints one line saying what it does. The output is `helper/signed/beethoven-bridge-windows.msi`
-and `helper/signed/beethoven-bridge-windows.msi.json`, the sidecar, which `node helper/build.mjs`
-reads before it copies the MSI into `extension/public/bridge/`.
+and `helper/signed/beethoven-bridge-windows.msi.json`, the sidecar, which `node helper/build.mjs
+--store-id <id>` reads before it copies the MSI into `extension/public/bridge/`.
 
 | Option | Meaning |
 | --- | --- |
@@ -140,9 +150,10 @@ fixes it), 4 a step did not produce what it should, 5 Azure refused or could not
    any warning: `wixl` warns about an attribute it does not know and then leaves it out, and the MSI
    it writes would look right and not be this package.
 8. Reads the MSI back with `msiinfo`: six registry values, all under `HKEY_CURRENT_USER` (Root 1),
-   the Chrome and Edge `NativeMessagingHosts` default values set to the manifest's path, the two
-   `MajorUpgrade` rows on the package's UpgradeCode, no `ALLUSERS` property, the summary's "no
-   administrator rights" bit, x64, and the three files at their staged sizes.
+   the Chrome and Edge `NativeMessagingHosts` default values set to the manifest's path, the three
+   `MajorUpgrade` rows on the package's UpgradeCode (older, the same version, newer), no `ALLUSERS`
+   property, the summary's "no administrator rights" bit, x64, the three files at their staged
+   sizes, and a version on the manifest.
 9. Signs the MSI the same way and checks that signature.
 10. Copies the MSI to `--out` and writes the sidecar. The MSI reaches `--out` only after every
     check, so a refused signature leaves nothing for a build to pick up.
@@ -180,9 +191,9 @@ both into `helper/signed/` on the machine that builds the extension when that is
 | `-SignTool` | the newest `signtool.exe` under `%ProgramFiles(x86)%\Windows Kits\10\bin\<version>\x64\` | signtool from the Windows SDK. None found: the script stops. |
 | `-Dlib` | the newest `Azure.CodeSigning.Dlib.dll` under `%USERPROFILE%\.nuget\packages\microsoft.trusted.signing.client\<version>\bin\x64\` | The Artifact Signing client's signtool plug-in. The NuGet package may have followed the service's rename; that was not checked from here, so pass the path when the default finds nothing. |
 | `-Wix` | `wix` on PATH | The WiX v5 command (`dotnet tool install --global wix`). |
-| `-OutDir` | the repository's `helper\signed` | Where the MSI and its sidecar go. |
+| `-OutDir` | the repository's `helper\signed` | Where the MSI and its sidecar go. The MSI is built and signed in a work folder and copied here only once both signatures verify, so a failed run leaves this folder as it was. |
 | `-Target` | `x86_64-pc-windows-msvc` | The Rust target. The MSI is built `-arch x64`, so only an `x86_64-pc-windows-*` target is accepted. |
-| `-SkipSign` | off | A trial build: compiles and packages without signtool, the Dlib or `signing.json`, writes no sidecar, and says that the output must never ship. |
+| `-SkipSign` | off | A trial build: compiles and packages without signtool, the Dlib or `signing.json`, writes the MSI to `<OutDir>\trial`, writes no sidecar, and says that the output must never ship. |
 
 ### What the Windows machine must have
 
@@ -273,7 +284,9 @@ asked for a signature. In particular:
   tables need), it signs without the optional `MsiDigitalSignatureEx` stream that `signtool` adds,
   and the MSI it writes has not been run through Windows Installer's ICE validation.
 - `build-msi.ps1` has not been run end to end: cargo for the MSVC target, signtool with the Dlib, WiX
-  v5 on `Package.wxs` (ICE validation included), and the two verifications.
+  v5 on `Package.wxs` (ICE validation included), and the two verifications. Nor has anyone read the
+  imports of an exe it builds; with the static C runtime they should name no `VCRUNTIME140.dll`,
+  and unlike `build-msi-mac.sh` the script does not check them.
 - No MSI has been installed, upgraded or uninstalled on a Windows machine, and Chrome has not been
   seen to start the installed `beethoven-bridge.exe` through the relative `"path"`.
 - Edge's `NativeMessagingHosts` key has not been seen to be read by Edge for this host.

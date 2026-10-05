@@ -40,8 +40,9 @@
              InstallScope="perUser"
              Compressed="yes"/>
 
-    <!-- An older bridge is replaced in place; a newer one already installed stays. -->
-    <MajorUpgrade DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
+    <!-- An older bridge, or one of the same version from an earlier build, is replaced in place; a
+         newer one already installed stays. -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer Beethoven bridge is already installed."/>
     <MediaTemplate EmbedCab="yes"/>
 
     <Property Id="ARPNOMODIFY" Value="1"/>
@@ -70,7 +71,7 @@
             </Component>
 
             <Component Id="HostManifest" Guid="2B1DFC4E-73F8-445D-84F6-5B99A0E07826">
-              <File Id="HostManifestFile" Source="$(var.StageDir)/com.openspineconsortium.beethoven.bridge.json" KeyPath="no"/>
+              <File Id="HostManifestFile" Source="$(var.StageDir)/com.openspineconsortium.beethoven.bridge.json" KeyPath="no" DefaultVersion="1.0.0.0"/>
               <RegistryValue Root="HKCU" Key="Software\OpenSpineConsortium\Beethoven bridge" Name="HostManifest" Value="$(var.Version)" Type="string" KeyPath="yes"/>
             </Component>
 

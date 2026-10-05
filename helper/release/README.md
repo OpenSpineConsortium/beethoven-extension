@@ -275,9 +275,10 @@ sidecars carry the size and SHA-256, and `build.mjs` refuses a file that does no
    the record: the tracked build is the placeholder build that `node helper/build.mjs --check
    --no-signed` proves in CI.
    `release.sh` then removes the `.pkg` and `.msi` copies from that folder (by hand, or a plain `node
-   helper/build.mjs` removes them and says so; a plain `--check` names them until then) and runs `node
-   helper/build.mjs --check --no-signed` to prove the tracked build is back. `git status` must show
-   nothing but `release/<version>/` before the commit.
+   helper/build.mjs`, which reads `helper/signed/` only with `--store-id` or `--signed`, removes them
+   and says so; a plain `--check` names them until then) and runs `node helper/build.mjs --check
+   --no-signed` to prove the tracked build is back. `git status` must show nothing but
+   `release/<version>/` before the commit.
 9. **Upload:** `node helper/release/publish-store.mjs upload --publisher <publisher id> --item <id>
    --zip release/<version>/beethoven-<version>-chrome.zip --require-signed --publish`: the recorded
    copy, so the record holds the bytes the store got.

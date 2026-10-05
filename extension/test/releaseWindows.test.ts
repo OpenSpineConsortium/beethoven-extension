@@ -82,7 +82,7 @@ describe('Package.wxs', () => {
   it('carries one fixed UpgradeCode, a MajorUpgrade with a downgrade message and no Modify in Settings', () => {
     const up = /UpgradeCode="([^"]+)"/.exec(wxs)?.[1] ?? '';
     expect(up).toMatch(GUID);
-    expect(wxs).toMatch(/<MajorUpgrade DowngradeErrorMessage="A newer Beethoven bridge is already installed\."\/>/);
+    expect(wxs).toMatch(/<MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer Beethoven bridge is already installed\."\/>/);
     expect(wxs).toContain('<Property Id="ARPNOMODIFY" Value="1"/>');
     expect(wxs).toContain('<Property Id="ARPURLINFOABOUT" Value="https://openspineconsortium.com/beethoven/"/>');
     expect(wxs).toContain('<Property Id="ARPHELPLINK" Value="https://openspineconsortium.com/beethoven/"/>');
@@ -194,6 +194,36 @@ describe('build-msi.ps1', () => {
     expect(ps1.split('\n').filter((l) => /'verify', '\/pa', '\/v'/.test(l)).length).toBe(2);
     expect(ps1).toMatch(/'build', '-arch', 'x64', '-d', "StageDir=\$Stage", '-d', "Version=\$Version", \$Wxs, '-o', \$Msi/);
     expect(ps1).toContain("'--release', '--target', $Target, '--target-dir', $TargetDir");
+  });
+
+  it('links the C runtime into the exe for the MSVC target, so it needs no VCRUNTIME140.dll the MSI does not install', () => {
+    const lines = ps1.split('\n');
+    const flag = lines.findIndex((l) => l.includes('$env:RUSTFLAGS = ("$savedRustFlags -C target-feature=+crt-static").Trim()'));
+    const cargo = lines.findIndex((l) => l.includes("Run 'cargo build'"));
+    expect(flag).toBeGreaterThan(0);
+    expect(lines[flag - 2]).toContain("if ($Target -like '*-msvc')");
+    expect(cargo).toBeGreaterThan(flag);
+    // put back afterwards, and refused when CARGO_ENCODED_RUSTFLAGS would make cargo ignore it
+    expect(lines.slice(cargo, cargo + 5).join('\n')).toContain('$env:RUSTFLAGS = $savedRustFlags');
+    expect(ps1).toContain('if ($env:CARGO_ENCODED_RUSTFLAGS) { throw');
+  });
+
+  it('builds and signs the MSI in its work folder and copies it out only once signed and verified; a trial goes to OutDir\\trial', () => {
+    expect(ps1).toContain('$Msi = Join-Path $Work $MsiName');
+    expect(ps1).toContain("if ($SkipSign) { $OutDir = Join-Path $OutDir 'trial' }");
+    expect(ps1).toContain('$FinalMsi = Join-Path $OutDir $MsiName');
+    expect(ps1).not.toMatch(/Join-Path \$OutDir \$MsiName[\s\S]*\$Msi = Join-Path \$OutDir/);
+    const lines = ps1.split('\n');
+    const verify = lines.findIndex((l) => l.includes("Run 'verifying the MSI'"));
+    const mkOut = lines.findIndex((l) => l.includes('New-Item -ItemType Directory -Force -Path $OutDir'));
+    const copy = lines.findIndex((l) => l.includes('Copy-Item -LiteralPath $Msi -Destination $FinalMsi'));
+    const sidecar = lines.findIndex((l) => l.includes('[IO.File]::WriteAllText("$FinalMsi.json"'));
+    expect(verify).toBeGreaterThan(0);
+    expect(mkOut).toBeGreaterThan(verify);
+    expect(copy).toBeGreaterThan(mkOut);
+    expect(sidecar).toBeGreaterThan(copy);
+    // nothing else writes into OutDir
+    expect(lines.filter((l) => /\$OutDir|\$FinalMsi/.test(l) && /New-Item|Copy-Item|WriteAllText|'-o'/.test(l))).toHaveLength(3);
   });
 
   it('writes metadata.json for the Dlib into its work folder and never prints it', () => {
@@ -353,8 +383,10 @@ describe.skipIf(!PWSH)('build-msi.ps1 -SkipSign against stand-ins (pwsh on PATH)
       expect(r.status, r.out + r.err).toBe(0);
       expect(r.out).toContain('never ship');
       expect(r.out).not.toMatch(/Signing beethoven-bridge\.exe|Writing the sidecar/);
-      expect(readdirSync(outDir).sort()).toEqual(['beethoven-bridge-windows.msi']);
-      const got = JSON.parse(readFileSync(path.join(outDir, 'beethoven-bridge-windows.msi'), 'utf8')) as {
+      // a trial goes to a folder of its own, so it never stands where the build reads a signed one
+      expect(readdirSync(outDir).sort()).toEqual(['trial']);
+      expect(readdirSync(path.join(outDir, 'trial')).sort()).toEqual(['beethoven-bridge-windows.msi']);
+      const got = JSON.parse(readFileSync(path.join(outDir, 'trial', 'beethoven-bridge-windows.msi'), 'utf8')) as {
         args: string[]; stage: string[]; bom: boolean; cr: boolean;
         manifest: { name: string; description: string; path: string; type: string; allowed_origins: string[] };
       };

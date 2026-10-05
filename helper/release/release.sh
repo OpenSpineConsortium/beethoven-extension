@@ -257,6 +257,11 @@ if [ -e "$REL" ]; then
 fi
 DIRTY=$(git status --porcelain)
 if [ -n "$DIRTY" ]; then
+  # a run cut off between the merge and step 14 (a kill, a power cut: no EXIT trap runs) leaves the
+  # merged bridge build, which names the store's extension and must never be committed
+  if ! printf '%s\n' "$DIRTY" | grep -v "^.. $BRIDGE/" >/dev/null; then
+    refuse 4 "$BRIDGE/ still holds the merged build of a release run that was cut off; it names the store's extension and is never committed: put the tracked files back with git checkout -- $BRIDGE/ and run again."
+  fi
   refuse 4 "The working tree is not clean (git status --porcelain lists what changed); commit or set the changes aside first, since the record names one commit."
 fi
 BRANCH=$(git symbolic-ref --short -q HEAD || true)

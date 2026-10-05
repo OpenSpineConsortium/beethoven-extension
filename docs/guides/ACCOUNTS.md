@@ -120,7 +120,7 @@ downloads of the file.
 *With it (15.0.0):* the MSI and the program inside it are signed, so Windows is expected to name a
 publisher instead of "Unknown Publisher". A new publisher whose file few people have downloaded may
 still meet SmartScreen's **Windows protected your PC**, which is why the panel's second step says
-"If Windows asks you to confirm, choose Install (or More info, then Run anyway)." Whether it does,
+"If Windows asks you to confirm, choose Run (or More info, then Run anyway)." Whether it does,
 and for how long, is not yet measured. A managed computer's App Control, AppLocker or security
 product may still stop it; then the student uses GlobalProtect.
 
