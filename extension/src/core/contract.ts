@@ -136,11 +136,14 @@ export interface ConnectOptions {
   chain: boolean;
 }
 
-const WORKER_NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
-const SITE_RE = /^[a-z0-9-]{1,32}$/;
-const INSTALL_RE = /^[0-9a-f]{32}$/;
-const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
-const LOGINS: readonly ConnectLogin[] = ['auto', 'always', 'never'];
+// The values a command line carries, each checked before it is placed: hpcworker's export `contract`
+// (cli.json "values") as this repository pins it in framework/contract/; test/conformance.test.ts holds
+// each equal to it. A site name never begins with "-" (until 2026-10-07 this took one, which cli.json refuses).
+export const WORKER_NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
+export const SITE_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+export const INSTALL_RE = /^[0-9a-f]{32}$/;
+export const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
+export const LOGINS: readonly ConnectLogin[] = ['auto', 'always', 'never'];
 
 /**
  * The only line the portal page script will ever type into a terminal page (AM2): the login-setup
@@ -241,7 +244,12 @@ export const commands = {
    * itself (launcher, marker, profile, the PATH block). `dir` has passed sharedRootOf, so it holds
    * no quote or space; the quotes are the same habit as every other argument here.
    */
-  installShared: (dir: string, profile: string) => `bash '${safe(dir)}/bin/hpcworker' install --shared '${safe(dir)}' --profile '${safe(profile)}'`,
+  installShared(dir: string, profile: string): string {
+    // checked like every 11.0.0 line (cli.json: a value is checked before it is placed, never quoted around)
+    const d = sharedRootOf(dir);
+    if (!d || !SITE_RE.test(profile)) throw new Error('bad install arguments');
+    return `bash '${toolPath(d)}' install --shared '${d}' --profile '${profile}'`;
+  },
   /** the login-node phase-1 discovery (JSON); a one-line fallback when the tool is not installed yet */
   discover: () =>
     `bash ${HPCWORKER} discover 2>/dev/null || { echo "sched=$(command -v sbatch qsub bsub condor_submit 2>/dev/null | tr '\\n' ' ')"; echo "rt=$(command -v apptainer singularity podman enroot 2>/dev/null | tr '\\n' ' ')"; echo "userns=$(sysctl -n user.max_user_namespaces 2>/dev/null)"; echo "os=$(. /etc/os-release 2>/dev/null; echo $PRETTY_NAME)"; echo "glibc=$(ldd --version 2>/dev/null | head -1)"; echo "tmp=\${SLURM_TMPDIR:-}|\${TMPDIR:-}"; echo "proxy=\${https_proxy:-\${HTTPS_PROXY:-}}"; sinfo -h -o 'part=%P|%l|%a' 2>/dev/null | head -40; }`,
@@ -324,6 +332,8 @@ export const commands = {
  * (open it in a tab; the student signs in there and gets a code), "SIGNED-IN <email> <plan>" (done),
  * "HPCW-LOGIN-FAILED: <sentence>" (the rest of the line says why). Claude Code's own screen is never
  * copied to that output; anything else that arrives is the shell's own text and is only shown.
+ * Lenient on purpose: it reads `claude login --plain` as framework 9 printed it ("HPCW-LOGIN 1 plain"),
+ * for the portal's login port only (LoginWatcher). The connect sitting is read exactly (LOGIN_RE).
  */
 export const LOGIN_LINES = {
   started: /^HPCW-LOGIN\b(?!-(?:FAILED|DRY))/,
@@ -410,12 +420,17 @@ export type StepEvent =
   /** "HPCW-STEP failed <code> <sentence>": the last line on failure; the sentence is for Details and Show log's raw view only */
   | { step: 'failed'; code: StepFailCode; detail: string };
 
+/**
+ * The step lines, by lines.json's ids (family "step"), each matched whole; test/conformance.test.ts holds
+ * every pattern equal to the pinned export. A bare "HPCW-STEP setup", which this read as "ready" until
+ * 2026-10-07, is no line of the contract and reads as text.
+ */
 export const STEP_RE = {
-  setup: /^HPCW-STEP setup(?: (ready|changed))?$/,
+  setup: /^HPCW-STEP setup (ready|changed)$/,
   consent: /^HPCW-STEP consent$/,
   queued: /^HPCW-STEP queued ([0-9]+) (new|kept)(?: (.+))?$/,
   signin: /^HPCW-STEP signin$/,
-  signedIn: /^HPCW-STEP signed-in (\S+) (\S+)$/,
+  'signed-in': /^HPCW-STEP signed-in (\S+) (\S+)$/,
   done: /^HPCW-STEP done$/,
   failed: /^HPCW-STEP failed ([a-z-]+)(?: (.*))?$/,
 };
@@ -431,7 +446,7 @@ export function parseStepLine(line: string): StepEvent | undefined {
   if (STEP_RE.consent.test(l)) return { step: 'consent' };
   if ((m = STEP_RE.queued.exec(l))) return { step: 'queued', job: m[1]!, fresh: m[2] === 'new', ...(m[3] ? { runDir: m[3] } : {}) };
   if (STEP_RE.signin.test(l)) return { step: 'signin' };
-  if ((m = STEP_RE.signedIn.exec(l))) return { step: 'signed-in', email: dash(m[1]), plan: dash(m[2]) };
+  if ((m = STEP_RE['signed-in'].exec(l))) return { step: 'signed-in', email: dash(m[1]), plan: dash(m[2]) };
   if (STEP_RE.done.test(l)) return { step: 'done' };
   if ((m = STEP_RE.failed.exec(l))) {
     const code = (FAIL_CODES as readonly string[]).includes(m[1]!) ? (m[1] as StepFailCode) : 'other';
@@ -461,7 +476,7 @@ export type ConnectEvent =
   /** "AUTH-URL: <url>": only a subscription's https link on claude.ai or claude.com (isClaudeAuthUrl) is reported; anything else, the Console's included, is "refused-url" */
   | { kind: 'auth-url'; url: string }
   | { kind: 'refused-url' }
-  /** "HPCW-LOGIN: paste the code from that page" (or Claude Code's own "Paste code here"): focus the box */
+  /** "HPCW-LOGIN: paste the code from that page": focus the box */
   | { kind: 'code-prompt' }
   /** "HPCW-LOGIN: code received, checking" */
   | { kind: 'code-received' }
@@ -474,35 +489,49 @@ export type ConnectEvent =
   /** any other HPCW-LOGIN progress line */
   | { kind: 'progress'; detail: string };
 
+/**
+ * The sign-in sitting's lines, by lines.json's ids (family "login"), each matched whole; `other` is any
+ * HPCW-LOGIN progress line the others do not name. test/conformance.test.ts holds every pattern equal to
+ * the pinned export. Until 2026-10-07 the connect reader matched these by their first words and took
+ * Claude Code's own "Paste code here" anywhere in a line for the prompt; the contract makes both text (the
+ * code still goes CODE_AFTER_LINK_MS after the link when no prompt line comes).
+ */
+export const LOGIN_RE = {
+  requesting: /^HPCW-LOGIN: requesting a compute node$/,
+  'on-node': /^HPCW-LOGIN: on (\S+); checking whether you are signed in already$/,
+  starting: /^HPCW-LOGIN: starting Claude Code's sign-in; waiting for the sign-in link$/,
+  menu: /^HPCW-LOGIN: (a menu appeared; chose the first entry|the menu is still up; pressed Enter again)$/,
+  'auth-url': /^AUTH-URL: (\S+)$/,
+  'code-prompt': /^HPCW-LOGIN: paste the code from that page$/,
+  'code-received': /^HPCW-LOGIN: code received, checking$/,
+  'code-refused': /^HPCW-LOGIN: that code was not accepted; paste it again$/,
+  keepalive: /^HPCW-LOGIN: still waiting$/,
+  'signed-in': /^SIGNED-IN (\S+) (\S+)$/,
+  failed: /^HPCW-LOGIN-FAILED: (.*)$/,
+  other: /^HPCW-LOGIN: (.+)$/,
+};
+
 /** one cleaned line of a connect sitting -> its event, or undefined for ordinary terminal text (never shown to a student) */
 export function parseConnectLine(line: string): ConnectEvent | undefined {
   const raw = String(line ?? '').trim();
   if (!raw) return undefined;
-  if (raw === KEEPALIVE_LINE) return { kind: 'keepalive' };
+  if (LOGIN_RE.keepalive.test(raw)) return { kind: 'keepalive' };
   const l = withoutKeepalive(raw);
   if (!l) return { kind: 'keepalive' };
   const step = parseStepLine(l);
   if (step) return { kind: 'step', step };
-  if (/^HPCW-LOGIN: requesting a compute node\b/.test(l)) return { kind: 'signin-wait' };
-  if (/^HPCW-LOGIN: on \S+; /.test(l)) return { kind: 'signin-node' };
-  if (/^HPCW-LOGIN: code received, checking\b/.test(l)) return { kind: 'code-received' };
-  if (/^HPCW-LOGIN: that code was not accepted\b/.test(l)) return { kind: 'code-rejected' };
-  const ev = parseLoginLine(l);
-  if (!ev) return undefined;
-  switch (ev.kind) {
-    case 'auth-url':
-      return isClaudeAuthUrl(ev.url) ? { kind: 'auth-url', url: ev.url } : { kind: 'refused-url' };
-    case 'code-prompt':
-      return { kind: 'code-prompt' };
-    case 'signed-in': {
-      const [email, plan] = ev.detail.split(/\s+/);
-      return { kind: 'signed-in', email: dash(email), plan: dash(plan) };
-    }
-    case 'failed':
-      return { kind: 'login-failed', detail: ev.detail };
-    case 'started':
-      return { kind: 'progress', detail: ev.detail };
-  }
+  let m: RegExpExecArray | null;
+  if (LOGIN_RE.requesting.test(l)) return { kind: 'signin-wait' };
+  if (LOGIN_RE['on-node'].test(l)) return { kind: 'signin-node' };
+  if ((m = LOGIN_RE['auth-url'].exec(l))) return isClaudeAuthUrl(m[1]) ? { kind: 'auth-url', url: m[1]! } : { kind: 'refused-url' };
+  if (LOGIN_RE['code-prompt'].test(l)) return { kind: 'code-prompt' };
+  if (LOGIN_RE['code-received'].test(l)) return { kind: 'code-received' };
+  if (LOGIN_RE['code-refused'].test(l)) return { kind: 'code-rejected' };
+  if ((m = LOGIN_RE['signed-in'].exec(l))) return { kind: 'signed-in', email: dash(m[1]), plan: dash(m[2]) };
+  if ((m = LOGIN_RE.failed.exec(l))) return { kind: 'login-failed', detail: m[1]!.trim() };
+  // starting, the menu and every other progress line: words for Details only
+  if ((m = LOGIN_RE.other.exec(l))) return { kind: 'progress', detail: m[1]!.trim() };
+  return undefined;
 }
 
 /**
@@ -584,9 +613,12 @@ export interface ProgressLine {
   arg?: string;
 }
 
+/** a progress.log line: the time, one space, the rest (lines.json family "progress", line_pattern) */
+export const PROGRESS_LINE_RE = /^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z) (.+)$/;
+
 /** one line of progress.log -> its event, or undefined for a line outside the fixed set (shown in Details only) */
 export function parseProgressLine(line: string): ProgressLine | undefined {
-  const m = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ) (.+)$/.exec(String(line ?? '').trim());
+  const m = PROGRESS_LINE_RE.exec(String(line ?? '').trim());
   if (!m) return undefined;
   const at = m[1]!;
   const text = m[2]!;
@@ -1096,7 +1128,6 @@ export type GateFile = (typeof GATE_FILES)[number];
 
 /** the gate's worker-name rule (framework 11's WORKER_NAME_RE, never with a leading "-" or "_") */
 export const GATE_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
-const GATE_SITE_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
 /** the gate's verbs, each one line the gate accepts; each builder throws on a value the gate would refuse */
 export const gate = {
@@ -1124,7 +1155,7 @@ export const gate = {
   /** connect NAME SITE INSTALLID|- MODE chain|no-chain: the gate runs connect with --login never, always */
   connect(o: { name: string; site: string; installId?: string; permissionMode: PermissionMode; chain: boolean }): string {
     if (!GATE_NAME_RE.test(o.name)) throw new Error('bad worker name for the gate');
-    if (!GATE_SITE_RE.test(o.site)) throw new Error('bad site for the gate');
+    if (!SITE_RE.test(o.site)) throw new Error('bad site for the gate');
     if (o.installId !== undefined && !INSTALL_RE.test(o.installId)) throw new Error('bad installation id');
     if (!MODES.includes(o.permissionMode)) throw new Error('bad permission mode');
     return `connect ${o.name} ${o.site} ${o.installId ?? '-'} ${o.permissionMode} ${o.chain ? 'chain' : 'no-chain'}`;
@@ -1137,11 +1168,82 @@ export const GATE_REFUSED = 'HPCW-GATE refused';
 export const GATE_KEY_EXPIRED = 'HPCW-KEY expired';
 
 /**
+ * The gate's lines and the key's that this reads, by lines.json's ids (families "gate" and "key"), each
+ * matched whole on a line of its own (contractLines), with the exit status lines.json gives the ones that
+ * have one. test/conformance.test.ts holds every pattern and status equal to the pinned export. Until
+ * 2026-10-07 these were read by their first words: a version line with any word for its due date, a
+ * limit, forget or refusal line with more after it, and an added line only with a fingerprint of 43
+ * characters (an added line of another key still fails the check of the fingerprint in signin.ts).
+ */
+export const GATE_RE = {
+  ok: /^HPCW-GATE ok (\S+) ([0-9]{4}-[0-9]{2}-[0-9]{2}|never|-) (\S+) claude=(yes|no|unknown)$/,
+  refused: /^HPCW-GATE refused$/,
+  limit: /^HPCW-GATE limit (names|hourly|watch|busy)$/,
+};
+export const GATE_EXIT = { refused: 126, limit: 123 } as const;
+export const KEY_RE = {
+  added: /^HPCW-KEY added (SHA256:\S+)$/,
+  none: /^HPCW-KEY none$/,
+  forgotten: /^HPCW-KEY forgotten$/,
+  stuck: /^HPCW-KEY stuck$/,
+  expired: /^HPCW-KEY expired$/,
+  refused: /^HPCW-KEY refused ([a-z-]+) (.*)$/,
+};
+export const KEY_EXIT = { stuck: 7, expired: 125 } as const;
+
+/**
+ * control sequences and carriage returns, as the vendor's phone host (phone.js) strips them. In a JavaScript class
+ * `\/` is the slash itself, so the CSI intermediates [ -\/] are space to slash (0x20-0x2F), as they should be; the
+ * same text in a sed bracket expression is space to backslash, the framework's defect fixed in framework 14
+ * (test/shell.test.ts pins it: ESC[K right before a link takes nothing with it)
+ */
+export const ANSI = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b[()][A-Za-z0-9]|\r/g;
+
+export function clean(s: string): string {
+  return String(s).replace(ANSI, '');
+}
+
+/**
+ * An answer's lines as lines.json reads them: terminal codes stripped, carriage returns dropped, each
+ * trimmed, empty ones left out. Every line is looked at, since the account's ~/.bashrc may print first.
+ */
+export function contractLines(output: string | undefined): string[] {
+  return clean(String(output ?? '')).split('\n').map((l) => l.trim()).filter(Boolean);
+}
+
+/** the first line of `output` that `re` matches whole, as its match */
+function lineMatch(output: string | undefined, re: RegExp): RegExpExecArray | undefined {
+  for (const l of contractLines(output)) {
+    const m = re.exec(l);
+    if (m) return m;
+  }
+  return undefined;
+}
+
+/** what a gate answer says before its verb is read: the key expired, the line was refused, a cap was reached, or the lab's copy has no gate */
+export type GateOutcome = { kind: 'key-expired' } | { kind: 'refused' } | { kind: 'limit'; which: GateLimit } | { kind: 'old-copy' };
+
+/** any verb's answer: one of the outcomes every verb shares, or undefined when the verb's own reader takes it from here */
+export function gateOutcome(stdout: string, stderr: string, exitStatus: number | null): GateOutcome | undefined {
+  if (exitStatus === KEY_EXIT.expired || lineMatch(stdout, KEY_RE.expired)) return { kind: 'key-expired' };
+  if (exitStatus === GATE_EXIT.refused && lineMatch(stdout, GATE_RE.refused)) return { kind: 'refused' };
+  const limit = exitStatus === GATE_EXIT.limit ? parseGateLimit(stdout) ?? parseGateLimit(stderr) : undefined;
+  if (limit) return { kind: 'limit', which: limit };
+  if (isUnknownVerb(stdout + '\n' + stderr)) return { kind: 'old-copy' };
+  return undefined;
+}
+
+/** a `read NAME FILE` answer: the file's bytes when the gate gave them (exit 0), else undefined (missing, not-plain, too-large: lines.json, cli.json "read") */
+export function gateReadFile(exitStatus: number | null, stdout: string): string | undefined {
+  return exitStatus === 0 ? stdout : undefined;
+}
+
+/**
  * The connect line as commands.connect types it (groups: name, site, consent, login, permission mode,
  * --no-chain). `fresh` stays in the login group so a line an older build typed is still read as a
  * connect line (and, as any Claude sign-in, never carried by the gate); no 15.0.0 line asks for it.
  */
-export const CONNECT_LINE_RE = /^exec bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' connect --name '([A-Za-z0-9_-]{1,32})' --profile '([a-z0-9-]{1,32})'(?: --consent '([0-9a-f]{32})')? --login '(auto|always|fresh|never)' --permission-mode '(default|acceptEdits|plan)'( --no-chain)?$/;
+export const CONNECT_LINE_RE = /^exec bash '\/[A-Za-z0-9._+/-]+\/bin\/hpcworker' connect --name '([A-Za-z0-9_-]{1,32})' --profile '([a-z0-9][a-z0-9-]{0,31})'(?: --consent '([0-9a-f]{32})')? --login '(auto|always|fresh|never)' --permission-mode '(default|acceptEdits|plan)'( --no-chain)?$/;
 
 /** the line the gate carries in place of an 11.0.0 line, or undefined (the gate has no such verb, or the line asks for a Claude sign-in) */
 export function gateLineFor(line: string): string | undefined {
@@ -1172,24 +1274,24 @@ export interface GateVersion {
 }
 
 export function parseGateVersion(output: string): GateVersion | undefined {
-  for (const raw of String(output ?? '').split('\n')) {
-    const m = /^HPCW-GATE ok (\S+) (\S+) (\S+) claude=(yes|no|unknown)\s*$/.exec(raw.trim());
-    if (m) return { framework: m[1]!, due: m[2]!, account: m[3]!, claude: m[4] as GateVersion['claude'] };
-  }
-  return undefined;
+  const m = lineMatch(output, GATE_RE.ok);
+  return m ? { framework: m[1]!, due: m[2]!, account: m[3]!, claude: m[4] as GateVersion['claude'] } : undefined;
 }
 
 /** forget through the gate: the browser line out ("forgotten"), none was there ("none"), or it could not be changed ("stuck") */
 export function parseForget(output: string): 'forgotten' | 'none' | 'stuck' | undefined {
-  const m = /^HPCW-KEY (forgotten|none|stuck)\b/m.exec(String(output ?? ''));
-  return m ? (m[1] as 'forgotten' | 'none' | 'stuck') : undefined;
+  for (const l of contractLines(output)) {
+    if (KEY_RE.forgotten.test(l)) return 'forgotten';
+    if (KEY_RE.none.test(l)) return 'none';
+    if (KEY_RE.stuck.test(l)) return 'stuck';
+  }
+  return undefined;
 }
 
 /** one of the gate's caps was reached (framework 11, exit 123): "HPCW-GATE limit names|hourly|watch|busy" */
 export type GateLimit = 'names' | 'hourly' | 'watch' | 'busy';
 export function parseGateLimit(output: string): GateLimit | undefined {
-  const m = /^HPCW-GATE limit (names|hourly|watch|busy)\b/m.exec(String(output ?? '').replace(/\r/g, ''));
-  return m ? (m[1] as GateLimit) : undefined;
+  return lineMatch(output, GATE_RE.limit)?.[1] as GateLimit | undefined;
 }
 
 /** the lab's copy on the grid is older than framework 11: it has no `gate` (or `browser-key`) verb at all */
@@ -1272,17 +1374,16 @@ export function browserKeyAdded(output: string, exitCode: number | null): boolea
   return browserKeyAddedFingerprint(output, exitCode) !== undefined;
 }
 
-/** the fingerprint the enrolment line says it added ("SHA256:<43>"), or undefined (not added) */
+/** the fingerprint the enrolment line says it added ("SHA256:..."), or undefined (not added); signin.ts checks it is this computer's */
 export function browserKeyAddedFingerprint(output: string, exitCode: number | null): string | undefined {
   if (exitCode !== 0) return undefined;
-  const m = /^HPCW-KEY added (SHA256:[A-Za-z0-9+/]{43})\s*$/m.exec(String(output ?? '').replace(/\r/g, ''));
-  return m ? m[1] : undefined;
+  return lineMatch(output, KEY_RE.added)?.[1];
 }
 
 /** the enrolment line's refusal: "HPCW-KEY refused <code> <sentence>" (codes key, agent, root, usage, home, ssh-dir, authorized-keys, copy) */
 export function parseKeyRefusal(output: string): { code: string; sentence: string } | undefined {
-  const m = /^HPCW-KEY refused ([a-z-]+)(?: (.*))?$/m.exec(String(output ?? '').replace(/\r/g, ''));
-  return m ? { code: m[1]!, sentence: (m[2] ?? '').trim().slice(0, 300) } : undefined;
+  const m = lineMatch(output, KEY_RE.refused);
+  return m ? { code: m[1]!, sentence: m[2]!.trim().slice(0, 300) } : undefined;
 }
 
 /**

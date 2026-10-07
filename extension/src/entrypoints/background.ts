@@ -42,7 +42,7 @@ import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/chan
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
@@ -602,7 +602,7 @@ async function siteForConnect(s: PortalSettings): Promise<string> {
   try {
     const c = await directClient();
     const ctx = c ? await clusterContext(c) : undefined;
-    if (ctx?.site && /^[a-z0-9-]{1,32}$/.test(ctx.site)) return ctx.site;
+    if (ctx?.site && SITE_RE.test(ctx.site)) return ctx.site;
   } catch {
     /* the portal's own name stands */
   }
@@ -1141,7 +1141,7 @@ async function actInner(a: Action): Promise<unknown> {
       const cur = await loadPrefs();
       const next = { ...cur, ...a.prefs };
       if (next.worker_name !== cur.worker_name) {
-        if (!/^[A-Za-z0-9_-]{1,32}$/.test(next.worker_name)) return { saved: false } satisfies ActionResults['set-pref'];
+        if (!WORKER_NAME_RE.test(next.worker_name)) return { saved: false } satisfies ActionResults['set-pref'];
         // another worker: its own run, its own statement
         await mutateRun(() => null);
         mem.restricted = false;

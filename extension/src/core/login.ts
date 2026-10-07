@@ -75,9 +75,10 @@ export function loginFailureSentence(detail: string): string {
 /**
  * Turns the connect sitting's terminal text into events (contract.ts parseConnectLine): complete
  * lines are assembled across frames first, terminal codes stripped. A redrawn AUTH-URL line is not a
- * second page; nothing after `HPCW-STEP done` or `HPCW-STEP failed` is reported. Claude Code's own
- * "Paste code here", which ends without a newline, is seen on the unfinished line too. The
- * terminal's text itself goes nowhere: only these events leave this class.
+ * second page; nothing after `HPCW-STEP done` or `HPCW-STEP failed` is reported. The framework's prompt
+ * line is seen on the unfinished line too, before its newline comes; Claude Code's own "Paste code here"
+ * is terminal text (the contract's lines are matched whole), and the code then goes CODE_AFTER_LINK_MS
+ * after the link. The terminal's text itself goes nowhere: only these events leave this class.
  */
 export class ConnectWatcher {
   private pending = '';
@@ -99,7 +100,7 @@ export class ConnectWatcher {
       this.line(line);
     }
     if (this.pending.length > 8192) this.pending = this.pending.slice(-4096);
-    // a prompt ends without a newline: look at the unfinished line for it alone
+    // the prompt line may come before its newline: look at the unfinished line for it alone
     const partial = parseConnectLine(this.pending);
     if (partial?.kind === 'code-prompt') {
       this.pending = '';

@@ -16,7 +16,7 @@
 // have none.
 import { Audit, FloorError, type EndpointClass } from './audit';
 import { BridgeError, GRID_HOST, GRID_HOST_KEY_PIN, GRID_PORT, type BridgeProvider } from './bridge';
-import { gate, gateLineFor, gateReadBody, GATE_FILES, GATE_KEY_EXPIRED, GATE_REFUSED, isUnknownVerb, parseForget, parseGateLimit, parseGateVersion, type GateFile, type GateLimit, type GateVersion } from './contract';
+import { gate, gateLineFor, gateOutcome, gateReadBody, gateReadFile, GATE_FILES, GATE_REFUSED, parseForget, parseGateVersion, type GateFile, type GateLimit, type GateVersion } from './contract';
 import { debugOutput } from './debuglog';
 import { KeyringError } from './keyring';
 import type { ActiveJobs, DirEntry, DirListing, PortalApi, RnodeState, RouteProbe, SessionInfo, WarmResult } from './portal';
@@ -265,13 +265,12 @@ export class SshPortal implements PortalApi {
         { method: 'SSH', endpoint: `ssh://${this.host}/gate/${verb}`, cls: classOf(verb), mutates: verb !== 'version' && verb !== 'read' && verb !== 'status', via: 'extension', ...(o.job ? { job: o.job } : {}) },
         async () => {
           const r = await this.withConnection((c) => c.exec(line, { timeoutMs: o.timeoutMs ?? 45_000, maxOutput: 512 * 1024 }));
-          const text = r.stdoutText;
-          const both = text + r.stderrText;
-          if (r.exitStatus === 125 || text.includes(GATE_KEY_EXPIRED)) throw new DirectError('key-expired', 'the lab key lifetime has passed: the gate removed the line');
-          if (r.exitStatus === 126 && text.includes(GATE_REFUSED)) throw new DirectError('refused', `the gate refused "${verb}"`);
-          const limit = parseGateLimit(both);
-          if (limit) throw new DirectError('limit', `the gate's ${limit} limit was reached`, limit);
-          if (isUnknownVerb(both)) throw new DirectError('old-copy', "the lab's copy on the grid has no gate (older than framework 11)");
+          // lines.json's gate and key lines, each by its line and its exit status (contract.ts gateOutcome)
+          const said = gateOutcome(r.stdoutText, r.stderrText, r.exitStatus);
+          if (said?.kind === 'key-expired') throw new DirectError('key-expired', 'the lab key lifetime has passed: the gate removed the line');
+          if (said?.kind === 'refused') throw new DirectError('refused', `the gate refused "${verb}"`);
+          if (said?.kind === 'limit') throw new DirectError('limit', `the gate's ${said.which} limit was reached`, said.which);
+          if (said?.kind === 'old-copy') throw new DirectError('old-copy', "the lab's copy on the grid has no gate (older than framework 11)");
           return { result: r, bytes: r.stdout.length + r.stderr.length + line.length, outcome: `exit ${r.exitStatus ?? '-'}${r.timedOut ? ' (timed out)' : ''}` };
         },
       );
@@ -311,7 +310,8 @@ export class SshPortal implements PortalApi {
         if (e instanceof DirectError && e.failure === 'refused') continue;
         throw e;
       }
-      if (r.exitStatus === 0) out[f] = r.stdoutText;
+      const body = gateReadFile(r.exitStatus, r.stdoutText);
+      if (body !== undefined) out[f] = body;
     }
     return out;
   }

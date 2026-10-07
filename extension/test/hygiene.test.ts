@@ -74,6 +74,11 @@ describe('what the source must not contain', () => {
     const hits = SRC.filter((p) => /['"`]\/framework\/|files\.json|bundledFrameworkVersion/.test(read(p))).map(rel);
     expect(hits).toEqual([]);
     expect(existsSync(path.join(ROOT, 'scripts', 'sync-framework.mjs'))).toBe(false);
+    // hpcworker's pinned contract and its programs (framework/contract, contract-text, shared-copy, testbed) are
+    // for the tests; no line of code (comments may cite the contract's text) names one in a string, so no import
+    // or read can carry one into the package
+    const named = SRC.filter((p) => read(p).split('\n').some((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l) && /['"`][^'"`]*framework\//.test(l))).map(rel);
+    expect(named).toEqual([]);
   });
 
   // 9.0.0 wears the site's typefaces; they are files in the package, never fetched (no remote code, and no
