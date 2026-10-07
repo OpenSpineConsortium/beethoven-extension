@@ -517,12 +517,15 @@ export function plausibleCode(code: unknown): string | undefined {
 
 /**
  * `claude auth status` says the sign-in is a Claude subscription's: authMethod "claude.ai" on
- * Anthropic's own service (apiProvider "firstParty", or not said). Everything else is refused (greg,
- * 2026-10-04: no API key anywhere): the Console ("console", API usage billing), a token taken from the
- * environment ("oauth_token", the setup-token route the credential rule forbids) and a cloud provider.
+ * Anthropic's own service (apiProvider "firstParty", or not said), and no apiKeySource at all. Everything
+ * else is refused (greg, 2026-10-04: no API key anywhere): the Console ("console", API usage billing), a
+ * token taken from the environment ("oauth_token", the setup-token route the credential rule forbids), a
+ * cloud provider, and a key behind a "claude.ai" sign-in (Claude Code 2.1.42 reports the Console's own key
+ * that way, and only apiKeySource tells it apart). That is the framework's verdict (hpcw_claude_signin);
+ * since framework 17 the probe folds it into loggedIn, and an older probe never wrote apiKeySource.
  */
-export function isSubscriptionSignIn(a: { loggedIn?: boolean; authMethod?: string; apiProvider?: string } | undefined): boolean {
-  return !!a?.loggedIn && a.authMethod === 'claude.ai' && (a.apiProvider ?? 'firstParty') === 'firstParty';
+export function isSubscriptionSignIn(a: { loggedIn?: boolean; authMethod?: string; apiProvider?: string; apiKeySource?: string | null } | undefined): boolean {
+  return !!a?.loggedIn && a.authMethod === 'claude.ai' && (a.apiProvider ?? 'firstParty') === 'firstParty' && a.apiKeySource === undefined;
 }
 
 /** the Claude plans Remote Control works on; "-" or nothing (unknown) is not refused */
