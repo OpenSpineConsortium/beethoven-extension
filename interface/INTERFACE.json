@@ -1,0 +1,34 @@
+{
+ "format": 1,
+ "name": "beethoven-extension",
+ "repository": "OpenSpineConsortium/beethoven-extension",
+ "summary": "The Beethoven browser extension, the native-messaging bridge it ships and the store releases: the student's client for their own Claude Code worker on the university's grid.",
+ "standard": "https://github.com/OpenSpineConsortium/beethoven/blob/main/INTERFACES.md",
+ "exports": [
+  {
+   "id": "agreement-texts",
+   "kind": "text",
+   "version": 1,
+   "summary": "The agreement and the privacy statement the extension shows and records acceptance of, each headed by its own 'Version N, yyyy-mm-dd.' line (TERMS_VERSION and TERMS_DATE in extension/src/core/terms.ts follow LICENSE.txt's); the website renders them as /beethoven/terms.html and /beethoven/privacy.html",
+   "paths": ["LICENSE.txt", "PRIVACY.md"],
+   "consumers": ["OpenSpineConsortium/openspineconsortium.github.io"]
+  },
+  {
+   "id": "version",
+   "kind": "data",
+   "version": 1,
+   "summary": "The product's version: the \"version\" field of this file and nothing else in it, which the website prints beside the texts",
+   "paths": ["extension/package.json"],
+   "consumers": ["OpenSpineConsortium/openspineconsortium.github.io"]
+  }
+ ],
+ "imports": [
+  {
+   "repository": "OpenSpineConsortium/hpcworker",
+   "export": "profiles",
+   "version": 1,
+   "into": "framework/profiles",
+   "origin": "framework/profiles/ORIGIN"
+  }
+ ]
+}
