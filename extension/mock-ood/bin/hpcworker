@@ -23,7 +23,7 @@
 # copy found in ~/.hpcworker is moved aside, never deleted; a plain `install` moves the marker
 # aside in turn, so the account runs its own copy again. `version` says which copy runs.
 #
-# Framework 10 (Beethoven 11.0.0, docs/V11_CONTRACT.md): `connect`, `worker status [--json]`,
+# Framework 10 (Beethoven 11.0.0, framework/contract-text/V11_CONTRACT.md): `connect`, `worker status [--json]`,
 # `worker stop`, `worker restrict`, `claude consent --record ID` and `login-setup [--remove]` are
 # answered by lib/tool.mjs (Node, which reads the pasted code from standard input with the keepalive
 # around it). `worker start` is framework 10's too (the queued status.json, the job in line, the job

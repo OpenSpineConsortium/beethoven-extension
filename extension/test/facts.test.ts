@@ -1,4 +1,4 @@
-// The run as its files say (core/facts.ts), by the contract's rules R1 to R13 (docs/V11_CONTRACT.md
+// The run as its files say (core/facts.ts), by the contract's rules R1 to R13 (framework/contract-text/V11_CONTRACT.md
 // §9.3), against the three defects 10.0.0 had (worker-start-status/states.out): a status.json from an
 // earlier job showed the wrong state (R1 ignores it); nothing on disk said "queued" (framework 10 writes
 // it, and it is live, R2); and the wait was counted from the browser (every clock counts from the files,

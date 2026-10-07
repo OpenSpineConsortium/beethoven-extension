@@ -4,7 +4,7 @@
 // survive sendMessage, so answers are wrapped. The login terminal is not a message: it is a port
 // (LOGIN_PORT) from the panel to the page script, so that closing the panel closes the shell.
 //
-// 11.0.0 (docs/V11_CONTRACT.md, "Messages") adds, without removing anything 10.0.0's page script
+// 11.0.0 (framework/contract-text/V11_CONTRACT.md, "Messages") adds, without removing anything 10.0.0's page script
 // and tab mode use:
 //   - VIEW_PORT: each open page holds one port to the background; it subscribes to its surface and
 //     receives every new view (model.ts SurfaceView). An open port is how the background knows the

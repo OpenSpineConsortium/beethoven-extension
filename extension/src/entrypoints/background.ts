@@ -20,7 +20,7 @@
 //   AM2's one-time key step (UNPROVEN ON THE GRID): when the shell asks for a password while a press
 //   waits, the student types it into the university's own terminal page; Beethoven types only the one
 //   setup line, after "I'm in" (core/loginSetup.ts).
-//   12.0.0, the direct way first (decision D3; docs/V12_CONTRACT.md): ssh to the grid with no VPN,
+//   12.0.0, the direct way first (decision D3; framework/contract-text/V12_CONTRACT.md): ssh to the grid with no VPN,
 //   through the first bridge this browser has (core/bridge.ts: a browser-only one when known, a relay
 //   the site profile names, else the helper inside Beethoven, offered for a one-time install), signed
 //   in once in Beethoven's own sheet (core/signin.ts) so this computer's key is enrolled, then every
@@ -42,7 +42,7 @@ import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/chan
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
@@ -135,7 +135,7 @@ const KILLLIST_ALARM_SKIP_MS = 60 * 60_000;
 const DEFAULT_SITE = 'wayne';
 const HELP_URL = 'https://openspineconsortium.com/beethoven/support.html';
 
-// cadences (docs/V11_CONTRACT.md §12)
+// cadences (framework/contract-text/V11_CONTRACT.md §12)
 /** the run folder's listing while a start is in progress and a page is open */
 const LIST_STARTING_MS = 5_000;
 /** otherwise */
@@ -602,7 +602,7 @@ async function siteForConnect(s: PortalSettings): Promise<string> {
   try {
     const c = await directClient();
     const ctx = c ? await clusterContext(c) : undefined;
-    if (ctx?.site && /^[a-z0-9-]{1,32}$/.test(ctx.site)) return ctx.site;
+    if (ctx?.site && SITE_RE.test(ctx.site)) return ctx.site;
   } catch {
     /* the portal's own name stands */
   }
@@ -1141,7 +1141,7 @@ async function actInner(a: Action): Promise<unknown> {
       const cur = await loadPrefs();
       const next = { ...cur, ...a.prefs };
       if (next.worker_name !== cur.worker_name) {
-        if (!/^[A-Za-z0-9_-]{1,32}$/.test(next.worker_name)) return { saved: false } satisfies ActionResults['set-pref'];
+        if (!WORKER_NAME_RE.test(next.worker_name)) return { saved: false } satisfies ActionResults['set-pref'];
         // another worker: its own run, its own statement
         await mutateRun(() => null);
         mem.restricted = false;
@@ -2990,7 +2990,7 @@ async function openSession(): Promise<ActionResults['open-session']> {
 }
 
 
-// ---- 12.0.0: the direct way (ssh through a bridge; docs/V12_CONTRACT.md) -------------------------------
+// ---- 12.0.0: the direct way (ssh through a bridge; framework/contract-text/V12_CONTRACT.md) -------------------------------
 //
 // D3's order: a browser-only bridge (none known: a named stub), a relay the site profile names (none at
 // Wayne State), the helper that comes inside Beethoven (offered for a one-time install when it does not

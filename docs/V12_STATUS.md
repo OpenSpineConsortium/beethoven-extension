@@ -12,7 +12,7 @@ pushed, deployed, uploaded or tagged. The release folder is `release/12.0.0/` (i
 
 Versions: extension 12.0.0; framework 11 (`framework/VERSION`); the helper ("the Beethoven bridge")
 1.0.0, protocol 1 (`helper/VERSION`); `LICENSE.txt` version 9 and `PRIVACY.md` version 10, both dated
-2026-10-02; `TERMS_VERSION` 9. The contract between the pieces is `docs/V12_CONTRACT.md`; the
+2026-10-02; `TERMS_VERSION` 9. The contract between the pieces is `framework/contract-text/V12_CONTRACT.md`; the
 students' and the lab lead's guides are in `docs/guides/`.
 
 ## 1. What 12.0.0 does differently from 11.0.0

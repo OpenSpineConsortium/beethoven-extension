@@ -184,7 +184,7 @@ export interface Facts {
   direct?: DirectFacts;
 }
 
-/** 12.0.0: what the direct way stands on (docs/V12_CONTRACT.md "Facts") */
+/** 12.0.0: what the direct way stands on (framework/contract-text/V12_CONTRACT.md "Facts") */
 export interface DirectFacts {
   /** Settings' "Connection": Direct when possible (direct) or GlobalProtect only (vpn) */
   pref: 'direct' | 'vpn';

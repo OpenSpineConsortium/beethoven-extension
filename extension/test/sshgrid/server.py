@@ -2,7 +2,7 @@
 """A stand-in for the Wayne State grid's ssh door, for Beethoven 12.0.0's tests. Never a credential store
 beyond the fixed test values below; it listens on 127.0.0.1 only.
 
-What it imitates (from what the grid answered on 2026-10-01, docs/V12_CONTRACT.md):
+What it imitates (from what the grid answered on 2026-10-01, framework/contract-text/V12_CONTRACT.md):
   - algorithms: kex curve25519-sha256 / ecdh-sha2-nistp256, an RSA host key, aes128/192/256-ctr, hmac-sha1;
   - methods publickey, password, keyboard-interactive; keyboard-interactive asks "Password: " and then
     "Your google authenticator one-time verification code: ", one prompt per request;

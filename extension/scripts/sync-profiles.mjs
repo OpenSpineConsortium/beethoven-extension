@@ -31,7 +31,8 @@ try {
 for (const name of names) {
   const site = name.slice(0, -'.json'.length);
   // the extension asks for /profiles/<site>.json by the site name in Settings (core/install.ts bundledSharedInstall)
-  if (!/^[A-Za-z0-9_-]+$/.test(site)) fail(`framework/profiles/${name}: a site name is letters, digits, _ and - only`);
+  // and types it into install --shared and connect, which take only cli.json's site form (core/contract.ts SITE_RE)
+  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(site)) fail(`framework/profiles/${name}: a site name is up to 32 lower-case letters, digits and -, not starting with -`);
   let profile;
   try {
     profile = JSON.parse(await fs.readFile(path.join(source, name), 'utf8'));

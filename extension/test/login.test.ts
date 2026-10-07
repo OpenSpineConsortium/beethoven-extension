@@ -86,7 +86,7 @@ describe('the plain login lines', () => {
   });
 });
 
-// 11.0.0: the `hpcworker connect` sitting (docs/V11_CONTRACT.md §5) and the rule for the pasted code.
+// 11.0.0: the `hpcworker connect` sitting (framework/contract-text/V11_CONTRACT.md §5) and the rule for the pasted code.
 describe('the connect sitting\'s reader', () => {
   it('assembles lines across frames and terminal codes, tolerates the keepalive anywhere, opens one link once, and stops at the last step', () => {
     const seen: ConnectEvent[] = [];
@@ -106,10 +106,13 @@ describe('the connect sitting\'s reader', () => {
     expect(w.tail.length).toBeLessThanOrEqual(20);
   });
 
-  it('sees Claude Code\'s own prompt on an unfinished line, and never hands on a link that is not Anthropic\'s', () => {
+  it('sees the framework\'s prompt on an unfinished line, takes Claude Code\'s own for text, and never hands on a link that is not Anthropic\'s', () => {
     const seen: ConnectEvent[] = [];
     const w = new ConnectWatcher((e) => seen.push(e));
+    // lines.json matches a line whole: Claude Code's own prompt is no line of the contract (the code goes CODE_AFTER_LINK_MS after the link)
     w.feed('AUTH-URL: https://evil.example/oauth\r\nPaste code here if prompted > ');
+    expect(seen.map((e) => e.kind)).toEqual(['refused-url']);
+    w.feed('\r\nHPCW-LOGIN: paste the code from that page');
     expect(seen.map((e) => e.kind)).toEqual(['refused-url', 'code-prompt']);
     expect(w.authUrl).toBeUndefined();
   });

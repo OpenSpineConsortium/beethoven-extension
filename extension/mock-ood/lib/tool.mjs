@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The framework 10 verbs of the mock's stand-in tool (bin/hpcworker hands them here), speaking
-// docs/V11_CONTRACT.md to the character where the extension parses: the same lines, the same files,
+// framework/contract-text/V11_CONTRACT.md to the character where the extension parses: the same lines, the same files,
 // the same field names. It submits nothing to a real scheduler; the job table (lib/jobs.mjs) and the
 // job simulator (lib/jobsim.mjs, driven by the mock portal's clock) play the cluster.
 //

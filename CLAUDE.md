@@ -332,12 +332,19 @@ store packages). The **server half** — `framework/` (hpcworker) and the mainta
 in `OpenSpineConsortium/hpcworker`. The original repository remains as the history up to the split;
 new work goes here.
 
-The seam between the two is the contract, not an import: `extension/src/core/contract.ts` describes
-the files and lines the cluster side writes, and must change together with the server repository's
-`docs/V11_CONTRACT.md` and code. The only server-side content here is `framework/profiles/` —
-site profiles vendored **as data** for `extension/scripts/sync-profiles.mjs` (canonical in the server
-repository; refresh with `bash framework/profiles/pull.sh`). Since 8.0.0 nothing else of the
-cluster side may enter the package.
+The seam between the two is the contract, not a checkout: `extension/src/core/contract.ts` reads
+the files and lines the cluster side writes, as the server repository publishes them in its export
+`contract`, pinned here in `framework/contract/` (with `contract-text`, the prose of
+`V11_CONTRACT.md` and `V12_CONTRACT.md`, in `framework/contract-text/`); `extension/test/conformance.test.ts`
+holds the code to it and runs every vector through the real readers. A change to what the cluster
+side writes is made in the server repository first and reaches here as a new pin, with the readers
+and their tests changed in the same pull request. Every pinned folder has an `ORIGIN` and
+is taken only by `bash interface/pull.sh` (`interface/README.md`): `framework/profiles/`, the site
+profiles **as data** for `extension/scripts/sync-profiles.mjs`, the only server-side files that enter
+the package; `framework/contract/` and `framework/contract-text/`, read by tests and people only; and
+`framework/shared-copy/` and `framework/testbed/`, the framework and its fake scheduler for the opt-in
+direct-way lane, which git ignores but for their `ORIGIN`. Since 8.0.0 nothing else of the cluster
+side may enter the package.
 
 CI (`.github/workflows/ci.yml`) runs the whole client suite hermetically on ubuntu: typecheck,
 vitest with the ssh tests against the python/asyncssh grid stand-in, the mock portal's full

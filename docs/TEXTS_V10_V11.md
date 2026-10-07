@@ -24,7 +24,7 @@ itself; the Extension says so and offers the newer one) stays true as it stands.
 Sources, in order of authority: Greg's decision of 2026-10-04 to sign the installers (relayed by the
 workflow); the task's shared contract for 15.0.0 (the two packages, the manifest entries, the
 picker's rule, the panel's sentences, the version numbers); the code in the working tree on
-2026-10-04 (`helper/src/rust`, `helper/src/mac`, `helper/src/linux`, `docs/V12_CONTRACT.md`); commit
+2026-10-04 (`helper/src/rust`, `helper/src/mac`, `helper/src/linux`, `framework/contract-text/V12_CONTRACT.md`); commit
 7ecea53 for the student's sitting of 2026-10-03. Where a sentence rests on something another stream
 was still building, its reason says **CONFIRM**. The quotations below are generated from the
 repository's last commit and the edited files, so they are exactly what changed (paragraphs are

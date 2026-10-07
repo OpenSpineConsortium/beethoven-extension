@@ -1,4 +1,4 @@
-// This computer's ssh key for the grid (12.0.0, docs/V12_CONTRACT.md "The key", decision D2).
+// This computer's ssh key for the grid (12.0.0, framework/contract-text/V12_CONTRACT.md "The key", decision D2).
 //
 // BY DEFAULT there is no biometric step. The key pair (Ed25519 where the browser's WebCrypto has it, else
 // ECDSA P-256) is made once; its private half is wrapped (AES-256-GCM, WebCrypto wrapKey) under a

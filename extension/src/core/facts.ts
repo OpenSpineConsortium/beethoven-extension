@@ -1,5 +1,5 @@
 // The facts the views are made from (11.0.0): the run as its files say, by the contract's rules R1 to
-// R13 (docs/V11_CONTRACT.md §9.3); which of the run folder's files to download after a listing; and
+// R13 (framework/contract-text/V11_CONTRACT.md §9.3); which of the run folder's files to download after a listing; and
 // Show log's lines, Beethoven's own events merged with the worker's progress.log. Pure: the background
 // lists, downloads and stores; these functions decide. Nothing here touches the browser or the grid.
 //

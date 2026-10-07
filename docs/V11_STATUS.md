@@ -60,7 +60,7 @@ the shell is typed into only on evidence it is up, never on a timer; grid times 
 computer's clock before they are compared with now. The agreement is version 8 and the privacy
 statement version 9 (`TERMS_VERSION` 8); an earlier acceptance is kept beside a new one, and Settings
 shows the installation identifier with the acceptance record and saves it as text.
-`docs/V11_CONTRACT.md` is the full contract; its §22 records what the four verifiers changed.
+`framework/contract-text/V11_CONTRACT.md` is the full contract; its §22 records what the four verifiers changed.
 
 ## 2. What was proven by running (on the mock only)
 
@@ -185,7 +185,7 @@ Decision 3 then adds "No GitHub needed." or a fourth requirement.
 ## 4. Departures from the specification, and why
 
 The specification is `scratchpad/v11/SPEC.md` of the build session; the contract is
-`docs/V11_CONTRACT.md`. Builders' departures, kept after review:
+`framework/contract-text/V11_CONTRACT.md`. Builders' departures, kept after review:
 
 **What the student sees**
 - "Sign-in was cancelled." is never shown: in Chromium 153 a Cancel and a wrong password look the same

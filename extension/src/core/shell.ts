@@ -18,19 +18,12 @@
 // open. It does not reset OnDemand's own idle timer (only input and output do), which is why the
 // cluster tool prints its own keepalive line under `connect`. A password prompt before anything is
 // typed ends the run with nothing typed, as a distinct outcome: the one-time key step follows (AM2).
+import { clean } from './contract';
 import type { PortalNet, WsLike } from './net';
 
-/**
- * control sequences and carriage returns, as the vendor's phone host (phone.js) strips them. In a JavaScript class
- * `\/` is the slash itself, so the CSI intermediates [ -\/] are space to slash (0x20-0x2F), as they should be; the
- * same text in a sed bracket expression is space to backslash, the framework's defect fixed in framework 14
- * (test/shell.test.ts pins it: ESC[K right before a link takes nothing with it)
- */
-export const ANSI = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b[()][A-Za-z0-9]|\r/g;
-
-export function clean(s: string): string {
-  return String(s).replace(ANSI, '');
-}
+// what the terminal codes are is the contract's reading rule (lines.json), so it lives in contract.ts, which plain
+// Node loads in the mock's self-test; this module's importers keep taking it from here
+export { ANSI, clean } from './contract';
 
 /** what the login node says when it wants a password: the shell reached no prompt without one */
 export const PASSWORD_PROMPT = /password:|passphrase|Permission denied/i;
@@ -287,7 +280,7 @@ export interface ShellSession {
 /**
  * The longest a sitting may hold the portal's shell open: fifteen minutes, the number the privacy
  * statement gives ("the extension closes the connection after fifteen minutes at the latest",
- * PRIVACY.md). The cluster tool's `connect` ends within fourteen (docs/V11_CONTRACT.md D7).
+ * PRIVACY.md). The cluster tool's `connect` ends within fourteen (framework/contract-text/V11_CONTRACT.md D7).
  */
 export const SESSION_MAX_MS = 15 * 60_000;
 

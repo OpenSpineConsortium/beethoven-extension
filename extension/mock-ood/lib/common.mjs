@@ -1,6 +1,6 @@
 // What the mock's framework 10 stand-in (lib/tool.mjs) and its job simulator (lib/jobsim.mjs) share:
 // where a path the portal shows lives on disk, the status.json document with every framework 10 field
-// in a fixed order (docs/V11_CONTRACT.md, "status.json"), progress.log's fixed sentences, the
+// in a fixed order (framework/contract-text/V11_CONTRACT.md, "status.json"), progress.log's fixed sentences, the
 // registration block Claude Code prints, and the mock account's Claude sign-in.
 //
 // Paths. The portal shows the student /home/<user>, the lab's shared copy at its own folder, and at

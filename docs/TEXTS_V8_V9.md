@@ -18,7 +18,7 @@ other documents cite them).
 
 Sources, in order of authority: Greg's own words; the orchestrator's amendments AM1 to AM8; the
 final specification (`scratchpad/v11/SPEC.md`, section "Sentences that change (old -> new)", called
-"the spec's list" below); `docs/V11_CONTRACT.md`; the access service as deployed on 2026-10-01
+"the spec's list" below); `framework/contract-text/V11_CONTRACT.md`; the access service as deployed on 2026-10-01
 (`ashley` repository, `tools/intake/worker.js` and `ACCESS_CHECK.md`). The texts were edited by one
 script from one list of edits, and this note is generated from the same list, so the quotations
 below are exactly what changed (paragraphs are quoted unwrapped; in the files each touched paragraph

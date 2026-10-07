@@ -1,4 +1,4 @@
-// The framework 10 contract as the extension reads it (docs/V11_CONTRACT.md): the command lines it
+// The framework 10 contract as the extension reads it (framework/contract-text/V11_CONTRACT.md): the command lines it
 // types (connect, worker status --json, worker stop, worker restrict, claude consent --record) and the
 // one it lets the student's own terminal run (login-setup), the HPCW-STEP grammar, the connect
 // sitting's lines with the keepalive tolerated wherever it lands, progress.log, worker status --json,
@@ -59,7 +59,6 @@ describe('the HPCW-STEP grammar', () => {
   it.each([
     ['HPCW-STEP setup ready', { step: 'setup', changed: false }],
     ['HPCW-STEP setup changed', { step: 'setup', changed: true }],
-    ['HPCW-STEP setup', { step: 'setup', changed: false }],
     ['HPCW-STEP consent', { step: 'consent' }],
     ['HPCW-STEP queued 40501234 new /rs/rs_grp_oschome/st1234/hpcworker/worker', { step: 'queued', job: '40501234', fresh: true, runDir: '/rs/rs_grp_oschome/st1234/hpcworker/worker' }],
     ['HPCW-STEP queued 40501234 kept', { step: 'queued', job: '40501234', fresh: false }],
@@ -79,6 +78,8 @@ describe('the HPCW-STEP grammar', () => {
   it('is not fooled by a near miss', () => {
     expect(parseStepLine('HPCW-STEPS queued 1 new')).toBeUndefined();
     expect(parseStepLine('echo HPCW-STEP done')).toBeUndefined();
+    // a bare setup line is no line of the contract (lines.json: setup ready or setup changed); it read as ready until 2026-10-07
+    expect(parseStepLine('HPCW-STEP setup')).toBeUndefined();
   });
 });
 

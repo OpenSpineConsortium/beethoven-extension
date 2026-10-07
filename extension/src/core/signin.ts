@@ -1,4 +1,4 @@
-// The first direct sign-in (12.0.0, docs/V12_CONTRACT.md "The sign-in sheet"), and every Claude sign-in
+// The first direct sign-in (12.0.0, framework/contract-text/V12_CONTRACT.md "The sign-in sheet"), and every Claude sign-in
 // on the direct way.
 //
 // Beethoven's own sheet (an extension page) asks for the AccessID; then the background opens the
@@ -444,7 +444,8 @@ export class SignInFlow {
     // login node is spared the profile check (R7)
     const site = this.state.purpose === 'enrol' ? await this.d.site() : undefined;
     if (site) {
-      const r = await this.audited('shell', 'install', () => conn.exec(commands.installShared(dir, site), { timeoutMs: 120_000 }), (x) => `exit ${x.exitStatus ?? '-'}`).catch(() => undefined);
+      // async, so a site name the contract refuses (commands.installShared throws) leaves the setup not ready and the sign-in standing
+      const r = await this.audited('shell', 'install', async () => conn.exec(commands.installShared(dir, site), { timeoutMs: 120_000 }), (x) => `exit ${x.exitStatus ?? '-'}`).catch(() => undefined);
       setupReady = r?.exitStatus === 0;
     }
     live();
