@@ -1,4 +1,4 @@
-// The bridges (12.0.0, docs/V12_CONTRACT.md "Bridges"): a browser extension has no socket of its own,
+// The bridges (12.0.0, framework/contract-text/V12_CONTRACT.md "Bridges"): a browser extension has no socket of its own,
 // so the ssh client (src/ssh) is handed a byte stream to grid.wayne.edu:22 by the first bridge this
 // browser has, in decision D3's order:
 //
@@ -193,7 +193,7 @@ export interface NativePort {
   onDisconnect: { addListener(fn: () => void): void };
 }
 
-/** helper -> extension messages (docs/V12_CONTRACT.md, the helper's wire contract) */
+/** helper -> extension messages (framework/contract-text/V12_CONTRACT.md, the helper's wire contract) */
 export type HelperOut =
   | { t: 'hello'; v: number; helper: string; os: string; kind: string; allow: string[] }
   | { t: 'opened'; id: string }

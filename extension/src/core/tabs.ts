@@ -1,4 +1,4 @@
-// The rules for the tabs Beethoven opens (AM7, docs/V11_CONTRACT.md §17), as pure decisions. A tab is
+// The rules for the tabs Beethoven opens (AM7, framework/contract-text/V11_CONTRACT.md §17), as pure decisions. A tab is
 // closed by Beethoven only if Beethoven opened or navigated it itself, only while it is still where
 // Beethoven left it, and never as the window's last tab (a New Tab is opened first, which keeps the
 // window and its panel). Where Beethoven left it:

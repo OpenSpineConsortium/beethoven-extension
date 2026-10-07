@@ -43,7 +43,7 @@
 //                                             student acknowledges the data statement ("yes <iso> <install id>")
 // At Wayne State shared_state_dir is /rs/rs_grp_oschome/$USER/hpcworker (CephFS), not the home.
 //
-// Framework 10 (for Beethoven 11.0.0; docs/V11_CONTRACT.md is the wire contract, exact to the
+// Framework 10 (for Beethoven 11.0.0; framework/contract-text/V11_CONTRACT.md is the wire contract, exact to the
 // character, and wins over this comment where they differ) adds, without moving anything above:
 //   <state_dir>/<name>/progress.log           one plain line per event: "<ISO-8601 UTC> <sentence>", from a fixed set (PROGRESS)
 //   <state_dir>/<name>/node                   the compute node's short name, written by the job as its first act; removed by

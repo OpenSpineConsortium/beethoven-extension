@@ -1,4 +1,4 @@
-// The framework 10 contract as the extension reads it (docs/V11_CONTRACT.md): the command lines it
+// The framework 10 contract as the extension reads it (framework/contract-text/V11_CONTRACT.md): the command lines it
 // types (connect, worker status --json, worker stop, worker restrict, claude consent --record) and the
 // one it lets the student's own terminal run (login-setup), the HPCW-STEP grammar, the connect
 // sitting's lines with the keepalive tolerated wherever it lands, progress.log, worker status --json,

@@ -1,4 +1,4 @@
-// The bridges (core/bridge.ts) against the helper's wire contract (docs/V12_CONTRACT.md: native messaging
+// The bridges (core/bridge.ts) against the helper's wire contract (framework/contract-text/V12_CONTRACT.md: native messaging
 // host com.openspineconsortium.beethoven.bridge; hello, open, data, close; opened, data, closed, error),
 // with a stand-in for Chrome's native port, and Chrome's own sentences when a host is missing or broken.
 // D3's order: the store stub, the relay (not configured at Wayne State), the helper.

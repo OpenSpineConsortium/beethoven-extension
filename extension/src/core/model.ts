@@ -1,4 +1,4 @@
-// The views the pages render and the actions they send (Beethoven 11.0.0; docs/V11_CONTRACT.md,
+// The views the pages render and the actions they send (Beethoven 11.0.0; framework/contract-text/V11_CONTRACT.md,
 // "Views and actions"; 12.0.0 adds the direct way's moments, words, Settings and Details sections and
 // actions, marked "12.0.0" where they are). The pages are pure functions of a view: they hold no state of their own
 // beyond what is on screen (a tick being ticked, a fold being open, the text in the code box) and
@@ -356,7 +356,7 @@ export const WORDS = {
   },
 
   /**
-   * 12.0.0: the direct way to the grid (ssh, no VPN), docs/V12_CONTRACT.md. Beethoven tries it first,
+   * 12.0.0: the direct way to the grid (ssh, no VPN), framework/contract-text/V12_CONTRACT.md. Beethoven tries it first,
    * through the first bridge this browser has (a browser-only one when one exists, else the small helper
    * that comes inside Beethoven), and only then the GlobalProtect way of 11.0.0. The first direct
    * sign-in asks for the AccessID, the password and the Google Authenticator code in Beethoven's own
@@ -766,7 +766,7 @@ export interface Overlays {
 export type Moment = 'welcome' | 'globalprotect' | 'grid' | 'statement' | 'connect' | 'claude' | 'login-setup' | 'queue' | 'starting' | 'online' | DirectMoment;
 
 /**
- * 12.0.0: the direct way's moments (docs/V12_CONTRACT.md). They come where the 11.0.0 GlobalProtect and
+ * 12.0.0: the direct way's moments (framework/contract-text/V12_CONTRACT.md). They come where the 11.0.0 GlobalProtect and
  * grid sign-in moments came, while the direct way is being set up or needs the student; once the key
  * works, the 11.0.0 moments from the statement on run unchanged.
  */
@@ -1544,7 +1544,7 @@ export type Action =
   | { kind: 'audit'; op: 'export' | 'clear' }
   /** "Google Drive in Claude (optional)": the student's own tick */
   | { kind: 'drive-connected'; done: boolean }
-  // ---- 12.0.0: the direct way (docs/V12_CONTRACT.md). The names follow the pages stream's draft
+  // ---- 12.0.0: the direct way (framework/contract-text/V12_CONTRACT.md). The names follow the pages stream's draft
   // (src/ui/model12.ts Action12) wherever the meaning is the same. ----
   /** the sheet's AccessID: opens the connection through the bridge and asks the grid what it wants */
   | { kind: 'grid-signin-account'; account: string }

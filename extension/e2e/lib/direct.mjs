@@ -7,8 +7,9 @@
 //     Authenticator code) and plays the 2FA refusal for the account "nocode"; a password session runs the
 //     client's command in bash, a key session runs the authorized_keys line's forced command exactly as
 //     OpenSSH does (SSH_ORIGINAL_COMMAND; restrict refuses a pty). The shared copy it runs is hpcworker's
-//     framework as E2E_FINAL/grid/setup_grid.sh installs it (at E2E_SHARED_TEST), under a test HOME, with a
-//     fake scheduler and a job clock. Neither the stand-in nor the framework is in this repository.
+//     framework as this repository pins it (framework/shared-copy), which E2E_FINAL/grid/setup_grid.sh installs
+//     at ~/final12/g/shared/current under a test HOME, behind hpcworker's pinned test scheduler
+//     (framework/testbed) and a job clock.
 //   - The test package (E2E_FINAL/ext, made by prep_ext.mjs from .output/chrome-mv3): a manifest key so its
 //     id is fixed, the bridge zips rebuilt with that id (the shipped zips refuse to install until the
 //     release step names the store id), and profiles/wayne.json pointed at the stand-in: 127.0.0.1, its
@@ -24,18 +25,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { sleep } from './harness.mjs';
 import { moment } from './flows.mjs';
+import { checkPinned, FETCH } from './pinned.mjs';
 
-// The lane runs hpcworker's real framework, which this repository does not carry and never reads from a
-// checkout (it takes only the site profiles, interface/README.md). So the folder that installs it and the
-// copy it installs are given, never guessed: E2E_FINAL (grid/setup_grid.sh, grid/gridd.py, decode_qr.py, the
-// test package ext/) and E2E_SHARED_TEST (the shared copy setup_grid.sh installs in WSL, as the stand-in's
-// sessions name it). A maintainer's lane until hpcworker's framework is an export a test may run as a black
-// box (extension/test/boundary.test.ts lists it until then).
-const missing = ['E2E_FINAL', 'E2E_SHARED_TEST'].filter((k) => !process.env[k]);
-if (missing.length) throw new Error(`the direct way's scenarios need ${missing.join(' and ')} set: the grid stand-in's folder and the shared copy it installs (e2e/README.md, "12.0.0: the direct way")`);
+// The lane runs hpcworker's real framework behind its test scheduler, both only as this repository pins them
+// (hpcworker's program exports `framework` and `testbed`, interface/README.md): checked against their ORIGIN
+// here, before anything runs, and the shared copy setup_grid.sh installs checked against the same ORIGIN again
+// before the stand-in starts (Grid.setup). Nothing of hpcworker is taken from a checkout or from E2E_FINAL,
+// which is the lane's own scaffolding: the stand-in, its set-up, decode_qr.py and the test package ext/.
+export const PINNED_FRAMEWORK = checkPinned('framework/shared-copy', 'framework');
+export const PINNED_TESTBED = checkPinned('framework/testbed', 'testbed');
+if (!process.env.E2E_FINAL) throw new Error(`the direct way's scenarios need E2E_FINAL set: the grid stand-in's folder (e2e/README.md, "12.0.0: the direct way")`);
 export const FINAL = process.env.E2E_FINAL;
 export const SSH_PORT = Number(process.env.E2E_SSH_PORT || 22411);
-export const SHARED_TEST = process.env.E2E_SHARED_TEST;
 export const TEST_EXT = path.join(FINAL, 'ext');
 export const HOST_NAME = 'com.openspineconsortium.beethoven.bridge';
 export const REGKEY = `Software\\Chromium\\NativeMessagingHosts\\${HOST_NAME}`;
@@ -50,19 +51,39 @@ export function wsl(cmd, opts = {}) {
   return { code: r.status, out: r.stdout ?? '', err: r.stderr ?? '' };
 }
 
+/** the shared copy as the stand-in's sessions name it: setup_grid.sh installs the pinned framework there */
+export const SHARED_TEST = (() => {
+  const home = wsl('printf %s "$HOME"').out.trim();
+  if (!/^(\/[A-Za-z0-9._+-]+)+$/.test(home)) throw new Error(`the direct way's scenarios run the stand-in in WSL, which gave no usable home folder (${home || 'none'})`);
+  return `${home}/final12/g/shared/current`;
+})();
+
+/** the shared copy setup_grid.sh installed equals the pinned framework, file for file, or nothing runs on it */
+function checkInstalled() {
+  const want = new Map(PINNED_FRAMEWORK.files);
+  const r = wsl(`cd '${SHARED_TEST}' && sha256sum -- ${[...want.keys()].join(' ')}`);
+  const got = new Map(r.out.split('\n').map((l) => /^([0-9a-f]{64}) [ *](\S+)$/.exec(l.trim())).filter(Boolean).map((m) => [m[2], m[1]]));
+  const off = [...want].filter(([p, sha]) => got.get(p) !== sha).map(([p]) => p);
+  if (off.length) throw new Error(`setup_grid.sh did not install the pinned framework (commit ${PINNED_FRAMEWORK.commit}) at ${SHARED_TEST}: ${off.slice(0, 5).join(', ')}${off.length > 5 ? ` and ${off.length - 5} more` : ''} differ. It takes the framework from its fourth argument and the scheduler from its fifth (e2e/README.md); ${FETCH} fetches both`);
+}
+
 /** the grid stand-in in WSL */
 export class Grid {
   constructor(run, { port = SSH_PORT, queueS = 20, startS = 6 } = {}) {
     Object.assign(this, { run, port, queueS, startS });
     this.proc = undefined;
   }
-  /** a fresh tree: the shared copy, the test HOME, the scheduler; returns the pin (the host key's fingerprint) */
+  /**
+   * a fresh tree: the shared copy (the pinned framework), the test HOME, the scheduler (the pinned testbed);
+   * returns the pin (the host key's fingerprint)
+   */
   setup() {
-    const r = wsl(`bash ${wslPath(path.join(FINAL, 'grid', 'setup_grid.sh'))} ${this.port} ${this.queueS} ${this.startS}`);
+    const r = wsl(`bash ${wslPath(path.join(FINAL, 'grid', 'setup_grid.sh'))} ${this.port} ${this.queueS} ${this.startS} '${wslPath(PINNED_FRAMEWORK.dir)}' '${wslPath(PINNED_TESTBED.dir)}'`);
     const fp = /FINGERPRINT (SHA256:\S+)/.exec(r.out)?.[1];
     if (!fp) throw new Error(`setup_grid.sh failed: ${r.out} ${r.err}`);
+    checkInstalled();
     this.fingerprint = fp;
-    this.run.ev('GRID', `stand-in tree set up (shared copy ${SHARED_TEST}, port ${this.port}, queue ${this.queueS} s, start ${this.startS} s, host key ${fp})`);
+    this.run.ev('GRID', `stand-in tree set up (shared copy ${SHARED_TEST}: hpcworker's framework at ${PINNED_FRAMEWORK.commit}, as pinned; its testbed at ${PINNED_TESTBED.commit}; port ${this.port}, queue ${this.queueS} s, start ${this.startS} s, host key ${fp})`);
     return fp;
   }
   /** start the server (hostKey 'other': the wrong-grid key, the tree kept) */

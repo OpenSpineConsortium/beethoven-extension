@@ -86,7 +86,7 @@ describe('the plain login lines', () => {
   });
 });
 
-// 11.0.0: the `hpcworker connect` sitting (docs/V11_CONTRACT.md §5) and the rule for the pasted code.
+// 11.0.0: the `hpcworker connect` sitting (framework/contract-text/V11_CONTRACT.md §5) and the rule for the pasted code.
 describe('the connect sitting\'s reader', () => {
   it('assembles lines across frames and terminal codes, tolerates the keepalive anywhere, opens one link once, and stops at the last step', () => {
     const seen: ConnectEvent[] = [];

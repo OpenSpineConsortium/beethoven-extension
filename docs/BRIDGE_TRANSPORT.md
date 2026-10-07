@@ -36,7 +36,7 @@ off-campus users", and no "paid code-signing certificates". Against this product
 
 - **What needs the VPN.** Wayne State's KB 20239 says Grid OnDemand needs the VPN and says nothing
   about ssh. `grid.wayne.edu:22` answered from the internet on 2026-10-01 and 2026-10-02
-  (`framework/profiles/wayne.json:88`, `docs/V12_CONTRACT.md` "Facts") and asks for the password and
+  (`framework/profiles/wayne.json:88`, `framework/contract-text/V12_CONTRACT.md` "Facts") and asks for the password and
   then the Google Authenticator code itself. That shows the port can be reached, not what Wayne State
   expects: whether off-campus users are meant to be on the VPN for ssh is not checked here (no
   statement of C&IT's on off-campus ssh has been read). The direct way is a plain ssh connection to
@@ -251,7 +251,7 @@ The other reasons:
 
 What stays in the code is not set aside in the code's order. A relay a site's own profile names
 (`ssh_relay`) is the second provider in decision D3's order, after the "store" stub and before the
-native host (`docs/V12_CONTRACT.md` "Bridges"; `extension/src/entrypoints/background.ts:3008`;
+native host (`framework/contract-text/V12_CONTRACT.md` "Bridges"; `extension/src/entrypoints/background.ts:3008`;
 `extension/src/core/bridge.ts:3-14`). `chooseBridge` stops at the first provider that answers
 "available" (`bridge.ts:432`), and a configured relay answers "available" without being tried
 (`bridge.ts:130-134`). So one `ssh_relay` line in a site profile makes that relay the transport, and
@@ -280,12 +280,12 @@ keeping it, is a decision for Greg; this record does not make it.
 
 ## The one-time key step, against the analysis's Phase 1
 
-| | The analysis's Phase 1 | Beethoven (`docs/V12_CONTRACT.md` "The sign-in sheet", "The key") |
+| | The analysis's Phase 1 | Beethoven (`framework/contract-text/V12_CONTRACT.md` "The sign-in sheet", "The key") |
 |---|---|---|
 | Key | `generateKey({name:"Ed25519"}, true, ...)` on install | Made at the first direct sign-in, before the grid is asked anything: Ed25519 where WebCrypto has it, else ECDSA P-256 (`extension/src/ssh/identity.ts:24-36`, `extension/src/core/keyring.ts:277-279`). By default it is extractable only so it can be wrapped once, and is kept wrapped (AES-256-GCM) under a non-extractable browser key (`keyring.ts:3-8`, 314-326). With the opt-in "Protect my key with Windows Hello / Touch ID" it is wrapped instead under a key derived from a passkey's PRF output (HKDF-SHA-256), and the browser key, if there was one, is deleted (the key is made that way from the start when the student ticks the opt-in before the first sign-in, `keyring.ts:365-378`); turning the opt-in on or off once the key exists unwraps the same key as an extractable key in memory, only for the moment of re-wrapping (`keyring.ts:10-18`, 385-422). Either way signing uses a non-extractable key held in memory, and the clear key is never written anywhere. Chrome 137's notes add Ed25519 to Web Cryptography, and with `minimum_chrome_version` 148 (`extension/wxt.config.ts:76`) every Chrome that installs Beethoven has it. |
 | Format | `exportKey("spki")`, "the raw 32-byte SPKI output" converted to `ssh-ed25519` | Wrong as stated: SPKI wraps the key in a header. Beethoven exports `raw`, which gives the 32 bytes (`keyring.ts:319`, 370), and writes string `"ssh-ed25519"` followed by string key (`identity.ts:57-63`), as RFC 8709 defines. |
 | Sign-in | AccessID and password, once | AccessID, then the grid's own prompts (the password, then the Google Authenticator code), asked only after the host key matched the pin, and never stored (`extension/src/core/signin.ts:1-27`). |
-| On the grid | append to `~/.ssh/authorized_keys` | One restricted line, `restrict,command="<shared>/bin/hpcworker gate" ... beethoven-browser <date>` (`extension/src/core/contract.ts:1077-1084`), written by `hpcworker browser-key add`. Beethoven refuses, before anything is sent, a key type or blob that is not exactly an Ed25519 or P-256 public key (`contract.ts:1250-1261`, the client's check); the framework checks again (the type prefix and the 68- or 140-character length, `bk_parse_key` in the hpcworker repository's `framework/lib/browser_key.sh`) and answers `HPCW-KEY refused key` (`docs/V12_CONTRACT.md` "The sign-in sheet"). There is one line per account, and the key counts as enrolled only when a second connection made with it names the same account. |
+| On the grid | append to `~/.ssh/authorized_keys` | One restricted line, `restrict,command="<shared>/bin/hpcworker gate" ... beethoven-browser <date>` (`extension/src/core/contract.ts:1077-1084`), written by `hpcworker browser-key add`. Beethoven refuses, before anything is sent, a key type or blob that is not exactly an Ed25519 or P-256 public key (`contract.ts:1250-1261`, the client's check); the framework checks again (the type prefix and the 68- or 140-character length, `bk_parse_key` in the hpcworker repository's `framework/lib/browser_key.sh`) and answers `HPCW-KEY refused key` (`framework/contract-text/V12_CONTRACT.md` "The sign-in sheet"). There is one line per account, and the key counts as enrolled only when a second connection made with it names the same account. |
 | Afterwards | no more MFA | The key reaches only the gate's eight verbs (version, status, watch, connect with `--login never`, stop, restrict, read, forget). A Claude sign-in asks for the password and code again, and **Forget this computer** removes the line. |
 
 A plain append would give a key held by a browser a full shell on the grid. The gate line limits it to

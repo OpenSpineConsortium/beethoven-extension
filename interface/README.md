@@ -17,28 +17,47 @@ website takes the new copy and renders it.
 
 ## What it takes
 
-hpcworker's `profiles` version 1, the composed site profiles, pinned in `framework/profiles/` with
-`framework/profiles/ORIGIN` and taken only by `framework/profiles/pull.sh` (your own `gh` sign-in, a
-commit hpcworker's `main` contains, the paths hpcworker's `interface/INTERFACE.json` lists for the
-export at that commit). The build copies them into the package as data (`extension/scripts/sync-profiles.mjs`).
+Five exports of `OpenSpineConsortium/hpcworker`, each at version 1 into its own folder with an `ORIGIN`
+(the repository, the commit, `export <id> <version>`, and each file's sha256, sorted by path):
 
-Not yet pinned, and listed here so nobody mistakes them for pinned copies:
+| Folder | Export | Kind | What reads it |
+| --- | --- | --- | --- |
+| `framework/profiles` | `profiles` | data | the build, which copies the JSON files into the package without their `notes` (`extension/scripts/sync-profiles.mjs`); nothing else of hpcworker enters the package |
+| `framework/contract` | `contract` | data | the tests only: `extension/test/conformance.test.ts` holds every pattern, code, value and command `extension/src/core/contract.ts` types by hand equal to `cli.json`, `lines.json`, `rules.json` and the three schemas, and runs every vector through the reader the extension really uses |
+| `framework/contract-text` | `contract-text` | text | people: `V11_CONTRACT.md` and `V12_CONTRACT.md`, the prose the code cites; no code reads it |
+| `framework/shared-copy` | `framework` | program | the opt-in direct-way lane only (`extension/e2e/lib/direct.mjs`), which installs it on the stand-in grid |
+| `framework/testbed` | `testbed` | program | the same lane: its fake scheduler |
 
-- `docs/V11_CONTRACT.md` and `docs/V12_CONTRACT.md` are hand copies of what hpcworker now offers as
-  `contract-text` (V11 equals hpcworker's `main`; V12's `.msi` entry here names the Mac route, `wixl`,
-  which hpcworker's copy lacks, and is otherwise the same). The parsers in
-  `extension/src/core/contract.ts` are typed from them by hand; they are to be tested against a pinned
-  copy of hpcworker's `contract` export once that is merged.
-- The website's home-page diagram (`extension/store-assets/src/diagram.*`, shipped as
-  `extension/public/tour/diagram.*`) is copied from a checkout of the site by
-  `build_assets.mjs --sync-site`, with no `ORIGIN`; `extension/test/boundary.test.ts` lists it until the
-  website offers it as an export.
+The two program folders are ignored by git but for their `ORIGIN` (`.gitignore`): the lane checks the
+files against `ORIGIN` before it runs any (`extension/e2e/lib/pinned.mjs`) and stops with the line that
+fetches them. No code under `extension/src/` names any of these folders (`extension/test/hygiene.test.ts`),
+and the built package is checked to carry nothing of them but the profiles.
+
+One script takes them all, with your own `gh` sign-in and from GitHub only, never from a checkout:
+
+```
+bash interface/pull.sh [--ref REF] framework/profiles framework/contract framework/contract-text
+bash interface/pull.sh --at-origin framework/shared-copy framework/testbed   # before the direct-way lane
+```
+
+It takes only a commit hpcworker's default branch contains (REF: `main`), and only the files hpcworker's
+`interface/INTERFACE.json` lists under the export at the version the import names, at that commit, with
+the executable bit hpcworker's tree records; `--at-origin` takes again exactly the commit each `ORIGIN`
+names. It refuses a link, a truncated listing and a `.json` file that is not a JSON object. A file a
+folder holds and the export no longer does is listed for you to remove in a reviewed commit; nothing is
+deleted. Then run the tests in `extension/` and commit each copy with its `ORIGIN`.
+
+The website's home-page diagram (`extension/store-assets/src/diagram.*`, shipped as
+`extension/public/tour/diagram.*`) is not pinned: it is copied from a checkout of the site by
+`build_assets.mjs --sync-site`, with no `ORIGIN`, and `extension/test/boundary.test.ts` lists it, with the
+live kill-list test's `BEETHOVEN_SITE_DIR`, until the website offers an export.
 
 ## What is not offered, and why
 
 - The bridge's wire protocol (`helper/README.md`, `extension/src/core/bridge.ts`, checked by
   `helper/test/suite.mjs` against every host): both of its ends live here, and no other repository's
-  code or tests read it. hpcworker's `docs/V12_CONTRACT.md` describes it in prose.
+  code or tests read it. hpcworker's `docs/V12_CONTRACT.md` (pinned here in `framework/contract-text/`)
+  describes it in prose.
 - The redaction rules (`extension/src/core/redact.ts`), the Claude Code link shapes
   (`ENVIRONMENT_URL`, `SESSION_URL`, `CLAUDE_CODE_LINK` in `extension/src/core/contract.ts`) and
   `PRODUCT_NAME` (`extension/src/core/terms.ts`): beethoven-desktop copies them by hand today, but they
@@ -52,4 +71,7 @@ export path names a tracked file; no tracked file reaches another repository's c
 variables naming another checkout, clones of the organisation's repositories, submodules, another
 repository checked out in a workflow, a dependency by path or git URL), with a short list of known
 exceptions, each with its reason, that fails when an entry goes stale; and each import folder equals its
-`ORIGIN`, holding nothing else but `ORIGIN`, `README.md` and `pull.sh`.
+`ORIGIN` for the export and version the manifest names, holding nothing else but `ORIGIN` and its own
+`README.md` (a folder git ignores may hold none of its files, or all of them). The same file checks that
+`interface/pull.sh` reads the manifest, takes through `gh api` only and deletes nothing;
+`extension/test/interfacePull.test.ts` runs it against a stand-in `gh`.

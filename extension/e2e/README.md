@@ -4,7 +4,7 @@ Two things live here and in `../mock-ood/`:
 
 - the **mock portal** (`mock-ood/server.mjs`, its stand-in tool `mock-ood/bin/hpcworker` with
   `mock-ood/lib/tool.mjs`, and the job clock `mock-ood/lib/jobsim.mjs`), which plays Wayne State's
-  Open OnDemand portal and framework 10 as `docs/V11_CONTRACT.md` describes them;
+  Open OnDemand portal and framework 10 as `framework/contract-text/V11_CONTRACT.md` describes them;
 - the **browser harness** (`e2e/run.mjs`), which loads the built extension into Chromium, walks a
   scenario as a student would, and records everything it saw.
 
@@ -201,14 +201,21 @@ stand-in**, never the grid. They are not part of `all`. `lib/direct.mjs` holds w
   password session runs the client's command in `bash -c`, with a pty when asked; a key session reads the test
   HOME's `~/.ssh/authorized_keys` (written by the real `hpcworker browser-key add`) and applies it as OpenSSH
   does (`command=` forced, `SSH_ORIGINAL_COMMAND`, `restrict` refuses a pty). The shared copy is hpcworker's
-  framework, installed by `E2E_FINAL/grid/setup_grid.sh` (at `E2E_SHARED_TEST`, the absolute WSL path of
-  `~/final12/g/shared/current`; a test HOME, hpcworker's fake scheduler `framework/tests/fakegrid.py`, an `srun`
-  that plays the Claude sign-in and an `id` that names the account st1234). Neither the stand-in nor the
-  framework is in this repository, which never reads another one's checkout (`interface/README.md`), so
-  `lib/direct.mjs` takes both folders only from `E2E_FINAL` and `E2E_SHARED_TEST` and stops the scenario
-  when either is unset. Until hpcworker publishes its framework and test scheduler as exports a test may
-  run, which framework the lane ran is whatever `setup_grid.sh` installed: write it in the run's notes. A
-  job clock in the stand-in runs a PENDING job after `queue_s` and brings it online `start_s` later. Its log
+  framework as this repository pins it (`framework/shared-copy`, hpcworker's program export `framework`), behind
+  hpcworker's test scheduler as pinned too (`framework/testbed`, the export `testbed`: `fakebin/sbatch`, `squeue`
+  and the rest, configured by `FAKE_SCHED_DIR` and the `FAKE_*` variables each file's header names; its `srun`
+  plays the Claude sign-in). Git keeps only each folder's `ORIGIN`: fetch the files once, from the repository's
+  root, with `bash interface/pull.sh --at-origin framework/shared-copy framework/testbed` (your own gh sign-in;
+  `interface/README.md`). `lib/direct.mjs` checks both folders against their `ORIGIN` when a scenario loads,
+  before anything runs, and stops the scenario with that line when a file is missing, differs or is not
+  listed. `E2E_FINAL/grid/setup_grid.sh <port> <queue_s> <start_s> <framework folder> <testbed folder>`
+  installs the framework from its fourth argument at `~/final12/g/shared/current` in WSL (a test HOME, the
+  testbed's scheduler from its fifth, an `id` that names the account st1234), and `Grid.setup` checks the
+  installed copy file for file against the same `ORIGIN` before the stand-in starts, so the run's log names
+  the commit it ran. The stand-in and its set-up are the lane's own scaffolding and in no repository; nothing
+  of hpcworker is taken from `E2E_FINAL` or from a checkout. Not yet measured: the `setup_grid.sh` of
+  2026-10-02 took three arguments and ran hpcworker's `framework/tests/fakegrid.py`, which is no export; it has
+  to take the two folders, and whatever it installs is checked as above. A job clock in the stand-in runs a PENDING job after `queue_s` and brings it online `start_s` later. Its log
   (`gridd-log.json` in each scenario folder) has every connection, method, account, the key line's options,
   each command (forced or not, the original command, pty) and its exit code; nothing typed into a prompt or a
   command's input is ever written.
@@ -239,7 +246,8 @@ stand-in**, never the grid. They are not part of `all`. `lib/direct.mjs` holds w
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH
-E2E_FINAL=<stand-in folder> E2E_SHARED_TEST=<its shared copy in WSL> E2E_PROFILES=<short folder> E2E_OUT=<out> E2E_SHOTS=1 node e2e/run.mjs 13 --ext <E2E_FINAL>/ext
+bash ../interface/pull.sh --at-origin framework/shared-copy framework/testbed   # once, and again after each pull of a new commit
+E2E_FINAL=<stand-in folder> E2E_PROFILES=<short folder> E2E_OUT=<out> E2E_SHOTS=1 node e2e/run.mjs 13 --ext <E2E_FINAL>/ext
 ```
 
 ## What waits for the build

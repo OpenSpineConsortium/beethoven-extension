@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The mock portal by itself, without the extension: every route and mode Beethoven 11.0.0 relies on,
-// checked against docs/V11_CONTRACT.md with the extension's own parsers and command builders
+// checked against framework/contract-text/V11_CONTRACT.md with the extension's own parsers and command builders
 // (src/core/contract.ts, imported as TypeScript). Prints one PASS or FAIL line per check and exits 1 on
 // any FAIL.
 //

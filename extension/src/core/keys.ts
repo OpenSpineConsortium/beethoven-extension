@@ -15,13 +15,13 @@ export const OPENED_KEY = 'bridge.opened'; //    {urls: [...]}: environment link
 export const LOGIN_SEEN_KEY = 'bridge.loginSeen'; // {at, detail}: when the login terminal in this browser last reported SIGNED-IN
 export const PROBE_KEY = 'bridge.probe'; //      {submitted_at, job}: the probe job the strip submitted by itself, so it is not submitted again while it runs
 export const INSTALL_KEY = 'bridge.install'; //  {attempted_at, ok, detail, dir, note}: the last install, so Details can say which copy it set up, or why the lab's could not be used
-// 11.0.0 (docs/V11_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 9:
+// 11.0.0 (framework/contract-text/V11_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 9:
 export const LAST_KNOWN_KEY = 'bridge.lastKnown'; // LastKnown: the worker's last known state, title, link and when, so the panel shows it at once and "Open my session" works with no grid
 export const CHANNEL_KEY = 'bridge.channel'; //      ChannelNote: how this browser reaches the portal ("direct" from the background, or "tab")
 export const WAIT_HISTORY_KEY = 'bridge.waits'; //  WaitHistory: the last five waits for a computer, in whole minutes ("Last time: 6 min.")
 export const TOUR_SEEN_KEY = 'bridge.tourSeen'; //  TourSeen: that the tour was seen
 export const ONCE_KEY = 'bridge.once'; //            OnceNotes: which one-time tips were shown or dismissed (pin tip, Try asking, the tour card, the New session toast)
-// 12.0.0 (docs/V12_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 10:
+// 12.0.0 (framework/contract-text/V12_CONTRACT.md, "Storage"); each is named in PRIVACY.md version 10:
 export const DIRECT_KEY = 'bridge.direct'; //          DirectNote: the direct way on this computer: the account the grid accepted, when this computer's key was enrolled, its fingerprint, the student's choice of GlobalProtect, the one-time protection card
 // The browser's key itself is NOT in storage.local: it lives in IndexedDB ('beethoven-key', core/keyring.ts KEY_DB), as a
 // key wrapped by a non-extractable browser key (the default) or by the student's passkey (opt-in), never in the clear.

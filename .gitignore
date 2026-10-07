@@ -26,3 +26,9 @@ release/*/bridge/*
 # the store kit's copy of that zip, and the kit's own zip that holds it (docs/store/PASTE.md)
 release/*/store-kit/00-beethoven-*-chrome.zip
 release/*/store-kit-*.zip
+# hpcworker's two program exports, which only the opt-in direct-way lane runs: interface/pull.sh fetches
+# their files (--at-origin), and only each folder's ORIGIN is committed (the interface standard, rule 3)
+framework/shared-copy/*
+!framework/shared-copy/ORIGIN
+framework/testbed/*
+!framework/testbed/ORIGIN

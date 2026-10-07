@@ -1,4 +1,4 @@
-// The first direct sign-in (12.0.0, docs/V12_CONTRACT.md "The sign-in sheet"), and every Claude sign-in
+// The first direct sign-in (12.0.0, framework/contract-text/V12_CONTRACT.md "The sign-in sheet"), and every Claude sign-in
 // on the direct way.
 //
 // Beethoven's own sheet (an extension page) asks for the AccessID; then the background opens the

@@ -287,7 +287,7 @@ export interface ShellSession {
 /**
  * The longest a sitting may hold the portal's shell open: fifteen minutes, the number the privacy
  * statement gives ("the extension closes the connection after fifteen minutes at the latest",
- * PRIVACY.md). The cluster tool's `connect` ends within fourteen (docs/V11_CONTRACT.md D7).
+ * PRIVACY.md). The cluster tool's `connect` ends within fourteen (framework/contract-text/V11_CONTRACT.md D7).
  */
 export const SESSION_MAX_MS = 15 * 60_000;
 

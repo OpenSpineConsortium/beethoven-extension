@@ -1,4 +1,4 @@
-// What the pages say to the background (core/messages.ts, docs/V11_CONTRACT.md "Messages and tabs"):
+// What the pages say to the background (core/messages.ts, framework/contract-text/V11_CONTRACT.md "Messages and tabs"):
 // one port per page that subscribes to its surface and receives every new view, "tick" every 2 s while
 // the page is open (which also tells the background a panel is open), and one message per Action.
 // The pages never talk to the portal, the lab or Anthropic themselves.

@@ -26,14 +26,18 @@ const SIBLING_PATH = new RegExp(`(?:\\.\\./|\\)/|\\}/)(${NAMES})(?![A-Za-z0-9_.-
 // (`${m.origin}/beethoven/services.json`, `${SITE_ORIGIN}/beethoven/request.html`)
 const WEB_BASE = /origin|\bport\b|url\b/i;
 // a variable whose value is another repository's checkout, or a folder of another repository's code this
-// one runs (the direct way's grid stand-in, which installs hpcworker's framework)
-const CHECKOUT_VAR = /\b((?:HPCWORKER|ASHLEY|SITES|QA|BEETHOVEN_(?:SERVICE|QA|AGENTS|RESEARCH|SITES?|EXTENSION|DESKTOP|VSCODE|BASE|HUB))_DIR|E2E_FINAL|E2E_SHARED_TEST)\b/g;
+// one runs. E2E_SHARED_TEST named the copy of hpcworker's framework the direct-way lane ran until that lane
+// took the pinned exports (framework/shared-copy, framework/testbed); E2E_FINAL, the lane's own scaffolding,
+// which is in no repository and supplies nothing of hpcworker's since then, is not one
+const CHECKOUT_VAR = /\b((?:HPCWORKER|ASHLEY|SITES|QA|BEETHOVEN_(?:SERVICE|QA|AGENTS|RESEARCH|SITES?|EXTENSION|DESKTOP|VSCODE|BASE|HUB))_DIR|E2E_SHARED_TEST)\b/g;
 // an option, as the code reads it, whose value is another repository's checkout
 const CHECKOUT_OPTION = /['"](--sync-site)['"]/g;
 // a clone of another repository of the organisation
 const CLONE = new RegExp(`\\b(?:git clone|gh repo clone)\\b[^\\n]*?OpenSpineConsortium/(${NAMES})\\b`, 'gi');
 const CHECKOUT_ACTION_REPO = /^\s*repository:\s*\S+/m;
 const KINDS = ['contract', 'schema', 'data', 'python', 'cli', 'files', 'program', 'text'];
+// what an import's folder may hold besides the export's files (rule 3); one of these the export itself
+// carries (the framework's own README.md) is the export's, and its ORIGIN lists it
 const OWN = new Set(['ORIGIN', 'README.md', 'pull.sh']);
 
 /** what still reaches another checkout today: the file, what matched, why it is still here and who removes it */
@@ -44,19 +48,9 @@ const KNOWN: Array<{ file: string; match: string; why: string }> = [
     why: "the maintainer's check of a signed kill-list before the site repository publishes it (docs/PUBLISHING_SITE.md, \"The kill-list\"): until it is pushed the list exists only in that checkout, so the check reads it there, opt-in with no default, and skips without the variable. It goes when the website offers the signed list as an export, or the check moves to the published address (the maintainer)",
   },
   {
-    file: 'extension/e2e/lib/direct.mjs',
-    match: 'E2E_FINAL',
-    why: "scenarios 13 to 16 run hpcworker's real framework, which grid/setup_grid.sh in that folder installs from outside this repository; opt-in, no default, a maintainer's lane outside CI. It goes when hpcworker's framework and testbed exports are merged and this repository pins them with a pull.sh (Wave B of the encapsulation)",
-  },
-  {
-    file: 'extension/e2e/lib/direct.mjs',
-    match: 'E2E_SHARED_TEST',
-    why: "the same lane: where that installed copy of hpcworker's framework is; goes with E2E_FINAL",
-  },
-  {
     file: 'extension/store-assets/src/build_assets.mjs',
     match: '--sync-site',
-    why: "copies the website's home-page diagram (tools/pages/index/body.html between flow:start and flow:end, and rules of assets/css/hero.css) from a checkout of the site the maintainer names, into store-assets/src/diagram.* and so into public/tour/diagram.*, with no ORIGIN; no default, a maintainer's tool. It goes when the website offers the diagram as an export this repository pins with a pull.sh (the maintainer, with the site)",
+    why: "copies the website's home-page diagram (tools/pages/index/body.html between flow:start and flow:end, and rules of assets/css/hero.css) from a checkout of the site the maintainer names, into store-assets/src/diagram.* and so into public/tour/diagram.*, with no ORIGIN; no default, a maintainer's tool. It goes when the website offers the diagram as an export this repository pins with interface/pull.sh (the maintainer, with the site)",
   },
 ];
 
@@ -223,14 +217,20 @@ describe('rule 2: what the repository offers, it declares in interface/INTERFACE
   });
 });
 
+/** git ignores this path of the tree (rule 3's program folders keep only their ORIGIN), or undefined without git */
+function ignored(rel: string): boolean | undefined {
+  const r = spawnSync('git', ['-C', REPO, 'check-ignore', '-q', '--no-index', '--', rel], { encoding: 'utf8' });
+  return r.status === 0 ? true : r.status === 1 ? false : undefined;
+}
+
 describe('rule 3: each import is a pinned copy that equals its ORIGIN', () => {
   for (const imp of MANIFEST.imports) {
     it(`${imp.into} holds exactly the files ${imp.origin} lists, byte for byte`, () => {
       const lines = readFileSync(path.join(REPO, imp.origin), 'utf8').split('\n').filter(Boolean);
       expect(lines[0]).toBe(`repository ${imp.repository}`);
       expect(lines[1]).toMatch(/^commit [0-9a-f]{40}$/);
-      // a copy taken before its provider published INTERFACE.json has no export line; the next pull writes one
-      for (const l of lines.filter((x) => x.startsWith('export '))) expect(l).toBe(`export ${imp.export} ${imp.version}`);
+      // every copy here was taken after its provider published INTERFACE.json, so each names its export
+      expect(lines.filter((x) => x.startsWith('export ')), `${imp.origin}: the export and its version`).toEqual([`export ${imp.export} ${imp.version}`]);
       expect(lines.filter((l) => !/^(repository \S+|commit [0-9a-f]{40}|export \S+ \d+|sha256 [0-9a-f]{64} \S+)$/.test(l)), `${imp.origin}: lines of no known form`).toEqual([]);
       const recorded = Object.fromEntries(lines.filter((l) => l.startsWith('sha256 ')).map((l) => [l.split(' ').slice(2).join(' '), l.split(' ')[1]]));
       expect(Object.keys(recorded).length, `${imp.origin} lists no file`).toBeGreaterThan(0);
@@ -242,24 +242,35 @@ describe('rule 3: each import is a pinned copy that equals its ORIGIN', () => {
           if (e.isDirectory()) walk(full);
           else {
             const rel = path.relative(folder, full).split(path.sep).join('/');
-            if (!OWN.has(rel)) present[rel] = createHash('sha256').update(readFileSync(full)).digest('hex');
+            if (!OWN.has(rel) || rel in recorded) present[rel] = createHash('sha256').update(readFileSync(full)).digest('hex');
           }
         }
       };
       walk(folder);
-      expect(present, `${imp.into} differs from ${imp.origin}: take a new copy with its pull.sh, never by hand`).toEqual(recorded);
-    });
-
-    it(`${imp.into}/pull.sh takes ${imp.export} ${imp.version} from ${imp.repository} and nothing else`, () => {
-      const pull = text(`${imp.into}/pull.sh`);
-      expect(pull, 'the folder has its pull.sh').not.toBe('');
-      expect(pull).toContain(`REPO=${imp.repository}\n`);
-      expect(pull).toMatch(new RegExp(`\\bEXPORT=${esc(imp.export)} WANT=${imp.version}\\b`));
-      // from GitHub through the person's own gh sign-in, at a commit the default branch contains
-      expect(pull).toContain('env -u GITHUB_TOKEN -u GH_TOKEN gh');
-      expect(pull).toMatch(/compare\/\$default\.\.\.\$sha/);
-      expect(pull).toContain('interface/INTERFACE.json');
-      expect(pull, 'a pull never deletes what the provider dropped').not.toMatch(/\brm -(?:r|rf|fr)\b|\bgit rm\b/);
+      // a program only an opt-in lane runs stays out of git (rule 3): ORIGIN is committed, the files are
+      // fetched by interface/pull.sh --at-origin, and when they are here they are the whole export, unchanged
+      const listed = Object.keys(recorded).map((f) => `${imp.into}/${f}`);
+      const out = listed.filter((f) => ignored(f));
+      expect(out.length === 0 || out.length === listed.length, `${imp.into}: git ignores some of its files and not others`).toBe(true);
+      expect(ignored(imp.origin), `${imp.origin} is committed`).not.toBe(true);
+      if (out.length && Object.keys(present).length === 0) return;
+      expect(present, `${imp.into} differs from ${imp.origin}: take a new copy with interface/pull.sh, never by hand`).toEqual(recorded);
     });
   }
+
+  it('interface/pull.sh takes each import from its repository, at a merged commit, and nothing else', () => {
+    const pull = text('interface/pull.sh');
+    expect(pull, 'the repository has its pull').not.toBe('');
+    // the import a folder holds is read from this repository's manifest, the export's files from the provider's
+    expect(pull.match(/interface\/INTERFACE\.json/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // from GitHub through the person's own gh sign-in, as it is (never a token of its own, a clone or a checkout)
+    expect(pull).toMatch(/\bgh api\b/);
+    expect(pull, 'gh signs in as the person does, with GH_TOKEN and GITHUB_TOKEN left as they are').not.toMatch(/env -u|unset (?:GH_TOKEN|GITHUB_TOKEN)/);
+    expect(pull).not.toMatch(/\bgit clone\b|\bcurl\b|\bwget\b/);
+    // at a commit the provider's default branch contains
+    expect(pull).toMatch(/compare\/\$default\.\.\.\$sha/);
+    expect(pull, 'a pull never deletes what the provider dropped').not.toMatch(/\brm -(?:r|rf|fr)\b|\bgit rm\b/);
+    // no folder keeps a pull of its own: one script takes every import
+    for (const imp of MANIFEST.imports) expect(existsSync(path.join(REPO, imp.into, 'pull.sh')), `${imp.into}/pull.sh`).toBe(false);
+  });
 });
