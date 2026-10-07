@@ -139,10 +139,11 @@ enough; the kill-list tool does not write the ledger).
    one-sentence `--message` in plain words, since the panel shows it. For 4.0.0 to 6.0.0, sign the
    old list at `ashley/bridge-killlist.json` as well.
 2. `verify-killlist` each written file.
-3. In `extension/`, run `npx vitest run test/killlist.live.test.ts`. That test asserts that nothing is
-   revoked, on purpose: it is a tripwire against a revocation nobody meant to publish. After a real
-   withdrawal, change its `toEqual([])` expectation for the versions to the intended list in the same
-   change, and only then commit.
+3. In `extension/`, run `BEETHOVEN_SITE_DIR=<your checkout of the site repository> npx vitest run
+   test/killlist.live.test.ts` (without the variable it skips: it never guesses where the site is
+   checked out). That test asserts that nothing is revoked, on purpose: it is a tripwire against a
+   revocation nobody meant to publish. After a real withdrawal, change its `toEqual([])` expectation
+   for the versions to the intended list in the same change, and only then commit.
 4. Commit and push the site repository. Then check the live file:
    `curl -sI https://openspineconsortium.com/beethoven/killlist.json` should answer `200` with
    `content-type: application/json` and `access-control-allow-origin: *`; download it and

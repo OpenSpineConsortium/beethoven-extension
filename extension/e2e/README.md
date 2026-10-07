@@ -200,13 +200,18 @@ stand-in**, never the grid. They are not part of `all`. `lib/direct.mjs` holds w
   verification code: "); the account `nocode` gets the grid's 2FA refusal as an INFO_REQUEST with no prompt. A
   password session runs the client's command in `bash -c`, with a pty when asked; a key session reads the test
   HOME's `~/.ssh/authorized_keys` (written by the real `hpcworker browser-key add`) and applies it as OpenSSH
-  does (`command=` forced, `SSH_ORIGINAL_COMMAND`, `restrict` refuses a pty). The shared copy is framework 11
-  from this working tree (`grid/setup_grid.sh`: `~/final12/g/shared/current`, a test HOME, the fake
-  scheduler of `framework/tests/fakegrid.py`, an `srun` that plays the Claude sign-in and an `id` that names
-  the account st1234). A job clock in the stand-in runs a PENDING job after `queue_s` and brings it online
-  `start_s` later. Its log (`gridd-log.json` in each scenario folder) has every connection, method, account,
-  the key line's options, each command (forced or not, the original command, pty) and its exit code; nothing
-  typed into a prompt or a command's input is ever written.
+  does (`command=` forced, `SSH_ORIGINAL_COMMAND`, `restrict` refuses a pty). The shared copy is hpcworker's
+  framework, installed by `E2E_FINAL/grid/setup_grid.sh` (at `E2E_SHARED_TEST`, the absolute WSL path of
+  `~/final12/g/shared/current`; a test HOME, hpcworker's fake scheduler `framework/tests/fakegrid.py`, an `srun`
+  that plays the Claude sign-in and an `id` that names the account st1234). Neither the stand-in nor the
+  framework is in this repository, which never reads another one's checkout (`interface/README.md`), so
+  `lib/direct.mjs` takes both folders only from `E2E_FINAL` and `E2E_SHARED_TEST` and stops the scenario
+  when either is unset. Until hpcworker publishes its framework and test scheduler as exports a test may
+  run, which framework the lane ran is whatever `setup_grid.sh` installed: write it in the run's notes. A
+  job clock in the stand-in runs a PENDING job after `queue_s` and brings it online `start_s` later. Its log
+  (`gridd-log.json` in each scenario folder) has every connection, method, account, the key line's options,
+  each command (forced or not, the original command, pty) and its exit code; nothing typed into a prompt or a
+  command's input is ever written.
 - **The test package** (`E2E_FINAL/ext`, made by `E2E_FINAL/prep_ext.mjs` from `.output/chrome-mv3`): a manifest
   `key` (a fixed id) and `profiles/wayne.json` pointed at the stand-in (`ssh_host` 127.0.0.1, its port, its host
   key's fingerprint as the pin, its shared copy). The bridge zips are kept exactly as the package carries them
@@ -234,7 +239,7 @@ stand-in**, never the grid. They are not part of `all`. `lib/direct.mjs` holds w
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH
-E2E_PROFILES=<short folder> E2E_OUT=<out> E2E_SHOTS=1 node e2e/run.mjs 13 --ext <E2E_FINAL>/ext
+E2E_FINAL=<stand-in folder> E2E_SHARED_TEST=<its shared copy in WSL> E2E_PROFILES=<short folder> E2E_OUT=<out> E2E_SHOTS=1 node e2e/run.mjs 13 --ext <E2E_FINAL>/ext
 ```
 
 ## What waits for the build
