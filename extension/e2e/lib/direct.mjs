@@ -6,8 +6,9 @@
 //     grid's algorithms and an RSA host key, asks the grid's two prompts (password, then the Google
 //     Authenticator code) and plays the 2FA refusal for the account "nocode"; a password session runs the
 //     client's command in bash, a key session runs the authorized_keys line's forced command exactly as
-//     OpenSSH does (SSH_ORIGINAL_COMMAND; restrict refuses a pty). The shared copy it runs is framework 11
-//     from this working tree (setup_grid.sh), under a test HOME, with a fake scheduler and a job clock.
+//     OpenSSH does (SSH_ORIGINAL_COMMAND; restrict refuses a pty). The shared copy it runs is hpcworker's
+//     framework as E2E_FINAL/grid/setup_grid.sh installs it (at E2E_SHARED_TEST), under a test HOME, with a
+//     fake scheduler and a job clock. Neither the stand-in nor the framework is in this repository.
 //   - The test package (E2E_FINAL/ext, made by prep_ext.mjs from .output/chrome-mv3): a manifest key so its
 //     id is fixed, the bridge zips rebuilt with that id (the shipped zips refuse to install until the
 //     release step names the store id), and profiles/wayne.json pointed at the stand-in: 127.0.0.1, its
@@ -24,10 +25,17 @@ import path from 'node:path';
 import { sleep } from './harness.mjs';
 import { moment } from './flows.mjs';
 
-const SCRATCH = 'C:/Users/grego/AppData/Local/Temp/claude/c--Users-grego-OneDrive-Desktop-CTSpinoPelvic1K-1/0599380b-0d32-4e19-b5be-65bdd1017566/scratchpad';
-export const FINAL = process.env.E2E_FINAL || `${SCRATCH}/v12/build/final`;
+// The lane runs hpcworker's real framework, which this repository does not carry and never reads from a
+// checkout (it takes only the site profiles, interface/README.md). So the folder that installs it and the
+// copy it installs are given, never guessed: E2E_FINAL (grid/setup_grid.sh, grid/gridd.py, decode_qr.py, the
+// test package ext/) and E2E_SHARED_TEST (the shared copy setup_grid.sh installs in WSL, as the stand-in's
+// sessions name it). A maintainer's lane until hpcworker's framework is an export a test may run as a black
+// box (extension/test/boundary.test.ts lists it until then).
+const missing = ['E2E_FINAL', 'E2E_SHARED_TEST'].filter((k) => !process.env[k]);
+if (missing.length) throw new Error(`the direct way's scenarios need ${missing.join(' and ')} set: the grid stand-in's folder and the shared copy it installs (e2e/README.md, "12.0.0: the direct way")`);
+export const FINAL = process.env.E2E_FINAL;
 export const SSH_PORT = Number(process.env.E2E_SSH_PORT || 22411);
-export const SHARED_TEST = '/home/gschwing/final12/g/shared/current';
+export const SHARED_TEST = process.env.E2E_SHARED_TEST;
 export const TEST_EXT = path.join(FINAL, 'ext');
 export const HOST_NAME = 'com.openspineconsortium.beethoven.bridge';
 export const REGKEY = `Software\\Chromium\\NativeMessagingHosts\\${HOST_NAME}`;

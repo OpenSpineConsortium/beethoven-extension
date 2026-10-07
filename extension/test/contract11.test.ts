@@ -158,6 +158,10 @@ describe('the small words', () => {
     expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'oauth_token', apiProvider: 'firstParty' })).toBe(false);
     expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'api_key' })).toBe(false);
     expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'bedrock' })).toBe(false);
+    // a key behind a "claude.ai" sign-in: any apiKeySource, whatever its value, is not a subscription (hpcw_claude_signin)
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiProvider: 'firstParty', apiKeySource: '/login managed key' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiKeySource: 'ANTHROPIC_API_KEY' })).toBe(false);
+    expect(isSubscriptionSignIn({ loggedIn: true, authMethod: 'claude.ai', apiKeySource: null })).toBe(false);
     expect(isSubscriptionSignIn({ loggedIn: true })).toBe(false);
     expect(isSubscriptionSignIn({ loggedIn: false, authMethod: 'claude.ai' })).toBe(false);
     expect(isSubscriptionSignIn(undefined)).toBe(false);
