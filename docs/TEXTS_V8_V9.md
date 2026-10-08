@@ -1,5 +1,8 @@
 # Beethoven texts for 11.0.0: agreement version 8, privacy statement version 9
 
+**16.0.0 (2026-10-08).** Agreement 11 and privacy statement 12 (`TEXTS_V11_V12.md`) build on these
+texts again: the direct way that agreement 9 and 10 and privacy statement 10 and 11 described is removed.
+
 Drafted 2026-10-01 for Greg and for counsel, by the texts stream of the 11.0.0 build. **This is
 drafting, not legal advice.** No lawyer has read these texts or this note; the questions at the end
 are for one.

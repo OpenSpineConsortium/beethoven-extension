@@ -1,5 +1,10 @@
 # Beethoven texts for 12.0.0: agreement version 9, privacy statement version 10
 
+**16.0.0 (2026-10-08).** This record describes agreement 9 and privacy statement 10 for 12.0.0, whose
+direct way (the Bridge, the sign-in sheet, the key in the browser, the restricted line, Forget this
+computer, the phone route, the relay, the Isolated Web App pilot) 16.0.0 removed whole. Agreement 11 and
+privacy statement 12 (`TEXTS_V11_V12.md`) take them out of the texts again.
+
 Drafted 2026-10-02 for Greg and for counsel, by the texts stream of the 12.0.0 build. **This is
 drafting, not legal advice.** No lawyer has read these texts or this note; the questions at the end
 are for one.

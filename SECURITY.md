@@ -61,21 +61,10 @@ Extension:
   pin it with Chrome's `ExtensionSettings.runtime_allowed_hosts` and `runtime_blocked_hosts`; the exact
   host and permission list is in `docs/STORE_LISTING.md`.
 - Never requests `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `debugger` or `identity`. Since 12.0.0 it requests `nativeMessaging` for one host, its bundled
-  bridge, which opens TCP only to the grid's ssh port from a built-in allowlist and holds no
-  credential. Since 15.0.0 the bridge a student installs on Windows or macOS is the compiled edition
-  (Rust, the standard library and the compiler's runtime support code, nothing else) in a signed
-  installer that travels inside the package: a per-user MSI Authenticode-signed through Azure
-  Artifact Signing, and a per-user installer package signed with a Developer ID, notarized and
-  stapled. Each names only the Chrome Web Store item in `allowed_origins`, written in when it is
-  built and never rewritten afterwards (a rewrite would break the signature), so a development build
-  is offered the script zips, whose origin the download page writes in as before; Linux keeps its
-  script. `helper/build.mjs` copies a signed package into the extension only when its size, SHA-256,
-  helper version, protocol, name, origins and signature kind match its sidecar record. Neither
-  installer has been opened on a real machine yet: not yet measured. The portal cookie is carried by
-  the network stack and never read. No automated login of the portal; on the direct way the student
-  types the grid password and one-time code into Beethoven's sign-in sheet, which sends them only to
-  the grid inside the encrypted ssh session and never keeps them.
+  `debugger`, `identity` or `nativeMessaging` (requested from 12.0.0 to 15.0.0 for the bundled
+  bridge of the direct way, gone since 16.0.0). The portal cookie is carried by the network stack
+  and never read. No automated login of the portal: the student signs in on the browser's own box or
+  the university's own pages, and the extension never sees what is typed there.
 - No remote code: no `eval`, no fetched scripts, MV3 default CSP. The kill-list is JSON verified with
   `crypto.subtle.verify` (Ed25519; ECDSA P-256 fallback below Chrome 137, Firefox 130, Safari 17)
   against a public key compiled into the bundle; a revoked version refuses to send commands and says
@@ -167,24 +156,10 @@ Release pipeline and keys:
   15.0.0 the store upload is the maintainer's own tool (`extension/scripts/publish-store.mjs` since
   16.0.0): a Desktop OAuth client in his own Google Cloud project, whose client file and refresh token
   sit in the vendor folder on his own computer (mode 0600), never on a command line, in a log or in CI.
-- The bridge's signing identities (15.0.0) stay on the maintainer's own machines and out of every
-  build service. The Developer ID Application and Developer ID Installer certificates, with their
-  private keys, sit in the login keychain of the maintainer's Mac, and so do the notarization
-  credentials, stored there as a `notarytool` keychain profile that the release script names by its
-  profile name only. The Windows signatures come from an Azure Artifact Signing account and
-  certificate profile reached through the maintainer's own Entra sign-in (`az login` on the Mac,
-  where `helper/release/windows/build-msi-mac.sh`, run by `release.sh`, signs the `.msi` with jsign
-  and an access token it passes through an environment variable, never a command line; on the
-  fallback Windows machine, `signtool` with the service's client); there is no key file. The names
-  of all of these, with the store item and the publisher ID, sit in `release.json` in the
-  maintainer's vendor folder on the Mac, and on the fallback route the Azure names in the gitignored
-  `helper/release/windows/signing.json`. None of them is in CI, which builds unsigned binaries for
-  maintainers only. What the signatures say is that the maintainer's identity signed these bytes;
-  the sidecar beside each package records its SHA-256, size, origins and the versions of the tools
-  that built it, and that record is the maintainer's own. It does not show that the signed bytes
-  were built from a given commit: a build attestation from a hosted builder (a signed statement
-  naming the source commit, the build steps and the output's digest) would add that later, with the
-  signing itself still kept off the builder.
+- Nothing is signed since 16.0.0: the bridge's signed installers of 15.0.0 went with the bridge, so
+  a release needs no signing identity, certificate or notarization profile, and none exists for it.
+  How the identities were kept off every build service is in this file's git history and in
+  `docs/TEXTS_V10_V11.md`.
 
 ## Incident record
 

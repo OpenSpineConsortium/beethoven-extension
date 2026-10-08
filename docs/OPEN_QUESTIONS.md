@@ -1,6 +1,6 @@
 # Open questions that only a real cluster can settle
 
-**12.0.0 (2026-10-02).** The direct way adds its own questions (OpenSSH 7.4 and the restricted key line, StrictModes on the homes, warrior's bash running the gate, the modes of the folders above the lab's copy, the 2FA Setup page on a phone, real Windows Hello and Touch ID). They and the tests that answer them are in `V12_STATUS.md`, section 4.
+**16.0.0 (2026-10-08).** The direct way of 12.0.0 to 15.0.0 added its own questions (OpenSSH 7.4 and the restricted key line, StrictModes on the homes, warrior's bash running the gate, the modes of the folders above the lab's copy, the 2FA Setup page on a phone, real Windows Hello and Touch ID; `V12_STATUS.md`, section 4). None was measured, and 16.0.0 removed the direct way, so they are closed as not applicable. Not yet measured in 16.0.0's one way: a Connect pressed while the grid is out of reach going ahead by itself once GlobalProtect connects (the reach re-check every 3 s with the panel open, once a minute without one), and the university's VPN page the GlobalProtect step links (the profile's `vpn_help_url`), both against the real portal.
 
 The twelve questions from the report ("Open questions that only a real cluster can settle"), in the
 report's rank order, each with the first test to run and a column for the answer. Record an answer
