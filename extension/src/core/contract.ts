@@ -61,7 +61,16 @@
 // The extension never deletes anything on the cluster: it writes files, touches the stop file and
 // types hpcworker's verbs. Removing a marker is done by the student in the portal's Files app. It
 // never writes into a shared folder either: it only reads <shared_install>/VERSION to show it.
+//
+// 17.0.0: the site profile is read with beethoven-base's reader (src/base/profile.ts, the `browser`
+// export pinned by interface/pull.sh): the keys clients read, each of module-schema 1's type, the
+// path rules and the deployment a portal belongs to live there once for the three editions. What is
+// below are the readers the extension's own code calls, in the shape it always called them (a
+// profile's JSON text in, a value out), on top of base's.
+import { expandPath, readProfileText, restricts, sharedRootOf, type SiteProfile } from '../base/profile';
 import { PRODUCT_NAME } from './terms';
+
+export { expandPath, sharedRootOf, type SiteProfile };
 
 export const FRAMEWORK_DIR = '.hpcworker';
 export const HPCWORKER = `~/${FRAMEWORK_DIR}/bin/hpcworker`;
@@ -161,22 +170,20 @@ export function isLoginSetupLine(line: unknown): line is string {
 /** AM2's one-time key step has not yet been tried on the real grid by a student without a key: Details says so while this is false */
 export const LOGIN_SETUP_PROVEN = false;
 
-/**
- * A shared folder the extension will name on a command line: absolute, made of letters, digits and
- * . _ + - only, no "." or ".." segment. Anything else is not used (the site then reads as keeping no
- * shared copy, and nothing is set up), so no path from a profile or a marker is ever quoted around.
- */
-export function sharedRootOf(raw: unknown): string | undefined {
-  if (typeof raw !== 'string') return undefined;
-  const s = raw.trim().replace(/\/+$/, '');
-  if (!/^(\/[A-Za-z0-9._+-]+)+$/.test(s)) return undefined;
-  if (s.split('/').some((seg) => seg === '.' || seg === '..')) return undefined;
-  return s;
+// sharedRootOf (a shared folder the extension will name on a command line: absolute, plain, no "." or
+// ".." segment; anything else is not used, so no path from a profile or a marker is ever quoted
+// around) and expandPath ($USER, ${USER}, $HOME, ${HOME} and a leading ~, as the job's shell would
+// expand them) are base's, re-exported above.
+
+/** a bundled or downloaded profile.json -> the keys clients read (base's SiteProfile), or undefined when it does not parse to an object */
+export function siteProfileFrom(profileJson: string | undefined): SiteProfile | undefined {
+  if (!profileJson) return undefined;
+  return readProfileText(profileJson)?.profile;
 }
 
 /** the profile's "shared_install" (framework 5), when it names a usable folder */
 export function sharedInstallFrom(profileJson: string | undefined): string | undefined {
-  return sharedRootOf(parseProfile(profileJson)?.shared_install);
+  return sharedRootOf(siteProfileFrom(profileJson)?.shared_install);
 }
 
 /** "/a/b/c" -> {dir: "/a/b", name: "c"}; what a listing-based existence check needs */
@@ -186,50 +193,26 @@ export function splitPath(abs: string): { dir: string; name: string } {
   return { dir: i <= 0 ? '/' : s.slice(0, i), name: s.slice(i + 1) };
 }
 
-/** `$USER`, `${USER}`, `$HOME`, `${HOME}` and a leading `~` in a profile path, as the job's shell would expand them */
-export function expandPath(raw: string, vars: { home: string; user: string }): string {
-  return String(raw ?? '')
-    .replace(/^~(?=\/|$)/, vars.home)
-    .replace(/\$\{?USER\}?/g, vars.user)
-    .replace(/\$\{?HOME\}?/g, vars.home)
-    .replace(/\/+$/, '');
-}
-
-function parseProfile(profileJson: string | undefined): Record<string, unknown> | undefined {
-  if (!profileJson) return undefined;
-  try {
-    const p = JSON.parse(profileJson) as unknown;
-    return p && typeof p === 'object' ? (p as Record<string, unknown>) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** the state directory: the profile's shared_state_dir, else the tool's own folder */
+/** the state directory: the profile's shared_state_dir expanded, else the tool's own folder */
 export function stateDirFrom(profileJson: string | undefined, vars: { home: string; user: string }): string {
-  const p = parseProfile(profileJson);
-  const raw = p?.shared_state_dir;
-  if (typeof raw === 'string' && raw) return expandPath(raw, vars);
+  const raw = siteProfileFrom(profileJson)?.shared_state_dir;
+  if (raw) return expandPath(raw, vars);
   return paths.root(vars.home);
 }
 
 /** the profile's site name, the first half of the session name the framework asks for */
 export function siteFrom(profileJson: string | undefined): string | undefined {
-  const site = parseProfile(profileJson)?.site;
-  return typeof site === 'string' ? site : undefined;
+  return siteProfileFrom(profileJson)?.site;
 }
 
 /**
- * Does the site profile mark a workspace restricted? The framework's schema (version 1) has no such
- * key yet; this reads `restricted_workspaces` (a list of worker names, or `"*"`) or `restricted: true`
- * if a later profile carries them, so a site can forbid workers without touching each workspace.
+ * Does the site profile mark a workspace restricted? `restricted: true`, or the worker's name (or
+ * `"*"`) in `restricted_workspaces`, so a site can forbid workers without touching each workspace
+ * (base's restricts; a profile that does not parse restricts nothing).
  */
 export function profileRestricts(profileJson: string | undefined, workerName: string): boolean {
-  const p = parseProfile(profileJson);
-  if (!p) return false;
-  if (p.restricted === true) return true;
-  const list = p.restricted_workspaces;
-  return Array.isArray(list) && list.some((x) => x === '*' || x === workerName);
+  const p = siteProfileFrom(profileJson);
+  return p ? restricts(p, workerName) : false;
 }
 
 /** single quotes and control characters cannot be typed into a quoted argument */
@@ -648,40 +631,13 @@ export function loginSetupOutcome(output: string): { done: boolean; line: string
 }
 
 // ---- framework 10: the site profile's keys the extension reads (V11_CONTRACT.md, "Site profile") ---
-
-export interface SiteProfile {
-  site?: string;
-  display_name?: string;
-  /** the portal the welcome page offers ("https://ondemand.grid.wayne.edu") */
-  ood_base_url?: string;
-  /** the Shell app host; "" lets the portal pick its default ("default") */
-  ood_shell_host?: string;
-  /** "http-basic" | "cookie": a hint only; the channel test decides at run time */
-  ood_auth?: string;
-  vpn_required?: boolean;
-  /** the VPN's portal address the student types into the VPN app ("protect.wayne.edu") */
-  vpn_portal?: string;
-  /** the VPN app's name ("GlobalProtect") */
-  vpn_app?: string;
-  vpn_help_url?: string;
-  grid_account_help_url?: string;
-  /** the Remote Control session title ("Wayne State grid") */
-  session_title?: string;
-  /** seconds a job waits in need_login before it stops itself and queues no successor */
-  login_abandon_s?: number;
-  shared_install?: string;
-  shared_state_dir?: string;
-  submit_host?: string;
-  worker_defaults?: { hours?: number; capacity?: number; permission_mode?: string };
-  // The profile also carries the grid's ssh door and its host key pin (ssh_host, ssh_port, ssh_host_key, ssh_relay) and
-  // the Google Authenticator help page (grid_2fa_help_url), which 12.0.0 to 15.0.0 read for the direct way; 16.0.0
-  // reads none of them.
-}
-
-/** a bundled or downloaded profile.json -> its keys, or undefined when it does not parse */
-export function siteProfileFrom(profileJson: string | undefined): SiteProfile | undefined {
-  return parseProfile(profileJson) as SiteProfile | undefined;
-}
+// Since 17.0.0 the keys and their types are base's SiteProfile (src/base/profile.ts, module-schema 1),
+// re-exported above; siteProfileFrom (with the readers beside it) is the way in. The welcome page
+// reads ood_base_url (the portal it offers), vpn_required, vpn_app and vpn_portal (the VPN need), the
+// help links and session_title (the grid's name); a worker's words read worker_defaults.hours. The
+// profile also carries the grid's ssh door and its host key pin (ssh_host, ssh_port, ssh_host_key,
+// ssh_relay) and the Google Authenticator help page (grid_2fa_help_url), which 12.0.0 to 15.0.0 read
+// for the direct way; since 16.0.0 nothing here reads them.
 
 /** the session title for a worker: the profile's title, with " · <name>" for a worker not named "worker" (framework 10 asks Claude Code for the same) */
 export function sessionTitleFor(profileTitle: string | undefined, workerName: string): string {

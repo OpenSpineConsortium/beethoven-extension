@@ -35,13 +35,20 @@ export const WORDS = {
   /** the welcome page (moment 2) */
   welcome: {
     headline: 'Claude, on your grid.',
-    subline: 'Ask in claude.ai or the Claude app. A worker on the Wayne State grid does the work.',
+    // 17.0.0: the grid's name is the picked deployment's session_title ("Wayne State grid"); the words
+    // below are the 11.0.0 ones to the letter where the Wayne State profile is picked
+    subline: (grid: string | undefined) => `Ask in claude.ai or the Claude app. A worker on ${grid ? `the ${grid}` : "your university's grid"} does the work.`,
     needsTitle: "You'll need",
-    needs: [
-      { title: 'A Wayne State grid account', detail: 'Your AccessID and password.', link: 'How to get one' },
-      { title: 'GlobalProtect', detail: 'Connected to protect.wayne.edu.', link: 'How to set it up' },
-      { title: 'Claude Pro or Max', detail: 'The account you use at claude.ai.', link: 'See plans' },
-    ],
+    /** "Your grid", the picker over the deployments this build carries; shown only when there are two or more */
+    gridPicker: 'Your grid',
+    needs: {
+      // the account's name ("AccessID") is Wayne State's word; a site module carries no text for it yet,
+      // so every deployment reads this line until hpcworker's module-schema names one
+      account: (grid: string | undefined) => ({ title: grid ? `${/^[aeiou]/i.test(grid) ? 'An' : 'A'} ${grid} account` : 'A grid account', detail: 'Your AccessID and password.', link: 'How to get one' }),
+      // left out where the profile says vpn_required: false
+      vpn: (app: string | undefined, portal: string | undefined) => ({ title: app || "Your university's VPN", detail: portal ? `Connected to ${portal}.` : 'Connected before you start.', link: 'How to set it up' }),
+      claude: { title: 'Claude Pro or Max', detail: 'The account you use at claude.ai.', link: 'See plans' },
+    },
     summaryTitle: 'The agreement, in short',
     showTerms: 'Show terms',
     hideTerms: 'Hide terms',
@@ -52,7 +59,7 @@ export const WORDS = {
     opening: 'Opening the grid…',
     allowNote: (host: string) => `Chrome will ask to let Beethoven reach ${host}. Choose Allow.`,
     footerNothingLeaves: 'Nothing leaves this computer until you agree.',
-    footerOtherPortal: 'Not at Wayne State? Use another portal',
+    footerOtherPortal: 'Another university? Use another portal',
     denied: (host: string) => `Beethoven needs ${host} to work.`,
     tryAgain: 'Try again',
     panelNotOpened: 'Open Beethoven from the toolbar: the puzzle icon, then Beethoven.',
@@ -858,9 +865,15 @@ export interface TourView {
 export interface WelcomeView {
   headline: string;
   subline: string;
+  /**
+   * 17.0.0: "Your grid", the deployments this build carries (core/deployments.ts, one per site profile,
+   * the Wayne State profile first), each by its display name; `selected` is the one the words, the
+   * links and the portal below are taken from. Rendered only when there are two or more.
+   */
+  grids: { label: string; options: Array<{ site: string; name: string }>; selected: string };
   needsTitle: string;
-  /** the three requirements in Greg's order, each with its help link (the site profile's grid_account_help_url, vpn_help_url; claude.ai/upgrade) */
-  needs: Array<{ title: string; detail: string; link: { label: string; url: string } }>;
+  /** the requirements in Greg's order, each with the university's own page where the profile names one (grid_account_help_url, vpn_help_url; claude.ai/upgrade); the VPN one left out where the profile says vpn_required: false */
+  needs: Array<{ title: string; detail: string; link?: { label: string; url: string } }>;
   summaryTitle: string;
   /** terms.ts SUMMARY: the four lines, verbatim */
   summary: string[];
@@ -965,6 +978,8 @@ export type Action =
   | { kind: 'agree'; origin: string; granted: boolean; panelOpened: boolean; tabId?: number; windowId?: number }
   /** "Use this portal": the page asked Chrome for the origin inside the click; Anthropic addresses are refused before any prompt */
   | { kind: 'use-portal'; origin: string; granted: boolean }
+  /** 17.0.0: "Your grid" on the welcome page: the deployment whose words, links and portal the page shows next; nothing is stored until the press */
+  | { kind: 'pick-grid'; site: string }
   // the grid
   /** "Sign in again", "Sign in" (Grid row): opens or reloads the sign-in tab, in front, in the panel's window */
   | { kind: 'sign-in-grid'; windowId?: number }
@@ -1048,6 +1063,7 @@ export type ActionKind = Action['kind'];
 export interface ActionResults {
   agree: { navigated: boolean; signedInAlready: boolean };
   'use-portal': { origin: string };
+  'pick-grid': { site: string };
   'sign-in-grid': { opened: boolean };
   'retry-grid': { reach: 'answers' | 'no-route'; session: 'signed-in' | 'signed-out' | 'unreachable' };
   'ask-access': { opened: boolean };

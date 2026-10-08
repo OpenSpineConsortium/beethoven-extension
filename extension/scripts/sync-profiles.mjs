@@ -28,9 +28,10 @@ try {
 } catch {
   console.warn(`sync-profiles: ${source} not found; the build carries no site profile, so every site reads as keeping no shared copy`);
 }
+const sites = [];
 for (const name of names) {
   const site = name.slice(0, -'.json'.length);
-  // the extension asks for /profiles/<site>.json by the site name in Settings (core/install.ts bundledSharedInstall)
+  // the extension asks for /profiles/<site>.json by the site name in Settings (core/deployments.ts bundledProfile)
   // and types it into install --shared and connect, which take only cli.json's site form (core/contract.ts SITE_RE)
   if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(site)) fail(`framework/profiles/${name}: a site name is up to 32 lower-case letters, digits and -, not starting with -`);
   let profile;
@@ -40,10 +41,17 @@ for (const name of names) {
     fail(`framework/profiles/${name} is not JSON (${e.message})`);
   }
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) fail(`framework/profiles/${name} is not a JSON object`);
+  // a profile is named by its own site id: the welcome page lists the ids and reads each by that name
+  if (profile.site !== site) fail(`framework/profiles/${name}: its "site" is ${JSON.stringify(profile.site)}, not "${site}"`);
   delete profile.notes;
   await fs.writeFile(path.join(target, name), JSON.stringify(profile, null, 1) + '\n');
+  sites.push(site);
 }
-console.log(`sync-profiles: ${names.length} site profile(s) copied from ${source}, without their notes; no framework code is bundled`);
+// 17.0.0: the list of the deployments the build carries, in the order a page offers them (a page cannot
+// list a folder of the package); core/deployments.ts reads it, and the welcome page's picker shows one
+// entry per site, the Wayne State profile first where it is carried (greg, 2026-10-08)
+await fs.writeFile(path.join(root, 'public', 'deployments.json'), JSON.stringify({ sites }, null, 1) + '\n');
+console.log(`sync-profiles: ${names.length} site profile(s) copied from ${source}, without their notes, and listed in public/deployments.json; no framework code is bundled`);
 
 // The agreement texts the extension ships must be byte-identical to the canonical ones at the
 // repository root (CLAUDE.md, "Terms"); copy them at the same moment, so a build can never carry

@@ -1,7 +1,9 @@
 // The welcome page (moment 2): the options page in a full tab until the agreement is accepted. The
 // three prerequisites in Greg's order (the grid account, GlobalProtect, a Claude plan), each with the
 // university's own page, the agreement in four lines, "Show terms" expanding in place (never
-// required), one tick, and "Agree and continue".
+// required), one tick, and "Agree and continue". 17.0.0: "Your grid" under the lede, only when the
+// build carries two or more deployments (the Wayne State profile first); the words, the links and the
+// portal the press asks for are the picked one's.
 // Before the press nothing is sent to anyone.
 //
 // The press is one gesture: inside the click and before any await, the page calls sidePanel.open with the
@@ -172,11 +174,34 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
             { class: 'need' },
             el('span', { class: 'need-num', 'aria-hidden': 'true', text: String(i + 1) }),
             el('div', {}, el('div', { class: 'need-title', text: n.title }), el('div', { class: 'need-detail', text: n.detail })),
-            el('a', { class: 'need-link', href: n.link.url, target: '_blank', rel: 'noopener noreferrer' }, el('span', { text: n.link.label }), icon('external', 13)),
+            n.link ? el('a', { class: 'need-link', href: n.link.url, target: '_blank', rel: 'noopener noreferrer' }, el('span', { text: n.link.label }), icon('external', 13)) : null,
           ),
         ),
       ),
     );
+  }
+
+  /**
+   * 17.0.0: "Your grid", the deployments this build carries, only when there are two or more (one
+   * grid needs no choosing). A pick asks the background for that grid's words, links and portal; nothing
+   * is stored until the press, and a portal typed under "Use another portal" still wins.
+   */
+  function grids(v: WelcomeView): HTMLElement | null {
+    if (v.grids.options.length < 2) return null;
+    const pick = el(
+      'select',
+      {
+        id: 'grid-pick',
+        class: 'field w-grids-select',
+        onChange: (e: Event) => {
+          const site = (e.target as HTMLSelectElement).value;
+          if (site && site !== v.grids.selected) void opts.act({ kind: 'pick-grid', site });
+        },
+      },
+      ...v.grids.options.map((o) => el('option', { value: o.site, selected: o.site === v.grids.selected, text: o.name })),
+    );
+    pick.value = v.grids.selected;
+    return el('div', { class: 'w-grids' }, el('label', { class: 'w-grids-label', for: 'grid-pick', text: v.grids.label }), pick);
   }
 
   /** "Claude, on your grid.": the website's own signature, the second half in teal italic */
@@ -283,6 +308,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
         el('div', { class: 'w-mark' }, el('img', { src: g.url('/icon/48.png'), alt: '', width: '28', height: '28' }), el('span', { text: WORDS.product })),
         headline(v.headline),
         el('p', { class: 'w-lede', text: v.subline }),
+        grids(v),
         needs(v),
       ),
       v.state === 'handoff' ? el('div', { class: 'w-right' }, handoff(v.handoff?.text ?? WORDS.welcome.handoff, v.handoff?.hero)) : agreement(v),

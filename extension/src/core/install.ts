@@ -24,11 +24,15 @@
 //
 // 11.0.0: moment 6 runs this line once, before Connect, when the account does not yet run the lab's
 // shared copy (that is what ticks "Your grid account is ready"); `hpcworker connect` sets the account up
-// itself as a safety net for a returning run. The whole bundled profile is read here too, for the words
-// (bundledProfile: the VPN's name and address, the session title, the help links).
-import { commands, LAUNCHER_TAG, paths, sharedInstallFrom, sharedRootOf, siteProfileFrom, type SiteProfile } from './contract';
+// itself as a safety net for a returning run. The whole bundled profile is read for the words too
+// (bundledProfile: the VPN's name and address, the session title, the help links); since 17.0.0 the
+// package's profiles are core/deployments.ts's, read with base's reader, and re-exported here.
+import { commands, LAUNCHER_TAG, paths, sharedRootOf } from './contract';
+import { bundledProfile, bundledSharedInstall, profileAsset } from './deployments';
 import type { InstallNote } from './keys';
 import type { PortalApi } from './portal';
+
+export { bundledProfile, bundledSharedInstall, profileAsset };
 
 /** what is known of the tool in the student's account (Details' tool line; the setup check) */
 export interface InstallFacts {
@@ -46,21 +50,6 @@ export interface InstallFacts {
   failed?: string;
 }
 
-/** where a site's profile sits in the package (scripts/sync-profiles.mjs writes public/profiles/) */
-export const profileAsset = (site: string): string => `/profiles/${site}.json`;
-
-/** the whole site profile this build carries for a site, or undefined when it carries none */
-export async function bundledProfile(site: string, fetchAsset: (path: string) => Promise<Response>): Promise<SiteProfile | undefined> {
-  if (!/^[A-Za-z0-9_-]+$/.test(String(site ?? ''))) return undefined;
-  try {
-    const res = await fetchAsset(profileAsset(site));
-    if (!res.ok) return undefined;
-    return siteProfileFrom(await res.text());
-  } catch {
-    return undefined;
-  }
-}
-
 /**
  * Does the account already run the lab's shared copy that `sharedDir` names? The marker names that
  * folder, the launcher carries its tag, and the profile is there. Read through the Files app (reads
@@ -75,22 +64,6 @@ export async function usesSharedCopy(portal: PortalApi, sharedDir: string): Prom
     const launcher = await portal.readFileIfExists(paths.bin(home));
     if (launcher === undefined) return false;
     return (launcher.split('\n')[1] ?? '').trim() === LAUNCHER_TAG;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * The shared folder the site profile this build carries names ("shared_install" in
- * framework/profiles/<site>.json), or undefined: no such profile, no such key, or a value that is
- * not a plain absolute folder.
- */
-export async function bundledSharedInstall(site: string, fetchAsset: (path: string) => Promise<Response>): Promise<string | undefined> {
-  if (!/^[A-Za-z0-9_-]+$/.test(String(site ?? ''))) return undefined;
-  try {
-    const res = await fetchAsset(profileAsset(site));
-    if (!res.ok) return undefined;
-    return sharedInstallFrom(await res.text());
   } catch {
     return undefined;
   }

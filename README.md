@@ -211,7 +211,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 16.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 17.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier

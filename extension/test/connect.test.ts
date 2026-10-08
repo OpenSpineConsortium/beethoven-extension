@@ -60,7 +60,10 @@ describe('connecting a portal', () => {
     expect(out.answered).toBe(true);
     expect(out.injected).toBe(true);
     expect(out.changed).toBe(true);
-    expect(out.settings).toMatchObject({ origin: 'https://ood.example', hostname: 'ood.example', shell_host: 'default', site: 'ood' });
+    // 17.0.0: the site is the caller's (the deployment whose profile declares the portal), "" when none does: never read from the host name
+    expect(out.settings).toMatchObject({ origin: 'https://ood.example', hostname: 'ood.example', shell_host: 'default', site: '' });
+    const named = await connectSequence(fakeBrowser().api, { origin: 'https://ood.example', tabId: 7, granting: Promise.resolve(true), site: 'wayne' });
+    expect(named.settings.site).toBe('wayne');
     expect(b.calls.slice(0, 4)).toEqual(['register https://ood.example', 'save ood.example', 'forget-tab', 'ping 7']);
     expect(b.calls).toContain('inject 7');
     expect(b.calls.filter((c) => c === 'ping 7').length).toBeGreaterThan(2);

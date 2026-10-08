@@ -8,7 +8,7 @@
 // before the connection is called unanswered. The browser API is passed in, so the sequence is
 // tested against a fake. An Anthropic address is refused here, and by every caller before it asks
 // the browser for anything.
-import { siteFromHostname, type PortalSettings } from './keys';
+import type { PortalSettings } from './keys';
 import { PRODUCT_NAME } from './terms';
 
 export const SCRIPT_ID = 'beethoven-portal';
@@ -183,6 +183,12 @@ export interface ConnectInput {
   /** pings after an injection: how many and how far apart */
   pingTries?: number;
   pingGapMs?: number;
+  /**
+   * 17.0.0: the site whose own profile declares this portal (core/deployments.ts deploymentOfPortal),
+   * or "" when none this build carries does; stored only when the settings are new. Never a guess
+   * from the host name.
+   */
+  site?: string;
 }
 
 export async function connectSequence(api: ConnectApi, input: ConnectInput): Promise<ConnectOutcome> {
@@ -199,7 +205,7 @@ export async function connectSequence(api: ConnectApi, input: ConnectInput): Pro
   const same = previous?.origin === origin;
   const settings: PortalSettings = same
     ? previous
-    : { origin, hostname, connected_at: new Date().toISOString(), shell_host: 'default', site: siteFromHostname(hostname) };
+    : { origin, hostname, connected_at: new Date().toISOString(), shell_host: 'default', site: input.site ?? '' };
   if (!same) {
     await api.saveSettings(settings);
     await api.forgetTab();

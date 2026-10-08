@@ -55,7 +55,12 @@ export interface PortalSettings {
   connected_at: string;
   /** the Shell app host segment; "default" lets the portal pick */
   shell_host: string;
-  /** the site profile name handed to `hpcworker install --profile` and used in the session name */
+  /**
+   * The site profile name handed to `hpcworker install --profile` and used in the session name: the
+   * deployment whose own profile declares this portal (17.0.0, core/deployments.ts), or "" for a
+   * portal no bundled profile declares (then the account's own profile names the site, or nothing is
+   * typed). A record of 11.0.0 to 16.0.0 may carry a name guessed from the host name.
+   */
   site: string;
 }
 
@@ -284,24 +289,7 @@ export interface OldKeyNote {
 
 export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true, appearance: 'cream' };
 
-/**
- * 11.0.0: the portal the welcome page offers before anything is stored: the bundled site profile's
- * ood_base_url (public/profiles/wayne.json), as {origin, hostname}. PortalSettings is written only
- * when the student presses "Agree and continue" or "Use this portal" and Chrome grants the origin.
- */
-export function defaultPortalFrom(profile: { ood_base_url?: string; site?: string } | undefined): { origin: string; hostname: string; site: string } | undefined {
-  try {
-    const u = new URL(String(profile?.ood_base_url ?? ''));
-    if (u.protocol !== 'https:') return undefined;
-    return { origin: u.origin, hostname: u.hostname, site: profile?.site || siteFromHostname(u.hostname) };
-  } catch {
-    return undefined;
-  }
-}
-
-/** "ondemand.grid.wayne.edu" -> "wayne": the default site profile name */
-export function siteFromHostname(hostname: string): string {
-  const parts = String(hostname ?? '').toLowerCase().split('.').filter(Boolean);
-  if (parts.length >= 2) return (parts[parts.length - 2] ?? '').replace(/[^a-z0-9-]/g, '');
-  return parts[0] ?? 'site';
-}
+// 11.0.0's defaultPortalFrom (the bundled profile's portal as {origin, hostname, site}) and
+// siteFromHostname ("ondemand.grid.wayne.edu" -> "wayne", a guess) went in 17.0.0: the portal the
+// welcome page offers is the picked deployment's (core/deployments.ts portalOf), and the site stored
+// with a granted portal is the one whose own profile declares it (deploymentOfPortal), or none.
