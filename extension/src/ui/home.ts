@@ -23,9 +23,6 @@ export interface HomeCtx {
   tryIndex: number;
   setTryIndex: (i: number) => void;
   working?: string;
-  /** 12.0.0: the Grid row's "Unlock" (the passkey step inside the click) */
-  unlock?: () => void;
-  keyBusy?: 'protect' | 'unlock' | 'create';
 }
 
 function primary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
@@ -149,7 +146,7 @@ export function renderHome(h: HomeView, ctx: HomeCtx): HTMLElement {
     'section',
     { class: 'screen home', 'data-screen': 'home' },
     top,
-    statusCard(h.rows, WORDS.home.rows, ctx.onAct, ctx.pending, { unlock: ctx.unlock, unlocking: ctx.keyBusy === 'unlock' }),
+    statusCard(h.rows, WORDS.home.rows, ctx.onAct, ctx.pending),
     footRow(h, ctx),
     ctx.working ? el('p', { class: 'status', style: 'margin-top:8px' }, spinner(16), el('span', { text: ctx.working })) : null,
     tryAsking(h, ctx),

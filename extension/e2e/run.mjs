@@ -28,11 +28,7 @@ const SCENARIOS = {
   10: ['home-extras', './scenarios/10-home-extras.mjs'],
   11: ['queue-reasons', './scenarios/11-queue-reasons.mjs'],
   12: ['welcome-extras', './scenarios/12-welcome-extras.mjs'],
-  // 12.0.0, the direct way, against the local grid stand-in (lib/direct.mjs): not part of "all"
-  13: ['direct-first-run', './scenarios/13-direct-first-run.mjs'],
-  14: ['direct-passkey', './scenarios/14-direct-passkey.mjs'],
-  15: ['direct-no-helper', './scenarios/15-direct-no-helper.mjs'],
-  16: ['direct-door', './scenarios/16-direct-door.mjs'],
+  // 13 to 16 walked the direct way of 12.0.0 to 15.0.0 against a local grid stand-in; 16.0.0 removed it
 };
 
 const a = process.argv.slice(2);

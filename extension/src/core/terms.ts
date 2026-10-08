@@ -25,8 +25,8 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 10;
-export const TERMS_DATE = '2026-10-04';
+export const TERMS_VERSION = 11;
+export const TERMS_DATE = '2026-10-08';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Agree and continue';
@@ -246,6 +246,8 @@ export function bindAccount(r: TermsRecord, account: string, at = new Date().toI
  * when it is replaced) and is out of force: everyone accepts once more.
  * 15.0.0 (LICENSE version 10, PRIVACY version 11: the signed bridge installers for Windows and macOS):
  * a version 9 acceptance is kept in the history the same way and is out of force.
+ * 16.0.0 (LICENSE version 11, PRIVACY version 12: the direct way removed): a version 10 acceptance is
+ * kept in the history the same way and is out of force.
  */
 export function recordInForce(r: unknown): r is TermsRecord {
   const x = r as TermsRecord | undefined;

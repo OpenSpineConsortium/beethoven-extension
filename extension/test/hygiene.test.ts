@@ -15,7 +15,6 @@ import { LOG_WORDS, WORDS } from '../src/core/model';
 import { PRODUCT_NAME } from '../src/core/terms';
 import { FIXTURES, fixtureStrings } from '../src/ui/fixtures';
 import { LABELS } from '../src/ui/labels';
-import { WORDS12 } from '../src/ui/model12';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -40,13 +39,13 @@ describe('what the source must not contain', () => {
     expect(hits).toEqual([]);
   });
 
-  // 12.0.0: nativeMessaging, for the Beethoven bridge that comes inside the package (D1): the only host it
-  // can reach is com.openspineconsortium.beethoven.bridge, and only once the student has installed it
-  it('asks for exactly storage, alarms, scripting, sidePanel and nativeMessaging (no activeTab since 11.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
+  // 16.0.0: nativeMessaging went with the bridge (12.0.0 to 15.0.0); the one way to the grid is the portal
+  it('asks for exactly storage, alarms, scripting and sidePanel (no activeTab since 11.0.0, no nativeMessaging since 16.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
     const cfg = read(path.join(ROOT, 'wxt.config.ts'));
     const perms = /permissions:\s*\[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
     const named = [...perms.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(named.sort()).toEqual(['alarms', 'nativeMessaging', 'scripting', 'sidePanel', 'storage']);
+    expect(named.sort()).toEqual(['alarms', 'scripting', 'sidePanel', 'storage']);
+    expect(/'nativeMessaging'/.test(cfg)).toBe(false);
     expect(/'activeTab'/.test(perms)).toBe(false);
     expect(/'cookies'|"cookies"/.test(perms)).toBe(false);
     const hosts = /const hosts = \[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
@@ -74,8 +73,7 @@ describe('what the source must not contain', () => {
     const hits = SRC.filter((p) => /['"`]\/framework\/|files\.json|bundledFrameworkVersion/.test(read(p))).map(rel);
     expect(hits).toEqual([]);
     expect(existsSync(path.join(ROOT, 'scripts', 'sync-framework.mjs'))).toBe(false);
-    // hpcworker's pinned contract and its programs (framework/contract, contract-text, shared-copy, testbed) are
-    // for the tests; no line of code (comments may cite the contract's text) names one in a string, so no import
+    // hpcworker's pinned contract (framework/contract, contract-text) is for the tests; no line of code (comments may cite the contract's text) names one in a string, so no import
     // or read can carry one into the package
     const named = SRC.filter((p) => read(p).split('\n').some((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l) && /['"`][^'"`]*framework\//.test(l))).map(rel);
     expect(named).toEqual([]);
@@ -261,18 +259,10 @@ describe('the built package', () => {
       }
       if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
       // nothing beside the manifest, the pages, the scripts, the styles, the icons (11.0.0: and their lit variants), the
-      // profiles, the texts, the bundled fonts with their licences (9.0.0), the tour's copy of the site diagram (11.0.0),
-      // (12.0.0, D1) the Beethoven bridge's installers as zips with the manifest that names them, and (15.0.0) the
-      // maintainer's signed installers beside them, a .pkg for macOS and an .msi for Windows, when the build had them
-      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css)|bridge\/[A-Za-z0-9._-]+\.(?:zip|pkg|msi)|bridge\/manifest\.json)$/.test(n));
+      // profiles, the texts, the bundled fonts with their licences (9.0.0) and the tour's copy of the site diagram
+      // (11.0.0); since 16.0.0 no bridge/ (the installers of 12.0.0 to 15.0.0 went with the direct way)
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css))$/.test(n));
       expect(other, label).toEqual([]);
-      // 12.0.0: the bridge's manifest names only files that are there, each under bridge/ (a zip; 15.0.0: or a signed installer)
-      const bm = entries.find((e) => e.name === 'bridge/manifest.json');
-      if (bm) {
-        // the helper stream writes each entry's file as "name" (core/bridge.ts parseBridgeManifest also reads the older "file")
-        const m = JSON.parse(bm.bytes().toString('utf8')) as { files?: Array<{ name?: string; file?: string }> };
-        for (const f of m.files ?? []) expect(names, `${label} bridge/${f.name ?? f.file}`).toContain(`bridge/${f.name ?? f.file}`);
-      }
       // 11.0.0: what the pages need is there: the lit icons, the tour's diagram, the notices
       for (const need of ['icon/on-16.png', 'icon/on-32.png', 'icon/on-48.png', 'icon/on-128.png', 'icon/off-16.png', 'icon/off-32.png', 'icon/off-48.png', 'icon/off-128.png', 'tour/diagram.js', 'tour/diagram.css', 'THIRD_PARTY_NOTICES.md']) expect(names, `${label} ${need}`).toContain(need);
       // the GPU a student may use depends on their account: the diagram names none
@@ -340,7 +330,7 @@ describe('the words a student reads', () => {
   };
 
   it('the sentence tables hold none of the internal words', () => {
-    const all = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS), ...strings(WORDS12)];
+    const all = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS)];
     expect(all.length).toBeGreaterThan(200);
     expect(all.filter((t) => BANNED(t) && !ALLOWED.has(t))).toEqual([]);
     // the allow-list is exactly what it says: each allowed sentence is still in the tables
@@ -353,80 +343,37 @@ describe('the words a student reads', () => {
     expect(hits).toEqual([]);
   });
 
-  // 12.0.0: the direct way may tempt the machinery's words onto the student's screen. "ssh", "native
-  // messaging", "WebCrypto", "PRF", "authorized_keys" and the halves of a key pair never appear; "key",
-  // "helper" and "bridge" only in the sentences below, where no honest plainer word exists (the browser's
-  // key the student may protect; the setup key Google Authenticator itself asks for; the helper the
-  // student downloads and its status; the Beethoven bridge by name). A new sentence with one of them
-  // fails here until it is reviewed and named. Details for the lab lead is exempt, as for the rest.
+  // 16.0.0: the direct way is gone, and with it every reason for the machinery's words to reach the screen.
+  // "ssh", "native messaging", "WebCrypto", "PRF", "authorized_keys" and the halves of a key pair never
+  // appear; "key", "helper" and "bridge" only in the sentences below, where no honest plainer word exists
+  // (the one-time key step the student runs in the portal's own terminal; Settings' note on a key an
+  // earlier version put in the grid account). A new sentence with one of them fails here until it is
+  // reviewed and named. Details for the lab lead is exempt, as for the rest.
   const NEVER = (t: string) => /\bssh\b|native messaging|webcrypto|\bprf\b|authorized_keys|public key|private key|key ?pair/i.test(t);
   const RESTRICTED = (t: string) => /\b(keys?|helpers?|bridges?)\b/i.test(t);
-  const D = WORDS.direct;
   const RESTRICTED_OK = new Set<string>([
     // 11.0.0's one-time terminal step
     WORDS.loginSetup.lineExplain,
-    // the helper the student downloads (the core's words)
-    D.installHelper.body,
-    D.installHelper.unsignedNote,
-    D.installHelper.checking,
-    D.installHelper.found,
-    D.installHelper.broken,
-    D.installHelper.noDownload,
-    // the browser's key and its opt-in protection
-    D.signin.checking,
-    D.signin.keyNotTaken,
-    D.signin.unlockBody,
-    D.protectKey.title,
-    D.protectKey.unsupported,
-    D.settings.protectKey,
-    D.settings.forgetNote,
-    D.settings.helper,
-    D.settings.keyNone,
-    D.settings.keyPlain,
-    D.settings.keyProtected,
-    LOG_WORDS.keyProtected,
-    LOG_WORDS.keyUnprotected,
-    // fixer A (12.0.0 reviews): the installers' own last sentence names the Beethoven bridge; the helper is waited for
-    D.installHelper.steps.windows[2],
-    D.installHelper.steps.mac[2],
-    D.installHelper.steps.linux[2],
-    String(D.installHelper.stepsNamed.windows('st1234')),
-    String(D.installHelper.stepsNamed.mac('st1234')),
-    String(D.installHelper.stepsNamed.linux('st1234')),
-    D.installHelper.waiting,
-    // 15.0.0: the signed installer's first step on Windows names the Beethoven bridge (the contract's sentence); the
-    // Mac's steps and the signed note use no restricted word
-    D.installHelper.installerSteps.windows![0]!,
-    // 15.0.0: the folder of the script helper of 14.0.0 and earlier, removed before the signed installer on Windows
-    String(D.settings.helperScriptFirst('st1234')),
-    // the browser's key: what the grid did with it, what this browser could not do, the later protection, Forget
-    D.signin.wrongGrid,
-    D.signin.keyNotTakenTitle,
-    D.signin.keyStoreTitle,
-    D.signin.keyStore,
-    D.protectKey.titleOn,
-    D.protectKey.notOff,
-    D.settings.protectLaterNote,
-    D.settings.forgottenHere,
-    D.settings.forgetLocked,
-    // the gate's caps, after a Connect on the direct way
-    D.gate.names,
-    D.gate.hourly,
-    // Google Authenticator's own "Enter a setup key"
-    D.codeSetup.phoneSteps[3],
-    WORDS12.routes.phoneNoKey,
-    WORDS12.routes.never,
+    // 16.0.0: the key an earlier version added, as strings() reads the table (a sentence function gets 'st1234')
+    WORDS.settings.oldKey,
+    WORDS.settings.oldKeyNote('st1234'),
   ]);
+  // the same note with the date the page (and a fixture) gives it
+  const OLD_KEY_NOTE = (t: string) => {
+    const date = /\((\d{4}-\d{2}-\d{2})\)/.exec(t)?.[1];
+    return !!date && t === WORDS.settings.oldKeyNote(date);
+  };
 
-  it("the sentence tables and every fixture keep 12.0.0's machinery off the screen, and key, helper and bridge to the named sentences", () => {
-    const tables = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS), ...strings(WORDS12)];
+  it('the sentence tables and every fixture keep the machinery off the screen, and key, helper and bridge to the named sentences', () => {
+    const tables = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS)];
     const shown = [...tables, ...FIXTURES.flatMap((f) => fixtureStrings(f))];
     expect(shown.filter(NEVER)).toEqual([]);
-    expect([...new Set(shown.filter((t) => RESTRICTED(t) && !RESTRICTED_OK.has(t)))]).toEqual([]);
+    expect([...new Set(shown.filter((t) => RESTRICTED(t) && !RESTRICTED_OK.has(t) && !OLD_KEY_NOTE(t)))]).toEqual([]);
     // the list is exactly what it says: each named sentence still has its word, and is still in the tables
     for (const t of RESTRICTED_OK) {
       expect(RESTRICTED(t), t).toBe(true);
       expect(tables, t).toContain(t);
     }
+    expect(shown.some(OLD_KEY_NOTE)).toBe(true);
   });
 });

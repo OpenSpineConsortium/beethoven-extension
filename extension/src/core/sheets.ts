@@ -6,7 +6,7 @@ import { LOGIN_SETUP_PROVEN, type SiteProfile, type StatusFile } from './contrac
 import { DEBUG_DETAILS_LINES } from './debuglog';
 import type { NodeReport } from './diagnostics';
 import type { RunState } from './facts';
-import type { Appearance, ChannelNote, PortalSettings, Prefs } from './keys';
+import type { Appearance, ChannelNote, OldKeyNote, PortalSettings, Prefs } from './keys';
 import { WORDS, type ButtonView, type DetailsView, type SettingsView } from './model';
 import { recordText, type TermsRecord } from './terms';
 
@@ -85,6 +85,8 @@ export interface SettingsInput {
   installId?: string;
   /** the bundled default portal's hostname, for the Change field when no portal is stored */
   defaultHostname?: string;
+  /** 16.0.0: the note an earlier version's key left (keys.ts OldKeyNote), while it stands */
+  oldKey?: OldKeyNote;
 }
 
 export function settingsView(i: SettingsInput): SettingsView {
@@ -115,5 +117,6 @@ export function settingsView(i: SettingsInput): SettingsView {
     activity: { show: S.show, export: S.export, clear: S.clear, count: i.auditCount },
     drive: { title: S.drive, connected: i.driveConnected },
     labLead: { title: S.labLead, shellHost: i.settings?.shell_host ?? 'default', siteProfile: i.settings?.site ?? '', hashes: i.hashes },
+    ...(i.oldKey ? { oldKey: { title: S.oldKey, text: S.oldKeyNote((i.oldKey.enrolled_at ?? i.oldKey.noted_at).slice(0, 10)), forget: { label: S.oldKeyForget, tone: 'text', action: { kind: 'forget-old-key' } } } } : {}),
   };
 }

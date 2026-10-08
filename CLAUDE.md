@@ -64,16 +64,13 @@ name and identifier carry no university name.
   working and stays.
 - **Tokens and secrets never appear on command lines, in argv, in logs, in job files or in
   `sbatch --export`.** Never echo one. The per-job token is a mode-0600 file.
-- **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's only
-  content script runs on the one Open OnDemand origin the student grants at click time. Never request
-  `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger` or
-  `identity`, and never any `claude.ai`, `anthropic.com` or `claude.com` origin. Since 12.0.0 the
-  extension requests `nativeMessaging` for one host only, its own bundled bridge
-  (`com.openspineconsortium.beethoven.bridge`), which carries bytes to the grid's ssh port and nothing
-  else (Greg's decision, 2026-10-02). On the direct way the student types the grid password and
-  one-time code into Beethoven's own sign-in sheet; they go only to the grid inside the encrypted ssh
-  session, are never stored or logged, and the sheet never offers to remember them. No automated
-  login of the portal; the university's sign-in pages are never filled in.
+- **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's
+  only content script runs on the one Open OnDemand origin the student grants at click time. Never
+  request `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
+  `debugger`, `identity` or `nativeMessaging` (requested from 12.0.0 to 15.0.0 for the bundled
+  bridge of the direct way, which 16.0.0 removed whole; see the bullet below), and never any
+  `claude.ai`, `anthropic.com` or `claude.com` origin. No automated login of the portal; the
+  university's sign-in pages are never filled in.
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
   refuses only on a verified revocation. Since 4.0.0 the list withdraws versions only.
@@ -101,38 +98,30 @@ name and identifier carry no university name.
 - **One store, one private listing (decided 2026-09-30, 8.0.0).** Beethoven is offered only as a
   Private item on the Chrome Web Store whose trusted testers are the maintainer's Google Group of
   approved students (`docs/store/SUBMISSION.md`). No Edge, Firefox or Safari listing, no download on
-  the website or for students anywhere else. The only signed files are the bridge's two installers
-  (`beethoven-bridge-mac.pkg`, `beethoven-bridge-windows.msi`, since 15.0.0), which travel inside
-  the extension's package and are never put on the website. The Firefox build script stays because
-  the code builds for it; nothing submits it.
-- **Signed bridge installers, built only on the maintainer's Mac (decided 2026-10-04, 15.0.0).** On
-  Windows and macOS the bridge a student installs is the binary edition (`helper/src/rust`, helper
-  1.0.0, protocol 1, its hello `"kind":"binary","runtime":"rust"`) in a signed, per-user installer
-  that asks for no administrator: `beethoven-bridge-mac.pkg`, a universal binary (aarch64 and x86_64
-  joined with `lipo`) codesigned with a Developer ID Application identity, the hardened runtime and a
-  timestamp, in an installer package signed with a Developer ID Installer identity, notarized
-  (`xcrun notarytool submit --keychain-profile <name> --wait`) and stapled, which installs into the
-  user's home only; and `beethoven-bridge-windows.msi`, x64, per-user, the exe and then the MSI
-  Authenticode-signed through Azure Artifact Signing (formerly Trusted Signing), removed from
-  Settings, Apps. One command on the maintainer's Mac, `helper/release/release.sh`, builds and signs
-  both, merges them into the package and uploads it to the store: the `.msi` there is built with
-  Rust's `x86_64-pc-windows-gnu` target and msitools' `wixl` from `bridge.wxs` and signed with jsign
-  on the maintainer's own `az login`. A Windows machine is the fallback for the `.msi` only
-  (`helper/release/windows/build-msi.ps1`: the msvc target with the C runtime linked in, WiX v5 from
-  `Package.wxs`, `signtool`). The packages and their sidecar records go to `helper/signed/`
-  (gitignored), and only `node helper/build.mjs --store-id <id>` or `--signed <dir>` copies each
-  verified package into `extension/public/bridge/` and lists it in its `manifest.json`; a plain build
-  leaves `helper/signed/` out. Identities, certificates, keychain profiles, account names, the store
-  item and publisher IDs, tokens and key files never enter the repository or CI: the names live in
-  `release.json` in the vendor folder (Mac route) or the gitignored
-  `helper/release/windows/signing.json` (fallback; example files of both are committed), the
-  sign-ins are the maintainer's own (Apple keychain, Entra, the store upload's Google sign-in),
-  never a key file, and CI keeps building unsigned binaries for maintainers only. The release bakes
-  `allowed_origins` for the Chrome Web Store item into each installer, so only the store item is
-  offered them; a development build, whose identifier they do not name, gets the script zips, and
-  Linux stays a script run by Perl or Python 3 in its zip. A script helper installed from a zip by
-  14.0.0 or earlier keeps working. Nothing of this has been built, signed, notarized or opened on a
-  real Mac or Windows machine yet: not yet measured.
+  the website or for students anywhere else. No signed file: since 16.0.0 the package carries no
+  installer (15.0.0's two signed bridge installers went with the bridge). The Firefox build script
+  stays because the code builds for it; nothing submits it.
+- **The direct way is gone (decided 2026-10-08, 16.0.0).** From 12.0.0 to 15.0.0 the extension first
+  tried ssh to the login node with no VPN, through a native-messaging bridge bundled in the package
+  (from 15.0.0 as signed, per-user installers for Windows and macOS, built and signed on the
+  maintainer's Mac by one command), with a sign-in sheet for the grid password and one-time code, a
+  key in the browser and one gate line in the grid account, and fell back to the portal. greg
+  removed it whole (his card answer "Remove", 2026-10-08 17:52Z, after his message of 15:30Z): the
+  extension cannot do it without a program outside the browser, and a student with the VPN has the
+  portal. Nothing of it is in the tree (`helper/`, `extension/src/ssh/`, `public/bridge/`, the two
+  program exports, the browser harness's direct-way lane, their tests); `docs/V12_CONTRACT.md`,
+  `docs/V12_STATUS.md`, `docs/BRIDGE_TRANSPORT.md`, `docs/TEXTS_V9_V10.md` and
+  `docs/TEXTS_V10_V11.md` stay as history, and `release/14.0.0/bridge/SHA256SUMS.txt` as a record.
+  The one way is the university's VPN and the portal, and the panel recommends only it: the welcome
+  page lists three needs with their pages; a press made while the grid is out of reach waits on the
+  GlobalProtect step ("Beethoven carries on by itself as soon as the grid answers.", with the
+  profile's `vpn_help_url` linked) and goes ahead by itself once the grid answers (reach re-checked
+  every 3 s with a page open, once a minute without one, never a sign-in tab from the alarm); "Keep
+  my worker running" also covers a run read as ended, at most three times; Settings note once, with
+  *Forget*, a key an earlier version put in the grid account (`bridge.oldKey`), and nothing on the
+  grid is ever touched for it; the first run after the update removes the direct way's storage and
+  deletes its key unread (`cleanupDirectWay`). The 11.0.0 one-time login-setup step on the portal's
+  terminal page stays.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
   action; no container command on the login node and nothing of ours under its `/tmp`; container
   temp and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne
@@ -168,24 +157,25 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-04 and extension 15.0.0 `LICENSE.txt` is version 10 and `PRIVACY.md`
-  version 11, which describe 15.0.0's bridge: on Windows and macOS a compiled program of Licensor's,
-  offered from inside the package as a signed installer, installed in the student's own account
-  without administrator rights and removed through Windows' Apps list or `uninstall.command`, with
-  the Rust standard library's notice in `THIRD_PARTY_NOTICES.md`; on Linux the script as before; the
-  operating system's own signature check, which tells Licensor nothing. That sits on top of version
-  9 and 10 (12.0.0: the direct way over ssh through the bridge, the sign-in sheet, the browser's key
-  and its gate line, Forget this computer), version 8 and 9 (11.0.0's first run: one tick with "Show
-  terms" optional, no scroll gate; the grid sign-in in the browser's own box; the one-time grid key
-  step; the acceptance history and the installation identifier in Settings), and version 7 and 8,
-  which added the shared copy as the only install, one installation per approved account with the
+  Edition; since 2026-10-08 and extension 16.0.0 `LICENSE.txt` is version 11 and `PRIVACY.md`
+  version 12, which describe the one way (the university's VPN and the portal; no bridge, no sign-in
+  sheet, no key in the browser), what an earlier version may have left (the bridge on the computer,
+  the gate line in the grid account, a passkey; `hpcworker browser-key remove` or the lab lead
+  removes the line) and 16.0.0's waiting press, keep-running and old-key note;
+  `THIRD_PARTY_NOTICES.md` lost the bridge's two notices with it. They replace version 10 and 11
+  (15.0.0: the bridge as a compiled program of Licensor's in signed installers) and version 9 and 10
+  (12.0.0: the direct way over ssh through the bridge, the sign-in sheet, the browser's key and its
+  gate line, Forget this computer), version 8 and 9 (11.0.0's first run: one tick with "Show terms"
+  optional, no scroll gate; the grid sign-in in the browser's own box; the one-time grid key step;
+  the acceptance history and the installation identifier in Settings), and version 7 and 8, which
+  added the shared copy as the only install, one installation per approved account with the
   installation identifier in the approval check, the request page's Google account, purpose,
   optional CV (deleted twelve months after the decision) and mailbox confirmation, and the private
   Chrome Web Store listing as the only channel; both describe the software as built (no keys; the
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 10 to match, with `TERMS_DATE` 2026-10-04; the framework's
+  `extension/src/core/terms.ts` is 11 to match, with `TERMS_DATE` 2026-10-08; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and
@@ -327,28 +317,24 @@ form.
 ## This repository (the split, 2026-10-03)
 
 This is the **client half** of the split of `OpenSpineConsortium/beethoven`: `extension/` (the
-Beethoven browser extension), `helper/` (the bundled native-messaging bridge) and `release/` (the
-store packages). The **server half** — `framework/` (hpcworker) and the maintainer's tools — lives
-in `OpenSpineConsortium/hpcworker`. The original repository remains as the history up to the split;
-new work goes here.
+Beethoven browser extension) and `release/` (the store packages). The **server half** — `framework/`
+(hpcworker) and the maintainer's tools — lives in `OpenSpineConsortium/hpcworker`. The original
+repository remains as the history up to the split; new work goes here.
 
-The seam between the two is the contract, not a checkout: `extension/src/core/contract.ts` reads
-the files and lines the cluster side writes, as the server repository publishes them in its export
+The seam between the two is the contract, not a checkout: `extension/src/core/contract.ts` reads the
+files and lines the cluster side writes, as the server repository publishes them in its export
 `contract`, pinned here in `framework/contract/` (with `contract-text`, the prose of
-`V11_CONTRACT.md` and `V12_CONTRACT.md`, in `framework/contract-text/`); `extension/test/conformance.test.ts`
-holds the code to it and runs every vector through the real readers. A change to what the cluster
-side writes is made in the server repository first and reaches here as a new pin, with the readers
-and their tests changed in the same pull request. Every pinned folder has an `ORIGIN` and
-is taken only by `bash interface/pull.sh` (`interface/README.md`): `framework/profiles/`, the site
-profiles **as data** for `extension/scripts/sync-profiles.mjs`, the only server-side files that enter
-the package; `framework/contract/` and `framework/contract-text/`, read by tests and people only; and
-`framework/shared-copy/` and `framework/testbed/`, the framework and its fake scheduler for the opt-in
-direct-way lane, which git ignores but for their `ORIGIN`. Since 8.0.0 nothing else of the cluster
-side may enter the package.
+`V11_CONTRACT.md` and `V12_CONTRACT.md`, in `framework/contract-text/`);
+`extension/test/conformance.test.ts` holds the code to it and runs every vector through the real
+readers. A change to what the cluster side writes is made in the server repository first and reaches
+here as a new pin, with the readers and their tests changed in the same pull request. Every pinned
+folder has an `ORIGIN` and is taken only by `bash interface/pull.sh` (`interface/README.md`):
+`framework/profiles/`, the site profiles **as data** for `extension/scripts/sync-profiles.mjs`, the
+only server-side files that enter the package; `framework/contract/` and `framework/contract-text/`,
+read by tests and people only. Since 8.0.0 nothing else of the cluster side may enter the package.
 
 CI (`.github/workflows/ci.yml`) runs the whole client suite hermetically on ubuntu: typecheck,
-vitest with the ssh tests against the python/asyncssh grid stand-in, the mock portal's full
-selftest with Playwright's Chromium for the terminal section, and a chrome build uploaded as an
-artifact. No secrets exist in this repository and the workflow needs none; the browser e2e harness
-(`extension/e2e/run.mjs`) stays a maintainer's tool, since its Chrome-native moments need Windows UIA
-(headless on a cluster node: `E2E_HEADLESS=1`).
+vitest, the mock portal's full selftest with Playwright's Chromium for the terminal section, and a
+chrome build uploaded as an artifact. No secrets exist in this repository and the workflow needs
+none; the browser e2e harness (`extension/e2e/run.mjs`) stays a maintainer's tool, since its
+Chrome-native moments need Windows UIA (headless on a cluster node: `E2E_HEADLESS=1`).

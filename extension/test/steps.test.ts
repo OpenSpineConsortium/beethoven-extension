@@ -498,9 +498,9 @@ describe('the panel', () => {
     expect(panelView(facts({ statement: { inForce: false }, grid: { session: 'signed-out' }, run: run({ phase: 'stopped', live: false }) })).kind).toBe('home');
   });
 
-  it('a press while the grid cannot be reached opens no sign-in moment; the home says it cannot reach the grid', () => {
+  it('16.0.0: a press while the grid cannot be reached waits on GlobalProtect (15.0.0 dropped it to the home), and says so', () => {
     const v = panelView(facts({ grid: { reach: 'no-route', session: 'unreachable' }, press: { kind: 'connect', at: ago(1) } }));
-    expect(v.kind).toBe('home');
+    expect(v.kind === 'journey' && v.journey.moment === 'globalprotect' ? v.journey.note : undefined).toBe('Beethoven carries on by itself as soon as the grid answers.');
   });
 });
 

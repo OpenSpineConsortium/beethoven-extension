@@ -8,9 +8,7 @@
 #   bash interface/pull.sh [--ref REF] FOLDER...    from GitHub through gh and your own sign-in (REF: main)
 #   bash interface/pull.sh --at-origin FOLDER...    again the files each FOLDER's ORIGIN records, at its commit
 #
-# FOLDER is an import's "into": framework/profiles, framework/contract, framework/contract-text, and the
-# two programs only the direct-way lane runs, framework/shared-copy and framework/testbed (git ignores
-# their files and keeps their ORIGIN, so a maintainer fetches them with --at-origin before that lane).
+# FOLDER is an import's "into": framework/profiles, framework/contract or framework/contract-text.
 # REF must be a commit the provider's default branch contains (a merged change, never a pull request's
 # branch). Only the files the provider's interface/INTERFACE.json lists under the export at that commit
 # are taken, at the version the import names, each to its path below the folder the export's paths share

@@ -1,5 +1,10 @@
 # Beethoven 12.0.0 and framework 11: where the build stands
 
+**16.0.0 (2026-10-08).** This record describes 12.0.0 to 14.0.0, whose direct way (the bridge, the
+sign-in sheet, the browser key, the gate) 16.0.0 removed whole; it is history, and nothing it names under
+`helper/`, `extension/src/ssh/` or the direct-way lane of the browser harness is in the tree. The one way
+is the university's VPN and the portal (`ARCHITECTURE.md`).
+
 2026-10-02, after the build streams, the four reviews, the fix passes and the final assembly (section
 3.7). **Nothing here was run against
 the Wayne State grid with a sign-in.** The build's only contacts with `grid.wayne.edu:22` were three

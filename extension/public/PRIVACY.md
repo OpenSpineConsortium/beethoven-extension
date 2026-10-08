@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 11, 2026-10-04. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 12, 2026-10-08. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -9,31 +9,26 @@ Beethoven. Questions and requests: the notice address on the support page at
 `https://openspineconsortium.com/beethoven/support.html`. Beethoven is licensed to individuals; it
 is not provided by or on behalf of any school, and Licensor is not acting for one.
 
-Beethoven is a browser extension that starts, watches and stops a job in your own cluster account,
-over a secure shell (ssh) connection to your cluster's login node (the ssh path, which it tries
-first) or through your university's Open OnDemand portal (the portal path); a small helper program,
-the Bridge, that ships inside the extension and that you may install on your computer to carry the
-ssh connection; and a set of scripts (the framework) that runs in your cluster account. The job runs
-Claude Code, which you signed in to yourself. This statement says what stays in your browser, what
-the Bridge does on your computer, what happens when you sign in to your cluster over ssh, what goes
-to your cluster account, what your university sees on the ssh path, what your portal sees, what
-happens when you sign in to Claude and when the portal's shell asks for your password, what
-Anthropic receives, what Licensor receives, and what is never collected. The ssh path and the Bridge
-came with Beethoven 12.0.0; they have been tried mostly against ssh servers Licensor ran itself, set
-up like your university's, and have had little use yet with real accounts on a real cluster. The
-signed installers of the Bridge for Windows and macOS, new in Beethoven 15.0.0, have not yet been
-opened on a real Windows computer or Mac.
+Beethoven is a browser extension that starts, watches and stops a job in your own cluster account
+through your university's Open OnDemand portal, in the browser session you have signed in to there,
+and a set of scripts (the framework) that runs in your cluster account. The job runs Claude Code,
+which you signed in to yourself. This statement says what stays in your browser, what an earlier
+version of Beethoven may have left on your computer and in your cluster account, what goes to your
+cluster account, what your portal sees, what happens when you sign in to Claude and when the
+portal's shell asks for your password, what Anthropic receives, what Licensor receives, and what is
+never collected. Beethoven 12.0.0 to 15.0.0 also reached your cluster over a secure shell (ssh)
+connection carried by a helper program on your computer, the Bridge, after a sign-in on a sheet of
+the extension's own; this version has none of that, reaches your cluster only through your portal,
+and never asks for your cluster password.
 
 ## What stays in your browser
 
 | Data | Where | Why | You control it by |
 |---|---|---|---|
 | The portal address (your university's, filled in from the site profile, or one you typed), and the one website you granted the extension access to | the extension's own storage (`storage.local`) | to reach your portal | Settings (in the panel's *More* menu); removing the site permission in your browser; uninstalling |
-| Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched), your appearance choice, and how Beethoven reaches the grid (*Direct when possible*, the default, or *GlobalProtect only*, under *Connection*) | `storage.local` | convenience | Settings |
-| The account name your cluster confirmed when you signed in (the name your portal's dashboard showed for your session, or, on the ssh path, the name you typed into the sign-in sheet once your cluster accepted it, or the name your cluster reported for a sign-in with the browser's key), and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (your account is set up on another installation; this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
-| The browser's key for the ssh path: a key pair the extension makes the first time you sign in over ssh, stored only encrypted: by default under a second key that the browser keeps and lets no page or script copy out, or, if you turn on the protection in the next row, under a secret only your passkey releases; with it its public half, the account it was added for, and when it was made and added | the extension's own database in your browser profile (IndexedDB) | so that later connections sign in without your password or code. The second key is kept beside the key, in the same browser files: anyone who could copy your browser profile's files could use the key, and so could Beethoven's own code, within its line's limits (below); no website and no other extension can | *Forget this computer* in Settings, which also asks your cluster to remove the key's line; uninstalling deletes the key but leaves the line on your cluster, so use *Forget this computer* first |
-| Only if you turn on *Protect my key with Windows Hello / Touch ID* (off unless you do): beside the key above, the passkey's identifier and the random values used with it. The passkey itself is kept by Windows Hello, your Mac's keychain or your browser's password manager (which may keep it in your Google account), not by the extension, under the name Beethoven, with your AccessID as its user name once Beethoven knows it | the extension's own database in your browser profile | so that the stored key is useless until you unlock it with your fingerprint, face, PIN or password, once each time you open the browser. Turned on after the key was made, it protects the key from then on; until the browser tidies its database, its files may still hold the earlier, unprotected form, so to have the protection from the start, tick it on the sign-in sheet | turning it off in Settings; *Forget this computer*, which also asks your passkey store to drop the passkey (not every store does); the passkey itself, in your system's or your browser's list of passkeys |
-| The direct way on this computer: the account name your cluster accepted and when, when this computer's key was added and its fingerprint, whether you chose *Use GlobalProtect instead*, and which of its one-time screens you have answered (*Protect the key on this computer?*, *This computer is set up.*, and the screen that says Beethoven is using GlobalProtect) | `storage.local` | so the panel takes the way you chose and does not ask again | *Forget this computer*; uninstalling |
+| Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched) and your appearance choice | `storage.local` | convenience | Settings |
+| The account name your portal's dashboard showed for the session you signed in to, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (your account is set up on another installation; this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
+| Only if an earlier version of Beethoven added a key for this computer to your grid account: a note of that, kept once from that version's record on the first run after the update: the account name it recorded, the key's fingerprint, when the key was added, and when the note was written (never the key itself, which is deleted unread) | `storage.local` | so Settings can tell you once that the key is there and that your lab lead can remove it | *Forget* beside that note in Settings (which removes the note and nothing on the grid); uninstalling |
 | Your acceptance of the agreement: its version and date, the hashes of the agreement and of this statement as shown, the four-line summary and the sentence shown with the box, that you ticked it, the label of the button, whether you opened the full text and whether you scrolled it to its end, opened it in a tab, saved it or printed it, the time, the version of Beethoven, your browser and the installation identifier, and your account name with the time it was seen, added once your portal first shows it after you agree; an acceptance made with an earlier version of Beethoven is kept beside it, out of force | `storage.local`, with a copy you can save from Settings (*Save your acceptance record*, shown with the installation identifier) | to prove the agreement and its terms, for you and for Licensor | it is yours to read, copy and print; uninstalling removes it |
 | Your statement about a worker's workspace, made with the box you tick in the panel before your first worker starts: that you will keep FERPA, IRB, health and export-controlled data out of it, and that Remote Control is turned on for that worker; kept as the workspace name, the sentence and the lines shown with their version, the label of the button, the time, and the time the framework reported writing the marker below, one record per workspace | `storage.local` | so you are not asked to tick it again for the same workspace (a one-line reminder sits beside *Connect* each time) | making it again for a workspace in the panel; uninstalling. It is asked again when the text or the workspace changes |
 | A note of the check job submitted from *Details* (the time and the job number), so it is not submitted again while it runs | `storage.local` | so that step does not repeat itself | uninstalling |
@@ -44,145 +39,71 @@ opened on a real Windows computer or Mac.
 | How the extension reaches your portal (directly from its background, or through a tab it opens), and whether the portal's shell opened without asking for a password, with the time this was last tested | `storage.local` | so it uses the way that works without testing again before every action | uninstalling |
 | Small notes for the panel: how long your last five waits for a computer took, in minutes ("Last time: 6 min."); whether the tour was seen, and to its end; when your worker was first seen online in this browser (*Try asking* shows for three days from then), whether the tour began playing below your first wait, and which one-time tips you have seen or dismissed (pinning the toolbar button, *Try asking*, the tour card, the *New session* tip), with when | `storage.local` | so the panel can tell you what to expect and does not repeat itself | uninstalling |
 | Connection state during this browser session: the worker's name and its folder on the cluster, the job number, what the worker's files last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record, the grid's reason for the wait and its estimate, and when it was asked for, got a computer and came online), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it) and the last lines of its progress log; whether your portal answers and whether you are signed in to it, with the account name it showed and when this was checked; a press that waits until the grid can carry it; the tabs the extension opened itself (the grid sign-in tab, Anthropic's sign-in tab, your claude.ai tab, the portal's terminal tab for the one-time step, and, on a portal that does not share its sign-in, the portal tab it works through), so it can close them or bring them forward; that you pressed *Agree and continue* on the welcome page, for a few minutes, so the panel opening beside it can say what is happening; how far your computer's clock is from the grid's, so the panel's clocks agree with the grid's; and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
-| What the last check of the ways to reach your cluster found: whether a browser-only bridge, a relay or the Bridge is available (in this version only the Bridge can be), the Bridge's version, system and kind as it reported them, and whether your cluster's ssh port answered with the identity your university's site profile names, with the time; while you set up a verification code, which route you chose; for the account name you typed into the sign-in sheet, how many sign-ins in a row your cluster refused and when the last one was, so that after three the sheet waits fifteen minutes before it asks your cluster again (never what you typed); and, only while your key is protected by a passkey and you have unlocked it in this browser session, the secret your passkey released to open it | `storage.session`, cleared when the browser closes | to use the first way that works, to show you the right steps, and to ask for Windows Hello or Touch ID only once each time you open the browser | closing the browser |
 | A plain-words list of what the extension did in this browser session, for *Show log* (for example, that you signed in to the grid and as which account, that you were approved, and the plan you signed in to Claude with), at most 200 lines | `storage.session`, cleared when the browser closes | so *Show log* can say what happened, beside your worker's own progress log | closing the browser; *Copy log* copies it only when you press it |
-| The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome), and one line per command it sent over the ssh path (time, the command's name, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed, your cluster password and your verification code are never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and under *Activity* in Settings (show, export, clear); it is never transmitted |
+| The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed is never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and under *Activity* in Settings (show, export, clear); it is never transmitted |
 
-The one durable secret in the extension's storage is the browser's key for the ssh path (above),
-whose line in your cluster account lets it run only the gate described below; there is no key of
-Licensor's, and your own sign-in to your cluster identifies you. The one-time step of the portal
-path, below, makes a key in your cluster account, never in your browser. The extension never reads
-your portal's sign-in: your browser attaches the sign-in it holds (a cookie, or the sign-in it keeps
-after you type into its own box) to requests to that one website, the extension's own background
-requests included, until the browser closes. Before you agree to the terms, the extension sends
-nothing anywhere. After you agree, it opens a connection to your cluster's ssh port, through the
-Bridge, only to check that it can reach your cluster, to sign in, or to do what you pressed; and it
-asks your portal's address whether it answers, with requests that carry no sign-in or cookie and
-from which it learns only whether an answer came: once when you agree, every three seconds while it
-waits for you to turn on your VPN (GlobalProtect at Wayne State), and when you press *Try again*.
-The one thing it reads about you from the portal is the account name the portal's own dashboard page
-shows for your session. On the ssh path your account name is the one you type into the sign-in
-sheet, and it counts only once your cluster has accepted the sign-in made with it. The extension
-never reads, stores, copies or relays a Claude credential: Claude Code keeps its own sign-in in your
-cluster account, and the framework reads only Claude Code's own report of whether it is signed in,
-with the account and plan that report names. The extension writes to your clipboard only when you
-press a *Copy* button and when you open the portal's terminal for the one-time step below, to put
-its one line there; it never reads your clipboard. The QR codes are drawn on your device: your
-session's link, for your phone, and, on the welcome page, under *What you need* and on the phone
-route below, the addresses of your university's instructions and of the app stores' pages for
-GlobalProtect and Google Authenticator, each printed under its code; the tour is drawn from files in
-the extension's package. Nothing is fetched or sent to show them.
+There is no durable secret in the extension's storage: there is no key of Licensor's, and your own
+sign-in to your cluster identifies you. The one-time step below, for when the portal's shell asks
+for your password, makes a key in your cluster account, never in your browser. The extension never
+reads your portal's sign-in: your browser attaches the sign-in it holds (a cookie, or the sign-in it
+keeps after you type into its own box) to requests to that one website, the extension's own
+background requests included, until the browser closes. Before you agree to the terms, the extension
+sends nothing anywhere. After you agree, it asks your portal's address whether it answers, with
+requests that carry no sign-in or cookie and from which it learns only whether an answer came: once
+when you agree; every three seconds while a page of Beethoven's is open and the grid is out of
+reach, which is while it waits for you to turn on your VPN (GlobalProtect at Wayne State) on the
+first run, and later whenever a press of yours waits for the grid; once a minute while no page of
+Beethoven's is open and the grid was last out of reach, so that a press you made, and *Keep my
+worker running*, go ahead by themselves once the grid answers; and when you press *Try again*. The
+one thing it reads about you from the portal is the account name the portal's own dashboard page
+shows for your session. The extension never reads, stores, copies or relays a Claude credential:
+Claude Code keeps its own sign-in in your cluster account, and the framework reads only Claude
+Code's own report of whether it is signed in, with the account and plan that report names. The
+extension writes to your clipboard only when you press a *Copy* button and when you open the
+portal's terminal for the one-time step below, to put its one line there; it never reads your
+clipboard. The one QR code, your session's link for your phone, is drawn on your device, and the
+tour is drawn from files in the extension's package; nothing is fetched or sent to show them. The
+welcome page's links to your university's pages about its accounts and its VPN and to Anthropic's
+plans page, and the link to your university's VPN page on the screen that asks you to turn on your
+VPN, open those pages in a new tab only when you choose them, as a bookmark would: the extension
+learns nothing of your visit, and those websites see it as they see any visit.
 
-## The Bridge on your computer
+## What an earlier version may have left
 
-The ssh path needs a program on your computer, because a browser extension cannot open an ssh
-connection itself. The Bridge, which the extension's screens call the helper, is that program. It
-ships inside the extension's package, and the extension offers its installer from there: nothing is
-downloaded from Licensor or anyone else. You save the installer and open it once, in your own user
-account; it needs no administrator rights. What the Bridge is depends on your system:
+Beethoven 12.0.0 to 15.0.0 offered a direct way to your cluster: an ssh connection carried by the
+Bridge, a helper program you installed on your computer; a sign-in on the extension's own sheet with
+your account name, cluster password and verification code; a key made in your browser, admitted to
+your cluster account by one restricted line; and, if you chose it, a passkey to protect that key.
+This version has none of it. On its first run after the update, the extension removes from your
+browser what that way kept there: the key and what protected it (deleted unread; the extension
+cannot use it and never sends it anywhere), the direct way's settings and one-time answers, and the
+*Connection* preference. If that version had recorded that it added a line for the key to your
+cluster account, the extension keeps one note of that first (the row in the table above), so that
+Settings can tell you.
 
-- On Windows and on a Mac, the Bridge is a compiled program of Licensor's (written in Rust, with no
-  code of anyone else's but the Rust standard library and the start-up and runtime support code its
-  compiler links in, which THIRD_PARTY_NOTICES.md lists), and its installer is a signed package. On
-  Windows it is a Windows Installer file (`beethoven-bridge-windows.msi`) signed by Licensor; it
-  installs into your own account, and Windows' Settings list it afterwards, under Apps, as
-  "Beethoven bridge". On a Mac it is an installer package (`beethoven-bridge-mac.pkg`) signed by
-  Licensor and notarized by Apple (checked by Apple's automated service before it was offered); it
-  installs into your own home folder only.
-- On Linux, the Bridge is a script run by Perl, or by Python 3 where Perl is absent; these come with
-  your system. Its installer is a script in a zip file.
-- A Bridge you installed from a zip file with Beethoven 14.0.0 or earlier keeps working until you
-  remove it: a script, run by Windows PowerShell on Windows or by Perl on a Mac, not signed and not
-  listed under Apps; the uninstaller placed beside it removes it. On Windows it uses the same folder
-  as the signed installer, so Beethoven's settings ask you to remove it before you install that one.
+Three things it cannot remove, because they are outside your browser:
 
-When you open a signed installer, your Mac or your Windows computer may check the installer's
-signature with Apple or Microsoft, as it does for any signed program it is asked to open. That check
-is your system's own behaviour, between your computer and them, and it tells Licensor nothing.
-
-Each installer puts the Bridge's few files in a folder of your user account and registers it with
-Chrome, and with the other browsers built on Chromium that it finds, so that the browser knows where
-it is (on Windows a key in your own part of the registry, for Chrome and for Microsoft Edge; on a
-Mac or on Linux a small file in the browser's folder in your home folder); the registration names
-Beethoven as the only extension that may start it (the signed installers name the Beethoven of the
-Chrome Web Store, written into them when they are built). Chrome starts the Bridge when the
-extension asks for it, and the Bridge ends when the extension lets it go. The Bridge opens a network
-connection only to your cluster's ssh port (at Wayne State, grid.wayne.edu, port 22, which is
-written into the Bridge; another address only if a settings file placed beside it names one, and the
-installers in the package bring none) and carries bytes between the extension and that port. What it
-carries is the ssh connection, which is encrypted between the extension and your cluster: the Bridge
-does not read it, keep it or log it, holds no password, key or other credential, offers no shell,
-runs no other program and sends nothing to Licensor. On Windows, Settings, Apps, "Beethoven bridge",
-Uninstall removes its files and the registration; on a Mac and on Linux, and for a Bridge installed
-from a zip file with Beethoven 14.0.0 or earlier, the uninstaller placed beside it does. If you do
-not install the Bridge, the extension uses the portal path.
-
-## When you sign in to your cluster over ssh
-
-The first time you use the ssh path in this browser, the extension asks you to sign in on its own
-sign-in sheet, a page of the extension: your account name (your AccessID at Wayne State), your
-cluster password, and the one-time verification code from Google Authenticator that your
-university's cluster asks for. The extension opens the ssh connection through the Bridge, checks
-that the server's identity (its host key) is the one your university's site profile names, and stops
-without sending anything about you if it is not. It then sends your account name, your password and
-your code to your cluster inside the encrypted connection, as the cluster asks for them, and to
-nobody else. The password and code are not kept: they stay in the browser's memory only until they
-are sent, and are dropped then (a browser cannot promise when its memory is overwritten); they are
-not kept in any storage, not written to the audit log or to *Show log*, not sent to Licensor or
-anyone else, and the sheet never offers to remember them. The extension never makes a verification
-code and never sees the secret your authenticator app keeps.
-
-In that same sign-in the extension makes the browser's key (see the table above) and runs one
-command in your account, the lab's framework's browser-key step, which adds the key's line there
-(see *What goes to your own cluster account*). The connection you signed in to with your password
-and code stays open, in the browser's memory only, for up to ten minutes after setup, so that your
-first *Connect* can run the Claude sign-in in it without asking for your password and code again; it
-closes when that sign-in ends, when the ten minutes pass, when you cancel, or when the browser
-closes. From then on this browser signs in with the key and asks you for nothing, and your cluster
-knows those connections by the key, not by your password. Protecting the key with a passkey is your
-choice and off unless you turn it on, on the sign-in sheet, on the screen that offers it once after
-setup, or in Settings: then the extension asks Windows Hello or Touch ID (or your device's PIN or
-password) to unlock the key once each time you open the browser, and keeps what unlocks it only in
-the browser's memory until the browser closes. You can turn it off again in Settings. If your lab
-sets a number of days for the key's line, the extension asks you to sign in with your password and
-code again once the line has lapsed, and it asks the same whenever the key is missing or refused.
-
-If your cluster refuses a code with its message that may mean a mistyped code or no verification
-code set up, the extension asks you which; if you say you have none, it shows two ways to set one
-up: on your computer, or on your phone. Both use your university's own pages and its 2FA Setup app,
-which you run yourself, with your university's VPN; the extension takes no part in them and sees
-nothing of them. The phone route shows QR codes drawn on your device, for the app stores' pages of
-GlobalProtect and Google Authenticator and for your university's instructions for Google
-Authenticator on the grid, with each address printed under its code (the welcome page and *What you
-need* also show one for its instructions for GlobalProtect); scanning one opens that page on your
-phone, which its website sees as it sees any visit. On the computer route, *Open the grid's website*
-opens your portal in a new tab, as a link would; the extension runs nothing there. Before any step
-that could lead you to run 2FA Setup a second time, the extension warns you that running it replaces
-the code you already have.
-
-The Claude sign-in (see *What happens when you sign in to Claude*) runs only in a connection you
-signed in to with your password and code, or through your portal, never through the browser's key.
-
-*Forget this computer*, in Settings, deletes the key from your browser and asks your cluster,
-through the gate, to remove the key's line. If your cluster cannot be reached, or the key is
-protected and you do not unlock it, the extension says so, and the line stays until it is removed,
-which `hpcworker browser-key remove`, run in a terminal on the cluster, does. A passkey you made is
-kept by your system or your browser's password manager: the extension asks it to drop the passkey,
-and where it does not, you delete it there.
-
-## Relays and the pilot app
-
-Beethoven can carry the ssh path through a relay server instead of the Bridge, but only through one
-your university's site profile names. None is named in this version, and none is used. If one is
-ever named, this statement will first say who runs it and what it sees: a relay would see the
-encrypted connection, your network address and the times, never your password, your code or anything
-inside the connection.
-
-A pilot edition of Beethoven made as an installable web app (an Isolated Web App) can reach the grid
-over ssh without the Bridge. It is given only to a student who asks for it, by the lab lead, as a
-file the student installs after turning on two of Chrome's developer settings, which make Chrome
-show a warning at every start. It keeps and sends what this statement says the extension keeps and
-sends; anything it does differently will be written here before it is given to anyone.
+- **The Bridge on your computer** stays installed until you remove it: on Windows, Settings, Apps,
+  "Beethoven bridge", Uninstall; on a Mac and on Linux, and for a Bridge installed from a zip file
+  with Beethoven 14.0.0 or earlier, the uninstaller placed beside it. This version holds no
+  `nativeMessaging` permission, so your browser never starts it for Beethoven, and it does nothing
+  on its own.
+- **The line in your cluster account** that the browser-key step of that version added to
+  `~/.ssh/authorized_keys` stays until it is removed. It holds `restrict`, the command `hpcworker
+  gate` from the lab's shared copy, the public half of the browser's key, the tag
+  `beethoven-browser` and the date it was added; `restrict` takes away a terminal, forwarding and
+  file transfer, and the command means that whatever the key asked for, the gate ran instead: a
+  short list of commands that could never sign a worker in to Claude. The key the line admits is
+  gone from your browser, so the line now admits nothing, and this version never uses it and never
+  types a command for it. Your lab lead can remove it for you, and `hpcworker browser-key remove`,
+  run in a terminal on the cluster, removes it; withdrawing your approval does not. The file
+  `~/.ssh/authorized_keys.beethoven-prev` beside it, that version's copy of the file from before its
+  line, and the gate's small counts file in your account's state folder on the cluster stay, as
+  ordinary files of yours. Settings say once, with the date, that such a line may be there, and
+  offer *Forget*, which removes only that note from your browser.
+- **A passkey** you made to protect the key is kept by Windows Hello, your Mac's keychain or your
+  browser's password manager, not by the extension; you delete it there, in your system's or your
+  browser's list of passkeys.
 
 ## What goes to your own cluster account
 
@@ -194,13 +115,13 @@ the cluster, and a small launcher that runs that copy, and a one-line note of wh
 take their place. The install also adds a marked block of a few lines to `~/.bashrc` so that a
 terminal finds the tool. Nothing about your approval goes there. When you tick the statement in the
 panel and press *Connect*, the framework writes one small file in your account, through the portal's
-shell or, on the ssh path, through the gate (its own marker, `~/.hpcworker/consent`), one line: the
-word yes, the time, and the random installation identifier from your browser. Your worker gives that
-answer to Claude Code when Claude Code asks its one-time question "Enable Remote Control?", and
-after the first session Claude Code's own record of your answer takes over. If your portal's shell
-asks for your password, the one-time step below adds three things in your account's `~/.ssh` folder:
-a key of its own (`beethoven_ed25519` and its public half), a marked block in `~/.ssh/config` that
-has ssh offer that key first when the portal's shell connects you to the login node, and one line in
+shell (its own marker, `~/.hpcworker/consent`), one line: the word yes, the time, and the random
+installation identifier from your browser. Your worker gives that answer to Claude Code when Claude
+Code asks its one-time question "Enable Remote Control?", and after the first session Claude Code's
+own record of your answer takes over. If your portal's shell asks for your password, the one-time
+step below adds three things in your account's `~/.ssh` folder: a key of its own
+(`beethoven_ed25519` and its public half), a marked block in `~/.ssh/config` that has ssh offer that
+key first when the portal's shell connects you to the login node, and one line in
 `~/.ssh/authorized_keys` that lets that key in only from the address the terminal came from, which
 at your institution is its Open OnDemand server; it makes `~/.ssh` and `authorized_keys` readable by
 you alone, as ssh requires, leaves your own keys and lines as they are, and refuses to change a file
@@ -214,52 +135,24 @@ folder when a sign-in starts, so that a worker waiting for that sign-in does not
 while you are on Anthropic's page. Everything there is in your own account under your institution's
 rules; Licensor has no access to it.
 
-On the ssh path, the first sign-in's browser-key step adds one line to `~/.ssh/authorized_keys`,
-makes `~/.ssh` readable by you alone if it has to create it, keeps the file's previous contents,
-without any line of Beethoven's, as `~/.ssh/authorized_keys.beethoven-prev`, refuses to change a
-file there that is a link or that others can change, and leaves your own keys and lines as they are.
-The line holds `restrict`, the command `hpcworker gate` from the lab's shared copy, the public half
-of the browser's key, the tag `beethoven-browser` and the date it was added. `restrict` takes away a
-terminal, forwarding and file transfer, and the command means that whatever the key asks for, the
-gate runs instead. The gate does only this, each a short command on the login node: report the
-framework's version, your account name and whether Claude Code says you are signed in; start your
-worker, always without any Claude sign-in; report your worker's state; read four of your worker's
-own files (its status, its connection, its node and its progress log); stop it; mark its workspace
-restricted; and remove the line. It refuses anything else, and it allows at most three worker names
-in any seven days (your own sign-in with your password and code clears them), twelve starts or new
-restrictions in any hour, and two watches at once, which it counts in a small file in your account's
-state folder on the cluster (the worker names and when each was last used, and the times of the last
-hour's starts). The line stays until you or the gate remove it: withdrawing your approval does not
-remove it. Your account keeps one such line: signing in over ssh from another browser replaces it.
-If your lab sets a number of days for it, the gate removes the line once it is older.
-
-## What your university sees on the ssh path
-
-Your university's login node records each ssh connection as it records any other: the time, the
-network address it came from (your computer's own, with no VPN), your account, and whether it signed
-in with a password and code or with a key. Your network and your university's see a connection to
-the cluster's ssh port. On the ssh path your worker is started, watched and stopped without your
-portal: the extension asks your portal only whether it answers (see *What stays in your browser*),
-with requests that carry no sign-in.
-
 ## What your portal sees
 
-On the portal path, the extension makes requests to your university's Open OnDemand portal, and only
-to it, using the sign-in your browser already holds, from the extension's own background, with no
-portal tab where your browser allows it: waking the portal's own web server up if it is asleep;
-reading the dashboard (when the panel opens, on each press that needs the grid, and about once a
-minute while the panel is open; every two seconds while you sign in); listing and reading your
-worker's files through the portal's Files app (every five seconds while a worker starts and the
-panel is open, every thirty seconds while it starts and the panel is closed, and about once a minute
-otherwise), and reading the version number of your lab's shared copy of the framework; and opening
-the shell for one command at a time (setting your account up to use the lab's copy; connect, which
-starts your worker and, when needed, holds the sign-in sitting described below; status, about once a
-minute while your worker waits for a computer and the panel is open; stop; and mark restricted),
-once after your first sign-in to test how the portal's shell can be reached (opened and closed with
-nothing typed but `exit`), during the one-time step below to test whether the shell still asks for a
-password, and, from *Details*, for the checks and the check job you start there. The extension types
-into the shell only once the shell has shown it is ready (its prompt), never at a password prompt. A
-shell connection from the extension's background arrives with the extension's own origin
+The extension makes requests to your university's Open OnDemand portal, and only to it, using the
+sign-in your browser already holds, from the extension's own background, with no portal tab where
+your browser allows it: waking the portal's own web server up if it is asleep; reading the dashboard
+(when the panel opens, on each press that needs the grid, and about once a minute while the panel is
+open; every two seconds while you sign in); listing and reading your worker's files through the
+portal's Files app (every five seconds while a worker starts and the panel is open, every thirty
+seconds while it starts and the panel is closed, and about once a minute otherwise), and reading the
+version number of your lab's shared copy of the framework; and opening the shell for one command at
+a time (setting your account up to use the lab's copy; connect, which starts your worker and, when
+needed, holds the sign-in sitting described below; status, about once a minute while your worker
+waits for a computer and the panel is open; stop; and mark restricted), once after your first
+sign-in to test how the portal's shell can be reached (opened and closed with nothing typed but
+`exit`), during the one-time step below to test whether the shell still asks for a password, and,
+from *Details*, for the checks and the check job you start there. The extension types into the shell
+only once the shell has shown it is ready (its prompt), never at a password prompt. A shell
+connection from the extension's background arrives with the extension's own origin
 (`chrome-extension://...`) in the portal's logs. Your institution's logs record those requests as
 they record any use of the portal; the shell's page token appears in the portal's access log, as it
 does when you open the shell yourself. The extension opens the portal in a tab only for you to sign
@@ -279,28 +172,26 @@ once you are signed in, and *Open my session* may bring forward the claude.ai ta
 Claude Code itself does the sign-in, inside your job's container on a compute node, through
 Anthropic's own paste-code flow. When Claude Code on your cluster already reports you signed in, no
 sitting runs. Otherwise the extension starts that sitting for you, in the same command that starts
-your worker, through the portal's shell or, on the ssh path, through a connection you signed in to
-with your password and code (never with the browser's key, which the gate refuses for this), reads
-the short lines the framework prints (that your account is set up, that your Remote Control answer
-is recorded, that your worker is in line, with its job number and folder, that the sitting is
-running and still waiting, the address of Anthropic's sign-in page, that it is waiting for the code,
-and Claude Code's own report afterwards with the account and plan it names), opens the sign-in page
-in a new tab, and shows you one box. Claude Code's own screen is never sent to your browser: it
-stays in a temporary file on the compute node that only you can read and that is removed when the
-sitting ends. You sign in on Anthropic's page with your own account, click *Authorize*, and paste
-the code the page shows into that box. The extension types the code once into the sitting on your
-cluster, through the same connection, and then forgets it: the code is not kept in any storage, not
-written to the audit log (which records only how many bytes were typed) and not sent to Licensor or
-anywhere else; on the compute node it is passed to Claude Code without being echoed. The extension
-never reads the sign-in page, never reads your clipboard, and never sees the credential Claude Code
-makes from the code; that credential stays in Claude Code's own folder in your cluster account. The
-extension closes the sign-in tab it opened once Claude Code reports you are signed in, unless that
-tab has loaded another page since you pasted the code. The sitting ends by itself within ten minutes
-of starting on the compute node, and the wait for a compute node is bounded too (the extension
-closes the connection after fifteen minutes at the latest); if it ends without a sign-in, nothing is
-kept and you can start it again.
+your worker, through the portal's shell, reads the short lines the framework prints (that your
+account is set up, that your Remote Control answer is recorded, that your worker is in line, with
+its job number and folder, that the sitting is running and still waiting, the address of Anthropic's
+sign-in page, that it is waiting for the code, and Claude Code's own report afterwards with the
+account and plan it names), opens the sign-in page in a new tab, and shows you one box. Claude
+Code's own screen is never sent to your browser: it stays in a temporary file on the compute node
+that only you can read and that is removed when the sitting ends. You sign in on Anthropic's page
+with your own account, click *Authorize*, and paste the code the page shows into that box. The
+extension types the code once into the sitting on your cluster, through the same connection, and
+then forgets it: the code is not kept in any storage, not written to the audit log (which records
+only how many bytes were typed) and not sent to Licensor or anywhere else; on the compute node it is
+passed to Claude Code without being echoed. The extension never reads the sign-in page, never reads
+your clipboard, and never sees the credential Claude Code makes from the code; that credential stays
+in Claude Code's own folder in your cluster account. The extension closes the sign-in tab it opened
+once Claude Code reports you are signed in, unless that tab has loaded another page since you pasted
+the code. The sitting ends by itself within ten minutes of starting on the compute node, and the
+wait for a compute node is bounded too (the extension closes the connection after fifteen minutes at
+the latest); if it ends without a sign-in, nothing is kept and you can start it again.
 
-## When the portal's shell asks for your password (the portal path)
+## When the portal's shell asks for your password
 
 An account with no key on the cluster may find that the portal's shell asks for a password when the
 extension opens it. The extension never types a password: it stops before typing anything and, when
@@ -350,36 +241,30 @@ Licensor before you have accepted the agreement. After that:
   open the panel after a day has passed or after a no. The request is sent without cookies, over an
   encrypted connection, to the address named in the services file below (Licensor's access service,
   `https://beethoven-access.openspineconsortium.workers.dev`), and carries: the account name your
-  cluster accepted for your sign-in (the one your portal's dashboard shows, or, on the ssh path, the
-  one you typed into the sign-in sheet, sent only after your cluster accepted the sign-in made with
-  it, or the one your cluster reports for a sign-in with the browser's key), your portal's hostname
-  (on the ssh path, the hostname of the portal your university's site profile names), the product
-  name (`bridge`), the extension's version and the random installation identifier described above;
-  like any request, it arrives at a time. The service answers yes or no, and nothing else about you
-  or anyone else. A no may carry one of three reasons: that your account is already set up on
-  another installation (the panel then says so and offers no button: your lab lead moves the
-  approval), that this installation is already set up for another account (the panel says so and
-  offers no button: your lab lead releases it), or that this version is too old (the panel asks you
-  to install the current one from the lab's private listing). The extension keeps a yes for up to a
-  day, and for up to seven days when the service cannot be reached, so an outage on Licensor's side
-  does not stop your work; it keeps a no for ten minutes, and while the answer is no it starts no
-  worker and, unless the reason is one of those three, offers you a button to ask for access.
-- **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
-  of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
-  list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
-  about you beyond what any web request carries (your network address, which the web host's ordinary
-  server logs may record for a short time); the files hold addresses and the list only.
+  portal's dashboard shows for your session, your portal's hostname, the product name (`bridge`),
+  the extension's version and the random installation identifier described above; like any request,
+  it arrives at a time. The service answers yes or no, and nothing else about you or anyone else. A
+  no may carry one of three reasons: that your account is already set up on another installation
+  (the panel then says so and offers no button: your lab lead moves the approval), that this
+  installation is already set up for another account (the panel says so and offers no button: your
+  lab lead releases it), or that this version is too old (the panel asks you to install the current
+  one from the lab's private listing). The extension keeps a yes for up to a day, and for up to
+  seven days when the service cannot be reached, so an outage on Licensor's side does not stop your
+  work; it keeps a no for ten minutes, and while the answer is no it starts no worker and, unless
+  the reason is one of those three, offers you a button to ask for access. - **Two files, once a
+  day.** `https://openspineconsortium.com/beethoven/services.json` (the address of the access
+  service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed list of
+  withdrawn extension versions). Both requests are sent without cookies and carry nothing about you
+  beyond what any web request carries (your network address, which the web host's ordinary server
+  logs may record for a short time); the files hold addresses and the list only.
 
 Those are the only requests the extension ever makes to Licensor. In particular:
 
 - there is no key of Licensor's and no activation step; your institution's own sign-in identifies
-  you; the extension never reads your portal's sign-in, cookie or password, and the cluster password
-  and code you type into its sign-in sheet go only to your cluster;
-- the extension sends no error reports, no crash reports and no usage data; it has no code for them
-  and no address to send them to;
-- your acceptance record, your statements, your audit log, your activity list, your settings, the
-  browser's key and what the extension remembers about your worker stay in your browser, and the
-  Bridge sends nothing to Licensor.
+  you; the extension never reads your portal's sign-in, cookie or password; - the extension sends no
+  error reports, no crash reports and no usage data; it has no code for them and no address to send
+  them to; - your acceptance record, your statements, your audit log, your activity list, your
+  settings and what the extension remembers about your worker stay in your browser.
 
 **What Licensor records from the checks.** One record for each account and product: the account
 name, the product, and the portal hostname and the version of the latest check; when the account was
@@ -403,8 +288,7 @@ identifier is random: it is not read from your device or derived from it, and Li
 from it which computer it is on. One account is the exception: the account the store's reviewers use
 with the lab's mock portal (`st1234`) is approved only in a check whose portal is on the reviewer's
 own computer (`localhost`), from any installation, and binds none; from any other portal it is
-answered as an unknown account is, and nothing is bound or e-mailed. The Bridge on the same computer
-and the browser's key belong to the installation they serve; neither talks to the access service.
+answered as an unknown account is, and nothing is bound or e-mailed.
 
 **The *Ask for access* button.** When the answer is no, the panel's one button opens Licensor's
 request page (`https://openspineconsortium.com/beethoven/request.html`) in a new tab with your
@@ -438,21 +322,19 @@ record.
 
 Stated in the negative because reviewers read for what is absent: the extension does not collect
 command text, file paths, prompt content, job output, portal cookies or tokens, your portal
-password, the cluster password and verification code you type into its sign-in sheet (it sends them
-to your cluster and keeps nothing of them), the code you paste to sign in to Claude, anything the
-portal's terminal page shows, the key the portal path's one-time step makes, the private half of the
-browser's key (it never leaves your browser), browsing activity, or anything from claude.ai or any
-Anthropic page. The Bridge collects nothing: it carries the encrypted connection and keeps no record
-of it. It reads no hardware address, serial number or other identifier from your device and derives
-none from it: the one identifier of the installation is the random number described above. It sends
-Licensor no error or crash reports, no usage data and no activation request; the approval check
-above is the only thing it sends about you. It has no site permission on claude.ai, claude.com or
-anthropic.com and never asks for one, requests no `activeTab`, `cookies`, `tabs`, `webRequest`,
-`debugger`, `identity` or `clipboardRead` permission, uses its `nativeMessaging` permission only to
-talk to the Bridge (Chrome lets it reach only a program that registered itself for this extension,
-and only once you installed one), is granted no website when it is installed (it asks for your
-portal's one website when you press *Agree and continue*, *Use this portal* or *Change* under
-Settings), and runs no code fetched from anywhere.
+password, your cluster password or verification code (you type them only into your browser's own
+sign-in box, your portal's own pages and the portal's own terminal page, never into the extension),
+the code you paste to sign in to Claude, anything the portal's terminal page shows, the key the
+one-time step makes, browsing activity, or anything from claude.ai or any Anthropic page. It reads
+no hardware address, serial number or other identifier from your device and derives none from it:
+the one identifier of the installation is the random number described above. It sends Licensor no
+error or crash reports, no usage data and no activation request; the approval check above is the
+only thing it sends about you. It has no site permission on claude.ai, claude.com or anthropic.com
+and never asks for one, requests no `activeTab`, `cookies`, `tabs`, `webRequest`, `debugger`,
+`identity`, `clipboardRead` or `nativeMessaging` permission (so no program on your computer is
+started for it), is granted no website when it is installed (it asks for your portal's one website
+when you press *Agree and continue*, *Use this portal* or *Change* under Settings), and runs no code
+fetched from anywhere.
 
 ## How Licensor uses and keeps it
 
@@ -464,9 +346,9 @@ accounting and disputes. Nothing is sold or used for advertising. The web host t
 daily files sees the requests any web server sees and nothing more. Processors acting for Licensor
 (hosting; the access service; the e-mail service that carries its notices) see only what they need
 to run the service. Your cluster password and verification code reach neither Licensor nor any
-processor of Licensor's: the extension uses them only to sign you in to your own cluster, when you
-ask it to, and keeps nothing of them. Licensor's use of data complies with the Chrome Web Store's
-Limited Use requirements.
+processor of Licensor's: the extension never sees them; you type them only into your browser's own
+sign-in box or your institution's own pages. Licensor's use of data complies with the Chrome Web
+Store's Limited Use requirements.
 
 ## Security and breaches
 
@@ -476,17 +358,17 @@ by Licensor.
 
 ## Your choices and rights
 
-Remove the site permission or uninstall the extension at any time; turn the passkey protection of
-the browser's key on or off in Settings; use *Forget this computer* to delete the browser's key and
-remove its line from your cluster (or remove the line with `hpcworker browser-key remove` on the
-cluster); remove the Bridge (on Windows from Settings, Apps; on a Mac or on Linux, and for a Bridge
-installed from a zip file with Beethoven 14.0.0 or earlier, with its uninstaller); remove the key of
-the portal path's one-time step from your cluster account with `hpcworker login-setup --remove`; ask
-Licensor to move your approval to another installation, or for a copy or deletion of your access
-records (deletion of your access record ends your approval and with it the license). Michigan
-residents and residents of other states may have further rights under their state's laws; Licensor
-honours requests it is obliged to honour and answers others where it reasonably can. Beethoven is
-offered in the United States.
+Remove the site permission or uninstall the extension at any time; press *Forget* on the note in
+Settings about a key an earlier version added; have the line an earlier version added to your
+cluster account removed (ask your lab lead, or run `hpcworker browser-key remove` in a terminal on
+the cluster); remove a Bridge an earlier version had you install (on Windows from Settings, Apps; on
+a Mac or on Linux, and for a Bridge installed from a zip file with Beethoven 14.0.0 or earlier, with
+its uninstaller); remove the key of the one-time step from your cluster account with `hpcworker
+login-setup --remove`; ask Licensor to move your approval to another installation, or for a copy or
+deletion of your access records (deletion of your access record ends your approval and with it the
+license). Michigan residents and residents of other states may have further rights under their
+state's laws; Licensor honours requests it is obliged to honour and answers others where it
+reasonably can. Beethoven is offered in the United States.
 
 ## Children
 
@@ -496,6 +378,24 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 12 (2026-10-08, Beethoven 16.0.0): the direct way of versions 12.0.0 to 15.0.0 is removed
+whole. The extension no longer reaches your cluster over ssh, has no Bridge, no sign-in sheet, no
+key in your browser, no passkey, no *Forget this computer*, no phone route and no relay, holds no
+`nativeMessaging` permission, and never asks for your cluster password or verification code; it
+reaches your cluster only through your university's Open OnDemand portal, behind your university's
+VPN where it requires one, as versions up to 11.0.0 did. On its first run after the update it
+deletes from your browser what the direct way kept there, the key unread, and keeps one note where
+that version recorded that it had added a line to your cluster account, which Settings show once,
+with *Forget*; the Bridge on your computer, that line and a passkey are outside the browser and stay
+until you remove them, as the new section *What an earlier version may have left* says. New on your
+device: a press you made while the grid was out of reach waits and goes ahead by itself once the
+grid answers, with the extension asking your portal's address whether it answers every three seconds
+while a page of Beethoven's is open and once a minute while none is; *Keep my worker running* also
+starts a worker again that ended, at most three times in a row; and the screen that asks you to turn
+on your VPN links your university's own page about it. The sections on the Bridge, the ssh sign-in,
+the relays and the pilot app, and on what your university sees on the ssh path, are gone with them.
+Nothing new reaches Licensor.
 
 Version 11 (2026-10-04, Beethoven 15.0.0): on Windows and on a Mac the Bridge is now a compiled
 program of Licensor's, offered from inside the extension as a signed installer that installs into

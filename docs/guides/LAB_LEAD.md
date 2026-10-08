@@ -1,224 +1,145 @@
-# Beethoven 15.0.0 for the lab lead
+# Beethoven 16.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
-and corrected by fixer B after the four reviews, against framework 11 as it stands in the working
-tree (`framework/lib/browser_key.sh`, `framework/lib/profile.awk`, `framework/README.md`). The exact
-tests still to run on the real grid are in `docs/V12_STATUS.md`, section 4. Section 9, who can read the
-lab's folders on the grid, was added later the same day with `tools/grid_access.sh`, and revised that
-evening after its review (section 2, step 1 and section 3, question 6 with it).
+and corrected by fixer B after the four reviews, against framework 11 as it then stood in the
+working tree; rewritten 2026-10-08 for 16.0.0, which removed the direct way of 12.0.0 to 15.0.0
+whole. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
+lab's folders on the grid, was added 2026-10-02 with `tools/grid_access.sh` and revised that evening
+after its review.
 
-**14.0.0 and framework 14 (2026-10-03).** Two changes, both in sections 11 and 12 below: a worker that
-resumed an earlier session (Claude Code prints that session's own link, `https://claude.ai/code/session_…`,
-and no environment link) is read as online, which needs framework 14 on the grid for the direct way; and
-the panel keeps a debug log in memory that a student copies for you with **⋯** (More), **Copy debug log**.
-Publish framework 14 with the two commands of section 2 (`--dry-run` first), as for 11 and 13.
+**14.0.0 and framework 14 (2026-10-03).** Two changes, both in sections 11 and 12 below: a worker
+that resumed an earlier session (Claude Code prints that session's own link,
+`https://claude.ai/code/session_…`, and no environment link) is read as online, which framework 14
+writes into `status.json`; and the panel keeps a debug log in memory that a student copies for you
+with **⋯** (More), **Copy debug log**. Publish framework 14 with the two commands of section 2
+(`--dry-run` first), as for 11 and 13.
 
 **15.0.0 and framework 17 (2026-10-04).** On the grid, Beethoven never signs anyone out of Claude:
-framework 17 refuses the `--login fresh` that earlier builds typed for **Use another account**, 15.0.0
-never asks for it, and a student who needs another Claude account signs out of Claude Code themselves,
-then presses **Sign in again** (section 13). On Windows and macOS the helper students install is now a
-compiled program in a signed installer, built only on Greg's own machines:
-`beethoven-bridge-windows.msi`, signed through Azure Artifact Signing and removed from Windows'
-Settings, Apps, "Beethoven bridge"; and `beethoven-bridge-mac.pkg`, signed with a Developer ID and
-notarized by Apple (`ACCOUNTS.md`, 2.1). Linux keeps the script. A helper a student already has
-keeps working; it is the same version, 1.0.0. The agreement is now version 10 and the privacy
-statement version 11, so every student accepts once more. Neither installer has been opened on a
-real computer yet: what students see on the way is not yet measured, and `INSTALL.md` asks them to
-tell you, in the window's own words; keep what they report (section 8).
+framework 17 refuses the `--login fresh` that earlier builds typed for **Use another account**, no
+build since 15.0.0 asks for it, and a student who needs another Claude account signs out of Claude
+Code themselves, then presses **Sign in again** (section 13). (15.0.0 also shipped the helper as a
+signed installer; 16.0.0 removed the helper, section 5.)
+
+**16.0.0 (2026-10-08).** One way to the grid: the university's VPN (GlobalProtect at Wayne State)
+and the Open OnDemand portal, inside the student's own signed-in browser session, as in 11.0.0. The
+bridge, the sign-in sheet, the key in the browser and its line in the grid account, the gate, the
+passkey, **Forget this computer**, the phone route, the relay and the pilot app are gone (Greg's
+decision; section 1). What an earlier version may have left in a student's account or on their
+computer, and how it goes, is section 5. The agreement is now version 11 and the privacy statement
+version 12, both of 2026-10-08, so every student accepts once more.
 
 ## 1. What changes for you
 
-- **Students reach the grid's login node directly**, over ssh, from their own computers, with no VPN:
-  `grid.wayne.edu`, port 22, through the small helper that ships inside the extension
-  (`INSTALL.md`). The Open OnDemand path of 11.0.0 stays, as the fallback, behind
-  **Use GlobalProtect instead**.
-- **The first direct sign-in is a password sign-in.** The student types their AccessID, password and
-  Google Authenticator code into Beethoven's own sign-in sheet (an extension page). Beethoven sends
-  them only to the grid, inside the ssh session, after the grid's host key matched the pin, and
-  keeps nothing. In that same session it runs `hpcworker browser-key add` and `hpcworker install
-  --shared` from the lab's shared copy; the first writes one restricted line into the student's
-  `~/.ssh/authorized_keys`. Beethoven keeps that password session open for up to ten minutes, so the
-  student's first **Connect** can run the Claude sign-in in it without a second password and code.
-- **From then on, the browser signs in with its own key**, and that key can run only the lab's gate
-  (section 4). The gate can never sign a worker in to Claude: a Claude sign-in always needs a
-  password-and-code session (or the portal path).
-- **Windows Hello / Touch ID protection of the key is the student's choice and off by default.**
-- **Every student's line runs your shared copy.** Whoever can change
-  `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`, anything under it, or rename anything in a
-  folder above it, can run anything in every enrolled student's account the next time Beethoven
-  polls with that student's key. Framework 11's `browser-key add` therefore refuses unless the copy,
-  and every folder from `/` down to it, can be changed by its owner alone or is sticky (section 2).
+- **One way to the grid again: GlobalProtect and the Open OnDemand portal**, inside the student's
+  own signed-in browser session, as in 11.0.0. The direct way of 12.0.0 to 15.0.0 (ssh to
+  `grid.wayne.edu` through a helper on the student's computer, a key in the browser with a
+  restricted line in `~/.ssh/authorized_keys`, the gate, the sign-in sheet, the passkey, **Forget
+  this computer**, the phone route, the relay and the pilot app) is gone whole: it could not work
+  without a program outside the browser, and a student with the VPN has the portal. The manifest is
+  11.0.0's again: `storage`, `alarms`, `scripting`, `sidePanel` and the optional `https://*/*` host
+  the student grants at click time; no `nativeMessaging`. Beethoven works offline on the last good
+  lists as before.
+- **Beethoven never asks for a grid password or a code.** The student signs in to the portal on the
+  university's own pages, in the box Chrome shows; Beethoven never fills them in. 11.0.0's one-time
+  grid key step stays: when the portal's shell asks for a password while a press waits, the student
+  types it into the university's own terminal page, and Beethoven's page script watches that tab's
+  title only and types one login-setup line after **I'm in**. The terminal may ask for the Google
+  Authenticator code too; the panel's one warning there, "Don't run 2FA Setup if you have one: it
+  replaces it.", is about that terminal. That step is not yet measured on the grid by a student
+  without a key.
+- **A press made while the grid is out of reach is kept.** The panel shows **Turn on
+  GlobalProtect.** with **How to set it up** (the site profile's `vpn_help_url`: Wayne State's KB
+  20314) and "Beethoven carries on by itself as soon as the grid answers."; reach is re-checked
+  every 3 seconds while a Beethoven page is open and once a minute while none is, and the press goes
+  ahead by itself when the grid answers. **Keep my worker running** also starts a worker read as
+  ended again, at most three times in a row without a press of the student's.
+- **Every line a student's Beethoven types runs your shared copy**, through the portal's shell:
+  `hpcworker install --shared`, `discover`, `probe`, `worker start|stop|restrict|status --json`,
+  `claude login --plain` and `hpcworker connect`; no `gate`, no `browser-key`. Whoever can change
+  `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`, or anything under it, can run anything in
+  every enrolled student's account the next time their Beethoven types a line. `deploy_shared.sh`
+  publishes the copy readable and never writable by others (section 9); keep it so.
 - **No python3 on the login node for anything Beethoven types.** Framework 11 reads the site profile
   and fills the job file and the workspace guide with awk and bash (section 6).
 - **An approval for the extension also opens the lab's folders on the grid.** The AccessIDs approved
   with the extension grant (`admin.mjs approve`, or `grant <id> extension`) are the list of accounts
   that may enter the lab's volume, kept on the grid by `tools/grid_access.sh`, every fifteen minutes
-  from your PC (section 9). An approval for the lab only (`approve-lab`) does not put anyone on it, and
-  neither does the store reviewers' mock account. Until a newly approved student is on it, their setup
-  ends in `Permission denied`. Otherwise approvals are as before: one approved account, one installation;
-  the helper and the browser's key belong to that installation and never talk to the access service.
-  Moving a student to a new computer is still `admin.mjs` (or the e-mail's link); on the new computer
-  they sign in directly once, and that replaces the old computer's line (one line per account).
-  Withdrawing an approval does **not** remove a student's line on the grid (section 5), but it takes
-  their AccessID off the list at the next run, and the line's command then cannot start (section 9).
+  from your PC (section 9). An approval for the lab only (`approve-lab`) does not put anyone on it,
+  and neither does the store reviewers' mock account. Until a newly approved student is on it, their
+  setup ends in `Permission denied`. Otherwise approvals are as before: one approved account, one
+  installation. Moving a student to a new computer is still `admin.mjs` (or the e-mail's link).
+  Withdrawing an approval takes their AccessID off the list at the next run (section 9); a line an
+  earlier version added to their `~/.ssh/authorized_keys` is not touched by it (section 5).
 
-## 2. Before the first student uses the direct way
+## 2. Before the first student
 
-Framework 10 is deployed on the grid now, at `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`.
-Framework 10 has no `gate` and no `browser-key`: a 12.0.0 student's first direct sign-in against it
-ends with **The lab's copy of the tool on the grid is older than this Beethoven** (or, in an older
-build, a key that is not taken). So, in this order:
+Nothing of the direct way is a condition any more: no gate, no `browser-key check`, no sticky-bit
+rule on the folders above the copy, no test sign-in of your own and no note to C&IT. What remains:
 
-1. **Look at the folders above the copy** (read only, on warrior, as yourself; the trailing `/` on the
-   first names the folder behind the link):
-
-   ```
-   stat -c '%A %U:%G %n' /rs/rs_grp_oschome/ /rs/rs_grp_oschome/shared /rs/rs_grp_oschome/shared/beethoven /rs/rs_grp_oschome/shared/beethoven/hpcworker
-   ```
-
-   The first is the volume's root, your own folder, `drwxrws--T go2432 oschome`: writable by the
-   group and by the students on the list (section 9), and sticky, the `T` in the last place, which you
-   set on 2026-10-02. Sticky means that whoever may write there can make a folder of their own but
-   cannot rename or remove `shared` or anything else that is not theirs, so the root passes. Keep it
-   so: `chmod +t` again if the `T` ever goes. Each of the other three must be writable by its owner
-   alone (no `w` in the group or other places) or sticky: on one of yours that is not, `chmod g-w` (or
-   `chmod +t`). (Until 2026-10-02 this step recorded the root as `drwxrws---`, not sticky, and took it
-   for C&IT's to fix; it is yours.) Above the root sit the CephFS scaffold folders, owned by root or by
-   other labs' accounts and writable by everyone; they are C&IT's (section 3, question 6), and
-   framework 12 reports them as a note for the university without refusing a key
-   (`framework/README.md`, "Folders above the copy"). Until every folder of yours passes,
-   `browser-key add` refuses every student with "other people can rename things in ..., which holds
-   the lab's copy of the grid tool your key would run. Ask your lab lead."
-2. **Publish framework 11**, from the laptop's checkout, as for framework 10:
+1. **Publish the framework**, from the laptop's checkout of hpcworker, as for every version:
 
    ```
    tools/deploy_shared.sh --site wayne --dry-run
    tools/deploy_shared.sh --site wayne
    ```
 
-   It checks `VERSION` (11) against the tool, LF line endings and `bash -n`, tars exactly the files
-   it lists with a SHA-256 manifest, and on the login node extracts them to `.../hpcworker/v11`,
-   sets read for the group and for others and no write (who gets in at all is the list, section 9),
-   and switches `current` in one rename; `v10` is kept for workers
-   that started on it. Its last check now runs `hpcworker profile check` on each site profile (awk,
-   the same verdict `profile.py validate` gives) instead of `python3`, which warrior's banner bans;
-   and it refuses to point `current` from version 11 or later back at a version before 11, because
-   every student's key would then meet a copy with no gate ("unknown command 'gate'"). Both were
-   tried with `--here` into a scratch folder in WSL on 2026-10-02, not on the grid.
-3. **Run the read-only check** as the copy's owner:
-
-   ```
-   bash /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker browser-key check
-   ```
-
-   It prints one line per folder or file that others than its owner may change, `copy: ...` or
-   `above the copy: ... (chmod +t or chmod go-w on it, by its owner)`, then `HPCW-KEY check ok
-   <copy>` or `HPCW-KEY check refused <copy>`. Fix every line until it says `ok`.
-4. **One test sign-in of your own**, from a test Chrome profile (`V12_STATUS.md`, test G1). It
-   settles what no local server could: OpenSSH 7.4 taking the restricted line, StrictModes on your
-   home, warrior's bash running the gate.
-5. Send C&IT the note in section 3, and wait for their answer before telling students to use the
-   direct way.
-6. Decide whether keys should lapse (section 5, `browser_key_days`).
+   It checks `VERSION` against the tool, LF line endings and `bash -n`, tars exactly the files it
+   lists with a SHA-256 manifest, and on the login node extracts them to `.../hpcworker/v<N>`, sets
+   read for the group and for others and no write (who gets in at all is the list, section 9), and
+   switches `current` in one rename; older versions are kept for workers that started on them. Its
+   last check runs `hpcworker profile check` on each site profile (awk, the same verdict `profile.py
+   validate` gives) instead of `python3`, which warrior's banner bans. 16.0.0 never calls the copy
+   outdated, whatever version `current` names: it types nothing that framework 11's gate added.
+   Framework 14 or later writes a resumed session's link into `status.json` (section 11); framework
+   17 refuses the `--login fresh` earlier builds typed (section 13).
+2. **Put the student on the list** (section 9) before their first **Connect**, or their setup ends
+   in `Permission denied`.
+3. **Tell them to turn GlobalProtect on first.** The welcome page lists it among the three needs,
+   with Wayne State's own page behind **How to set it up**; a press made without it waits and goes
+   ahead by itself (section 1).
 
 ## 3. What to tell C&IT
 
-Only one rule about the grid is C&IT's own instruction to the lab (2026-09-28: nothing
-container-related on warrior and nothing of ours under its `/tmp`); the 20-process login-node cap is
-Wayne State's published policy; everything else below is this product's own design. Say so when you
-write. A draft:
+Nothing new for 16.0.0. Students reach the grid through the VPN and the portal, as Wayne State's own
+pages describe, and nothing of Beethoven's is installed on the grid but the lab's own scripts in the
+group folder. The draft 12.0.0 kept here, about students' browsers signing in to `grid.wayne.edu`
+directly with restricted keys, is withdrawn with the direct way; whether it was ever sent is not
+recorded in these texts. If it was, tell C&IT that no such key is added any more and that the lines
+already in students' `~/.ssh/authorized_keys` are being removed (section 5).
 
-> Subject: Beethoven 12: students' browsers signing in to grid.wayne.edu directly
->
-> My lab's students use Beethoven, a Chrome extension that starts, watches and stops their own
-> Claude Code batch jobs on the grid. Until now it worked only through Open OnDemand on the VPN.
-> From version 12 it first tries ssh to grid.wayne.edu port 22 directly from the student's computer,
-> without the VPN, through a small helper program on the student's computer that only relays TCP to
-> grid.wayne.edu:22. Nothing is installed on the grid but the lab's own scripts in our group
-> folder. Your KB 20245 and 20243 already describe plain ssh to the grid and keys students add
-> themselves; this is the same thing, done by a program on the student's behalf.
->
-> The first time, the student types their AccessID, password and Google Authenticator code into the
-> extension's own sign-in page. They are sent only inside the ssh session, after the server's host
-> key matches the one the extension carries (ssh-rsa
-> SHA256:kLTz1xK6anQ1denM+31kDEryQtgan2P76r9aLno+K3s), and are never stored. In that session the
-> extension runs two of our scripts' commands, one of which adds one line to the student's
-> ~/.ssh/authorized_keys:
->
-> `restrict,command="/rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker gate" <ecdsa-sha2-nistp256 or ssh-ed25519> <key> beethoven-browser <date>`
->
-> `restrict` turns off the terminal and all forwarding, and the forced command means the key can
-> only run our "gate", a bash script that accepts eight fixed commands (report the version, report
-> a worker's state, follow it for up to 30 minutes, start a worker, stop it, mark a workspace
-> restricted, read one of four status files, remove the line) and refuses everything else. It
-> cannot open a shell, copy files, read other files or sign anyone in to anything. Each key may use
-> three worker names in any seven days, start a worker twelve times an hour, and follow two at once.
->
-> While a student has the extension's panel open, it keeps one ssh connection open and runs a short
-> command over it: every few seconds while a worker starts, about once a minute otherwise; it asks
-> Slurm about a queued worker at most once a minute. The first password session is held open for up
-> to ten minutes so the student's first Claude sign-in does not need a second password and code.
-> Nothing it runs on the login node uses python, node, md5sum, rsync or anything else on warrior's
-> banned list: bash, coreutils, grep, sed and awk, and srun for the Claude sign-in. After three
-> refused password sign-ins in a row it stops for fifteen minutes.
->
-> Questions:
-> 1. Is a key restricted this way, used from outside the VPN, acceptable under the grid's rules,
->    given that password sign-ins require the Google Authenticator code?
-> 2. Do the grid's defences (fail2ban or similar) ban an address after failed sign-ins, and at what
->    threshold? A student's home address could be banned by a few mistyped codes.
-> 3. Is one ssh connection per student held open while their panel is open, with a short command
->    every few seconds to once a minute, acceptable on warrior?
-> 4. Will you tell us before the grid's ssh host key changes? Every student's extension refuses a
->    different key and sends nothing.
-> 5. Students without a Google Authenticator code set one up themselves with Open OnDemand's
->    2FA Setup app, as KB 20242 describes. Is that the route you want them to use?
-> 6. The CephFS folders above our volume's root, owned by root or by other labs' accounts, are
->    writable by everyone and not sticky. Could you set the sticky bit on them, so that no account
->    can rename another's folder there? (Our own root is sticky since 2026-10-02; our scripts report
->    these folders and do not refuse over them.)
+When you write to them at all, say which rules are whose: only one rule about the grid is C&IT's own
+instruction to the lab (2026-09-28: nothing container-related on warrior and nothing of ours under
+its `/tmp`); the 20-process login-node cap is Wayne State's published policy; everything else
+Beethoven does on the grid (the 60-second floor on scheduler questions, the wall time on every job)
+is this product's own design.
 
-## 4. The gate, in one paragraph
+## 4. The gate (12.0.0 to 15.0.0), in one paragraph
 
-Each enrolled student's `~/.ssh/authorized_keys` holds one line for Beethoven, beginning
-`restrict,command="<the lab's shared copy>/bin/hpcworker gate"` and ending `beethoven-browser
-<date>`. `restrict` turns off the terminal and agent, port and X11 forwarding, and the forced command
-makes sshd run the gate whatever the client asks, so no file transfer or shell is possible. The gate
-reads the request from `SSH_ORIGINAL_COMMAND`, refuses anything over 200 characters, any character
-outside letters, digits, dot, underscore, hyphen and single spaces, and any word starting with a
-hyphen, and accepts exactly eight verbs: `version` (the framework's version, the account, the
-line's due date, and whether Claude Code reports a sign-in), `status` and `watch` (a worker's
-state), `connect` (starts a worker, always with `--login never`, written last so nothing can
-outrank it, so the key can never run the Claude sign-in), `stop`, `restrict` (marks a workspace
-restricted), `read` (one of four run files of a named worker: `status.json`, `connection.json`,
-`progress.log`, `node`; never `rc.log`) and `forget` (removes the line). It caps each key at three
-worker names in any seven days (the student's own password sign-in clears them), twelve connects (and
-restricts of a name with no run) in any rolling hour and two watches at once, ends a watch after
-thirty minutes, and asks the scheduler about a queued worker at most once a minute. Everything else
-answers `HPCW-GATE refused` (exit 126); a cap answers `HPCW-GATE limit names|hourly|watch|busy` (exit
-123). The gate is bash with coreutils, grep, sed and awk, and runs no `python3`. It cannot open a
-shell, read any other file, add a key or sign a worker in to Claude. If a student's own `~/.bashrc`
-prints something, sshd shows it before the gate's own lines; Beethoven reads the gate's lines by
-their prefix (`README.md`, "The gate").
+Framework 11 added two commands for the direct way: `hpcworker gate`, the forced command of the
+browser's key, which accepted eight fixed verbs over ssh and refused everything else, and `hpcworker
+browser-key`, which added, checked and removed the key's line. 16.0.0 calls neither; every line it
+types goes through the portal's shell (section 1) and none of them is a gate verb. Whether the
+shared copy keeps the two commands is hpcworker's; what the gate's line left in a student's account
+is section 5. The old answer **The lab's copy of the tool on the grid is older than this
+Beethoven**, which was the gate's reply from a copy without it, no longer exists: the one way never
+calls the copy outdated.
 
-## 5. Revoking a key
+## 5. What an earlier version may have left
 
-| Who | How | Effect |
+16.0.0 never adds a key, never types a command about one, and deletes nothing on the grid or under a
+student's home, ever. What 12.0.0 to 15.0.0 left stays until a person removes it:
+
+| What | Where | How it goes |
 |---|---|---|
-| The student, in Beethoven | **⋯**, **Settings**, **Connection**, **Forget this computer**, **Forget** | The browser's key is deleted and the gate's `forget` removes the line. If the key is protected, Beethoven asks to unlock it first so the grid forgets it too. If the grid cannot be reached, the key leaves the browser and the line stays; Beethoven says so. |
-| The student, in a terminal on the grid (OnDemand's shell, on the VPN) | `bash /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker browser-key remove` | `HPCW-KEY removed` (or `none`). Refused under Claude Code, another agent or a batch job. |
-| The student, by hand | delete the line ending `beethoven-browser <date>` from `~/.ssh/authorized_keys` | Same. The copy framework 11 keeps, `authorized_keys.beethoven-prev`, never holds a Beethoven line, so putting it back cannot bring a key back. |
-| A new direct sign-in from another browser | automatic | Replaces the line: the old browser's key stops working. |
-| You, for one student | You cannot edit another account's `authorized_keys`. Ask the student, or ask C&IT. Withdrawing the approval (admin console, or `admin.mjs`) stops the extension starting workers at its next check, but **does not remove the line**: the gate does not consult the access service. The next run of the list (section 9) does take the AccessID off the volume root, and the line's forced command lives under that root, so from then on it cannot start (not tried on the grid). | |
-| You, for everyone | Set `browser_key_days` in `framework/profiles/wayne.json` and publish the copy: from then on the gate removes any line older than that many days the next time it is used (`HPCW-KEY expired`), and the student signs in with the password and code again. Wayne State's profile sets none today, so lines never lapse. | |
-| You, in an emergency | Every line runs your `current` copy, so a copy whose gate refuses everything would stop every browser key at once without touching students' files. Framework 11 has no ready switch for this; building one is a decision for you (`V12_STATUS.md`, section 7). | |
+| **A line in the student's `~/.ssh/authorized_keys`** on the cluster, beginning `restrict,command="<the lab's shared copy>/bin/hpcworker gate"` and ending with the tag `beethoven-browser` and a date. Beside it, `~/.ssh/authorized_keys.beethoven-prev` is that version's copy of the file from before the line was added; it never holds a Beethoven line. | The student's home on the grid | The student, in a terminal on the cluster (OnDemand's shell, on the VPN): `bash /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker browser-key remove` (the framework's shared copy still has the command; it answers `HPCW-KEY removed`, or `HPCW-KEY none`; refused under Claude Code, another agent or a batch job). Or by hand: delete the line. You cannot edit another account's file: ask the student, or C&IT. Withdrawing the approval does **not** remove it. 16.0.0 cannot use the line: the key it belonged to was dropped from the browser, unread, on the first run after the update. |
+| **The Settings note** | The student's Beethoven | **Settings** shows once **A key from an earlier version**: "An earlier version of Beethoven added a key for this computer to your grid account (<date>). Beethoven no longer uses it. Your lab lead can remove it for you." **Forget** hides the note and nothing more. |
+| **The helper** (the bridge) | The student's computer | Windows: **Settings**, **Apps**, **Beethoven bridge**, **Uninstall**. macOS: `uninstall.command` in `~/Library/Application Support/Beethoven/bridge`. Linux: `bash ~/.local/share/beethoven/bridge/uninstall.sh`. A zip install of 14.0.0 or earlier: its own `uninstall.cmd` or `uninstall.command` (`INSTALL.md`). 16.0.0 holds no permission to start it. |
+| **A passkey named Beethoven** (Windows Hello or Touch ID protection) | The browser's or the system's passkey store | The student deletes it in that store's own list (`INSTALL.md`, "Remove Beethoven completely"). |
 
-A student who loses a laptop signs in directly once from another computer, which replaces the line
-so that the lost laptop's key stops working, or removes the line from the OnDemand shell. (**Forget
-this computer** on the new computer would remove the new computer's key, not the lost one's.) If the
-passkey protection was on from the first sign-in, the lost key cannot be used without their
-fingerprint, face or PIN; if it was turned on later, an older unprotected copy may still be in that
-browser's files, so replace the line either way.
+A lost laptop with 12.0.0 to 15.0.0 still on it holds a key whose line, while the shared copy still
+answers `gate`, lets it start, watch and stop that student's worker until the line is removed: have
+the student remove the line (above). Once the list (section 9) drops an AccessID, the line's forced
+command, which lives under the volume root, cannot start either (not tried on the grid).
 
 ## 6. The python3 question, settled in framework 11
 
@@ -227,56 +148,39 @@ a second on the login node to read the site profile (`profile.py shellenv`), fil
 (`render`) and a new workspace's guide (`guide`), and check the profile at install (`validate`).
 Framework 11 does all four with awk and bash (`lib/profile.awk`, `lib/profile_sh.sh`), with the same
 results byte for byte on every profile the tests hold (`tests/test_profile_awk.py`), and
-`tests/test_login_node.py` measures that no line the extension types, the first connect and every
-gate verb included, starts `python3` or looks up any other banned program. `python3` remains only
-for what a person types at a terminal (`hpcworker profile show|set|validate|schema`, `install
---discover`) and the compute-node side of jobs; `tools/deploy_shared.sh`'s last check uses
-`hpcworker profile check` (section 2, step 2). None of this was measured on warrior itself (gawk
-4.0.2, bash 4.2.46): the suite passes under a bash 4.2.46 built from source and under gawk 5.2 and
-mawk 1.3.4.
+`tests/test_login_node.py` measures that no line the extension types, the first connect included,
+starts `python3` or looks up any other banned program. `python3` remains only for what a person
+types at a terminal (`hpcworker profile show|set|validate|schema`, `install --discover`) and the
+compute-node side of jobs; `tools/deploy_shared.sh`'s last check uses `hpcworker profile check`
+(section 2, step 1). None of this was measured on warrior itself (gawk 4.0.2, bash 4.2.46): the
+suite passes under a bash 4.2.46 built from source and under gawk 5.2 and mawk 1.3.4.
 
-## 7. The caps and the waits, in one table
+## 7. The floors and the waits, in one table
 
-| Limit | Value | Where |
+| What | How often | Where |
 |---|---|---|
-| Worker names a key may use | 3, each counting for 7 days after its last use; the student's own password sign-in clears them | `GATE_MAX_NAMES`, `GATE_NAME_DAYS` |
-| Connects through the gate (and restricts of a name with no run) | 12 in any rolling hour | `GATE_MAX_CONNECTS` |
-| Watches at once | 2, each ending after 30 minutes; none taken for a run that does not exist | `GATE_MAX_WATCHES`, `GATE_WATCH_MIN` |
-| Scheduler asked about a queued worker | at most once a minute, whoever asks | `GATE_POLL_FLOOR` |
-| Refused password sign-ins before Beethoven stops | 3 in a row, then a 15-minute pause for that AccessID | the sign-in sheet ("That didn't work three times.", "Try again at ...") |
-| The first password session, held for the first Claude sign-in | up to 10 minutes | the extension |
-| Line lifetime | none at Wayne State (`browser_key_days` unset) | the site profile |
+| The worker's files read through the portal | every 5 seconds while a worker starts, once a minute after | the extension (the line under **Details for your lab lead** says so) |
+| The scheduler asked about a queued worker (`worker status --json`) | at most once a minute | the extension |
+| A worker started or stopped | at most once a minute, only on a press of the student's; **Keep my worker running** at most once a minute and three times in a row | the extension |
+| Reach re-checked while a press waits on GlobalProtect | every 3 seconds while a Beethoven page is open, once a minute while none is | the extension |
+| The one-time key step re-tested after the line is typed | every 2 seconds | the extension |
 
-When a cap is reached the gate answers `HPCW-GATE limit names|hourly|watch` and runs nothing;
-Beethoven says which in plain words and offers GlobalProtect for that action.
+The 60-second floor on scheduler questions is this product's own etiquette, not C&IT's (section 3).
 
 ## 8. What students will ask you
 
-- **"The grid didn't accept the code."** Either the code was mistyped or had changed, or the account
-  has no grid code yet; Beethoven asks the student which. Only a student with no code at all should
-  run 2FA Setup (`USE.md`, part 2): running it twice destroys the existing code. Beethoven warns
-  before each step that could lead there.
-- **"Windows (or my Mac) says the helper is unsafe."** Since 15.0.0 the Windows and Mac installers
-  are signed (`ACCOUNTS.md`, 2.1), so the warnings of the unsigned script are not expected any more.
-  On Windows, SmartScreen may still warn while a new publisher has little reputation; **More info**,
-  then **Run anyway** is the panel's own second step. Whether and how often that happens is not yet
-  measured: ask for the window's exact words or a photo, and keep them. A warning on Windows that
-  names no publisher, or any warning on a Mac, is not expected: have the student stop, use
-  GlobalProtect, and send you the file's name and where it came from. On Linux the helper is still
-  the script, and `INSTALL.md` has its steps.
-- **"Can't reach the grid directly."** Their network blocks outbound port 22 (some hospital and hotel
-  networks do). They use **Use GlobalProtect instead**.
-- **"Stopped: the grid's identity didn't match."** The grid's host key did not match the pin.
-  Beethoven sent nothing. Do not tell them to go around it; they can use GlobalProtect meanwhile.
-  Check with C&IT whether the key changed; if it did, the site profile's pin must change in a new
-  extension version.
-- **"The grid's own tool said no: other people can rename things in ..."** The folders above the
-  lab's copy (section 2, step 1).
-- **"The lab's copy of the tool on the grid is older than this Beethoven."** Framework 11 is not
-  published yet (section 2, step 2).
-- **"The grid lets this computer's key use only a few worker names."** The names cap (section 7).
-  Signing in again with the password and code clears it; so does waiting a week.
-- **"I lost my laptop."** Section 5.
+- **"It says Turn on GlobalProtect and stays there."** GlobalProtect is off, or not connected to
+  `protect.wayne.edu` (the panel says **Still looking. Check that GlobalProtect says Connected.**).
+  Wayne State's guide is KB 20314, behind **How to set it up**. Once it is on, Beethoven goes ahead
+  with the kept press by itself; nothing to press again.
+- **"It says One more thing, once."** The one-time grid key step (section 1): the student types
+  their grid password, and the Google Authenticator code if the terminal asks, into the grid's own
+  terminal page, then presses **I'm in**. Only a student with no grid code at all should run 2FA
+  Setup (Wayne State's KB 20242): running it with one destroys the existing code, and the panel says
+  so there. Not yet measured on the grid: ask what the terminal showed and keep it.
+- **"Settings says A key from an earlier version."** Section 5. **Forget** hides the note only.
+- **"I lost my laptop."** Section 5, if 12.0.0 to 15.0.0 was on it; otherwise nothing of
+  Beethoven's on it reaches the grid without the student's own VPN and portal sign-in.
 - **"This Claude account has no Pro or Max plan."** The Claude account they signed in with has no
   Remote Control. To use another one they sign out of Claude on the grid themselves, then press
   **Sign in again**; Beethoven never does the sign-out (section 13).
@@ -452,9 +356,10 @@ closes Chrome completely, opens it again and clicks **Connect** (`USE.md`, part 
 
 **Taking an AccessID off.** Withdrawing an approval takes the entry away at the next run. That
 account then cannot reach anything under `/rs/rs_grp_oschome`: its own folder there included (the
-files stay), and the forced command of its browser key, which lives under the folder, so the key can no
-longer start anything. A worker of theirs that is still running loses its way to the lab's copy and
-to its folder; what it does then was not tried.
+files stay). A worker of theirs that is still running loses its way to the lab's copy and to its
+folder; what it does then was not tried. A line an earlier version left in that student's
+`~/.ssh/authorized_keys` (section 5) is not touched by this, but its forced command lives under the
+folder, so it cannot start either.
 
 Not proven: the tool has been run only in WSL, against a temporary folder standing for the volume,
 with `setfacl` and `getfacl` emulated (WSL has no acl package), the owners of the root's entries
@@ -464,13 +369,13 @@ chown to accounts that do not exist), ssh replaced by a stand-in that runs the g
 On the grid, only the entry for hy9698 that you set by hand on 2026-10-02 has been seen to work. Run
 `--dry-run --force` first.
 
-## 10. Not proven
+## 10. Not yet measured
 
-Everything about the direct way was run only against ssh servers the lab ran itself, set up like the
-grid, and the framework only against a fake scheduler; no key or password has been sent to
-grid.wayne.edu. `V12_STATUS.md` lists what that leaves open and the three tests that settle it (G1:
-your own key sign-in with the VPN off; G2: the phone route's paste; G3: real Windows Hello and Touch
-ID).
+Of the one way, on the real grid: the one-time grid key step by a student without a key (section
+1); a press kept on the GlobalProtect step going ahead by itself when the grid answers; and **Keep
+my worker running** starting an ended worker again from a closed panel. The framework's own open
+questions are hpcworker's `docs/OPEN_QUESTIONS.md`. Nothing of the direct way remains to measure:
+`V12_STATUS.md`'s tests G1 to G3 are moot.
 
 ## 11. A resumed session's link (14.0.0, framework 14)
 
@@ -483,10 +388,10 @@ environment link: on 2026-10-03 go2432's job 40554211 wrote `status.json` as `on
 a worker that was online. Framework 14 writes `session_url` = the link printed (either form) and
 `environment_url` = the environment link when one was printed, else "". 14.0.0 opens either.
 
-- **Publish framework 14** before students rely on it on the direct way (section 2's two commands). The
-  browser's key cannot read `rc.log` through the gate, so on the direct way 14.0.0 learns a resumed
-  session's link only from framework 14's `status.json` and `connection.json`. On the GlobalProtect way
-  14.0.0 also reads the link out of `rc.log`, so there it works with framework 13 too.
+- **Publish framework 14** before students rely on a resumed session's link (section 2's two
+  commands): it writes the link into `status.json` and `connection.json`, which `hpcworker worker
+  status` prints. 16.0.0 reads the worker's files through the portal, `rc.log` included, so it learns
+  the link out of `rc.log` with framework 13 too.
 - **No New session on such a link.** On a resumed session's link Claude Code serves that one session and exits
   when it is complete (the worker then starts it again), so the home offers **Open my session**, **Copy link** and **Phone**, and not
   **New session** (which opens an environment's page, where a new session can start).
@@ -494,33 +399,33 @@ a worker that was online. Framework 14 writes `session_url` = the link printed (
 
 ## 12. The debug log (14.0.0)
 
-A student who is stuck opens **⋯** (More) and clicks **Copy debug log**, then pastes it to you. It is the
-background's own account of what it did, one line per decision, newest last, after a header line naming
-the Beethoven version, the way to the grid (direct, vpn or setup), the portal, the AccessID, the worker's
-name and the time. **Details for your lab lead** shows its last 200 lines under the heading "Debug log",
-with a **Copy debug log** button; **Copy details** adds the same 200 lines.
+A student who is stuck opens **⋯** (More) and clicks **Copy debug log**, then pastes it to you. It
+is the background's own account of what it did, one line per decision, newest last, after a header
+line naming the Beethoven version, the mode (how Beethoven talks to the portal: `direct`, from the
+background itself with the browser's own sign-in, or `tab`, through a portal tab it opens and
+closes; `unknown` before the first check; `direct` here is the channel's word and not the direct way
+of 12.0.0 to 15.0.0), the portal, the AccessID, the worker's name and the time. **Details for your
+lab lead** shows its last 200 lines under the heading "Debug log", with a **Copy debug log** button;
+**Copy details** adds the same 200 lines.
 
 Each line is `<UTC time> <tag> <what happened>`. The tags:
 
 | Tag | What it says |
 |---|---|
 | `sw` | the background started (Chrome starts it again after it has been idle) |
-| `mode` | direct, vpn or setup, and why: the preference, the bridge, the key, whether the grid answered |
-| `bridge` | each bridge probe: which was chosen, and what each provider said |
-| `ssh` | each ssh connection opened and closed: to where, as whom, through which bridge, why, how long it took and lived |
-| `gate` | each gate verb (its verb and the worker's name; for `read`, which file), its exit status, how long it took, and the first 160 characters of its output; a verb the floor held back says so |
-| `grid` | each check of the grid sign-in, and what it found (framework, Claude Code's sign-in on the grid) |
+| `cleanup` | 16.0.0's one-time removal of what the direct way left in this browser: removed, none, or why not |
+| `grid` | each check of the grid sign-in through the portal, and what it found (signed in or not, as whom, the HTTP status) |
 | `read` | each read of the run's files: `status.json`'s job, state and `updated_at`, the phase Beethoven made of it, stale or not, seen alive or not, and whether a link is there and of which form |
 | `status` | each `worker status --json` the panel asked while a worker was in line or renewing |
 | `press`, `action`, `ready` | each button by its kind only, the press's result, and what a press waited for (the grid, the approval, the setup) |
-| `connect`, `sitting` | the connect line's start and way, then each event of the sitting by its kind; a Claude sign-in link by its host and path only |
-| `sheet` | each phase of the grid sign-in sheet, and the kinds of the grid's prompts |
+| `connect`, `sitting` | the connect line's start and whether it ran through the portal's shell from the background or through a portal tab, then each event of the sitting by its kind; a Claude sign-in link by its host and path only |
+| `keep` | **Keep my worker running**: a job that ended without a Stop, and the restart it made, with its count of three |
 | `access` | each approval check: asked or not, approved or not, and why |
 | `panel`, `online`, `open` | what the panel showed (the moment or the home's state, its sentence and its button), the online moment, each opening of claude.ai |
 | `fail` | each failure, with its detail |
 
-What it never holds: a password, a grid code, the code pasted from Claude's page, a key, a token, or a
-full authorize link. The background passes kinds, words and hosts, never what was typed; and the ring
+What it never holds: a password, a grid code, the code pasted from Claude's page, a token, or a full
+authorize link. The background passes kinds, words and hosts, never what was typed; and the ring
 itself cuts every web address to its host and path and removes anything key-, token- or code-shaped
 before a line is kept (`extension/src/core/debuglog.ts`). It is in the background's memory only, at most
 3,000 lines: never written to storage, never sent anywhere. It starts empty whenever Chrome starts the
@@ -531,10 +436,11 @@ still shows the problem.
 ## 13. Switching Claude accounts (15.0.0, framework 17)
 
 Beethoven never signs a student out of Claude. Its own tooling has no command for it, on purpose:
-earlier builds' **Use another account** typed `connect --login fresh`, which signed out of Claude Code
-on the grid before signing in again; framework 17 refuses that line, and 15.0.0 never types it. So when
-a student needs to use another Claude account (the panel said "This Claude account has no Pro or Max
-plan. Remote Control needs one.", or they have a second account of their own), the sign-out is theirs:
+earlier builds' **Use another account** typed `connect --login fresh`, which signed out of Claude
+Code on the grid before signing in again; framework 17 refuses that line, and no build since 15.0.0
+types it. So when a student needs to use another Claude account (the panel said "This Claude account
+has no Pro or Max plan. Remote Control needs one.", or they have a second account of their own), the
+sign-out is theirs:
 
 1. In a terminal on a compute node, inside the lab's worker image, with the student's own sign-in
    folder (`~/.beethoven/claude`) as `CLAUDE_CONFIG_DIR`, the student runs Claude Code's own

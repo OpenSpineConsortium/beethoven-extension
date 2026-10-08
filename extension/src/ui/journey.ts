@@ -1,5 +1,5 @@
-// The first run's moments in the panel (the specification's moments 4 to 12, AM2's one-time key step,
-// and 12.0.0's direct way, drawn by direct.ts), each one column: the title, the body, the moment's one control, then a spacer that keeps the
+// The first run's moments in the panel (the specification's moments 4 to 12 and AM2's one-time key
+// step), each one column: the title, the body, the moment's one control, then a spacer that keeps the
 // primary 32 px from the bottom. Every word comes from the view (core/model.ts JourneyView). The
 // four-node track is drawn above the moments by the panel (panel.ts), so it stays put while they slide.
 import { WORDS, formatTimer, type ProblemView, type ClaudeMoment, type ConnectMoment, type GlobalProtectMoment, type GridMoment, type JourneyView, type LoginSetupMoment, type OnlineMoment, type QueueMoment, type StartingMoment, type StatementMoment, type WelcomeMoment } from '../core/model';
@@ -9,8 +9,6 @@ import { drawnCheck, icon, spinner, type IconName } from './icons';
 import { logFold, type LogWords } from './log';
 import { button, checklist, fold, foldToggle, glyph, liveSub, orb, problem, tickBox, type OnAct } from './parts';
 import type { LogLine } from '../core/model';
-import { renderDirect, type DirectCtx } from './direct';
-import { WORDS12 } from './model12';
 
 /** what a moment may change on the page alone (a tick, a fold) and the acts it needs from the panel */
 export interface JourneyCtx {
@@ -34,8 +32,6 @@ export interface JourneyCtx {
   working?: string;
   /** "Allow again" (the portal's grant taken away): Chrome is asked for the origin inside the click, then use-portal is sent */
   allowAgain?: (origin: string) => void;
-  /** 12.0.0: the direct way's moments (direct.ts) */
-  direct: DirectCtx;
 }
 
 const STATEMENT_ICONS: IconName[] = ['eye', 'clock', 'shield', 'gauge'];
@@ -91,7 +87,7 @@ export function renderMoment(j: JourneyView, ctx: JourneyCtx): HTMLElement {
     case 'online':
       return online(j, ctx);
     default:
-      return renderDirect(j, ctx.direct) ?? el('section', { class: 'screen moment' });
+      return el('section', { class: 'screen moment' });
   }
 }
 
@@ -137,6 +133,8 @@ function globalProtect(m: GlobalProtectMoment, ctx: JourneyCtx): HTMLElement {
     glyph('lock'),
     title(m.title),
     body(m.body),
+    // 16.0.0: the university's own GlobalProtect page (the site profile's), when it has one
+    m.help ? el('p', { class: 'm-fine' }, el('a', { class: 'need-link', href: m.help.url, target: '_blank', rel: 'noopener noreferrer' }, el('span', { text: m.help.label }), icon('external', 13))) : null,
     m.chip
       ? el(
           'div',
@@ -151,6 +149,8 @@ function globalProtect(m: GlobalProtectMoment, ctx: JourneyCtx): HTMLElement {
       st.state === 'connected' ? drawnCheck(18) : spinner(16),
       el('span', { text: st.text }),
     ),
+    // 16.0.0: a press made while the grid is out of reach waits here and carries on by itself
+    m.note ? el('p', { class: 'm-fine', role: 'status', text: m.note }) : null,
   ]);
 }
 
@@ -274,8 +274,8 @@ function loginSetup(m: LoginSetupMoment, ctx: JourneyCtx): HTMLElement {
   const press = m.button
     ? button(opens ? { ...m.button, action: undefined, busy: m.button.busy || ctx.pending === 'open-terminal-for-login-setup' } : m.button, ctx.onAct, { pending: ctx.pending, onClick: opens ? () => ctx.openTerminal(m) : undefined })
     : null;
-  // 12.0.0: the grid's terminal may ask for the Google Authenticator code too; a student who has one must not run 2FA Setup
-  const codeNote = m.phase === 'password' ? el('p', { class: 'm-fine', style: 'margin-top:14px' }, icon('alert', 15), el('span', { text: WORDS12.loginSetupCode })) : null;
+  // the grid's terminal may ask for the Google Authenticator code too; a student who has one must not run 2FA Setup
+  const codeNote = m.phase === 'password' ? el('p', { class: 'm-fine', style: 'margin-top:14px' }, icon('alert', 15), el('span', { text: WORDS.loginSetup.codeNote })) : null;
   const phaseLine =
     m.phase === 'checking'
       ? el('p', { class: 'status', role: 'status' }, spinner(16), el('span', { text: m.body }))

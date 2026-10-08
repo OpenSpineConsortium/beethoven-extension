@@ -90,27 +90,6 @@ export function renderDetails(d: DetailsView | undefined, cb: { onAct: OnAct; pe
             pre(d.debugLog.lines.join('\n')),
           )
         : null,
-      // 12.0.0: the direct way, for the lab lead: the mode, each bridge in order, the grid's pinned
-      // identity, this browser's key (fingerprint, protected or not), the port, the account the grid
-      // accepted, the helper's file, and the plain statement that it is unproven on the grid
-      d.direct
-        ? section(
-            L.direct,
-            el(
-              'dl',
-              { class: 'd-card', style: 'margin:0' },
-              kv(L.directMode, d.direct.mode),
-              kv(L.bridges, d.direct.bridges.join('\n')),
-              kv(L.host, d.direct.host),
-              kv(L.pin, d.direct.pin),
-              kv(L.key, d.direct.key),
-              kv(L.reach, d.direct.reach),
-              kv(L.account, d.direct.account),
-              kv(L.helperFile, d.direct.helperFile),
-            ),
-            el('p', { class: 'd-note', text: d.direct.unproven }),
-          )
-        : null,
       section(
         L.connection,
         el('dl', { class: 'd-card', style: 'margin:0' }, kv(L.shellHost, d.shellHost), kv(L.siteProfile, d.siteProfile), kv(L.channel, d.channel), kv(L.loginSetup, `${d.loginSetup.proven ? L.proven : L.unproven}`)),

@@ -2,7 +2,7 @@
  "format": 1,
  "name": "beethoven-extension",
  "repository": "OpenSpineConsortium/beethoven-extension",
- "summary": "The Beethoven browser extension, the native-messaging bridge it ships and the store releases: the student's client for their own Claude Code worker on the university's grid.",
+ "summary": "The Beethoven browser extension and its store releases: the student's client for their own Claude Code worker on the university's grid, reached through the Open OnDemand portal the student grants, behind the university's VPN.",
  "standard": "https://github.com/OpenSpineConsortium/beethoven/blob/main/INTERFACES.md",
  "exports": [
   {
@@ -10,16 +10,25 @@
    "kind": "text",
    "version": 1,
    "summary": "The agreement and the privacy statement the extension shows and records acceptance of, each headed by its own 'Version N, yyyy-mm-dd.' line (TERMS_VERSION and TERMS_DATE in extension/src/core/terms.ts follow LICENSE.txt's); the website renders them as /beethoven/terms.html and /beethoven/privacy.html",
-   "paths": ["LICENSE.txt", "PRIVACY.md"],
-   "consumers": ["OpenSpineConsortium/openspineconsortium.github.io"]
+   "paths": [
+    "LICENSE.txt",
+    "PRIVACY.md"
+   ],
+   "consumers": [
+    "OpenSpineConsortium/openspineconsortium.github.io"
+   ]
   },
   {
    "id": "version",
    "kind": "data",
    "version": 1,
    "summary": "The product's version: the \"version\" field of this file and nothing else in it, which the website prints beside the texts",
-   "paths": ["extension/package.json"],
-   "consumers": ["OpenSpineConsortium/openspineconsortium.github.io"]
+   "paths": [
+    "extension/package.json"
+   ],
+   "consumers": [
+    "OpenSpineConsortium/openspineconsortium.github.io"
+   ]
   }
  ],
  "imports": [
@@ -43,20 +52,6 @@
    "version": 1,
    "into": "framework/contract-text",
    "origin": "framework/contract-text/ORIGIN"
-  },
-  {
-   "repository": "OpenSpineConsortium/hpcworker",
-   "export": "framework",
-   "version": 1,
-   "into": "framework/shared-copy",
-   "origin": "framework/shared-copy/ORIGIN"
-  },
-  {
-   "repository": "OpenSpineConsortium/hpcworker",
-   "export": "testbed",
-   "version": 1,
-   "into": "framework/testbed",
-   "origin": "framework/testbed/ORIGIN"
   }
  ]
 }

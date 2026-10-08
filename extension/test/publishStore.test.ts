@@ -1,4 +1,4 @@
-// helper/release/publish-store.mjs, the maintainer's upload to the Chrome Web Store, run as a process
+// extension/scripts/publish-store.mjs, the maintainer's upload to the Chrome Web Store, run as a process
 // against a stand-in on 127.0.0.1 that plays Google's token endpoint and the store's fetchStatus, upload
 // and publish, and records every request. What is checked is the tool's own work: the zip checks refuse
 // before any request, the requests are the documented methods and paths with the bearer token, a sign-in
@@ -20,13 +20,11 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const REPO = fileURLToPath(new URL('../..', import.meta.url));
-const TOOL = path.join(REPO, 'helper', 'release', 'publish-store.mjs');
+const TOOL = path.join(REPO, 'extension', 'scripts', 'publish-store.mjs');
 const VERSION = (JSON.parse(fs.readFileSync(path.join(REPO, 'extension', 'package.json'), 'utf8')) as { version: string }).version;
 const SCOPE = 'https://www.googleapis.com/auth/chromewebstore';
 const PUBLISHER = '0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0';
 const ITEM = 'abcdefghijklmnopabcdefghijklmnop';
-const OTHER_ITEM = 'ponmlkjihgfedcbaponmlkjihgfedcba';
-const ORIGIN = `chrome-extension://${ITEM}/`;
 const POSIX = process.platform !== 'win32';
 
 // planted secrets: none of them may ever show in what the tool prints
@@ -186,28 +184,17 @@ function zip(files: Record<string, Buffer | string>): Buffer {
 
 const sha256 = (b: Buffer) => crypto.createHash('sha256').update(b).digest('hex');
 
-interface Pkg { manifest: Record<string, unknown>; bridge: Record<string, unknown>; files: Record<string, Buffer | string> }
+interface Pkg { manifest: Record<string, unknown>; files: Record<string, Buffer | string> }
 
-/** a release package as npm run zip leaves it after the signed merge; `mutate` turns it wrong */
+/** a release package as npm run zip leaves it; `mutate` turns it wrong */
 function pkg(label: string, mutate?: (p: Pkg) => void): string {
-  const mac = crypto.randomBytes(3000);
-  const msi = crypto.randomBytes(3000);
-  const binary = (name: string, osName: string, data: Buffer, signed: string) => ({ os: osName, kind: 'binary', name, size: data.length, sha256: sha256(data), allowed_origins: [ORIGIN], signed });
   const p: Pkg = {
-    manifest: { manifest_version: 3, name: 'Beethoven', version: VERSION, permissions: ['storage', 'alarms', 'scripting', 'nativeMessaging', 'sidePanel'], optional_host_permissions: ['https://*/*'] },
-    bridge: {
-      name: 'Beethoven bridge', helper: '1.0.0', protocol: 1, allowed_origins: [ORIGIN], origins_filled: true,
-      files: [
-        { os: 'windows', kind: 'script', name: 'beethoven-bridge-windows.zip', open: 'install.cmd', size: 1, sha256: '0'.repeat(64) },
-        binary('beethoven-bridge-mac.pkg', 'mac', mac, 'developer-id-notarized'),
-        binary('beethoven-bridge-windows.msi', 'windows', msi, 'authenticode'),
-      ],
-    },
-    files: { 'background.js': 'console.log(1);\n', 'bridge/beethoven-bridge-mac.pkg': mac, 'bridge/beethoven-bridge-windows.msi': msi },
+    manifest: { manifest_version: 3, name: 'Beethoven', version: VERSION, permissions: ['storage', 'alarms', 'scripting', 'sidePanel'], optional_host_permissions: ['https://*/*'] },
+    files: { 'background.js': 'console.log(1);\n', 'chunks/panel.js': crypto.randomBytes(3000) },
   };
   mutate?.(p);
   const file = path.join(tmp(`zip-${label}`), `beethoven-${VERSION}-chrome.zip`);
-  fs.writeFileSync(file, zip({ 'manifest.json': JSON.stringify(p.manifest), 'bridge/manifest.json': JSON.stringify(p.bridge, null, 2), ...p.files }));
+  fs.writeFileSync(file, zip({ 'manifest.json': JSON.stringify(p.manifest), ...p.files }));
   return file;
 }
 
@@ -218,25 +205,19 @@ const form = (s: Seen) => Object.fromEntries(new URLSearchParams(s.body.toString
 // ---- the zip, before any request ------------------------------------------------------------------
 
 describe('upload refuses a package before any request', () => {
-  const binaries = (p: Pkg) => (p.bridge.files as Array<Record<string, unknown>>).filter((f) => f.kind === 'binary');
-  const cases: Array<{ label: string; signed?: boolean; mutate?: (p: Pkg) => void; says: RegExp; raw?: (file: string) => void }> = [
+  const cases: Array<{ label: string; mutate?: (p: Pkg) => void; says: RegExp; raw?: (file: string) => void }> = [
     { label: 'another version', mutate: (p) => { p.manifest.version = '13.0.0'; }, says: /its version is "13\.0\.0", and extension\/package\.json says/ },
     { label: 'a "key" field', mutate: (p) => { p.manifest.key = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA'; }, says: /has a "key" field/ },
     { label: 'a localhost permission (a development build)', mutate: (p) => { p.manifest.optional_host_permissions = ['https://*/*', 'http://localhost/*', 'http://127.0.0.1/*']; }, says: /names http:\/\/localhost\/\*, http:\/\/127\.0\.0\.1\/\*, so it is a development build/ },
     { label: 'a Manifest V2 package (the Firefox zip)', mutate: (p) => { p.manifest.manifest_version = 2; }, says: /manifest_version is 2/ },
     { label: 'no manifest.json at the top (a folder zipped one level up)', raw: (f) => { fs.writeFileSync(f, zip({ 'chrome-mv3/manifest.json': '{}' })); }, says: /no manifest\.json at its top level/ },
     { label: 'a file that is not a zip', raw: (f) => { fs.writeFileSync(f, 'not a zip at all'); }, says: /is not a zip file/ },
-    { label: '--require-signed without the two installers', signed: true, mutate: (p) => { delete p.files['bridge/beethoven-bridge-mac.pkg']; delete p.files['bridge/beethoven-bridge-windows.msi']; }, says: /--require-signed: it holds no bridge\/beethoven-bridge-mac\.pkg/ },
-    { label: '--require-signed without the Windows installer', signed: true, mutate: (p) => { delete p.files['bridge/beethoven-bridge-windows.msi']; }, says: /it holds no bridge\/beethoven-bridge-windows\.msi/ },
-    { label: '--require-signed with a wrong sha256', signed: true, mutate: (p) => { binaries(p)[1]!.sha256 = 'f'.repeat(64); }, says: /gives beethoven-bridge-windows\.msi the sha256 "f{64}", and the file in the zip has [0-9a-f]{64}/ },
-    { label: '--require-signed with an installer listed as a script', signed: true, mutate: (p) => { binaries(p)[0]!.kind = 'script'; }, says: /lists beethoven-bridge-mac\.pkg as kind "script", not "binary"/ },
-    { label: '--require-signed with installers built for another item', signed: true, mutate: (p) => { for (const b of binaries(p)) b.allowed_origins = [`chrome-extension://${OTHER_ITEM}/`]; }, says: /is built for .*ponmlkjihgfedcba.*, not for this item .* build it with --store-id abcdefghijklmnopabcdefghijklmnop/ },
   ];
   for (const c of cases) {
     it(`refuses ${c.label}: exit 2, one plain sentence, no request`, async () => {
       const file = pkg('refuse', c.mutate);
       c.raw?.(file);
-      const r = await run(UPLOAD(file, '--publish', ...(c.signed ? ['--require-signed'] : [])), { BEETHOVEN_VENDOR_DIR: vendor('refuse') });
+      const r = await run(UPLOAD(file, '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('refuse') });
       expect(r.code, r.err).toBe(2);
       expect(r.err).toMatch(c.says);
       expect(r.err).toContain('is not uploaded: ');
@@ -245,18 +226,10 @@ describe('upload refuses a package before any request', () => {
     });
   }
 
-  it('without --require-signed takes a package with no installers, and says so', async () => {
-    const file = pkg('nosigned', (p) => { delete p.files['bridge/beethoven-bridge-mac.pkg']; delete p.files['bridge/beethoven-bridge-windows.msi']; });
-    const r = await run(UPLOAD(file), { BEETHOVEN_VENDOR_DIR: vendor('nosigned') });
-    expect(r.code, r.err).toBe(0);
-    expect(r.out).toContain('NOTE: it does not carry both signed installers');
-    expect(requests()).toEqual(['POST /token', `POST /upload/v2/publishers/${PUBLISHER}/items/${ITEM}:upload`]);
-  });
-
   it('a package that passes the checks but no saved sign-in: exit 3 and the sign-in sentence, no request', async () => {
-    const r = await run(UPLOAD(pkg('nosignin'), '--require-signed'), { BEETHOVEN_VENDOR_DIR: tmp('empty-vendor') });
+    const r = await run(UPLOAD(pkg('nosignin')), { BEETHOVEN_VENDOR_DIR: tmp('empty-vendor') });
     expect(r.code).toBe(3);
-    expect(r.err).toMatch(/no Google sign-in is saved in .*; run node helper\/release\/publish-store\.mjs sign-in --client </);
+    expect(r.err).toMatch(/no Google sign-in is saved in .*; run node extension\/scripts\/publish-store\.mjs sign-in --client </);
     expect(seen).toEqual([]);
   });
 });
@@ -264,9 +237,9 @@ describe('upload refuses a package before any request', () => {
 // ---- the requests --------------------------------------------------------------------------------
 
 describe('upload, publish and status against the stand-in', () => {
-  it('upload --require-signed --publish sends exactly the token renewal, the upload and the publish, with the bearer token', async () => {
+  it('upload --publish sends exactly the token renewal, the upload and the publish, with the bearer token', async () => {
     const file = pkg('full');
-    const r = await run(UPLOAD(file, '--require-signed', '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('full') });
+    const r = await run(UPLOAD(file, '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('full') });
     expect(r.code, r.err).toBe(0);
     expect(requests()).toEqual([
       'POST /token',
@@ -283,7 +256,6 @@ describe('upload, publish and status against the stand-in', () => {
     expect(pub.body.length).toBe(0);
     // what the tool printed: the package, then each answer's keys and state-like fields, generically
     expect(r.out).toContain(`beethoven-${VERSION}-chrome.zip: Beethoven ${VERSION}, ${fs.statSync(file).size} bytes, sha256 ${sha256(fs.readFileSync(file))}`);
-    expect(r.out).toContain('It carries the signed installers for Mac and Windows.');
     expect(r.out).toContain('upload: HTTP 200');
     expect(r.out).toContain('  top-level keys: name, itemId, crxVersion, uploadState');
     expect(r.out).toContain('  uploadState: SUCCEEDED');
@@ -293,10 +265,10 @@ describe('upload, publish and status against the stand-in', () => {
   });
 
   it('upload without --publish stops after the upload and names the publish command', async () => {
-    const r = await run(UPLOAD(pkg('nopublish'), '--require-signed'), { BEETHOVEN_VENDOR_DIR: vendor('nopublish') });
+    const r = await run(UPLOAD(pkg('nopublish')), { BEETHOVEN_VENDOR_DIR: vendor('nopublish') });
     expect(r.code, r.err).toBe(0);
     expect(requests()).toEqual(['POST /token', `POST /upload/v2/publishers/${PUBLISHER}/items/${ITEM}:upload`]);
-    expect(r.out).toContain(`Uploaded, not submitted. Submit it with: node helper/release/publish-store.mjs publish --publisher ${PUBLISHER} --item ${ITEM}`);
+    expect(r.out).toContain(`Uploaded, not submitted. Submit it with: node extension/scripts/publish-store.mjs publish --publisher ${PUBLISHER} --item ${ITEM}`);
   });
 
   it('publish alone renews the token and submits', async () => {
@@ -318,9 +290,9 @@ describe('upload, publish and status against the stand-in', () => {
 
   it('invalid_grant from the renewal: exit 3, one sentence to sign in again, nothing uploaded', async () => {
     plan.refresh = { status: 400, body: { error: 'invalid_grant', error_description: 'Token has been expired or revoked.' } };
-    const r = await run(UPLOAD(pkg('expired'), '--require-signed', '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('expired') });
+    const r = await run(UPLOAD(pkg('expired'), '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('expired') });
     expect(r.code).toBe(3);
-    expect(r.err).toContain('publish-store: Google no longer accepts the saved sign-in (saved 2026-10-04T19:30:00.000Z), so run node helper/release/publish-store.mjs sign-in again (one visit in the browser) and then this command again.');
+    expect(r.err).toContain('publish-store: Google no longer accepts the saved sign-in (saved 2026-10-04T19:30:00.000Z), so run node extension/scripts/publish-store.mjs sign-in again (one visit in the browser) and then this command again.');
     expect(requests()).toEqual(['POST /token']);
   });
 
@@ -329,7 +301,7 @@ describe('upload, publish and status against the stand-in', () => {
       status: 403,
       body: { error: { code: 403, message: `The caller does not have permission (echo: Bearer ${ACCESS}, ${encodeURIComponent(REFRESH)}, ${CLIENT_SECRET})`, status: 'PERMISSION_DENIED' } },
     };
-    const r = await run(UPLOAD(pkg('denied'), '--require-signed', '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('denied') });
+    const r = await run(UPLOAD(pkg('denied'), '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('denied') });
     expect(r.code).toBe(1);
     expect(r.err).toContain('publish-store: the store refused the upload: HTTP 403, PERMISSION_DENIED: The caller does not have permission (echo: Bearer [redacted], [redacted], [redacted])');
     expect(r.out).toContain('upload: HTTP 403');
@@ -339,7 +311,7 @@ describe('upload, publish and status against the stand-in', () => {
   it('a 2xx upload whose answer reads as a failure stops before the publish', async () => {
     // invented names: the guard keys on "state", "status" and "error" in any field name, not on these
     plan.upload = { status: 200, body: { uploadState: 'FAILED', itemError: [{ error_detail: 'the manifest is invalid' }] } };
-    const r = await run(UPLOAD(pkg('failed'), '--require-signed', '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('failed') });
+    const r = await run(UPLOAD(pkg('failed'), '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('failed') });
     expect(r.code).toBe(1);
     expect(r.err).toContain('the upload answered HTTP 200, but uploadState is FAILED; nothing was submitted');
     expect(requests()).toEqual(['POST /token', `POST /upload/v2/publishers/${PUBLISHER}/items/${ITEM}:upload`]);
@@ -347,7 +319,7 @@ describe('upload, publish and status against the stand-in', () => {
 
   it('a 5xx from the publish after a good upload: exit 1 and the publish command still works on its own', async () => {
     plan.publish = { status: 503, body: 'Service Unavailable' };
-    const r = await run(UPLOAD(pkg('pub503'), '--require-signed', '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('pub503') });
+    const r = await run(UPLOAD(pkg('pub503'), '--publish'), { BEETHOVEN_VENDOR_DIR: vendor('pub503') });
     expect(r.code).toBe(1);
     expect(r.err).toContain('the store did not take the submission: HTTP 503, Service Unavailable');
     expect(seen).toHaveLength(3);
@@ -361,7 +333,7 @@ describe('upload, publish and status against the stand-in', () => {
   });
 
   it('refuses a vendor folder inside the repository, and makes nothing there', async () => {
-    const inside = path.join(REPO, 'helper', 'release', `vendor-never-${tag}`);
+    const inside = path.join(REPO, 'extension', 'scripts', `vendor-never-${tag}`);
     const client = path.join(tmp('client-inside'), 'client.json');
     fs.writeFileSync(client, JSON.stringify({ installed: { client_id: CLIENT_ID, client_secret: CLIENT_SECRET } }));
     const r = await run(['sign-in', '--client', client], { BEETHOVEN_VENDOR_DIR: inside });

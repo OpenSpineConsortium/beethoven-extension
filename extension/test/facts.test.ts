@@ -5,7 +5,7 @@
 // R10). Also: which files a listing downloads, the wait history, and Show log's merge.
 import { describe, expect, it } from 'vitest';
 import { parseRegistration, type StatusFile } from '../src/core/contract';
-import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, environmentLinkOf, forJob, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../src/core/facts';
+import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, environmentLinkOf, forJob, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../src/core/facts';
 import { formatClock } from '../src/core/model';
 import type { DirEntry } from '../src/core/portal';
 
@@ -195,69 +195,6 @@ describe('Show log', () => {
   });
 });
 
-// 12.0.0, the direct way: the gate's read has no modified time. The background stamped each read with its
-// own moment, so a file left "online" or "running" by a worker that had gone never aged (2026-10-02,
-// docs/V12_STATUS.md "the direct-way hang"). The read's moment now counts only when the file changed.
-describe('the direct way: a status.json read through the gate (applyStatusRead)', () => {
-  const sec = (ms: number) => Math.floor(ms / 1000);
-  const found = (): RunState => ({ stateDir: STATE, run: 'worker', job: '40400001', set_at: ago(10 * S), started_by: 'found' });
-  const runningFile = (beatAgo: number, extra: Partial<StatusFile> = {}): StatusFile => ({ ...queuedFile('40400001'), state: 'running', got_computer_at: ago(beatAgo + 5 * MIN), updated_at: ago(beatAgo), ...extra });
-
-  it('a worker that has gone (its file two hours old and never changing) reads as stale at once and stays so', () => {
-    const file = runningFile(120 * MIN);
-    let r = applyStatusRead(found(), file, sec(NOW)).run;
-    expect(r.status_mtime).toBeUndefined();
-    // 13.0.0 (M1): found in the folder and never seen to change, so never seen alive by this browser
-    expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ stale: true, live: false, neverSeenAlive: true });
-    // the same bytes read again later: still no proof of life
-    r = applyStatusRead(r, { ...file }, sec(NOW + 30 * S)).run;
-    expect(r.alive_seen).toBeUndefined();
-    expect(runFacts({ ...r, listed_at: ago(0) }, NOW + 30 * S)).toMatchObject({ stale: true, live: false, neverSeenAlive: true });
-    // "online" without a fresh heartbeat is not online either (R5), with its link or without
-    const online = applyStatusRead(found(), { ...runningFile(120 * MIN), state: 'online', environment_url: LINK }, sec(NOW)).run;
-    expect(runFacts({ ...online, listed_at: ago(0) }, NOW)).toMatchObject({ phase: 'connecting', stale: true, live: false });
-  });
-
-  it('a heartbeating worker is live even when the grid clock lags this one by five minutes: its file changes between reads', () => {
-    let r = applyStatusRead(found(), runningFile(5 * MIN), sec(NOW)).run;
-    // one read alone cannot tell a lagging clock from a stopped heartbeat
-    expect(runFacts({ ...r, listed_at: ago(0) }, NOW).stale).toBe(true);
-    r = applyStatusRead(r, runningFile(5 * MIN - 30 * S), sec(NOW + 30 * S)).run;
-    expect(r.status_mtime).toBe(sec(NOW + 30 * S));
-    expect(r.alive_seen).toBe(true);
-    const live = runFacts({ ...r, listed_at: new Date(NOW + 30 * S).toISOString() }, NOW + 30 * S);
-    expect(live).toMatchObject({ stale: false, live: true });
-    expect(live.neverSeenAlive).toBeUndefined();
-    // and it goes stale three minutes after its last heartbeat was seen: R12, but a run seen alive here (M1: the panel keeps its phase)
-    r = applyStatusRead(r, runningFile(5 * MIN - 30 * S), sec(NOW + 4 * MIN)).run;
-    const quiet = runFacts({ ...r, listed_at: new Date(NOW + 4 * MIN).toISOString() }, NOW + 4 * MIN);
-    expect(quiet.stale).toBe(true);
-    expect(quiet.neverSeenAlive).toBeUndefined();
-  });
-
-  it("another job's file is ignored and refreshes nothing (R1); a renewal starts the new job's clock from its own file", () => {
-    const old = applyStatusRead(found(), runningFile(120 * MIN), sec(NOW)).run;
-    const other = applyStatusRead(old, { ...queuedFile('40400999'), state: 'stopped' }, sec(NOW + 30 * S));
-    expect(other.taken).toBe(false);
-    expect(other.run.status_mtime).toBeUndefined();
-    expect(runFacts({ ...other.run, listed_at: ago(0) }, NOW + 30 * S)).toMatchObject({ stale: true, live: false });
-    // a renewal: the successor named by next_job becomes the run's job, and a mtime of the old job does not carry over
-    const renewing = { ...old, next_job: '40400002', status_mtime: sec(NOW) };
-    const renewed = applyStatusRead(renewing, { ...runningFile(10 * S), job: '40400002' }, sec(NOW + 30 * S));
-    expect(renewed).toMatchObject({ taken: true, run: { job: '40400002', alive_seen: true } });
-    expect(renewed.run.status_mtime).toBeUndefined();
-    expect(runFacts({ ...renewed.run, listed_at: ago(0) }, NOW + 30 * S)).toMatchObject({ stale: false, live: true });
-  });
-
-  it('13.0.0 (M1): only a found run is ever "never seen alive"; a Connect\'s run or the restart\'s is the student\'s own', () => {
-    for (const started_by of ['connect', 'auto'] as const) {
-      const r = applyStatusRead({ ...found(), started_by }, runningFile(120 * MIN), sec(NOW)).run;
-      expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ stale: true });
-      expect(runFacts({ ...r, listed_at: ago(0) }, NOW).neverSeenAlive).toBeUndefined();
-    }
-  });
-});
-
 // 13.0.0 (M1) on the GlobalProtect way: the listing's modified_at is the file's own, so a found run's heartbeat
 // is measured as it is; "seen alive" there is a download whose modified_at moved since the last one of the run
 describe('the Files listing: a found run is seen alive once its status.json is written again (applyStatus with a modified time)', () => {
@@ -340,17 +277,6 @@ describe('14.0.0: the link of a run is either form', () => {
     expect(runFacts(viaRc, NOW).link).toBe(SES);
     // a connection.json of another job says nothing (R1)
     expect(applyConnection(runWith(undefined), { job: '1', session_url: SES }).taken).toBe(false);
-  });
-
-  it('on the direct way, a found run whose session-form file changes between two reads is online and seen alive', () => {
-    const sec = (ms: number) => Math.floor(ms / 1000);
-    const found: RunState = { stateDir: STATE, run: 'worker', job: '40554211', set_at: ago(10 * S), started_by: 'found', listed_at: ago(0) };
-    const file = (beatAgo: number): StatusFile => ({ ...queuedFile('40554211'), state: 'online', node: 'asx15', got_computer_at: ago(50 * MIN), online_at: ago(43 * MIN), updated_at: ago(beatAgo), session_url: SES, environment_url: '', environment_id: '', resumed: true });
-    let r = applyStatusRead(found, file(20 * S), sec(NOW - 30 * S)).run;
-    expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ phase: 'online', link: SES, stale: false, neverSeenAlive: true });
-    r = applyStatusRead(r, file(0), sec(NOW)).run;
-    expect(r.alive_seen).toBe(true);
-    expect(runFacts({ ...r, listed_at: ago(0) }, NOW)).toMatchObject({ phase: 'online', link: SES });
   });
 
   it("a renewal forgets the previous job's rc.log: its successor online before its own link is read is connecting, then has its own link", () => {

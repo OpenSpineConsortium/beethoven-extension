@@ -62,6 +62,9 @@ export interface RunState {
   status_json_at?: string;
   /** the student pressed Stop: the run stays stopped until they connect again */
   stopped_by_student?: boolean;
+  /** 16.0.0, "Keep my worker running": the ended job this browser started the worker again for, and how many such starts in a row (the student's own Connect resets it) */
+  kept_running_job?: string;
+  kept_running?: number;
   /** the link opened once for this press (14.0.0: either form; the name is kept for the stored record) */
   opened_env?: string;
   /** the job whose wait went into WAIT_HISTORY_KEY */
@@ -171,29 +174,6 @@ export function forJob(run: RunState, job: string): RunState {
   if (job === run.job) return run;
   const { connection: _c, connection_mtime: _cm, registration: _r, rc_tail: _rt, rc_mtime: _rm, next_job: _n, ...rest } = run;
   return { ...rest, job };
-}
-
-/**
- * 12.0.0, the direct way: R1 and R3 for a status.json read through the gate, whose read carries no
- * modified time. The heartbeat is then the file's own updated_at (R5, R12), and the moment of the read
- * (`readAt`, s) stands in for the listing's modified_at only as proof of life: when the file changed
- * since the last read of the same job (the worker wrote a heartbeat in between). A first read of a job,
- * or a read of a file that has not changed, never refreshes it, so a run whose worker has gone (its
- * file left "online" or "running") reads as stale; and a grid clock behind this computer's cannot make
- * a heartbeating worker stale past the first read after its next heartbeat (up to one heartbeat, 30 s, on
- * a fresh copy). Stamping every read with its own moment, as the
- * direct way did at first, made every such file look alive for ever (2026-10-02, docs/V12_STATUS.md).
- * 13.0.0: a file that changed between two reads also marks the run alive_seen (a renewal's first file too).
- */
-export function applyStatusRead(run: RunState, status: StatusFile, readAt: number): { run: RunState; taken: boolean } {
-  const before = run.status;
-  const r = applyStatus(run, status);
-  if (!r.taken) return r;
-  const changed = !!before && JSON.stringify(before) !== JSON.stringify(status);
-  const seen = changed ? { alive_seen: true } : {};
-  const sameJob = !!before && String(before.job ?? '') === String(status.job ?? '') && run.job === r.run.job;
-  if (!sameJob) return { run: { ...r.run, ...seen, status_mtime: undefined }, taken: true };
-  return changed ? { run: { ...r.run, ...seen, status_mtime: readAt }, taken: true } : r;
 }
 
 /**

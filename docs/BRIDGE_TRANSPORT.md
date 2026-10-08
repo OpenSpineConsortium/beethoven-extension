@@ -1,5 +1,12 @@
 # How Beethoven reaches the grid from the browser
 
+**16.0.0 (2026-10-08).** This record describes a subsystem 16.0.0 removed whole: the bridge and native
+messaging, the browser key and the gate line, the signed installers, the relay set aside. Since 16.0.0 the
+one way to the grid is the university's VPN and the Open OnDemand portal (`ARCHITECTURE.md`); the
+extension requests no `nativeMessaging` and ships no helper. The text below is kept as history, in the
+present tense of 15.0.0, and the files it cites under `extension/src/ssh/`, `extension/src/core/bridge.ts`
+and `helper/` are gone from the tree.
+
 The design record of the bridge's transport, as of extension 15.0.0 (helper 1.0.0, protocol 1),
 2026-10-04. Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are
 Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher.

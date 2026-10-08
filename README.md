@@ -1,11 +1,11 @@
 # Beethoven
 
 > **This repository** is the **client half** of the 2026-10-03 split of
-> `OpenSpineConsortium/beethoven`: `extension/` (the Beethoven browser extension), `helper/` (the
-> bundled bridge) and `release/` (the store packages), with the site profiles vendored as data in
-> `framework/profiles/`. The cluster side (hpcworker) lives in the sibling repository,
-> `OpenSpineConsortium/hpcworker`. The text below predates the split and describes the whole
-> product; where it names `framework/` beyond the profiles, read the sibling repository.
+> `OpenSpineConsortium/beethoven`: `extension/` (the Beethoven browser extension) and `release/`
+> (the store packages), with the site profiles vendored as data in `framework/profiles/`. The
+> cluster side (hpcworker) lives in the sibling repository, `OpenSpineConsortium/hpcworker`. The
+> text below predates the split and describes the whole product; where it names `framework/` beyond
+> the profiles, read the sibling repository.
 
 ## Trying it from this repository (collaborators)
 
@@ -165,14 +165,11 @@ From the report's "deliberately absent" list and its security controls:
 - No install-time host permission. Access to the one portal origin is requested from the click on
   the icon (or the *Connect* button on the setup page).
 - No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`,
-  `identity` or `clipboardRead` permission. `nativeMessaging` is requested since 12.0.0 for one host
-  only, Beethoven's own bundled bridge (`helper/`), which carries bytes to the grid's ssh port and
-  nothing else; since 15.0.0 it reaches Windows and macOS as a signed installer inside the package,
-  and Linux as a script. The portal cookie is carried by the browser's network stack and never read.
+  `identity`, `clipboardRead` or `nativeMessaging` permission (`nativeMessaging` was requested from
+  12.0.0 to 15.0.0, for Beethoven's own bundled bridge, and is not since 16.0.0). The portal cookie
+  is carried by the browser's network stack and never read.
 - No automated login of the portal: a redirect to the identity provider means "sign in to your
-  portal in a tab", and the university's sign-in pages are never filled in. On the direct way the
-  student types the grid password and one-time code into Beethoven's own sign-in sheet, which sends
-  them only to the grid inside the encrypted ssh session and never keeps them.
+  portal in a tab", and the university's sign-in pages are never filled in.
 - No remote code: no `eval`, no fetched scripts. The kill-list is JSON, verified with WebCrypto against
   a public key compiled into the bundle, and the extension works offline on the last good list.
 - Nothing persistent on the login node: one `sbatch --parsable` through the shell, then the shell is
@@ -214,7 +211,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 10.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 16.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -222,12 +219,16 @@ with the approval check (one installation per approved account) and is offered o
 private Chrome Web Store listing; 9.0.0 wears the site's theme with its typefaces bundled and was
 never submitted for review; 10.0.0 refuses an address on claude.ai, claude.com or anthropic.com
 before asking the browser for anything, removes a grant an earlier build obtained on one, and keeps
-the agreement's button grey until the text has been read; `release/10.0.0/README.md` lists the
-changes); the framework's `VERSION` file is 8, and the lab's shared copy at
-Wayne State is the version `tools/deploy_shared.sh` last published (the panel shows it under
-*Details*); the agreement `LICENSE.txt` is version 7 and the extension's `TERMS_VERSION`
-(`extension/src/core/terms.ts`) is 7 to match; `PRIVACY.md` is version 8. All integers; a changed
-text moves its version with it.
+the agreement's button grey until the text has been read; 11.0.0 reaches the portal from its own
+background and accepts the agreement with one tick; 12.0.0 to 15.0.0 tried a direct way over ssh
+first, through a bridge bundled in the package, with signed installers for it from 15.0.0; 16.0.0
+removes that way whole and keeps the one way, the university's VPN and the portal, with a press that
+waits for the VPN and goes ahead by itself; `release/<version>/README.md` lists a version's changes,
+up to 14.0.0); the framework is the server repository's, `OpenSpineConsortium/hpcworker`, and the
+lab's shared copy at Wayne State is the version its `tools/deploy_shared.sh` last published (the
+panel shows it under *Details*); the agreement `LICENSE.txt` is version 11 and the extension's
+`TERMS_VERSION` (`extension/src/core/terms.ts`) is 11 to match; `PRIVACY.md` is version 12. All
+integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -321,30 +322,26 @@ that sends no installation identifier (before 8.0.0) is refused once the service
    move to the next whole number; a changed agreement or privacy statement moves its own "Version N"
    line and, for the agreement, `TERMS_VERSION`/`TERMS_DATE` in `src/core/terms.ts`; a changed framework
    moves `framework/VERSION` and the `VERSION=` line at the top of `framework/bin/hpcworker`.
-2. Since 15.0.0 the package carries the bridge's two signed installers, so it is made on the
-   maintainer's Mac by one command, from the repository root on a clean `main` equal to
-   `origin/main`: `bash helper/release/release.sh` (`helper/release/README.md` is the runbook; once
-   per Mac, `bash helper/release/setup-mac.sh`; a Windows machine builds the `.msi` only as the
-   fallback). It runs `npm ci`, the type check and the tests in `extension/`, builds and signs
-   `beethoven-bridge-mac.pkg` and `beethoven-bridge-windows.msi`, merges them, zips, runs the package
-   tests on that zip, records `release/<version>/` and uploads the zip to the private Chrome Web Store
-   item, submitted for review; `--no-upload` stops after the record and prints the upload command
-   (step 4). `npm run typecheck && npm run build && npm run zip && npm test` in `extension/` still
-   builds and checks a package, without the signed installers: never the one the store gets. The framework's tests and its deploy to each site's
-   shared copy (`tools/deploy_shared.sh`) are the server repository's, `OpenSpineConsortium/hpcworker`;
-   a changed framework reaches the lab's copy before the extension that needs it reaches students:
-   the extension runs whatever the lab's copy is.
-3. The record: the release's zip and its `bridge/` name the store item and carry the signed
-   installers, so `.gitignore` keeps them out and they stay on the Mac; commit what `release.sh`'s
-   summary lists (the record's `README.md`, `guides/` and its two `SHA256SUMS.txt` files), tag
-   `v<version>` and push. A GitHub release named `v<version>` on the organisation's private copy, if
-   one is made, carries those checksums and no zip; it is never a download page for students, who
-   install only from the private listing. Records up to 14.0.0 hold their zips and were made by hand
-   (`release/10.0.0/` also holds the store kit and the reviewers' mock-portal zip).
+2. The package: on any machine with Node 22, from a clean `main` equal to `origin/main`, `npm ci`,
+   `npm run typecheck`, `npm run build`, `npm run zip` and `npm test` in `extension/` (the Chrome
+   zip lands in `extension/.output/`). That zip is the one the store gets: since 16.0.0 the package
+   carries no installer and nothing in it is signed. The framework's tests and its deploy to each
+   site's shared copy (`tools/deploy_shared.sh`) are the server repository's,
+   `OpenSpineConsortium/hpcworker`; a changed framework reaches the lab's copy before the extension
+   that needs it reaches students: the extension runs whatever the lab's copy is.
+3. The record: `release/<version>/` holds the record's `README.md` (what was built, from which
+   commit, with which steps), `guides/` when the store kit changed, and `SHA256SUMS.txt`, which pins
+   the zip; the zip itself names the store's extension and stays on the maintainer's computer
+   (`.gitignore`). Commit the record, tag `v<version>` and push. A GitHub release named `v<version>`
+   on the organisation's private copy, if one is made, carries those checksums and no zip; it is
+   never a download page for students, who install only from the private listing. Records up to
+   14.0.0 hold their zips and were made by hand (`release/10.0.0/` also holds the store kit and the
+   reviewers' mock-portal zip).
 4. For a first submission, or whenever the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) comes
-   before the upload, run step 2 with `--no-upload`, make the test, then upload the recorded zip as
-   `docs/store/SUBMISSION.md` says (texts in `docs/store/LISTING.md`). Then rebuild and push the site
-   pages if a text changed.
+   before the upload, make the test on the recorded zip, then upload it as
+   `docs/store/SUBMISSION.md` says (`node extension/scripts/publish-store.mjs upload`, on the
+   maintainer's own sign-in, with no key in the repository; texts in `docs/store/LISTING.md`). Then
+   rebuild and push the site pages if a text changed.
 
 ## Documents
 
@@ -368,8 +365,8 @@ that sends no installation identifier (before 8.0.0) is refused once the service
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 7; the extension's
-  `TERMS_VERSION` is 7) and the privacy statement (version 8).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 11; the extension's
+  `TERMS_VERSION` is 11) and the privacy statement (version 12).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

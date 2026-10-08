@@ -4,7 +4,3 @@ node_modules/
 public/framework/
 *.log
 public/profiles/
-# the signed bridge installers a release build copies in from helper/signed/; the manifest.json beside
-# them stays tracked, and the one a release build writes is restored before any commit (helper/release/README.md)
-public/bridge/*.pkg
-public/bridge/*.msi

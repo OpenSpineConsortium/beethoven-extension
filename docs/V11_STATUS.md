@@ -1,5 +1,8 @@
 # Beethoven 11.0.0 and framework 10: where the build stands
 
+**16.0.0 (2026-10-08).** 16.0.0 returns to this version's one way to the grid, the portal behind the
+university's VPN; the direct way that 12.0.0 to 15.0.0 tried first is removed (`ARCHITECTURE.md`).
+
 2026-10-01, after the integration pass. Nothing here was run against the Wayne State grid, its portal
 or the live access service: every run below is against the repository's mock portal
 (`extension/mock-ood`) on this computer, with the access service played by a local stand-in. Nothing

@@ -1,6 +1,6 @@
 # Beethoven for testers
 
-**12.0.0 (2026-10-02).** For 12.0.0, follow `guides/INSTALL.md` and `guides/USE.md`, which replace this page for installing the helper, the first direct sign-in, the grid code, the key and Forget this computer. The steps below, from asking for access to the invitation, still hold.
+**16.0.0 (2026-10-08).** For 16.0.0, follow `guides/INSTALL.md` and `guides/USE.md`, which replace this page for installing and using Beethoven (one way to the grid: your university's VPN, then its Open OnDemand portal). The steps below, from asking for access to the invitation, still hold; where a panel word below differs from the guides, the guides have today's.
 
 What you do, in order, from asking for access to your first worker. There is no key and nothing to
 paste anywhere: your own sign-in to your university's Open OnDemand portal identifies you, and the
@@ -85,9 +85,10 @@ another computer where Chrome is signed in to the same Google account, that copy
 installation and is refused: remove it there, or turn off syncing of extensions in Chrome's settings
 on the computers you do not use for Beethoven.
 
-The extension's setup page opens by itself. Read the agreement to its end (the button stays grey
-until you have), tick the four statements, type your name and choose *Accept and Continue*. That is
-all the setup page needs; nothing else is entered there.
+The extension's welcome page opens by itself. Read *You'll need* (a grid account, your university's
+VPN, Claude Pro or Max), tick the one box (*Show terms* opens the agreement) and choose *Agree and
+continue*; your browser then asks to let the extension reach your portal's site. That is all the
+welcome page needs; nothing else is entered there.
 
 ## 3. Open your portal and click the icon
 
@@ -106,15 +107,15 @@ all the setup page needs; nothing else is entered there.
    terminal, and the extension does not keep it.
 
 When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off
-on the setup page), and the panel shows a green *Open in Claude* button for later. The worker stays
+in Settings), and the panel shows a green *Open my session* button for later. The worker stays
 on by itself until you press *Stop*.
 
 ## After it connects, nothing on your laptop is needed
 
-The worker is a job on the cluster, not a program on your computer. Once the panel shows *Open in
-Claude*, you can close the panel, the portal tab, the browser and the laptop. From any device, open
-`https://claude.ai/code` (or *Code* in the Claude app), pick the environment named after your site
-(at Wayne State, `wayne-worker`) and carry on; you do not sign in to the portal again for that. The
+The worker is a job on the cluster, not a program on your computer. Once the panel shows *Open my
+session*, you can close the panel, the portal tab, the browser and the laptop. From any device, open
+`https://claude.ai/code` (or *Code* in the Claude app), pick the environment the panel names for you
+(*Look for …*) and carry on; you do not sign in to the portal again for that. The
 job renews itself: before its time is up it has already queued its successor, which takes over and
 continues the same session. You need the portal again only to press *Stop*, to start a worker after
 you stopped it, or if the cluster ended the chain (the panel's one button then reads *Start*).
@@ -147,7 +148,7 @@ or no; the service records those with the time, a salted hash of your network ad
 answer, and keeps which installation your approval is bound to. Once a day it also downloads,
 without cookies, two small files from the maintainer's website (the service address and the signed
 list of withdrawn versions), which carry nothing about you. No usage data, no error reports, no
-activation. The full statement is `PRIVACY.md` (version 8), also at
+activation. The full statement is `PRIVACY.md` (version 12), also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
 ## What to send when something does not work

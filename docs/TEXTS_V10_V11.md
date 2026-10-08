@@ -1,5 +1,9 @@
 # Beethoven texts for 15.0.0: agreement version 10, privacy statement version 11
 
+**16.0.0 (2026-10-08).** This record describes agreement 10 and privacy statement 11 for 15.0.0, the
+Bridge's signed installers; 16.0.0 removed the Bridge whole. Agreement 11 and privacy statement 12
+(`TEXTS_V11_V12.md`) take it out of the texts.
+
 Drafted 2026-10-04 for Greg and for counsel, by the texts stream of the 15.0.0 build. **This is
 drafting, not legal advice.** No lawyer has read these texts or this note; the questions at the end
 are for one.
