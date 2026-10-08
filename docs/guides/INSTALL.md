@@ -1,44 +1,30 @@
 # Install Beethoven
 
-For Beethoven 15.0.0. Written 2026-10-02, updated 2026-10-04.
+For Beethoven 16.0.0. Written 2026-10-02, updated 2026-10-08.
 
-**Updating from 14.0.0.** If Beethoven came from its page in the Chrome Web Store, Chrome updates it
-by itself. If you have a copy loaded any other way, remove it first: click the puzzle icon, then
-**⋮** next to Beethoven, then **Remove from Chrome**; then install 15.0.0 as in Part 1, and sign in
-to the grid once more. Keep only one copy: two copies side by side sign each other out of the grid.
-Beethoven asks you to accept its terms once more: they now describe the signed helper. If Beethoven
-finds your helper, it stays as it is and keeps working (it is the same helper, version 1.0.0). If
-Beethoven offers the helper again after the update, remove the old one first ([Remove the
-helper](#remove-the-helper), the way for 14.0.0 and earlier), then install it from the panel. What
-changes: on Windows and on a Mac, the helper now comes as a signed installer (part 2).
+**Updating from 15.0.0, or from 12.0.0 to 14.0.0.** If Beethoven came from its page in the Chrome
+Web Store, Chrome updates it by itself. If you have a copy loaded any other way, remove it first:
+click the puzzle icon, then **⋮** next to Beethoven, then **Remove from Chrome**; then install
+16.0.0 as below. Keep only one copy. Beethoven asks you to accept its terms once more: they no
+longer describe the helper. What changes: 16.0.0 has one way to the grid, GlobalProtect and the
+grid's website, as 11.0.0 had. The helper that 12.0.0 to 15.0.0 installed on your computer is not
+used any more and is never started; you can remove it ([If an earlier version installed the
+helper](#if-an-earlier-version-installed-the-helper)). The key an earlier version added to your grid
+account is not used either: **Settings** shows **A key from an earlier version** once, with
+**Forget**, which only hides that note; your lab lead can have the key removed ([Use
+Beethoven](USE.md), part 4). Your worker and your files on the grid stay as they are: the update
+touches nothing on the grid.
 
-**Updating from 13.0.0.** First remove every older copy: click the puzzle icon, then **⋮** next to
-each Beethoven, then **Remove from Chrome** (or remove each Beethoven card in
-`chrome://extensions`). Then install the current Beethoven as in Part 1, and sign in to the grid
-once more. Keep only one copy: two copies side by side sign each other out of the grid. Your helper,
-your worker and your files on the grid stay as they are. What 14.0.0 changed: a worker that picked
-up an earlier conversation now shows **Online** with **Open my session**, where 13.0.0 waited on
-**Starting · Connecting to Claude…** (your lab lead also publishes framework 14 on the grid); and
-**⋯** (More) has **Copy debug log**, for your lab lead when something is stuck ([Use
-Beethoven](USE.md), part 7).
+**What 13.0.0 and 14.0.0 changed**, for anyone coming from 12.0.0: if your worker's next job was
+cancelled, Beethoven shows **Stopped** with **Connect** (13.0.0, once framework 13 is published on
+the grid; your lab lead does that); a worker that picked up an earlier conversation shows **Online**
+with **Open my session**, where 13.0.0 waited on **Starting · Connecting to Claude…** (14.0.0, with
+framework 14 on the grid); and **⋯** (More) has **Copy debug log**, for your lab lead when something
+is stuck ([Use Beethoven](USE.md), part 5).
 
-**Updating from 12.0.0.** First remove the 12.0.0 copy: click the puzzle icon, then **⋮** next to
-Beethoven, then **Remove from Chrome**. Then install the current Beethoven as in Part 1. Keep only
-one copy, because two copies side by side sign each other out of the grid. Your helper, your worker
-and your files on the grid stay as they are; you sign in to the grid once more. What 13.0.0 changed:
-if your worker's next job was cancelled, Beethoven shows **Stopped** with **Connect**, once
-framework 13 is published on the grid (your lab lead does that). Before, it waited with no button.
-
-Beethoven has two parts:
-
-1. **Beethoven itself**, a Chrome extension. You install it from its private page in the Chrome Web
-   Store.
-2. **The helper**, a small program that comes inside Beethoven. You install it once on each
-   computer. It lets Beethoven reach the grid without GlobalProtect. It is optional: without it,
-   Beethoven uses GlobalProtect, as before.
-
-You never need administrator rights. Nothing comes from a website: the helper is a file inside
-Beethoven.
+Beethoven is one part: a Chrome extension, installed from its private page in the Chrome Web Store.
+Nothing else is installed on your computer, nothing is downloaded from a website, and you never need
+administrator rights.
 
 ## What you need
 
@@ -46,147 +32,37 @@ Beethoven.
 - The invitation to Beethoven's private page. It goes to the Google account you gave when you asked
   for access.
 - A Wayne State AccessID with a grid account.
+- GlobalProtect, Wayne State's VPN app, connected to `protect.wayne.edu`. Beethoven reaches the grid
+  only through it. Wayne State's own guide is KB 20314; the welcome page's **How to set it up**
+  opens it.
 - Claude Pro or Max.
-- To reach the grid without GlobalProtect: a Google Authenticator code for the grid. If you don't
-  have one yet, Beethoven shows you how to set it up ([Using Beethoven](USE.md), part 2).
 
-## Part 1. Install Beethoven
+## Install Beethoven
 
 1. Open the invitation in Chrome. Chrome must be signed in to the Google account the invitation was
    sent to.
 2. Open the link to Beethoven's page in the Chrome Web Store.
 3. Click **Add to Chrome**.
-4. Chrome asks whether to add Beethoven and lists what it can do. Click **Add extension**. The list
-   says **Communicate with cooperating native applications**: that is the helper of part 2.
-   Beethoven can talk to it once you install it, and to no other program on your computer.
-5. Beethoven's welcome page opens. Carry on with [Using Beethoven](USE.md), part 1.
+4. Chrome asks whether to add Beethoven and lists what it can do. Click **Add extension**.
+5. Beethoven's welcome page opens. Carry on with [Use Beethoven](USE.md), part 1.
 6. Pin Beethoven so it is one click away: click the puzzle icon at the top right of Chrome, then the
    pin next to **Beethoven**.
 
 If the link shows no item, Chrome is signed in to another Google account. Switch to the account the
 invitation was sent to and open the link again.
 
-## Part 2. Install the helper (once per computer)
-
-### What the helper is
-
-- A small program, called the Beethoven bridge in its own files. It comes inside Beethoven, so
-  nothing is downloaded from a website.
-- What it is depends on your computer:
-  - **Windows and Mac.** A small program in an installer that is signed: "This installer is signed,
-    so your computer can check that it came from Beethoven's maker before it runs."
-  - **Linux.** A short script that runs on Perl, or on Python 3 where Perl is missing; both come
-    with Linux. It is not signed by a company. You can read it: every file in it is plain text.
-- It needs no administrator. It installs into your own user account.
-- It only carries Beethoven's encrypted connection to the grid: to `grid.wayne.edu`, port 22, and
-  nowhere else.
-- It never sees your password or your code. Beethoven encrypts the connection before the helper gets
-  it.
-- It holds no password and no key, keeps no log of what it carries, and starts no other program.
-- Chrome starts it only when Beethoven needs it.
-
-### When Beethoven offers it
-
-The panel shows **One small download, once**. The button says **Download for Windows**, **Download
-for macOS** or **Download for Linux**. The file's name and size are under the button.
-
-If you don't want the helper, click **Use GlobalProtect instead**.
-
-You can also find it later: click **⋯** (More), then **Settings**, then **Connection**. The
-**Helper** line says **Installed** or **Not installed**, with the download.
-
-On Windows and on a Mac the download is the installer itself, made out to Beethoven from the Chrome
-Web Store. On Linux it is a small zip file, made out to the Beethoven you have. Either way the
-helper answers only that Beethoven. Each system has its own steps.
-
-**Nobody has opened the signed installers on a real computer yet.** The Windows and Mac steps below
-are what they are built to do. What your computer shows on the way is not yet measured: please tell
-your lab lead exactly what it showed, in its own words (a photo of the screen is fine), whether it
-went smoothly or not.
-
-### Windows
-
-1. Click **Download for Windows**. Chrome saves `beethoven-bridge-windows.msi` in your **Downloads**
-   folder. If Chrome warns about the file, open Chrome's download list and choose **Keep**.
-2. Under the button the panel shows three steps. Do them in order:
-   - "Open the file you downloaded. Windows installs the Beethoven bridge into your own account; no
-     administrator rights are needed." Click the file in Chrome's download list, or double-click it
-     in **Downloads**.
-   - "If Windows asks you to confirm, choose Run (or More info, then Run anyway)." If your
-     organization's security software stops it, this computer can't run the helper: use
-     GlobalProtect instead ([Using Beethoven](USE.md), part 6), and tell your lab lead.
-   - "When the window closes, come back here and press Check again." The panel has been saying
-     **Waiting for the helper. Beethoven checks by itself every few seconds.** It says **Helper
-     found.** and moves on to **Sign in to the grid**. If it says **Not found yet. Open the
-     downloaded file, then Check again.**, click **Check again**.
-
-The helper lives in `%LOCALAPPDATA%\Beethoven\bridge`, with one entry each for Chrome and Edge in
-your own part of the registry. Windows lists it in **Settings**, under **Apps**, as **Beethoven
-bridge**.
-
-### Mac
-
-1. Click **Download for macOS**. Chrome saves `beethoven-bridge-mac.pkg` in your **Downloads**
-   folder. If Chrome warns about the file, open Chrome's download list and choose **Keep**.
-2. Under the button the panel shows three steps. Do them in order:
-   - "Open the file you downloaded. The macOS Installer opens." Click the file in Chrome's download
-     list, or double-click it in **Downloads** in the Finder.
-   - "Click Continue, then Install. It installs into your own account, so no administrator password
-     is asked." If the Installer asks where to install it, choose **Install for me only** (whether
-     it asks at all is not yet measured).
-   - "When it says the installation was successful, close it and press Check again here." Beethoven
-     says **Helper found.** If the Installer says the installation failed, close it, use
-     GlobalProtect for now, and tell your lab lead what it said.
-
-The helper lives in `~/Library/Application Support/Beethoven/bridge`, with one small file in
-Chrome's own folder (and in Microsoft Edge's and Chromium's, if you have them) that tells the
-browser where it is.
-
-### Linux
-
-1. Click **Download for Linux**. Chrome saves `beethoven-bridge-linux.zip` in your **Downloads**
-   folder.
-2. Open a terminal and type:
-
-   ```
-   cd ~/Downloads
-   unzip beethoven-bridge-linux.zip -d beethoven-bridge
-   bash beethoven-bridge/install.sh
-   ```
-
-3. Press Return when it asks. It says **The Beethoven bridge 1.0.0 is installed for Chrome** (with
-   perl or python3) **Go back to Beethoven and press Check again.** Beethoven says **Helper found.**
-   (or click **Check again**).
-
-The helper runs on Perl, or on Python 3 where Perl is missing. If Chrome was installed as a Snap or
-a Flatpak, it can't start the helper: use GlobalProtect instead. The helper lives in
-`~/.local/share/beethoven/bridge`.
-
-### A Chromebook, or another computer
-
-Beethoven says **There's no helper for this computer yet.** Use GlobalProtect ([Using
-Beethoven](USE.md), part 6).
-
-### If the installer says something else
-
-- **Windows or Mac.** Anything other than the steps above is new to us: use GlobalProtect for now
-  and tell your lab lead what the window said, word for word.
-- **Linux: "This copy of the bridge was built without Beethoven's extension identifier, so Chrome
-  would not let Beethoven use it."** The zip did not come from your Beethoven's own panel (or
-  Beethoven could not make it out to itself). Download it again from the panel's **Download** button
-  and use that file. If it says this again, tell your lab lead.
-- **Linux: "The bridge is installed, but it did not answer when started."** Press **Check again** in
-  Beethoven. If it still does not connect, use GlobalProtect instead and tell your lab lead.
-
 ## Check that it works
 
-- In the panel, the **Grid** line says **Direct** beside your AccessID once you have signed in.
-- In **Settings**, **Connection**, the **Helper** line says **Installed · version 1.0.0**.
+- With GlobalProtect on, the panel's **Grid** line says **Signed in as** your AccessID once you have
+  signed in to the grid's website ([Use Beethoven](USE.md), part 1).
+- With GlobalProtect off, it says **Can't reach**, and the panel asks you to turn GlobalProtect on.
+  Your worker on the grid keeps running either way.
 
-## Remove the helper
+## If an earlier version installed the helper
 
-Removing the helper does not take your key off the grid. Do **Forget this computer** first if you
-are leaving this computer for good ([Using Beethoven](USE.md), part 5).
+Beethoven 12.0.0 to 15.0.0 installed a small program, the Beethoven bridge, on your computer. 16.0.0
+does not use it and cannot start it: it no longer has Chrome's permission to. You can leave it or
+remove it; removing it changes nothing on the grid.
 
 - **Windows.** Open **Settings**, then **Apps** (on Windows 11, **Installed apps**; on Windows 10,
   **Apps & features**). Find **Beethoven bridge** and choose **Uninstall** (on Windows 11 it is
@@ -201,20 +77,18 @@ are leaving this computer for good ([Using Beethoven](USE.md), part 5).
   computer.** On a Mac it is the same **uninstall.command** as above, opened the way you opened its
   installer; it says **The Beethoven bridge is removed from this Mac.**
 
-After that, Beethoven uses GlobalProtect, or offers the helper again.
+The key those versions added to your grid account is a separate thing, on the grid, and no step on
+your computer removes it: ask your lab lead ([Use Beethoven](USE.md), part 4).
 
 ## Remove Beethoven completely
 
-1. In Beethoven: **⋯** (More), **Settings**, **Connection**, **Forget this computer**, then
-   **Forget**.
-2. Remove the helper (above).
-3. Remove Beethoven from Chrome: click the puzzle icon, then **⋮** next to Beethoven, then **Remove
+1. If an earlier version installed the helper, remove it (above).
+2. Remove Beethoven from Chrome: click the puzzle icon, then **⋮** next to Beethoven, then **Remove
    from Chrome**.
-4. If you turned on Windows Hello or Touch ID protection, Beethoven made a passkey named
-   **Beethoven**. **Forget this computer** asks your passkey store to remove it, but not every store
-   does. If it is still listed, delete it: on Windows, **Settings**, **Accounts**, **Passkeys**; on a
-   Mac, the **Passwords** app (or **System Settings**, **Passwords**); in Google Password Manager,
-   open `chrome://password-manager/passwords` in Chrome.
+3. If an earlier version made a passkey named **Beethoven** (Windows Hello or Touch ID protection,
+   in 12.0.0 to 15.0.0), 16.0.0 does not remove it. Delete it yourself: on Windows, **Settings**,
+   **Accounts**, **Passkeys**; on a Mac, the **Passwords** app (or **System Settings**,
+   **Passwords**); in Google Password Manager, open `chrome://password-manager/passwords` in Chrome.
 
 Your worker and your files on the grid are not touched by any of this. To stop the worker, press
-**Stop** in Beethoven before step 3.
+**Stop** in Beethoven before step 2.

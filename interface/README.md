@@ -28,7 +28,7 @@ Three exports of `OpenSpineConsortium/hpcworker`, each at version 1 into its own
 
 No code under `extension/src/` names any of these folders (`extension/test/hygiene.test.ts`), and the
 built package is checked to carry nothing of them but the profiles. Until 15.0.0 two more, hpcworker's
-program exports `framework` and `testbed`, were pinned for the direct-way lane of the browser harness;
+program exports `framework` and `testbed`, were pinned for the harness's direct-way lane; none is now:
 16.0.0 removed that way and the lane, and takes no program from any repository.
 
 One script takes them all, with your own `gh` sign-in and from GitHub only, never from a checkout:

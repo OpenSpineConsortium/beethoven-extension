@@ -1,58 +1,66 @@
-# Accounts and subscriptions for Beethoven 15.0.0
+# Accounts and subscriptions for Beethoven
+
+**16.0.0 (2026-10-08).** 16.0.0 removed the helper, its signed installers, the relay question and
+the pilot app with the direct way, so it needs no membership that 11.0.0 did not: not the Apple
+Developer Program, not Azure Artifact Signing. The one thing kept from 15.0.0 is the Google Cloud
+project for the store upload (`extension/scripts/publish-store.mjs`). Sections 2.1 to 2.4 stay as
+the record of what was weighed and bought for 12.0.0 to 15.0.0; nothing in them is in force.
 
 For Greg. Written 2026-10-02 by the texts stream of the 12.0.0 build and completed by fixer B from
 the three explorations of that day (A: store extensions and Secure Shell; B: relays, web ssh and
 accounts; C: the script helper); updated 2026-10-04 by the texts stream of 15.0.0, after Greg
-decided that day to sign the helper's installers for Windows and macOS. Each price says where it
-came from. **Secondary source** means the vendor's own page built its prices with a script and
-showed none when fetched, so the figure comes from a third-party summary; check it on the vendor's
-page before paying. Nothing here was bought, registered or signed up for by the streams that wrote
-it.
+decided that day to sign the helper's installers for Windows and macOS; brought to 16.0.0 on
+2026-10-08, after the direct way was removed. Each price says where it came from. **Secondary
+source** means the vendor's own page built its prices with a script and showed none when fetched, so
+the figure comes from a third-party summary; check it on the vendor's page before paying. Nothing
+here was bought, registered or signed up for by the streams that wrote it.
 
-The short answer: **15.0.0 needs two paid memberships that 12.0.0 did not: the Apple Developer
-Program, US$99 a year, and Azure Artifact Signing's Basic plan, US$9.99 a month** (Greg's decision,
-2026-10-04; both figures with their sources in 2.1). On Windows and macOS the helper is now a
-compiled program in a signed installer, and these two sign it; on Linux it stays the script, which
-needs neither. One more thing is new, with no fee named for it: a Google Cloud project with a
-Desktop OAuth client, Greg's own, through which the release command uploads the package to the store
-(section 1). Nothing else is new: everything else in section 2 is optional, and each item says what
-students live with if it is skipped.
+The short answer, for 16.0.0: **no paid membership that 11.0.0 did not have.** The two that 15.0.0
+added (the Apple Developer Program, US$99 a year, and Azure Artifact Signing's Basic plan, US$9.99 a
+month; both figures with their sources in 2.1) signed the helper's installers, and 16.0.0 ships no
+helper; if either was bought, nothing here uses it now. One thing from 15.0.0 stays, with no fee
+named for it: a Google Cloud project with a Desktop OAuth client, Greg's own, through which
+`extension/scripts/publish-store.mjs` uploads the package to the store (section 1). Everything in
+section 2 is the record of what was weighed for the direct way, and each item says what it would
+have cost.
 
 Up to 14.0.0 the helper was a script that every operating system already runs, shipped inside the
 extension, with nothing to compile, sign or notarize, so 12.0.0 to 14.0.0 needed no new account and
-no new subscription.
+no new subscription; 15.0.0 compiled and signed it; 16.0.0 removed it.
 
 ## 1. What the lab needs and already has
 
-| Item | Who holds it | Cost | Status for 12.0.0 | Without it |
+| Item | Who holds it | Cost | Status for 16.0.0 | Without it |
 |---|---|---|---|---|
-| Chrome Web Store developer account (the private listing) | Greg, personal Google account | a one-time registration fee; Google's page states no amount, secondary sources say US$5 | Needed, as for 11.0.0. 12.0.0 adds the `nativeMessaging` permission, which the store reviews; no new account. | No listing updates. |
+| Chrome Web Store developer account (the private listing) | Greg, personal Google account | a one-time registration fee; Google's page states no amount, secondary sources say US$5 | Needed, as for 11.0.0. 12.0.0 to 15.0.0 added the `nativeMessaging` permission, which the store reviews; 16.0.0's manifest is 11.0.0's again. No new account. | No listing updates. |
 | Google Group `Beethoven-users` (the listing's testers) | Greg | free | Unchanged. | Nobody can install the private listing. |
 | Access service `beethoven-access` (the approval check) | Cloudflare Workers, `beethoven-access.openspineconsortium.workers.dev` | Workers Free allows 100,000 requests a day; Workers Paid starts at US$5 a month (developers.cloudflare.com, pricing page dated 2026-10-02). Which plan the account is on was not established (it needs the dashboard). | Unchanged; the check carries no new field (R4). It answers approval questions; it is not a proxy, so the Workers terms' proxy clause does not touch it. | No approval checks: the extension stops. |
 | Resend (the confirmation and approval e-mails) | Greg | Free plan US$0: 3,000 e-mails a month, 100 a day; Pro US$20 a month (resend.com/pricing, fetched 2026-10-02) | Unchanged. | No e-mails; requests are still stored and answered as pending. |
 | Cloudflare Zero Trust, Free plan (the optional second wall on the access service's `/admin`) | Greg | free up to 50 users; US$7 per user per month beyond (secondary source) | Unchanged, optional. | `/admin` is protected by its own sign-in alone. |
-| The domain `openspineconsortium.com` (DNS at Spaceship) and the website on GitHub Pages | Greg | the renewal price was not established | Unchanged. The site hosts **no** helper: it ships inside the extension (D1). | No support or privacy pages. |
-| The lab's shared copy on the grid (framework 11) | the lab's CephFS volume, `/rs/rs_grp_oschome/shared/beethoven/hpcworker` | as today | Needs framework 11 published, and every folder from `/` to the copy writable by its owner alone or sticky (`LAB_LEAD.md`, section 2). | No direct way: `browser-key add` refuses, and a framework 10 copy has no gate. |
+| The domain `openspineconsortium.com` (DNS at Spaceship) and the website on GitHub Pages | Greg | the renewal price was not established | Unchanged. The site hosts no package and no helper (there is no helper since 16.0.0). | No support or privacy pages. |
+| The lab's shared copy on the grid | the lab's CephFS volume, `/rs/rs_grp_oschome/shared/beethoven/hpcworker` | as today | Published with hpcworker's `deploy_shared.sh` (`LAB_LEAD.md`, section 2); a student's approval puts their AccessID on the volume's list (section 9 there). 16.0.0 never calls the copy outdated. | No worker: the setup line fails. |
 | Signing key for the withdrawn-versions list | Greg, offline | free | Unchanged. | No signed kill-list. |
-| Apple Developer Program membership (the Developer ID identities and notarization, for the Mac installer) | Greg | US$99 per membership year (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs and notarizes `beethoven-bridge-mac.pkg`. | No signed Mac installer: the package offers the Mac script zip, as up to 14.0.0, with the warnings in 2.1. |
-| Azure Artifact Signing, Basic plan (the Windows signature) | Greg, behind his own Microsoft Entra sign-in | US$9.99 a month for 5,000 signatures (2.1) | Not needed for 12.0.0. Needed since 15.0.0 (decided 2026-10-04): it signs the program inside `beethoven-bridge-windows.msi` and the MSI. | No signed Windows installer: the package offers the Windows script zip, as up to 14.0.0, with the warnings in 2.1. |
-| A Google Cloud project with the Chrome Web Store API and a Desktop OAuth client (the release command's upload) | Greg, the Google account that owns the store item; the saved sign-in stays in his vendor folder on the Mac, never in the repository or in CI | no fee is named on the store's API page; not yet set up, so what the console asks for is not yet measured | Not needed for 12.0.0. Used since 15.0.0 (Greg, 2026-10-04): `helper/release/publish-store.mjs` uploads the release's zip and submits it for review (`helper/release/README.md`, "Uploading to the Chrome Web Store"). While the consent screen stays in "Testing", Google drops the saved sign-in after seven days. | The upload is done by hand in the developer dashboard, as up to 14.0.0. |
+| Apple Developer Program membership (the Developer ID identities and notarization, for the Mac installer) | Greg | US$99 per membership year (2.1) | Needed only in 15.0.0 (decided 2026-10-04), to sign and notarize `beethoven-bridge-mac.pkg`; not needed since 16.0.0, which ships no helper and signs nothing. | Nothing. |
+| Azure Artifact Signing, Basic plan (the Windows signature) | Greg, behind his own Microsoft Entra sign-in | US$9.99 a month for 5,000 signatures (2.1) | Needed only in 15.0.0 (decided 2026-10-04), to sign the program inside `beethoven-bridge-windows.msi` and the MSI; not needed since 16.0.0, which ships no helper and signs nothing. | Nothing. |
+| A Google Cloud project with the Chrome Web Store API and a Desktop OAuth client (the release command's upload) | Greg, the Google account that owns the store item; the saved sign-in stays in his vendor folder, never in the repository or in CI | no fee is named on the store's API page; not yet set up, so what the console asks for is not yet measured | Used since 15.0.0 (Greg, 2026-10-04) and kept in 16.0.0: `extension/scripts/publish-store.mjs` uploads the release's zip and submits it for review. While the consent screen stays in "Testing", Google drops the saved sign-in after seven days. | The upload is done by hand in the developer dashboard, as up to 14.0.0. |
 
 What each **student** needs, and already has or gets free:
 
 | Item | Cost | Notes |
 |---|---|---|
 | Wayne State AccessID and grid account | free (WSU KB 20199) | As before. |
-| Google Authenticator, set up for the grid | free app | The grid asks for its code at every password sign-in. Set up once in Open OnDemand's **2FA Setup** app (WSU KB 20242), which needs GlobalProtect once. Beethoven's two routes (`USE.md`, part 2) walk through it. |
+| Google Authenticator, set up for the grid | free app | The grid's own terminal may ask for its code, the one time Beethoven sends a student there (`USE.md`, part 1); Beethoven itself never asks for it. Set up once in Open OnDemand's **2FA Setup** app (WSU KB 20242), the university's own steps; a student who has a code must not run it again. |
 | Microsoft Authenticator | free app | Wayne State's own multi-factor app for every other WSU service, GlobalProtect's sign-in included (KB 20242 and KB 20314). Students will have both apps: the grid's code is in **Google** Authenticator. |
-| GlobalProtect | free (WSU, KB 20314; portal `protect.wayne.edu`) | Needed once, on the computer or on the phone, to set up the grid code; and every time for a student on the GlobalProtect path. |
-| Google Chrome on Windows, macOS or Linux, signed in to the Google account the invitation went to | free | A Chromebook, a Snap or Flatpak Chrome, or a managed Chrome that blocks user-level helpers cannot run the helper: GlobalProtect path. |
+| GlobalProtect | free (WSU, KB 20314; portal `protect.wayne.edu`) | Needed every time a student starts, watches or stops a worker: the one way to the grid since 16.0.0, as up to 11.0.0. The welcome page and the panel link to KB 20314. |
+| Google Chrome on Windows, macOS or Linux, signed in to the Google account the invitation went to | free | Any Chrome that can open the grid's website with GlobalProtect on; nothing runs outside the browser since 16.0.0. |
 | Claude Pro or Max | Pro: US$17 a month with the annual plan (US$200 billed up front) or US$20 billed monthly; Max: from US$100 a month (claude.com/pricing, fetched 2026-10-02). Claude Code is not part of the Free plan. | As before. Paid by the student. |
-| Windows Hello or Touch ID | free, built in | Optional (D2): off unless the student turns it on. |
 
 ## 2. What is optional, what it costs, and what students see without it
 
-### 2.1 Signing the helper (in force since 15.0.0)
+### 2.1 Signing the helper (15.0.0 only; the record)
+
+*Record: 16.0.0 ships no helper and signs nothing, and `helper/` is gone from the tree. What follows
+is what 15.0.0 did and what it cost, kept for the account.*
 
 Since 15.0.0 (Greg's decision, 2026-10-04) the helper for Windows and macOS is a compiled program,
 the Rust edition in `helper/src/rust` (nothing in it but Rust's standard library), and both of its
@@ -124,7 +132,9 @@ still meet SmartScreen's **Windows protected your PC**, which is why the panel's
 and for how long, is not yet measured. A managed computer's App Control, AppLocker or security
 product may still stop it; then the student uses GlobalProtect.
 
-### 2.2 A relay host (only if one is chosen)
+### 2.2 A relay host (12.0.0 to 15.0.0; the record)
+
+*Record: 16.0.0 has no ssh, so no relay question arises.*
 
 A relay is a server that carries the browser's encrypted ssh bytes to `grid.wayne.edu:22`, so no
 helper is needed on the student's computer. 12.0.0 can use one only if the site profile names it
@@ -164,7 +174,9 @@ there first. Exploration B's verdict, with its sources:
 *Skipped (12.0.0 as built):* students install the helper once; where they cannot, they use
 GlobalProtect.
 
-### 2.3 A browser-only bridge from the Chrome Web Store
+### 2.3 A browser-only bridge from the Chrome Web Store (the record)
+
+*Record: moot since 16.0.0, which opens no socket.*
 
 **None exists** (exploration A, read in Chromium's source and run in Chromium 153). Chromium lets
 exactly two extensions open network sockets, Google's Secure Shell (stable and dev), from a list in
@@ -179,7 +191,9 @@ password would be typed into Secure Shell's terminal rather than Beethoven's she
 need a change for an empty command, and it rests on a socket exception Google calls temporary. Not
 in 12.0.0.
 
-### 2.4 The Isolated Web App pilot (installed only for a student who asks)
+### 2.4 The Isolated Web App pilot (the record)
+
+*Record: the pilot app went with the direct way in 16.0.0; it is installed for nobody.*
 
 | Item | Cost | Notes |
 |---|---|---|
@@ -191,18 +205,19 @@ in 12.0.0.
 
 ### 2.5 Small optional ones
 
-- A free Microsoft account, to send Microsoft a helper file Defender wrongly flags
-  (microsoft.com/wdsi/filesubmission). Defender raised nothing in about 25 runs on Greg's computer.
+- None since 16.0.0. (Up to 15.0.0: a free Microsoft account, to send Microsoft a helper file
+  Defender wrongly flags, microsoft.com/wdsi/filesubmission. Defender raised nothing in about 25
+  runs on Greg's computer, and nothing was sent.)
 
 ### 2.6 Things that are not needed
 
 - No API key, and no Google Cloud project or OAuth client for the product itself. The one Google
   Cloud project, with its Desktop OAuth client, is Greg's own release tool's, for the store upload
   only (section 1); students never meet it.
-- No Cloudflare Workers paid plan for 12.0.0; 15.0.0 adds nothing that would need one.
-- No code-signing certificate from a commercial certificate authority: since 15.0.0 the Windows
-  signature comes from Azure Artifact Signing and the Mac's from the Apple Developer Program (2.1);
-  up to 14.0.0 nothing was signed.
+- No Cloudflare Workers paid plan: nothing from 12.0.0 to 16.0.0 needs one.
+- No code-signing certificate from a commercial certificate authority, and since 16.0.0 no signature
+  at all: 15.0.0 signed its installers through Azure Artifact Signing and the Apple Developer
+  Program (2.1); up to 14.0.0, and again since 16.0.0, nothing is signed.
 - No new e-mail service, analytics or crash-reporting account: Beethoven has none.
 - No account with Palo Alto Networks, Google or Microsoft for GlobalProtect, Google Authenticator or
   Microsoft Authenticator: all are free to the student, through Wayne State.
@@ -211,7 +226,8 @@ in 12.0.0.
 
 | If you add | Change before it ships |
 |---|---|
-| A compiled, signed helper (done in 15.0.0, for Windows and macOS) | `THIRD_PARTY_NOTICES.md` (the Rust standard library's notice), `LICENSE.txt` 5(b)(i) and section 15 and `PRIVACY.md` "The Bridge on your computer" (what runs it, the signed installers), `INSTALL.md` (the installers' steps), the store's package file list. All done in LICENSE version 10 and PRIVACY version 11 (`docs/TEXTS_V10_V11.md`). |
-| A relay | `PRIVACY.md` "Relays and the pilot app" must name its operator and what it sees, in a new version shown for acceptance; the store's privacy answers; the site profile's `ssh_relay`; a note to C&IT. |
-| Secure Shell as the student's terminal | `PRIVACY.md` and `LICENSE.txt` 5(b) (the first password typed into Secure Shell's terminal), `INSTALL.md` and `USE.md`, the store's privacy answers, a gate change in the framework. |
-| The pilot app for a named student | Nothing in the texts (the privacy statement has described it since version 10); a note to C&IT and the student's own instructions (`scratchpad/v12/iwa/STUDENT_STEPS.md`). |
+| Removing the helper, the sheet, the key, the relay and the pilot app (done in 16.0.0) | `LICENSE.txt` (version 11) and `PRIVACY.md` (version 12), both of 2026-10-08, lose the Bridge, the ssh path, the sign-in sheet and the relay; `THIRD_PARTY_NOTICES.md` loses the Rust notice; `INSTALL.md`, `USE.md`, `LAB_LEAD.md` and the store texts say one way; the store's package file list has no installer and the permissions no `nativeMessaging`. The agreement is shown again and accepted again. |
+| A compiled, signed helper (done in 15.0.0, for Windows and macOS; undone in 16.0.0) | `THIRD_PARTY_NOTICES.md` (the Rust standard library's notice), `LICENSE.txt` 5(b)(i) and section 15 and `PRIVACY.md` "The Bridge on your computer" (what runs it, the signed installers), `INSTALL.md` (the installers' steps), the store's package file list. All done in LICENSE version 10 and PRIVACY version 11 (`docs/TEXTS_V10_V11.md`), and taken out again in 11 and 12. |
+| A relay (moot since 16.0.0: no ssh) | `PRIVACY.md` "Relays and the pilot app" must name its operator and what it sees, in a new version shown for acceptance; the store's privacy answers; the site profile's `ssh_relay`; a note to C&IT. |
+| Secure Shell as the student's terminal (moot since 16.0.0) | `PRIVACY.md` and `LICENSE.txt` 5(b) (the first password typed into Secure Shell's terminal), `INSTALL.md` and `USE.md`, the store's privacy answers, a gate change in the framework. |
+| The pilot app for a named student (gone in 16.0.0) | Nothing in the texts (the privacy statement described it in versions 10 and 11); a note to C&IT and the student's own instructions (`scratchpad/v12/iwa/STUDENT_STEPS.md`). |
