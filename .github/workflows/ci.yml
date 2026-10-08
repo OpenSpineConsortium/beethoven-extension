@@ -1,8 +1,9 @@
 name: ci
 # The extension's suite in the environment it really has: Node 22, a real bash for the mock
-# portal's stand-ins, python with asyncssh for the grid stand-in the ssh tests speak to, and
-# Playwright's Chromium for the mock's terminal section. No secrets: every test runs against
-# the mock portal and the bundled stand-ins; nothing here can reach a grid or claude.ai.
+# portal's stand-ins, and Playwright's Chromium for the mock's terminal section. No secrets:
+# every test runs against the mock portal and the bundled stand-ins; nothing here can reach a
+# grid or claude.ai. 16.0.0 dropped the bridge and its binary job: the extension's only way to
+# the grid is the portal the student grants, behind the university's VPN.
 on:
   push:
     branches: [main]
@@ -10,44 +11,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  bridge-binary:
-    # the bridge's binary edition: built per platform and held to the same wire contract the script
-    # hosts answer to (helper/test/suite.mjs, host-agnostic). Unsigned on purpose: signing identities
-    # never enter CI or the repository, so these artifacts are for maintainers and collaborators only.
-    # The signed installers students get on Windows and macOS are built from the same sources on the
-    # maintainer's own machines by helper/release/ and merged by helper/build.mjs; Linux and a
-    # development build keep the script zips inside the extension.
-    name: bridge (rust, ${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # host spelled per platform: on Windows the suite launches it through cmd.exe, which
-          # splits an unquoted forward-slash path at its switches
-          - { os: ubuntu-latest, bin: beethoven-bridge, out: beethoven-bridge-linux-x86_64, host: helper/src/rust/target/release/beethoven-bridge }
-          - { os: macos-latest, bin: beethoven-bridge, out: beethoven-bridge-mac-arm64, host: helper/src/rust/target/release/beethoven-bridge }
-          - { os: windows-latest, bin: beethoven-bridge.exe, out: beethoven-bridge-windows-x86_64.exe, host: helper\src\rust\target\release\beethoven-bridge.exe }
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: build
-        working-directory: helper/src/rust
-        run: cargo build --release
-      - name: the wire contract, the same 17 checks every host answers
-        run: node helper/test/suite.mjs --host "${{ matrix.host }}" --label rust-${{ runner.os }}
-      - name: name the artifact for its platform
-        shell: bash
-        run: cp "helper/src/rust/target/release/${{ matrix.bin }}" "${{ matrix.out }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.out }}
-          path: ${{ matrix.out }}
-          retention-days: 90
-
   suite:
     name: typecheck, vitest, mock selftest, build
     runs-on: ubuntu-latest
@@ -62,14 +25,7 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: extension/package-lock.json
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: asyncssh, for the grid stand-in the ssh tests run against
-        run: pip install asyncssh
       - run: npm ci
-      - name: the tracked bridge zips and manifest are a fresh build of helper/src (no signed packages here)
-        run: node ../helper/build.mjs --check --no-signed
       - name: profiles and agreement texts into public/ (the tests read them)
         run: npm run sync-profiles
       - run: npm run typecheck

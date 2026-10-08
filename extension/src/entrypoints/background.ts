@@ -1,4 +1,4 @@
-// The background (11.0.0, and 12.0.0's direct way): a Chrome/Edge MV3 service worker or the Firefox persistent background,
+// The background (11.0.0; 16.0.0 took the direct way of 12.0.0 to 15.0.0 out again): a Chrome/Edge MV3 service worker or the Firefox persistent background,
 // from one file. It is where everything happens; the pages only draw the views it pushes and send the
 // actions the student presses (core/model.ts, core/messages.ts VIEW_PORT).
 //
@@ -20,12 +20,12 @@
 //   AM2's one-time key step (UNPROVEN ON THE GRID): when the shell asks for a password while a press
 //   waits, the student types it into the university's own terminal page; Beethoven types only the one
 //   setup line, after "I'm in" (core/loginSetup.ts).
-//   12.0.0, the direct way first (decision D3; framework/contract-text/V12_CONTRACT.md): ssh to the grid with no VPN,
-//   through the first bridge this browser has (core/bridge.ts: a browser-only one when known, a relay
-//   the site profile names, else the helper inside Beethoven, offered for a one-time install), signed
-//   in once in Beethoven's own sheet (core/signin.ts) so this computer's key is enrolled, then every
-//   action through the gate with the key (core/sshChannel.ts). Only when no bridge is there, or the
-//   student chooses it, or the grid's ssh door does not answer, the 11.0.0 way above runs unchanged.
+//   16.0.0 (greg, 2026-10-08): one way to the grid, the portal behind the university's VPN. The direct
+//   way of 12.0.0 to 15.0.0 (ssh through a bridge, a browser key, the gate) is gone: it could not work
+//   without a program outside the browser, and a student with the VPN has the portal. What it left in
+//   this browser is removed once on the first run after the update (cleanupDirectWay). Out of reach,
+//   a press now waits on the GlobalProtect moment and goes ahead by itself once the grid answers; the
+//   alarm asks once a minute whether it does, so "Keep my worker running" works with the panel closed.
 //
 // It never runs anything on, and holds no site permission for, claude.ai, claude.com or anthropic.com
 // (it opens Anthropic's sign-in page and the claude.ai link in tabs, as a bookmark would); it never
@@ -34,43 +34,39 @@
 import { browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { Audit, AUDIT_KEY, clearRecordsKeepingClocks } from '../core/audit';
-import { BridgeError, chooseBridge, GRID_HOST, GRID_HOST_KEY_PIN, GRID_PORT, helperDownloadFor, RelayBridge, relayConfigFrom, StoreExtensionBridge, type BridgeProvider, type WsLikeCtor } from '../core/bridge';
-import { forgetKey, keyState, loadIdentity, type KeyState } from '../core/keyring';
-import { SignInFlow, type SignInOutcome } from '../core/signin';
-import { DirectError, directFailureOf, SshPortal } from '../core/sshChannel';
 import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/channel';
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, gateText, isClaudeCodeLink, isEnvironmentUrl, parseGateJson, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type GateFile, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, isClaudeCodeLink, isEnvironmentUrl, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
-import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, applyStatusRead, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
+import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
 import { bundledProfile, usesSharedCopy } from '../core/install';
 import {
   ACCESS_KEY,
   ACTIVITY_KEY,
   ANTHROPIC_TAB_KEY,
-  BRIDGE_KEY,
   CHANNEL_KEY,
   CHECKLIST_KEY,
   CHECKS_KEY,
   CLAUDE_TAB_KEY,
   DEFAULT_PREFS,
   defaultPortalFrom,
-  DIRECT_KEY,
   GRID_KEY,
   IDENTITY_KEY,
   KILLLIST_KEY,
   LAST_KNOWN_KEY,
+  OLD_DIRECT_LOCAL_KEYS,
+  OLD_DIRECT_SESSION_KEYS,
+  OLD_KEY_DB,
+  OLD_KEY_KEY,
   ONCE_KEY,
   PORTAL_KEY,
   PREFS_KEY,
   PRESS_KEY,
   PROBE_KEY,
   REVOKED_KEY,
-  ROUTE_KEY,
-  REFUSALS_KEY,
   RUN_KEY,
   SERVICES_KEY,
   SIGNIN_TAB_KEY,
@@ -82,34 +78,31 @@ import {
   WELCOME_PRESS_KEY,
   type ActivityEntry,
   type AnthropicTab,
-  type BridgeNote,
   type ChannelNote,
   type Checklist,
-  type DirectNote,
   type GridNote,
   type IdentityNote,
   type LastKnown,
+  type OldKeyNote,
   type OnceNotes,
   type OpenedTab,
   type PendingPress,
   type PortalSettings,
   type Prefs,
   type ProbeNote,
-  type RouteNote,
-  type RefusalNote,
   type TourSeen,
   type WaitHistory,
 } from '../core/keys';
 import { CodeGate, ConnectWatcher } from '../core/login';
 import { LoginSetupFlow } from '../core/loginSetup';
 import { CONNECT_PORT, fail, succeed, unwrap, VIEW_PORT, type Answer, type ConnectOut, type Request, type TerminalTyped, type ViewIn, type ViewOut } from '../core/messages';
-import { BADGE_COLORS, DIRECT_LINKS, LOG_WORDS, WORDS, type Action, type ActionResults, type ConnectFailure, type ConnectionSettingsView, type DirectDetails, type HelperDownload, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
+import { BADGE_COLORS, LOG_WORDS, WORDS, type Action, type ActionResults, type ConnectFailure, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
 import type { WsConstructor } from '../core/net';
 import { reach } from '../core/net';
 import { DASHBOARD, PORTAL_OPS, PortalClient, type PortalApi, type SessionInfo } from '../core/portal';
 import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell';
 import { detailsView, settingsView } from '../core/sheets';
-import { connectionMode, ENROLLED_HOLD_MS, firstRunDone, FOUND_HOLD_MS, PROTECTED_HOLD_MS, heroOf, home, lastKnownOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type DirectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
+import { firstRunDone, heroOf, home, lastKnownOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
 import { connectLine, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
@@ -117,7 +110,6 @@ import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
 import { connectApi, disconnectPortal, dropAnthropicLeftovers, savePortal } from '../ext/connectApi';
-import { bridgeManifest, browserKeyring, helperBridge, helperOs } from '../ext/direct';
 import { hasPanel } from '../ext/gesture';
 import { assetUrl, installId, local, prefs as loadPrefs, session, version } from '../ext/storage';
 import { activeTabIn, closeUnderGuards, focusTab, openTab, tabHost, tabNow } from '../ext/tabs';
@@ -152,6 +144,10 @@ const REACH_EVERY_MS = 3_000;
 const KEY_DONE_HOLD_MS = 1_500;
 /** a waiting press asks again for what it waits on (the approval, the setup) at most this often */
 const PRESS_RETRY_MS = 15_000;
+/** 16.0.0: "Keep my worker running" starts a worker that ended at most this often (the product's own 60 s floor on starts) */
+const KEEP_RUNNING_MS = 60_000;
+/** 16.0.0: and at most this many times in a row without a press of the student's (a grid that ends every job is not fought) */
+const KEEP_RUNNING_MAX = 3;
 
 /** the toolbar's unlit rack (no tile, the ink's faint tone): it recedes on a light and a dark toolbar, so the lit one always reads as "on" */
 const PLAIN_ICONS = { 16: '/icon/off-16.png', 32: '/icon/off-32.png', 48: '/icon/off-48.png', 128: '/icon/off-128.png' };
@@ -169,8 +165,8 @@ function welcomeStillIn(tabId: number | undefined): boolean {
 /** the Claude sign-in sitting in flight (one at most) */
 interface Sitting {
   id: number;
-  /** direct: the portal's shell from here; tab: a page script in a portal tab; ssh: 12.0.0's direct way (the held sign-in session, or connect through the gate) */
-  mode: 'direct' | 'tab' | 'ssh';
+  /** direct: the portal's shell from here; tab: a page script in a portal tab */
+  mode: 'direct' | 'tab';
   login: ConnectLogin;
   gate: CodeGate;
   close(): void;
@@ -211,8 +207,8 @@ const mem = {
   profile: undefined as { site: string; profile?: SiteProfile } | undefined,
   client: undefined as { key: string; client: PortalClient } | undefined,
   failDetail: '',
-  last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0 },
-  busy: { list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false },
+  last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0, keep: 0 },
+  busy: { list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false, keep: false },
   lastToolbar: '',
   lastKnownJson: '',
   pollEvery: 0,
@@ -223,49 +219,13 @@ const mem = {
   startId: 0,
   /** student presses being carried out now (Connect, Stop, Sign in to Claude…): the tick carries nothing meanwhile */
   pressDepth: 0,
-  /** 12.0.0: the direct way */
-  direct: {
-    providers: undefined as { key: string; list: BridgeProvider[] } | undefined,
-    probing: false,
-    probingNow: undefined as Promise<BridgeNote> | undefined,
-    lastProbe: 0,
-    probeDetail: undefined as string[] | undefined,
-    foundAt: undefined as number | undefined,
-    downloadedAt: undefined as number | undefined,
-    /** undefined: not read yet; null: no file for this computer */
-    download: undefined as HelperDownload | null | undefined,
-    key: undefined as { at: number; state: KeyState } | undefined,
-    portal: undefined as { key: string; portal: SshPortal } | undefined,
-    sheet: undefined as SignInFlow | undefined,
-    /** a press waits on a direct sign-in: the sheet is shown */
-    sheetWanted: false,
-    /** the sign-in the sheet asks for is a Claude one (a press of Sign in to Claude, or a Connect that needs it) */
-    claudeWanted: false,
-    /** the grid's ssh door did not answer through the bridge */
-    unreachable: false,
-    enrolledAt: undefined as number | undefined,
-    protectOutcome: undefined as 'on' | 'cancelled' | 'unsupported' | 'failed' | undefined,
-    /** when the first-run card's Turn on worked: "Protected." holds PROTECTED_HOLD_MS before the moment moves on */
-    protectedAt: undefined as number | undefined,
-    /** what `version` through the gate last said of Claude Code's sign-in on the grid */
-    claude: undefined as 'yes' | 'no' | 'unknown' | undefined,
-    /** the probe running now is the student's own Check again */
-    probingByHand: false,
-    /** Check again was pressed since the installer was saved */
-    checkedByHand: false,
-    /** the page's last Unlock did not unlock */
-    unlockFailed: false,
-    /** "Use GlobalProtect instead" was pressed: the fallback moment is shown once, even without a waiting press */
-    fallbackWanted: false,
-  },
 };
 
 // ---- 14.0.0: the debug log ------------------------------------------------------------------------------
 //
-// What this background does under the hood, one line per decision (core/debuglog.ts): the mode and why, the
-// bridges, each ssh connection and gate verb (core/sshChannel.ts), each read of the run's files and what the
-// panel made of it, each press and what it waited for, the sign-in sheet's phases, the approval check, the
-// sitting's events, every failure, and what the panel shows. In memory only, at most 3000 lines; More, Copy
+// What this background does under the hood, one line per decision (core/debuglog.ts): the channel, each read
+// of the run's files and what the panel made of it, each press and what it waited for, the approval check,
+// the sitting's events, every failure, and what the panel shows. In memory only, at most 3000 lines; More, Copy
 // debug log copies it, and Details for your lab lead shows the last 200. Never a password, a one-time code, a
 // pasted Claude code, a key, a token or a full authorize link: the callers below pass kinds, words and hosts,
 // and the ring cuts every address to its host and path and removes anything key- or token-shaped besides.
@@ -282,7 +242,7 @@ function dbg(tag: string, text: string): void {
 }
 
 /** what the debug log last said of each of these, so each is said again only when it changes */
-const said = { mode: '', panel: '', connect: '', sheet: '' };
+const said = { mode: '', panel: '', connect: '' };
 
 /** a failure, for Details and the debug log; `logged` is what the debug log says instead when the detail may hold a terminal's lines */
 function setFail(detail: string, logged?: string): void {
@@ -358,23 +318,13 @@ function describePanel(f: Facts): string {
   }
 }
 
-/** the sign-in sheet's phase in the debug log, when it changes: its purpose, phase, work and failure, the kinds of the grid's prompts (never an answer) */
-function noteSheet(): void {
-  const st = mem.direct.sheet?.state;
-  if (!st) return;
-  const line = `${st.purpose}: ${st.phase}${st.work ? ` (${st.work})` : ''}${st.failure ? `, failure ${st.failure}` : ''}${st.prompts?.length ? `, the grid asks for ${st.prompts.map((x) => x.kind).join(' + ')}` : ''}${st.answered ? `, ${st.answered} answered` : ''}${st.notAccepted ? ', not accepted' : ''}${st.refusals ? `, refusals ${st.refusals}` : ''}${st.detail ? `: ${st.detail}` : ''}`;
-  if (line === said.sheet) return;
-  said.sheet = line;
-  dbg('sheet', line);
-}
-
 /** Copy debug log: the header (version, mode, portal, account, worker, time), then every line, newest last */
 async function debugLogText(): Promise<string> {
   const s = await settingsNow();
   const grid = await session.get<GridNote>(GRID_KEY);
   const prefs = await loadPrefs();
   const account = grid?.account ?? (await local.get<IdentityNote>(IDENTITY_KEY))?.username;
-  const mode = await modeNow().catch(() => 'unknown');
+  const mode = (await channelNow())?.mode ?? 'unknown';
   return debugRing.text({ version: version(), mode, ...(s ? { portal: s.hostname } : {}), ...(account ? { account } : {}), worker: prefs.worker_name, at: Date.now() });
 }
 
@@ -436,10 +386,12 @@ export default defineBackground({
       await ensureAlarms();
       await dropLeftoversOnce();
       await unregisterOldScripts();
+      await cleanupDirectWay();
     });
     browser.runtime.onStartup?.addListener(async () => {
       await ensureAlarms();
       await dropLeftoversOnce();
+      await cleanupDirectWay();
     });
     void ensureAlarms();
 
@@ -506,6 +458,35 @@ async function unregisterOldScripts(): Promise<void> {
     void SCRIPT_ID;
   } catch {
     /* none, or this browser keeps none */
+  }
+}
+
+/**
+ * 16.0.0: what a build from 12.0.0 to 15.0.0 left for the direct way goes, once: its storage keys, the
+ * stored "Connection" preference, and the IndexedDB database that held the browser's wrapped key (dropped
+ * whole, unread). Before the direct record goes, that this computer's key was added to the student's
+ * grid account is kept as keys.ts OldKeyNote (the fingerprint and the dates, never the key), so Settings
+ * can say so; the key's line on the grid is the student's or their lab lead's to remove, and Beethoven
+ * types nothing for it. Idempotent: a second run finds nothing.
+ */
+async function cleanupDirectWay(): Promise<void> {
+  try {
+    const old = await local.get<{ account?: string; enrolled_at?: string; key_fp?: string }>(OLD_DIRECT_LOCAL_KEYS[0]);
+    if (old && (old.enrolled_at || old.key_fp) && !(await local.get<OldKeyNote>(OLD_KEY_KEY))) {
+      await local.set(OLD_KEY_KEY, { ...(old.account ? { account: old.account } : {}), ...(old.key_fp ? { key_fp: old.key_fp } : {}), ...(old.enrolled_at ? { enrolled_at: old.enrolled_at } : {}), noted_at: nowIso() } satisfies OldKeyNote);
+    }
+    for (const k of OLD_DIRECT_LOCAL_KEYS) await local.remove(k);
+    for (const k of OLD_DIRECT_SESSION_KEYS) await session.remove(k).catch(() => undefined);
+    const prefs = await local.get<Record<string, unknown>>(PREFS_KEY);
+    if (prefs && 'connection' in prefs) {
+      const { connection: _c, ...rest } = prefs;
+      await local.set(PREFS_KEY, rest);
+    }
+    const idb = (globalThis as { indexedDB?: { deleteDatabase(name: string): unknown } }).indexedDB;
+    idb?.deleteDatabase(OLD_KEY_DB);
+    dbg('cleanup', `the direct way's records: ${old ? 'removed' : 'none'}`);
+  } catch (e) {
+    dbg('cleanup', `the direct way's records: not removed (${(e as Error).message})`);
   }
 }
 
@@ -576,14 +557,13 @@ async function channelNow(): Promise<ChannelNote | undefined> {
  */
 async function sharedDirNow(): Promise<string | undefined> {
   const s = await settingsNow();
-  // the site: the portal's, else the one this build is for. The direct way has no portal to name
-  // one — and losing the stored portal (Disconnect) must not lose the site: the sheet signed hy9698
-  // in to the grid, then failed "no-shared" only because the portal record was gone (2026-10-03)
+  // the site: the portal's, else the one this build is for (losing the stored portal on Disconnect must
+  // not lose the site: a sign-in failed "no-shared" only because the portal record was gone, 2026-10-03)
   const site = s?.site ?? DEFAULT_SITE;
   const key = `${s?.origin ?? '-'}|${site}`;
   if (mem.sharedDir?.key === key && mem.sharedDir.dir) return mem.sharedDir.dir;
   let dir = sharedRootOf((await siteProfile(site))?.shared_install);
-  if (!dir && s && (await modeNow()) === 'vpn') {
+  if (!dir && s) {
     try {
       const c = await directClient();
       const home = c ? await c.home() : undefined;
@@ -616,8 +596,6 @@ async function siteForConnect(s: PortalSettings): Promise<string> {
 async function withShell<T>(fn: (p: PortalApi) => Promise<T>, o: { viaTabId?: number } = {}): Promise<T> {
   const s = await settingsNow();
   if (!s) throw new Error('no portal connected');
-  // 12.0.0: on the direct way every line goes through the gate (a line it has no verb for is refused before it is sent)
-  if ((await modeNow()) === 'direct') return fn(await sshPortal());
   const ch = await channelNow();
   if (ch?.mode === 'tab') {
     mem.workingInTab++;
@@ -709,7 +687,6 @@ async function buildFacts(): Promise<Facts> {
     ...(mem.toast && mem.toast.until > now ? { toast: mem.toast.text } : {}),
     ...(mem.onlineAnnouncedAt !== undefined ? { onlineAnnouncedAt: mem.onlineAnnouncedAt } : {}),
     ...(mem.tourFromMenu ? { tourFromMenu: true } : {}),
-    direct: await directFacts(prefs, profile, settings, now),
   };
 }
 
@@ -728,7 +705,6 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       const settings = await settingsNow();
       const report = await session.get<DiagReport>(CHECKS_KEY);
       const audit = (await local.get<{ records?: Array<Record<string, unknown>> }>(AUDIT_KEY))?.records ?? [];
-      const direct = await directDetails();
       const dv = detailsView({
           reports: report?.reports,
           running: mem.checksRunning,
@@ -739,7 +715,7 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
           debug: debugRing.tail(DEBUG_DETAILS_LINES),
           now: f.now,
         });
-      return { surface: 'details', view: { ...dv, direct } };
+      return { surface: 'details', view: dv };
     }
     case 'settings': {
       const terms = await local.get<TermsRecord>(TERMS_KEY);
@@ -749,8 +725,9 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       // the same default the welcome page shows: with no stored portal (after Disconnect) the
       // Change field must refill from the bundled profile, not come back empty (hy9698, 2026-10-03)
       const settingsDef = settings ? undefined : defaultPortalFrom(await siteProfile(DEFAULT_SITE));
-      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId() });
-      return { surface: 'settings', view: { ...sv, connection: await connectionSettings(f.prefs) } };
+      const oldKey = await local.get<OldKeyNote>(OLD_KEY_KEY);
+      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}) });
+      return { surface: 'settings', view: sv };
     }
   }
 }
@@ -839,8 +816,6 @@ function onViewPort(port: ViewPort): void {
       sub.windowId = msg.windowId;
       sub.last = undefined;
       if (msg.surface === 'panel' && msg.windowId !== undefined) mem.panelWindowId = msg.windowId;
-      // 12.0.0: while the panel is open the direct way keeps one connection for its reads
-      if (msg.surface === 'panel') mem.direct.portal?.portal.hold(true);
       schedulePush();
     } else if (msg.type === 'tick') void tick();
   });
@@ -850,7 +825,6 @@ function onViewPort(port: ViewPort): void {
       // the log is closed every time the panel opens
       mem.logOpen = false;
       mem.tourFromMenu = false;
-      mem.direct.portal?.portal.hold(false);
     }
   });
 }
@@ -862,24 +836,13 @@ async function tick(): Promise<void> {
   const settings = await settingsNow();
   if (!settings) return schedulePush();
   const grid = await session.get<GridNote>(GRID_KEY);
-  const mode = await modeNow();
-  // 12.0.0: the bridges, looked for again while the direct way waits on one (every 3 s for ten minutes
-  // after the installer was saved, else every 15 s), and once in five minutes when one was found
-  if (mode !== 'vpn' && !mem.direct.probing) {
-    const B = await session.get<BridgeNote>(BRIDGE_KEY);
-    const since = now - mem.direct.lastProbe;
-    const eager = mem.direct.downloadedAt !== undefined && now - mem.direct.downloadedAt < 10 * 60_000;
-    if (!B || (B.chosen === 'none' && since >= (eager ? 3_000 : 15_000)) || (B.chosen !== 'none' && since >= 5 * 60_000)) void probeBridges();
-  }
   // the grid sign-in: a dashboard GET on each tick while a sign-in tab is watched
-  if (mode === 'setup') {
-    /* the direct way's moments carry it; no portal check */
-  } else if (mem.signin.waiting && now - mem.last.signin >= SIGNIN_WATCH_MS) {
+  if (mem.signin.waiting && now - mem.last.signin >= SIGNIN_WATCH_MS) {
     mem.last.signin = now;
     void checkGrid('watch');
   }
-  // GlobalProtect: is the grid answering yet?
-  else if (mode === 'vpn' && (grid?.reach === 'no-route' || grid?.session === 'unreachable') && now - mem.last.reach >= REACH_EVERY_MS) void recheckReach();
+  // GlobalProtect: is the grid answering yet? (16.0.0: after the first run too, while a press waits on it)
+  else if ((grid?.reach === 'no-route' || grid?.session === 'unreachable') && now - mem.last.reach >= REACH_EVERY_MS) void recheckReach();
   // the Grid row's live check, once a minute
   else if (now - mem.last.grid >= GRID_LIVE_MS) void checkGrid('minute');
   const run = await session.get<RunState>(RUN_KEY);
@@ -903,6 +866,15 @@ async function tick(): Promise<void> {
 async function backgroundPoll(): Promise<void> {
   if (!(await termsInForce()) || !(await settingsNow())) return;
   const grid = await session.get<GridNote>(GRID_KEY);
+  // 16.0.0: out of reach with no page open (the VPN off, or the portal not answering), one credential-free
+  // request per alarm asks whether the grid answers again: a press kept for later then goes ahead, and a
+  // worker that ended is started again under "Keep my worker running", without the panel. Never a sign-in
+  // tab from here (afterReach): a tab opening while nothing of Beethoven's is on screen is a surprise
+  if (grid && (grid.reach === 'no-route' || grid.session === 'unreachable') && mem.ports.size === 0) {
+    await recheckReach({ fromAlarm: true });
+    schedulePush();
+    return;
+  }
   if (grid?.session === 'signed-in' || mem.ports.size === 0) await pollRun();
   schedulePush();
 }
@@ -1023,12 +995,6 @@ async function actInner(a: Action): Promise<unknown> {
       return onUsePortal(a.origin, a.granted, a.kind === 'change-portal');
     case 'sign-in-grid':
       if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
-      // 12.0.0: on the direct way the grid's sign-in is Beethoven's own sheet, never the portal's box
-      if ((await modeNow()) !== 'vpn') {
-        mem.direct.sheetWanted = true;
-        if (!(await session.get<BridgeNote>(BRIDGE_KEY))) void probeBridges();
-        return { opened: true } satisfies ActionResults['sign-in-grid'];
-      }
       return { opened: await openSigninTab('press') } satisfies ActionResults['sign-in-grid'];
     case 'retry-grid': {
       const r = await recheckReach();
@@ -1147,11 +1113,6 @@ async function actInner(a: Action): Promise<unknown> {
         mem.restricted = false;
       }
       await local.set(PREFS_KEY, next);
-      if (next.connection !== cur.connection) {
-        if (next.connection !== 'vpn') await directAgain();
-        await writeGrid({ session: 'unknown' });
-        void checkGrid('set-pref');
-      }
       return { saved: true } satisfies ActionResults['set-pref'];
     }
     case 'disconnect':
@@ -1163,19 +1124,13 @@ async function actInner(a: Action): Promise<unknown> {
       return { disconnected: true } satisfies ActionResults['disconnect'];
     case 'start-over':
       // back to the panel's first screen: the journey's progress on this computer goes, nothing
-      // durable does — the agreement, the portal, the key, the worker's run record and the
-      // preferences all stay (asked for after a student's sheet dead-ended, 2026-10-03)
+      // durable does — the agreement, the portal, the worker's run record and the preferences all
+      // stay (asked for after a student's journey dead-ended, 2026-10-03)
       await cancelPress();
-      await session.remove(ROUTE_KEY);
       await session.remove(WELCOME_PRESS_KEY).catch(() => undefined);
       mem.welcome = { state: 'idle', problem: undefined };
-      mem.direct.sheet?.dispose();
-      mem.direct.sheet = undefined;
-      mem.direct.sheetWanted = false;
-      mem.direct.claudeWanted = false;
       mem.setup = { state: 'unknown' };
       mem.signin = { waiting: false } as SigninFacts;
-      await directAgain();
       await local.remove(ONCE_KEY);
       schedulePush();
       return { restarted: true } satisfies ActionResults['start-over'];
@@ -1190,154 +1145,11 @@ async function actInner(a: Action): Promise<unknown> {
     case 'drive-connected':
       await local.set(CHECKLIST_KEY, a.done ? ({ drive_connected_at: nowIso() } satisfies Checklist) : ({} satisfies Checklist));
       return { recorded: true } satisfies ActionResults['drive-connected'];
-    // ---- 12.0.0: the direct way ----
-    case 'grid-signin-account':
-      return signinAccount(a.account);
-    case 'grid-signin-answer': {
-      const r = mem.direct.sheet?.answer(a.text);
-      return { sent: !!r?.sent, ...(r && r.waiting ? { waiting: r.waiting } : {}) } satisfies ActionResults['grid-signin-answer'];
-    }
-    case 'grid-signin-retry': {
-      await session.remove(ROUTE_KEY);
-      mem.direct.sheetWanted = true;
-      const flow = mem.direct.sheet;
-      if (flow?.state.account) {
-        const started = flow.retry();
-        if (started) void flow.done().then((out) => (out ? onSheetDone(flow, out) : onSheetEnded(flow)));
-        return { started } satisfies ActionResults['grid-signin-retry'];
-      }
-      flow?.cancel();
-      return { started: false } satisfies ActionResults['grid-signin-retry'];
-    }
-    case 'grid-signin-change':
-      mem.direct.sheet?.cancel();
-      return { closed: true } satisfies ActionResults['grid-signin-change'];
-    case 'grid-signin-continue':
-      await writeDirect({ enrolled_seen_at: nowIso() });
-      mem.direct.enrolledAt = undefined;
-      void carryPress();
-      return { recorded: true } satisfies ActionResults['grid-signin-continue'];
-    case 'use-vpn': {
-      // the GlobalProtect way for this computer until "Try the direct way again" or Settings' "Direct when
-      // possible"; the fallback moment comes first (its Continue opens the grid's own sign-in box)
-      await writeDirect({ vpn_chosen_at: nowIso() }, ['fallback_seen_at']);
-      await session.remove(ROUTE_KEY);
-      mem.direct.sheet?.dispose();
-      mem.direct.sheet = undefined;
-      mem.direct.sheetWanted = false;
-      mem.direct.claudeWanted = false;
-      mem.direct.fallbackWanted = true;
-      mem.connect = { ...mem.connect, failure: undefined };
-      await writeGrid({ session: 'unknown' });
-      await activity(LOG_WORDS.usingVpn(siteWords(await profileNow(), (await loadPrefs()).worker_name).vpnApp ?? 'GlobalProtect'));
+    case 'forget-old-key':
+      // the note goes; the key's line on the grid is not Beethoven's to touch (no cli.json command, and nothing is typed for it)
+      await local.remove(OLD_KEY_KEY);
       schedulePush();
-      return { recorded: true } satisfies ActionResults['use-vpn'];
-    }
-    case 'try-direct': {
-      const n = await (await directAgain()).probe;
-      mem.direct.sheetWanted = true;
-      void checkGrid('try-direct');
-      return { bridge: n.chosen } satisfies ActionResults['try-direct'];
-    }
-    case 'fallback-continue': {
-      await writeDirect({ fallback_seen_at: nowIso() });
-      mem.direct.fallbackWanted = false;
-      await writeGrid({ session: 'unknown' });
-      // the 11.0.0 way from here: GlobalProtect's reach, the portal's sign-in (its own box in a tab when the
-      // browser holds none), then the press that was waiting
-      void (async () => {
-        const r = await recheckReach();
-        const word = r === 'answers' ? await checkGrid('fallback') : 'unreachable';
-        if (word === 'signed-out' || word === 'not-ood') await openSigninTab('press', undefined, mem.panelWindowId).catch(() => false);
-        await carryPress();
-      })();
-      return { recorded: true } satisfies ActionResults['fallback-continue'];
-    }
-    case 'no-grid-code':
-      // the student says the account has no grid code yet: the route choice (its 2FA Setup notice above it).
-      // The run of code refusals is dropped: once a code is set up, a later refusal is first taken for a typo
-      // again, never pushed toward a second 2FA Setup (which would replace the code just made)
-      mem.direct.sheet?.cancel();
-      await session.set(ROUTE_KEY, { route: 'choose', at: nowIso() } satisfies RouteNote);
-      return { recorded: true } satisfies ActionResults['no-grid-code'];
-    case 'choose-route':
-      await session.set(ROUTE_KEY, { route: a.route, at: nowIso() } satisfies RouteNote);
-      return { recorded: true } satisfies ActionResults['choose-route'];
-    case 'route-back':
-      await session.set(ROUTE_KEY, { route: 'choose', at: nowIso() } satisfies RouteNote);
-      return { recorded: true } satisfies ActionResults['route-back'];
-    case 'bridge-downloaded':
-      mem.direct.downloadedAt = Date.now();
-      mem.direct.checkedByHand = false;
-      void probeBridges();
-      return { looking: true } satisfies ActionResults['bridge-downloaded'];
-    case 'check-bridge': {
-      // the student's own Check again: only this turns the button, and only after it may "Not found yet" show
-      mem.direct.probingByHand = true;
-      schedulePush();
-      let n: BridgeNote;
-      try {
-        n = await probeBridges();
-      } finally {
-        mem.direct.probingByHand = false;
-        mem.direct.checkedByHand = true;
-      }
-      if (n.chosen !== 'none') void carryPress();
-      return { bridge: n.chosen, ...(n.helper_version ? { helperVersion: n.helper_version } : {}) } satisfies ActionResults['check-bridge'];
-    }
-    case 'set-connection': {
-      const cur = await loadPrefs();
-      await local.set(PREFS_KEY, { ...cur, connection: a.connection } satisfies Prefs);
-      // "Direct when possible": an earlier "Use GlobalProtect instead" no longer holds; the bridges are looked for again
-      if (a.connection === 'direct') await directAgain();
-      await writeGrid({ session: 'unknown' });
-      void checkGrid('set-connection');
-      return { saved: true } satisfies ActionResults['set-connection'];
-    }
-    case 'protect-key': {
-      mem.direct.protectOutcome = a.outcome === 'off' ? undefined : a.outcome;
-      const k = await keyStateNow(true);
-      mem.direct.portal = undefined;
-      if (a.on && a.outcome === 'on') {
-        // the card says "Protected." a moment (PROTECTED_HOLD_MS), then the waiting press carries on
-        const offered = !(await local.get<DirectNote>(DIRECT_KEY))?.protect_offer_done_at;
-        await writeDirect({ protect_offer_done_at: nowIso() });
-        if (offered) {
-          mem.direct.protectedAt = Date.now();
-          setTimeout(() => {
-            mem.direct.protectedAt = undefined;
-            schedulePush();
-            void carryPress();
-          }, PROTECTED_HOLD_MS + 50);
-        }
-        await activity(LOG_WORDS.keyProtected);
-      } else if (!a.on && a.outcome === 'off') await activity(LOG_WORDS.keyUnprotected);
-      return { protected: k.wrapped } satisfies ActionResults['protect-key'];
-    }
-    case 'protect-key-later':
-      await writeDirect({ protect_offer_done_at: nowIso() });
-      mem.direct.protectOutcome = undefined;
-      mem.direct.protectedAt = undefined;
-      void carryPress();
-      return { recorded: true } satisfies ActionResults['protect-key-later'];
-    case 'unlock-key': {
-      const k = await keyStateNow(true);
-      mem.direct.portal = undefined;
-      if (a.outcome === 'unlocked' && !k.locked) {
-        mem.direct.unlockFailed = false;
-        void checkGrid('unlock').then(() => carryPress());
-        return { unlocked: true } satisfies ActionResults['unlock-key'];
-      }
-      // an Unlock that did not unlock (from the home's Grid row too): the unlock sheet says so, with its ways out
-      if (a.outcome === 'failed' || a.outcome === 'cancelled') {
-        mem.direct.unlockFailed = a.outcome === 'failed';
-        if (k.locked) mem.direct.sheetWanted = true;
-        schedulePush();
-      }
-      return { unlocked: false } satisfies ActionResults['unlock-key'];
-    }
-    case 'forget-computer':
-      return forgetComputer();
+      return { forgotten: true } satisfies ActionResults['forget-old-key'];
   }
 }
 
@@ -1375,15 +1187,6 @@ async function onAgree(a: Extract<Action, { kind: 'agree' }>): Promise<ActionRes
   const noPanel = !a.panelOpened && hasPanel();
   mem.welcome = { state: noPanel ? 'no-panel' : 'opening', problem: undefined };
   schedulePush();
-  // 12.0.0 (D3): the direct way first. The panel carries its moments (the helper, the sign-in sheet);
-  // the welcome tab is not navigated to the portal's sign-in
-  if ((await loadPrefs()).connection !== 'vpn') {
-    await probeBridges();
-    if ((await modeNow()) !== 'vpn') {
-      if (!noPanel) mem.welcome = { state: 'handoff', problem: undefined };
-      return no;
-    }
-  }
   // the panel carries GlobalProtect's moment; the welcome page hands over to it, and this same tab
   // becomes the sign-in once the grid answers (afterReach)
   const handoff = () => {
@@ -1459,11 +1262,9 @@ async function writeGrid(patch: Partial<GridNote>): Promise<GridNote> {
 }
 
 /** the credential-free check (net.ts reach), only after acceptance; "Connected." when it starts answering */
-async function recheckReach(): Promise<'answers' | 'no-route'> {
+async function recheckReach(o: { fromAlarm?: boolean } = {}): Promise<'answers' | 'no-route'> {
   const s = await settingsNow();
   if (!s || !(await termsInForce())) return 'no-route';
-  // the direct way checks its own door (checkGridDirect); the portal's reach is the 11.0.0 way's
-  if ((await modeNow()) !== 'vpn') return 'answers';
   if (mem.busy.reach) return ((await session.get<GridNote>(GRID_KEY))?.reach as 'answers' | 'no-route' | undefined) ?? 'no-route';
   mem.busy.reach = true;
   mem.last.reach = Date.now();
@@ -1481,7 +1282,7 @@ async function recheckReach(): Promise<'answers' | 'no-route'> {
       mem.lookingSince = undefined;
       await writeGrid({ reach: 'answers' });
       // the grid answers again: its sign-in is checked (after "Connected." has been held a moment)
-      if (wasLooking || grid?.session === 'unreachable') setTimeout(() => void afterReach(), wasLooking ? 750 : 0);
+      if (wasLooking || grid?.session === 'unreachable') setTimeout(() => void afterReach(o), wasLooking ? 750 : 0);
     }
     schedulePush();
     return r;
@@ -1490,10 +1291,13 @@ async function recheckReach(): Promise<'answers' | 'no-route'> {
   }
 }
 
-/** the grid answers after GlobalProtect: check the sign-in, and open the sign-in box if it is needed for the first run or a waiting press */
-async function afterReach(): Promise<void> {
+/**
+ * the grid answers after GlobalProtect: check the sign-in (a sign-in found carries a waiting press on, onSignedIn),
+ * and open the sign-in box if it is needed for the first run or a waiting press; never from the alarm with no page open
+ */
+async function afterReach(o: { fromAlarm?: boolean } = {}): Promise<void> {
   const s = await checkGrid('reach');
-  if (s !== 'signed-out') return;
+  if (s !== 'signed-out' || (o.fromAlarm && mem.ports.size === 0)) return;
   const press = await session.get<PendingPress>(PRESS_KEY);
   const f = await buildFacts();
   if (!press && firstRunDone(f)) return;
@@ -1515,10 +1319,6 @@ async function rememberIdentity(s: SessionInfo): Promise<void> {
 /** one dashboard GET from this background: signed in, signed out, unreachable (never "Failed to fetch") */
 async function checkGrid(reason: string): Promise<'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown'> {
   if (!(await termsInForce())) return 'unknown';
-  // 12.0.0: the direct way asks the gate with the key; while it is being set up there is nothing to ask
-  const mode = await modeNow();
-  if (mode === 'direct') return checkGridDirect(reason);
-  if (mode === 'setup') return 'unknown';
   const c = await directClient();
   if (!c) return 'unknown';
   if (mem.busy.grid) return ((await session.get<GridNote>(GRID_KEY))?.session as 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | undefined) ?? 'unknown';
@@ -1602,10 +1402,9 @@ async function onSignedIn(reason: string): Promise<void> {
     const grid = await session.get<GridNote>(GRID_KEY);
     const wasWaiting = mem.signin.waiting;
     mem.signin = { waiting: false, signedInAt: Date.now() };
-    const direct = (await modeNow()) === 'direct';
-    if (grid?.account && !direct) await activity(LOG_WORDS.gridSignedIn(grid.account));
+    if (grid?.account) await activity(LOG_WORDS.gridSignedIn(grid.account));
     let ch = await channelNow();
-    if (!ch && !direct) ch = await runChannelTest();
+    if (!ch) ch = await runChannelTest();
     const rec = await session.get<OpenedTab>(SIGNIN_TAB_KEY);
     if (rec) {
       if (ch?.mode === 'tab') {
@@ -1808,12 +1607,6 @@ async function ensureSetup(): Promise<void> {
   if (mem.setup.state === 'ready' || mem.busy.setup) return;
   const f = await buildFacts();
   if (!f.access.ok || f.grid.session !== 'signed-in') return;
-  if (connectionMode(f) === 'direct') {
-    // the gate has no install verb: the first direct sign-in ran install --shared, and connect sets the account up itself if it must
-    mem.setup = { state: 'ready', detail: 'direct: connect sets the account up itself if it must' };
-    schedulePush();
-    return;
-  }
   mem.busy.setup = true;
   try {
     mem.setup = { state: 'checking' };
@@ -1878,55 +1671,15 @@ async function ensureSetup(): Promise<void> {
  */
 async function readyForPress(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
   const r = await readyForPressInner(kind);
-  dbg('ready', `${kind}: ${r.go ? 'go' : r.drop ? 'dropped' : `waits for ${r.waiting ?? 'something'}`} (mode ${said.mode.split(' ')[0] || 'unknown'})`);
+  dbg('ready', `${kind}: ${r.go ? 'go' : r.drop ? 'dropped' : `waits for ${r.waiting ?? 'something'}`}`);
   return r;
 }
 
 async function readyForPressInner(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
-  // 12.0.0: while the direct way is being set up, a press waits on it (the helper, the sheet, an unlock)
-  const mode = await modeNow();
-  if (mode === 'setup') {
-    if (kind === 'open-files') return { go: false, drop: true };
-    mem.direct.sheetWanted = true;
-    if (kind === 'sign-in-claude') mem.direct.claudeWanted = true;
-    if (!(await session.get<BridgeNote>(BRIDGE_KEY))) void probeBridges();
-    schedulePush();
-    return { go: false, waiting: 'grid' };
-  }
-  if (mode === 'direct') {
-    const g = await checkGridDirect('press');
-    if (g === 'unreachable') {
-      // the fallback moment says so; Continue there carries the press on the 11.0.0 way
-      mem.direct.unreachable = true;
-      schedulePush();
-      return { go: false, waiting: 'grid' };
-    }
-    if (g !== 'signed-in') {
-      mem.direct.sheetWanted = true;
-      if (kind === 'sign-in-claude') mem.direct.claudeWanted = true;
-      schedulePush();
-      return { go: false, waiting: 'grid' };
-    }
-    if (kind === 'open-files') return { go: true };
-    const f = await buildFacts();
-    if (kind === 'connect' || kind === 'sign-in-claude' || kind === 'restrict') {
-      if (!f.access.ok) {
-        if (f.access.state === 'checking' && f.access.accessId) {
-          const now = Date.now();
-          if (now - mem.last.pressAccess >= PRESS_RETRY_MS) {
-            mem.last.pressAccess = now;
-            void checkAccessNow('press').then(() => carryPress());
-          }
-          return { go: false, waiting: 'approval' };
-        }
-        return { go: false, drop: true };
-      }
-      if (mem.setup.state !== 'ready') mem.setup = { state: 'ready', detail: 'direct: connect sets the account up itself if it must' };
-    }
-    return { go: true };
-  }
   const g = await checkGrid('press');
-  if (g === 'unreachable') return { go: false, drop: true };
+  // 16.0.0: out of reach, the press waits on the GlobalProtect moment and goes ahead by itself once the grid
+  // answers (the tick and the alarm ask; afterReach, onSignedIn, carryPress). 15.0.0 dropped it here.
+  if (g === 'unreachable') return { go: false, waiting: 'grid' };
   if (g !== 'signed-in') {
     await openSigninTab('press');
     return { go: false, waiting: 'grid' };
@@ -2003,6 +1756,8 @@ async function pressConnect(statement?: { tick: string; lines: string[]; buttonL
   // one connect at a time: a start or a sitting under way is this press's own
   if (mem.sitting || mem.startId) return { started: true };
   mem.connect = { ...freshConnect() };
+  // 16.0.0: the student's own Connect starts "Keep my worker running"'s count of starts in a row afresh
+  await mutateRun((cur) => (cur && cur.kept_running ? { ...cur, kept_running: 0 } : undefined));
   await session.set(PRESS_KEY, { kind: 'connect', at: nowIso() } satisfies PendingPress);
   const r = await readyForPress('connect');
   if (r.drop) {
@@ -2057,8 +1812,6 @@ async function cancelPress(): Promise<ActionResults['cancel']> {
   mem.loginSetup?.stop();
   mem.loginSetup = undefined;
   mem.connect = { ...freshConnect() };
-  mem.direct.sheetWanted = false;
-  mem.direct.claudeWanted = false;
   return { cancelled: had };
 }
 
@@ -2131,22 +1884,8 @@ async function startConnectClaimed(id: number, login: ConnectLogin): Promise<boo
   mem.restricted = false;
   await mutateRun((cur) => (cur && cur.stopped_by_student ? { ...cur, stopped_by_student: false } : undefined));
   schedulePush();
-  // 12.0.0: the direct way. Through the gate when no Claude sign-in is wanted (it is always --login
-  // never there); a Claude sign-in runs connect in the student's own signed-in session (held from a
-  // sign-in a moment ago, or the sheet first)
-  if ((await modeNow()) === 'direct') {
-    const needsClaude = login === 'always' || (login === 'auto' && mem.direct.claude === 'no');
-    const held = !!mem.direct.sheet?.holding();
-    if (!needsClaude && !(login === 'auto' && held && mem.direct.claude !== 'yes')) {
-      dbg('connect', `start ${id}: the direct way, through the gate (no Claude sign-in; Claude Code on the grid signed in: ${mem.direct.claude ?? '?'})`);
-      const gateOpts: ConnectOptions = { ...opts, login: 'never' };
-      return startGateConnect(id, gateOpts);
-    }
-    dbg('connect', `start ${id}: the direct way, in a sign-in sitting (Claude sign-in wanted: ${needsClaude ? 'yes' : 'no'}; a held sign-in: ${held ? 'yes' : 'no'})`);
-    return startSshSitting(id, line, login);
-  }
   const ch = await channelNow();
-  dbg('connect', `start ${id}: the GlobalProtect way, ${ch?.mode === 'tab' ? 'through a portal tab' : "through the portal's shell from here"}`);
+  dbg('connect', `start ${id}: ${ch?.mode === 'tab' ? 'through a portal tab' : "through the portal's shell from here"}`);
   return ch?.mode === 'tab' ? startTabSitting(id, s, opts, dir, login) : startDirectSitting(id, line, login);
 }
 
@@ -2711,23 +2450,6 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
   if (mem.busy.list) return;
   const grid = await session.get<GridNote>(GRID_KEY);
   if (!force && grid?.session !== 'signed-in' && mem.ports.size > 0) return;
-  // 12.0.0: the direct way reads the run file by file through the gate; nothing while it is being set up
-  const mode = await modeNow();
-  if (mode === 'setup') return;
-  if (mode === 'direct') {
-    if (!(await termsInForce())) return;
-    mem.busy.list = true;
-    mem.last.list = Date.now();
-    try {
-      await pollRunDirect(want);
-    } catch {
-      /* the next tick reads again */
-    } finally {
-      mem.busy.list = false;
-      schedulePush();
-    }
-    return;
-  }
   const c = await directClient();
   if (!c || !(await termsInForce())) return;
   mem.busy.list = true;
@@ -2816,7 +2538,7 @@ async function pollRun(force = false, want: { progress?: boolean } = {}): Promis
     });
     if (rcPassedOver) dbg('read', `portal: rc.log is older than job ${run?.job ?? '-'}'s computer (its predecessor's): passed over`);
     if (run) {
-      if (plan.status || plan.connection) noteRead('portal', run, read.status, plan.status, read.connection, plan.connection);
+      if (plan.status || plan.connection) noteRead(run, read.status, plan.status, read.connection);
       await afterRead();
     }
   } finally {
@@ -2838,18 +2560,17 @@ function clockOffset(serverDate: string | undefined, asked: number, answered: nu
   return Math.abs(off) <= CLOCK_JITTER_MS ? 0 : Math.round(off);
 }
 
-/** `worker status --json`, once a minute while queued (13.0.0: or renewing) with a page open: the scheduler's reason and estimate, and from framework 13 whether a renewal's successor is still there (direct only: tab mode would open a portal tab every minute) */
+/** `worker status --json`, once a minute while queued (13.0.0: or renewing) with a page open: the scheduler's reason and estimate, and from framework 13 whether a renewal's successor is still there (the background's own channel only: tab mode would open a portal tab every minute) */
 async function refreshStatusJson(): Promise<void> {
   if (mem.busy.statusJson) return;
-  const direct = (await modeNow()) === 'direct';
   const ch = await channelNow();
-  if (ch?.mode === 'tab' && !direct) return;
+  if (ch?.mode === 'tab') return;
   mem.busy.statusJson = true;
   mem.last.statusJson = Date.now();
   try {
     const snap = await session.get<RunState>(RUN_KEY);
     const dir = await sharedDirNow();
-    const c: PortalApi | undefined = direct ? await sshPortal() : await directClient();
+    const c: PortalApi | undefined = await directClient();
     if (!snap || !dir || !c) return;
     // asked only while the run is still in line (or renewing) and no press of the student's waits or runs
     const asking = (r: RunState) => ['queued', 'renewing'].includes(runFacts(r, Date.now()).phase);
@@ -2863,7 +2584,7 @@ async function refreshStatusJson(): Promise<void> {
       dbg('status', `worker status --json failed: ${(e as Error)?.message ?? String(e)}`);
       return undefined;
     });
-    dbg('status', sj ? `worker status --json (${direct ? 'direct' : 'portal'}): status ${sj.status?.state ?? '-'}, scheduler ${sj.scheduler?.state ?? '-'}${sj.scheduler?.reason ? ` (${sj.scheduler.reason})` : ''}` : 'worker status --json: no answer, or not asked');
+    dbg('status', sj ? `worker status --json: status ${sj.status?.state ?? '-'}, scheduler ${sj.scheduler?.state ?? '-'}${sj.scheduler?.reason ? ` (${sj.scheduler.reason})` : ''}` : 'worker status --json: no answer, or not asked');
     if (!sj) return;
     let say: string | undefined;
     await mutateRun((cur) => {
@@ -2940,19 +2661,41 @@ async function afterRead(): Promise<void> {
   }
   const rf = runFacts(run, Date.now());
   await setPollEvery(rf.phase === 'online' || rf.phase === 'stopped' || rf.phase === 'ended' || rf.phase === 'error' || rf.phase === 'none' ? 1 : 0.5);
+  // 16.0.0: a worker seen to have ended by a read (the tick's or the alarm's), not only on the grid sign-in
+  if (rf.phase === 'ended') void maybeKeepRunning();
 }
 
-/** "Keep my worker running": a worker that ended without the student's Stop is started again on the grid sign-in, with no sign-in sitting and no tab */
+/**
+ * "Keep my worker running": a worker that ended without the student's Stop is started again, with no sign-in
+ * sitting and no tab, on the grid sign-in (11.0.0) and, since 16.0.0, when a read finds it ended, with the
+ * panel open or not: at most once a minute, once per ended job, and at most KEEP_RUNNING_MAX times in a row
+ * without a Connect of the student's. A worker the student stopped, one that failed, or one still renewing
+ * itself is never started this way.
+ */
 async function maybeKeepRunning(): Promise<void> {
   const prefs = await loadPrefs();
-  if (!prefs.auto_start || mem.sitting) return;
-  const f = await buildFacts();
-  const run = await session.get<RunState>(RUN_KEY);
-  if (!run || run.stopped_by_student || f.run.phase !== 'ended') return;
-  if (!f.statement.inForce || !f.access.ok || mem.setup.state !== 'ready') return;
-  const ch = await channelNow();
-  if (ch?.shell === 'password') return;
-  await startConnect('never');
+  if (!prefs.auto_start || mem.sitting || mem.startId || mem.busy.keep) return;
+  const now = Date.now();
+  if (now - mem.last.keep < KEEP_RUNNING_MS) return;
+  mem.busy.keep = true;
+  try {
+    const f = await buildFacts();
+    const run = await session.get<RunState>(RUN_KEY);
+    if (!run || run.stopped_by_student || f.run.phase !== 'ended' || f.grid.session !== 'signed-in') return;
+    if (run.kept_running_job === run.job || (run.kept_running ?? 0) >= KEEP_RUNNING_MAX) return;
+    if (!f.statement.inForce || !f.access.ok) return;
+    if (mem.setup.state === 'unknown') await ensureSetup();
+    if (mem.setup.state !== 'ready') return;
+    const ch = await channelNow();
+    if (ch?.shell === 'password') return;
+    mem.last.keep = now;
+    // written before the start, so a start that fails is not tried again for the same job
+    await mutateRun((cur) => (cur && cur.job === run.job ? { ...cur, kept_running_job: run.job, kept_running: (cur.kept_running ?? 0) + 1 } : undefined));
+    dbg('keep', `job ${run.job} ended without a Stop: starting the worker again (${(run.kept_running ?? 0) + 1} of ${KEEP_RUNNING_MAX} in a row)`);
+    await startConnect('never');
+  } finally {
+    mem.busy.keep = false;
+  }
 }
 
 // ---- claude.ai --------------------------------------------------------------------------------------
@@ -2990,629 +2733,14 @@ async function openSession(): Promise<ActionResults['open-session']> {
 }
 
 
-// ---- 12.0.0: the direct way (ssh through a bridge; framework/contract-text/V12_CONTRACT.md) -------------------------------
-//
-// D3's order: a browser-only bridge (none known: a named stub), a relay the site profile names (none at
-// Wayne State), the helper that comes inside Beethoven (offered for a one-time install when it does not
-// answer), and only when none is there, or the student chooses it, the 11.0.0 way through GlobalProtect.
-// The first direct sign-in is Beethoven's own sheet (core/signin.ts); then this computer's key, through
-// the gate, carries every action (core/sshChannel.ts). A Claude sign-in always needs the student's own
-// password and code (the gate cannot sign a worker in): the session of a sign-in that just happened is
-// held for it, or the sheet is shown again.
-
-/** the providers in D3's order, made once */
-function bridgeProviders(profile: SiteProfile | undefined): BridgeProvider[] {
-  const relay = relayConfigFrom(profile);
-  const key = relay ? relay.url : '-';
-  if (mem.direct.providers?.key !== key) {
-    mem.direct.providers = { key, list: [new StoreExtensionBridge(), new RelayBridge(relay, globalThis.WebSocket as unknown as WsLikeCtor | undefined), helperBridge()] };
-  }
-  return mem.direct.providers.list;
-}
-
-/** the grid's ssh door as the site profile names it (the bundled profile; Wayne State's pin by default) */
-function doorOf(profile: SiteProfile | undefined): { host: string; port: number; pin: string } {
-  const pin = typeof profile?.ssh_host_key === 'string' && /^SHA256:[A-Za-z0-9+/]{43}$/.test(profile.ssh_host_key) ? profile.ssh_host_key : GRID_HOST_KEY_PIN;
-  const host = typeof profile?.ssh_host === 'string' && /^[a-z0-9.-]+$/.test(profile.ssh_host) ? profile.ssh_host : GRID_HOST;
-  const port = Number.isInteger(profile?.ssh_port) && profile!.ssh_port! > 0 && profile!.ssh_port! < 65536 ? profile!.ssh_port! : GRID_PORT;
-  return { host, port, pin };
-}
-
-async function profileNow(): Promise<SiteProfile | undefined> {
-  const s = await settingsNow();
-  return siteProfile(s?.site ?? DEFAULT_SITE);
-}
-
-/** probe the bridges in D3's order and keep what was found (session BRIDGE_KEY); "Helper found." when it answers for the first time */
-async function probeBridges(): Promise<BridgeNote> {
-  if (mem.direct.probingNow) return mem.direct.probingNow;
-  mem.direct.probing = true;
-  schedulePush();
-  mem.direct.probingNow = (async () => {
-    const before = await session.get<BridgeNote>(BRIDGE_KEY);
-    const t0 = Date.now();
-    const choice = await chooseBridge(bridgeProviders(await profileNow()));
-    dbg('bridge', `probe in ${Date.now() - t0} ms: chosen ${choice.chosen}; ${choice.probes.map((x) => `${x.id} ${x.state}${x.detail ? ` (${x.detail})` : ''}`).join('; ')}`);
-    const p = (id: string) => choice.probes.find((x) => x.id === id);
-    const helper = p('helper');
-    const note: BridgeNote = {
-      chosen: choice.chosen,
-      store: 'not-available',
-      relay: p('relay')?.state === 'available' ? 'available' : p('relay')?.state === 'not-configured' ? 'not-configured' : 'not-available',
-      helper: helper ? (helper.state === 'available' ? 'available' : helper.state === 'not-installed' ? 'not-installed' : helper.state === 'broken' ? 'broken' : 'not-available') : before?.helper ?? 'not-available',
-      ...(helper?.helper ? { helper_version: helper.helper.version, ...(helper.helper.os === 'windows' || helper.helper.os === 'mac' || helper.helper.os === 'linux' ? { helper_os: helper.helper.os } : {}), ...(helper.helper.kind === 'script' || helper.helper.kind === 'binary' ? { helper_kind: helper.helper.kind } : {}) } : {}),
-      reach22: choice.chosen === before?.chosen ? before?.reach22 ?? 'unknown' : 'unknown',
-      checked_at: nowIso(),
-    };
-    mem.direct.probeDetail = choice.probes.map((x) => `${x.id}: ${x.state} (${x.detail})`);
-    await session.set(BRIDGE_KEY, note);
-    if (note.chosen !== 'none' && (before?.chosen ?? 'none') === 'none') {
-      mem.direct.foundAt = Date.now();
-      mem.direct.unreachable = false;
-      setTimeout(() => schedulePush(), FOUND_HOLD_MS + 50);
-    }
-    return note;
-  })();
-  try {
-    return await mem.direct.probingNow;
-  } finally {
-    mem.direct.probingNow = undefined;
-    mem.direct.probing = false;
-    mem.direct.lastProbe = Date.now();
-    schedulePush();
-  }
-}
-
-/**
- * The direct way again (Settings' "Direct when possible", "Try the direct way again"): an earlier "Use
- * GlobalProtect instead" and its fallback no longer hold, the door is taken as unknown, and the bridges
- * are looked for (the probe, returned for whoever waits on it).
- */
-async function directAgain(): Promise<{ probe: Promise<BridgeNote> }> {
-  await writeDirect({}, ['vpn_chosen_at', 'fallback_seen_at']);
-  mem.direct.unreachable = false;
-  mem.direct.fallbackWanted = false;
-  const probe = probeBridges();
-  probe.catch(() => undefined);
-  return { probe };
-}
-
-/** the chosen bridge's provider (probing first when nothing is known); a BridgeError when there is none */
-async function chosenBridge(): Promise<BridgeProvider> {
-  let note = await session.get<BridgeNote>(BRIDGE_KEY);
-  if (!note) note = await probeBridges();
-  const p = bridgeProviders(await profileNow()).find((x) => x.id === note!.chosen);
-  if (!p) throw new BridgeError('not-installed', 'no bridge on this computer');
-  return p;
-}
-
-/** this computer's key, as the facts need it (cached; re-read after any change) */
-async function keyStateNow(force = false): Promise<KeyState> {
-  if (!force && mem.direct.key && Date.now() - mem.direct.key.at < 30_000) return mem.direct.key.state;
-  const state = await keyState(browserKeyring()).catch(() => ({ present: false, wrapped: false, locked: false, enrolled: false }) as KeyState);
-  mem.direct.key = { at: Date.now(), state };
-  return state;
-}
-
-/** which way the grid is reached now (steps.ts connectionMode on what is stored) */
-async function modeNow(): Promise<'direct' | 'vpn' | 'setup'> {
-  const prefs = await loadPrefs();
-  const D = (await local.get<DirectNote>(DIRECT_KEY)) ?? {};
-  const B = await session.get<BridgeNote>(BRIDGE_KEY);
-  const k = await keyStateNow();
-  const base = directBase(prefs, D, B, k);
-  const mode = connectionMode({ direct: { ...base } });
-  // 14.0.0: the debug log says the mode and why, when either changes
-  const why = `${mode} (preference ${base.pref}${base.vpnChosen ? ', GlobalProtect chosen' : ''}; bridge ${base.bridge}; key ${base.key.present ? (base.key.enrolled ? 'enrolled' : 'not enrolled') : 'none'}${base.key.locked ? ', locked' : ''}${base.unreachable ? '; the grid did not answer through the bridge' : ''}${base.fallbackSeen ? '; the GlobalProtect way was offered' : ''})`;
-  if (why !== said.mode) {
-    said.mode = why;
-    dbg('mode', why);
-  }
-  return mode;
-}
-
-/** the part of DirectFacts connectionMode reads */
-function directBase(prefs: Prefs, D: DirectNote, B: BridgeNote | undefined, k: KeyState): DirectFacts {
-  return {
-    pref: prefs.connection ?? 'direct',
-    vpnChosen: !!D.vpn_chosen_at,
-    bridge: B ? B.chosen : 'unknown',
-    helper: { state: B ? (B.helper === 'available' ? 'available' : B.helper === 'not-installed' ? 'not-installed' : B.helper === 'broken' ? 'broken' : 'not-available') : 'unknown', ...(B?.helper_version ? { version: B.helper_version } : {}) },
-    probing: mem.direct.probing,
-    key: { present: k.present, wrapped: k.wrapped, locked: k.locked, enrolled: k.enrolled && (!D.account || !k.account || k.account === D.account), ...(k.keyType ? { keyType: k.keyType } : {}), ...(k.fingerprint ? { fingerprint: k.fingerprint } : {}) },
-    unreachable: mem.direct.unreachable || B?.reach22 === 'no-route',
-    ...(D.account ? { account: D.account } : {}),
-    sheetWanted: mem.direct.sheetWanted,
-    enrolledSeen: true,
-    protectOffer: false,
-    fallbackSeen: !!D.fallback_seen_at,
-    links: { globalProtect: DIRECT_LINKS.globalProtect, gridCode: DIRECT_LINKS.gridCode, gridSite: 'https://ondemand.grid.wayne.edu/pun/sys/dashboard/' },
-  };
-}
-
-/** the direct facts for the views */
-async function directFacts(prefs: Prefs, profile: SiteProfile | undefined, settings: PortalSettings | undefined, now: number): Promise<DirectFacts> {
-  const D = (await local.get<DirectNote>(DIRECT_KEY)) ?? {};
-  const B = await session.get<BridgeNote>(BRIDGE_KEY);
-  const R = await session.get<RouteNote>(ROUTE_KEY);
-  const k = await keyStateNow();
-  const base = directBase(prefs, D, B, k);
-  const download = await helperDownloadNow();
-  const enrolledAt = mem.direct.enrolledAt;
-  return {
-    ...base,
-    ...(mem.direct.foundAt !== undefined && now - mem.direct.foundAt < FOUND_HOLD_MS + 500 ? { foundAt: mem.direct.foundAt } : {}),
-    ...(mem.direct.downloadedAt !== undefined ? { downloadedAt: mem.direct.downloadedAt } : {}),
-    ...(download ? { download } : {}),
-    ...(mem.direct.sheet ? { sheet: mem.direct.sheet.state } : {}),
-    ...(R ? { route: R.route } : {}),
-    ...(enrolledAt !== undefined ? { enrolledAt } : {}),
-    enrolledSeen: !!D.enrolled_seen_at && (!D.enrolled_at || D.enrolled_seen_at >= D.enrolled_at),
-    protectOffer: (!!D.enrolled_at && !D.protect_offer_done_at && k.present && !k.wrapped) || (mem.direct.protectedAt !== undefined && now - mem.direct.protectedAt < PROTECTED_HOLD_MS),
-    ...(mem.direct.protectOutcome ? { protectOutcome: mem.direct.protectOutcome } : {}),
-    ...(mem.direct.probingByHand ? { probingByHand: true } : {}),
-    ...(mem.direct.checkedByHand ? { checkedByHand: true } : {}),
-    ...(mem.direct.unlockFailed ? { unlockFailed: true } : {}),
-    // "Use GlobalProtect instead" wants the fallback moment even when no press waits
-    ...(mem.direct.fallbackWanted && D.vpn_chosen_at && !D.fallback_seen_at ? { sheetWanted: true } : {}),
-    links: {
-      globalProtect: profile?.vpn_help_url || DIRECT_LINKS.globalProtect,
-      gridCode: profile?.grid_2fa_help_url || DIRECT_LINKS.gridCode,
-      gridSite: settings ? `${settings.origin}${DASHBOARD}` : `${profile?.ood_base_url ?? 'https://ondemand.grid.wayne.edu'}${DASHBOARD}`,
-    },
-  };
-}
-
-/** this computer's installer from the package's bridge manifest (15.0.0: a signed one only when it is made out to this very extension) */
-async function helperDownloadNow(): Promise<HelperDownload | undefined> {
-  if (mem.direct.download !== undefined) return mem.direct.download || undefined;
-  const os = await helperOs();
-  const m = await bridgeManifest();
-  const dl = helperDownloadFor(m, os, (p) => assetUrl(p), browser.runtime.id);
-  mem.direct.download = dl ?? null;
-  return dl;
-}
-
-/** the integer before the first dot of a version ("1.0.0" -> 1); undefined when there is none */
-function majorOf(version: string | undefined): number | undefined {
-  const m = /^(\d+)/.exec(version ?? '');
-  return m ? Number(m[1]) : undefined;
-}
-
-/** the direct portal: the gate's verbs over ssh with this computer's key */
-async function sshPortal(): Promise<SshPortal> {
-  const profile = await profileNow();
-  const door = doorOf(profile);
-  const key = `${door.host}:${door.port}|${door.pin}`;
-  if (mem.direct.portal?.key === key) return mem.direct.portal.portal;
-  const audit = new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) });
-  const portal = new SshPortal({
-    bridge: chosenBridge,
-    identity: () => loadIdentity(browserKeyring()),
-    account: async () => (await local.get<DirectNote>(DIRECT_KEY))?.account,
-    audit,
-    pin: door.pin,
-    host: door.host,
-    port: door.port,
-    debug: dbg,
-  });
-  mem.direct.portal?.portal.hold(false);
-  mem.direct.portal = { key, portal };
-  portal.hold([...mem.ports.values()].some((p) => p.surface === 'panel'));
-  return portal;
-}
-
-async function writeDirect(patch: Partial<DirectNote>, drop: Array<keyof DirectNote> = []): Promise<DirectNote> {
-  const cur = (await local.get<DirectNote>(DIRECT_KEY)) ?? {};
-  const next: DirectNote = { ...cur, ...patch };
-  for (const k of drop) delete next[k];
-  await local.set(DIRECT_KEY, next);
-  return next;
-}
-
-/** one gate `version` with the key: the Grid row, the account for the approval check, Claude Code's sign-in on the grid */
-async function checkGridDirect(reason: string): Promise<'signed-in' | 'signed-out' | 'unreachable' | 'unknown'> {
-  if (mem.busy.grid) return ((await session.get<GridNote>(GRID_KEY))?.session as 'signed-in' | 'signed-out' | 'unreachable' | undefined) ?? 'unknown';
-  mem.busy.grid = true;
-  mem.last.grid = Date.now();
-  try {
-    const before = (await session.get<GridNote>(GRID_KEY))?.session;
-    const sp = await sshPortal();
-    let word: 'signed-in' | 'signed-out' | 'unreachable';
-    let account: string | undefined;
-    try {
-      const v = await sp.version();
-      word = 'signed-in';
-      account = v.account;
-      mem.direct.unreachable = false;
-      mem.direct.claude = v.claude;
-    } catch (e) {
-      const f = directFailureOf(e);
-      setFail(`direct: ${f}: ${(e as Error).message}`);
-      if (f === 'locked') {
-        word = 'signed-out';
-      } else if (f === 'key-refused' || f === 'key-expired' || f === 'no-key') {
-        // the grid no longer takes this key: the next press asks for a sign-in, which enrols it again
-        word = 'signed-out';
-        await markNotEnrolled();
-      } else if (f === 'no-bridge') {
-        await probeBridges();
-        word = 'unreachable';
-      } else {
-        word = 'unreachable';
-        mem.direct.unreachable = true;
-      }
-    }
-    dbg('grid', `direct (${reason}): ${word}${account ? ` as ${account}` : ''}${word === 'signed-in' ? `; framework ${sp.lastVersion?.framework ?? '?'}, Claude Code on the grid signed in: ${mem.direct.claude ?? '?'}` : ''}`);
-    await writeGrid({ session: word, ...(word === 'unreachable' ? {} : { reach: 'answers' }), ...(account ? { account } : {}) });
-    // the door's answer through the bridge, for Details and the fallback (a key refused still means the door answered)
-    const B = await session.get<BridgeNote>(BRIDGE_KEY);
-    if (B) await session.set(BRIDGE_KEY, { ...B, reach22: word === 'unreachable' ? (mem.direct.unreachable ? 'no-route' : B.reach22) : 'answers' } satisfies BridgeNote);
-    if (account) {
-      await local.set(IDENTITY_KEY, { username: account, seen_at: nowIso() } satisfies IdentityNote);
-      const t = await local.get<TermsRecord>(TERMS_KEY);
-      if (recordInForce(t) && !t.bound_account) await local.set(TERMS_KEY, bindAccount(t, account));
-    }
-    if (word === 'signed-in' && before !== 'signed-in') void onSignedIn(reason);
-    schedulePush();
-    return word;
-  } finally {
-    mem.busy.grid = false;
-  }
-}
-
-/** the grid no longer takes this computer's key (refused, expired, or forgotten elsewhere) */
-async function markNotEnrolled(): Promise<void> {
-  const r = await browserKeyring().store.get().catch(() => undefined);
-  if (r?.enrolled_at) {
-    const { enrolled_at: _e, ...rest } = r;
-    await browserKeyring().store.put(rest as typeof r);
-  }
-  await writeDirect({}, ['enrolled_at']);
-  await keyStateNow(true);
-}
-
-/** the sheet, made for its purpose (a Claude sign-in when a press waits on one) */
-function sheetFlow(purpose: 'enrol' | 'claude'): SignInFlow {
-  const cur = mem.direct.sheet;
-  if (cur && (cur.state.phase === 'prompt' || cur.state.phase === 'working' || cur.state.phase === 'connecting')) return cur;
-  if (cur && cur.state.purpose === purpose && !cur.holding()) return cur;
-  cur?.dispose();
-  const flow = new SignInFlow(
-    {
-      bridge: chosenBridge,
-      keyring: browserKeyring(),
-      sharedDir: sharedDirNow,
-      site: async () => {
-        const s = await settingsNow();
-        return s && (await siteProfile(s.site)) ? s.site : undefined;
-      },
-      verify: async (account, identity) => {
-        // a second connection, made with the new key for the account the grid just accepted (nothing is
-        // recorded yet, so this portal is the check's own and is dropped after it)
-        mem.direct.portal = undefined;
-        await keyStateNow(true);
-        const door = doorOf(await profileNow());
-        const audit = new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) });
-        const check = new SshPortal({ bridge: chosenBridge, identity: async () => identity, account: async () => account, audit, pin: door.pin, host: door.host, port: door.port, debug: dbg });
-        return check.version();
-      },
-      changed: () => {
-        noteSheet();
-        schedulePush();
-      },
-      debug: dbg,
-      audit: new Audit(local, { revocation: async () => local.get<{ revoked: boolean; message: string }>(REVOKED_KEY) }),
-      refusals: {
-        get: async (account) => ((await session.get<RefusalNote>(REFUSALS_KEY)) ?? {})[account],
-        set: async (account, note) => {
-          const all = (await session.get<RefusalNote>(REFUSALS_KEY)) ?? {};
-          await session.set(REFUSALS_KEY, { ...all, [account]: note } satisfies RefusalNote);
-        },
-        clear: async (account) => {
-          const all = (await session.get<RefusalNote>(REFUSALS_KEY)) ?? {};
-          if (!(account in all)) return;
-          delete all[account];
-          await session.set(REFUSALS_KEY, all);
-        },
-      },
-      ...(() => {
-        const door = doorOf(mem.profile?.profile);
-        return { pin: door.pin, host: door.host, port: door.port };
-      })(),
-    },
-    purpose,
-    undefined,
-  );
-  mem.direct.sheet = flow;
-  return flow;
-}
-
-/** the sheet's AccessID: the sign-in starts; when it ends well the account is recorded and the waiting press carries on */
-async function signinAccount(account: string): Promise<ActionResults['grid-signin-account']> {
-  const note = await session.get<BridgeNote>(BRIDGE_KEY);
-  if (!note || note.chosen === 'none') {
-    const n = await probeBridges();
-    if (n.chosen === 'none') return { started: false, error: 'no-bridge' };
-  }
-  const press = await session.get<PendingPress>(PRESS_KEY);
-  const purpose = mem.direct.claudeWanted || press?.kind === 'sign-in-claude' ? 'claude' : 'enrol';
-  const flow = sheetFlow(purpose);
-  if (flow.state.phase === 'prompt' || flow.state.phase === 'working') return { started: false, error: 'busy' };
-  if (!flow.start(account)) return { started: false, error: 'account' };
-  void flow.done().then((out) => (out ? onSheetDone(flow, out) : onSheetEnded(flow)));
-  return { started: true };
-}
-
-async function onSheetEnded(flow: SignInFlow): Promise<void> {
-  // three refusals: Try again comes back by itself once the cooldown has passed
-  const at = flow.state.phase === 'stopped' ? flow.state.retryAt : undefined;
-  if (at !== undefined && at > Date.now()) setTimeout(() => schedulePush(), Math.min(at - Date.now() + 100, 20 * 60_000));
-  // for Details and "Copy details" only
-  if (flow.state.detail) setFail(`direct sign-in: ${flow.state.failure ?? flow.state.phase}: ${flow.state.detail}`);
-  schedulePush();
-}
-
-/** the grid accepted the sign-in and the key works: the account is recorded, then the approval check, then the waiting press */
-async function onSheetDone(flow: SignInFlow, out: SignInOutcome): Promise<void> {
-  const k = await keyStateNow(true);
-  const now = nowIso();
-  await writeDirect({ account: out.account, account_recorded_at: now, enrolled_at: now, ...(k.fingerprint ? { key_fp: k.fingerprint } : {}) }, ['vpn_chosen_at']);
-  await session.remove(ROUTE_KEY);
-  mem.direct.enrolledAt = Date.now();
-  mem.direct.sheetWanted = false;
-  mem.direct.unreachable = false;
-  mem.direct.claude = out.version.claude;
-  mem.direct.portal = undefined;
-  if (out.setupReady) mem.setup = { state: 'ready' };
-  await activity(LOG_WORDS.directSignedIn(out.account));
-  await activity(LOG_WORDS.computerSetUp);
-  await writeGrid({ session: 'signed-in', reach: 'answers', account: out.account });
-  await local.set(IDENTITY_KEY, { username: out.account, seen_at: now } satisfies IdentityNote);
-  const t = await local.get<TermsRecord>(TERMS_KEY);
-  if (recordInForce(t) && !t.bound_account) await local.set(TERMS_KEY, bindAccount(t, out.account));
-  setTimeout(() => schedulePush(), ENROLLED_HOLD_MS + 50);
-  schedulePush();
-  // the approval check goes only now, after the grid accepted the account
-  await checkAccessNow('signin');
-  if (mem.setup.state !== 'ready') mem.setup = { state: 'ready', detail: 'direct: connect sets the account up itself if it must' };
-  void flow;
-  await carryPress();
-  void pollRun(true);
-}
-
-/** "Forget this computer": the grid's line through the gate (when it can be reached), then the key here */
-async function forgetComputer(): Promise<ActionResults['forget-computer']> {
-  let onGrid: ActionResults['forget-computer']['onGrid'] = 'not-reached';
-  const k = await keyStateNow(true);
-  if (k.present && k.enrolled && !k.locked) {
-    try {
-      // a refused floor (a shell-class line a moment ago) is waited out, never taken for "not reached"
-      const sp = await sshPortal();
-      const r = await withFloor(() => sp.forget());
-      onGrid = r === 'stuck' ? 'not-reached' : r;
-    } catch {
-      onGrid = 'not-reached';
-    }
-  }
-  mem.direct.sheet?.dispose();
-  mem.direct.sheet = undefined;
-  mem.direct.portal?.portal.hold(false);
-  mem.direct.portal = undefined;
-  await forgetKey(browserKeyring()).catch(() => undefined);
-  await keyStateNow(true);
-  await writeDirect({}, ['enrolled_at', 'key_fp', 'protect_offer_done_at', 'enrolled_seen_at']);
-  mem.direct.enrolledAt = undefined;
-  if ((await modeNow()) !== 'vpn') await writeGrid({ session: 'unknown' });
-  await activity(LOG_WORDS.computerForgotten);
-  return { forgotten: true, onGrid };
-}
-
-/** the Claude sign-in sitting on the direct way: in the held session of a sign-in that just happened, else the sheet first */
-async function startSshSitting(id: number, line: string, login: ConnectLogin): Promise<boolean> {
-  const flow = mem.direct.sheet;
-  if (!flow || !flow.holding()) {
-    // a sign-in first; the press waits for it and carries on by itself
-    mem.connect = { ...mem.connect, inFlight: false };
-    mem.direct.claudeWanted = true;
-    mem.direct.sheetWanted = true;
-    dbg('sitting', `${id}: a Claude sign-in needs the grid sign-in sheet first; the press waits for it`);
-    await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', at: nowIso() } satisfies PendingPress);
-    const f = sheetFlow('claude');
-    if (f.state.phase === 'done' || f.state.phase === 'failed' || f.state.phase === 'stopped') f.cancel();
-    schedulePush();
-    return false;
-  }
-  mem.direct.claudeWanted = false;
-  let registered = false;
-  const early: ConnectEvent[] = [];
-  const watcher = new ConnectWatcher((ev) => (registered ? void onConnectEvent(id, ev) : void early.push(ev)));
-  let shell: ShellSession;
-  try {
-    // the floor's wait is given up the moment the start is (Stop, Cancel, another sign-in)
-    shell = await withFloor(() => flow.openSitting(line, (text) => watcher.feed(text)), undefined, () => mem.startId === id);
-  } catch (e) {
-    mem.connect = { ...mem.connect, inFlight: false, failure: 'closed' };
-    setFail((e as Error).message);
-    schedulePush();
-    return false;
-  }
-  if (mem.startId !== id || mem.sitting) {
-    shell.close();
-    if (mem.startId !== id) mem.connect = { ...mem.connect, inFlight: false };
-    schedulePush();
-    return false;
-  }
-  const gate = new CodeGate((input) => shell.send(input));
-  mem.sitting = { id, mode: 'ssh', login, gate, close: () => shell.close() };
-  dbg('sitting', `${id} open: ssh in the held sign-in session, login ${login}`);
-  registered = true;
-  for (const ev of early.splice(0)) await onConnectEvent(id, ev);
-  void shell.done.then((end) => {
-    if (mem.direct.sheet === flow) {
-      mem.direct.sheet = undefined;
-      flow.dispose();
-    }
-    void onSittingEnd(id, end.reason, watcher.tail);
-  });
-  return true;
-}
-
-/** connect through the gate (--login never): its step lines are read as a sitting's would be */
-async function startGateConnect(id: number, opts: ConnectOptions): Promise<boolean> {
-  const sp = await sshPortal();
-  const gate = new CodeGate(() => undefined);
-  mem.sitting = { id, mode: 'ssh', login: 'never', gate, close: () => undefined };
-  let r: { lines: string[]; exitStatus: number | null };
-  try {
-    r = await withFloor(() => sp.connectGate({ name: opts.name, site: opts.site, ...(opts.installId ? { installId: opts.installId } : {}), permissionMode: opts.permissionMode, chain: opts.chain }), undefined, () => mem.startId === id);
-  } catch (e) {
-    const f = directFailureOf(e);
-    setFail(`direct connect: ${f}: ${(e as Error).message}`);
-    if (f === 'key-refused' || f === 'key-expired') await markNotEnrolled();
-    if (f === 'unreachable' || f === 'timeout' || f === 'dropped') mem.direct.unreachable = f === 'unreachable';
-    // the gate's caps and an old copy have their own sentences (steps.ts connectProblem)
-    const own: ConnectFailure | undefined =
-      f === 'old-copy' ? 'old-copy' : f === 'limit' ? ((e as DirectError).limit === 'names' ? 'limit-names' : (e as DirectError).limit === 'hourly' ? 'limit-hourly' : 'limit-busy') : undefined;
-    void onSittingEnd(id, 'closed', []).then(() => {
-      if (own && mem.startId === id) {
-        mem.connect = { ...mem.connect, inFlight: false, failure: own };
-        schedulePush();
-      }
-    });
-    return false;
-  }
-  dbg('sitting', `${id} gate connect: exit ${r.exitStatus ?? '-'}, ${r.lines.filter((l) => l.startsWith('HPCW-STEP')).length} step lines`);
-  const watcher = new ConnectWatcher((ev) => void onConnectEvent(id, ev));
-  watcher.feed(r.lines.join('\n') + '\n');
-  void onSittingEnd(id, 'closed', watcher.tail);
-  return true;
-}
-
-/** the run's files on the direct way: one connection (the held one while the panel is open), one read per file */
-async function pollRunDirect(want: { progress?: boolean }): Promise<void> {
-  const sp = await sshPortal();
-  const prefs = await loadPrefs();
-  let snap = await session.get<RunState>(RUN_KEY);
-  if (!snap) {
-    if (mem.connect.inFlight || mem.sitting || mem.startId) return;
-    const dir = await sharedDirNow();
-    if (!dir) return;
-    const sj = await statusByShell(sp, dir, prefs.worker_name).catch(() => undefined);
-    if (!sj || !sj.job || !sj.state_dir) return;
-    const found: RunState = { stateDir: sj.state_dir, run: sj.run || prefs.worker_name, job: String(sj.job), set_at: nowIso(), started_by: 'found', ...(sj.next_job ? { next_job: String(sj.next_job) } : {}) };
-    dbg('read', `found a run already there (direct): ${found.run}, job ${found.job}, state ${sj.status?.state ?? '-'}`);
-    snap = await mutateRun((cur) => (cur ? undefined : found));
-    if (!snap) return;
-  }
-  const detailsOpen = [...mem.ports.values()].some((p) => p.surface === 'details');
-  const st = snap.status?.state;
-  const files: GateFile[] = ['status.json'];
-  if (!claudeLinkOf(snap) || st === 'online' || st === 'running') files.push('connection.json');
-  if (!snap.node) files.push('node');
-  if (mem.logOpen || detailsOpen || want.progress) files.push('progress.log');
-  // rc.log (the worker's raw terminal) is not one of the gate's files: on the direct way the link comes from connection.json and status.json
-  let read: Partial<Record<GateFile, string>>;
-  try {
-    read = await sp.readRun(snap.run, files);
-  } catch (e) {
-    const f = directFailureOf(e);
-    if (f === 'key-refused' || f === 'key-expired') {
-      await markNotEnrolled();
-      await writeGrid({ session: 'signed-out' });
-    } else if (f === 'unreachable' || f === 'timeout') await writeGrid({ session: 'unreachable' });
-    const why = (e as Error).message;
-    dbg('read', `the run's files (direct) could not be read: ${f}: ${why}`);
-    await mutateRun((cur) => (sameRun(cur, snap) ? { ...cur!, error: why } : undefined));
-    return;
-  }
-  const mtime = Math.floor(Date.now() / 1000);
-  // the account's ~/.bashrc may print before the gate's bytes: the JSON is found after it, node is its last line
-  const status = parseGateJson<StatusFile>(read['status.json']);
-  const connection = parseGateJson<ConnectionFile>(read['connection.json']);
-  const node = gateText(read.node, 'node');
-  const progress = gateText(read['progress.log'], 'progress.log');
-  const run = await mutateRun((cur) => {
-    if (!sameRun(cur, snap)) return undefined;
-    let r = cur!;
-    // the gate's read has no modified time: the heartbeat is the file's own, the read's moment only proof of a new one (facts.ts applyStatusRead)
-    if (status) r = applyStatusRead(r, status, mtime).run;
-    if (connection) r = applyConnection(r, connection, mtime).run;
-    if (node) r = { ...r, node_mtime: mtime, node: node.slice(0, 100) };
-    if (progress !== undefined) r = { ...r, progress_tail: progress.split('\n').filter(Boolean).slice(-40), progress_mtime: mtime };
-    return { ...r, listed_at: nowIso(), error: undefined };
-  });
-  if (run) {
-    noteRead('direct', run, status, read['status.json'] !== undefined, connection, files.includes('connection.json'));
-    await afterRead();
-  }
-}
-
-/** 14.0.0: one read of the run's files in the debug log: status.json's job, state and heartbeat, what the panel made of it, and whether a link is there */
-function noteRead(way: 'direct' | 'portal', run: RunState, status: StatusFile | undefined, statusThere: boolean, connection: ConnectionFile | undefined, connectionAsked: boolean): void {
+/** what a read of the run's files found, for the debug log */
+function noteRead(run: RunState, status: StatusFile | undefined, statusThere: boolean, connection: ConnectionFile | undefined): void {
   const rf = runFacts(run, Date.now());
   const s = status
     ? `status.json: job ${status.job ?? '-'}, state ${status.state}, updated_at ${status.updated_at ?? '-'}`
     : `status.json: ${statusThere ? 'not readable as JSON' : 'not there, or unchanged'}`;
-  dbg('read', `${way}: ${s} -> phase ${rf.phase}, stale ${rf.stale ? 'yes' : 'no'}, alive_seen ${run.alive_seen ? 'yes' : 'no'}, link ${linkWord(rf.link)}${rf.badLink ? ' (the file names a link that is not a Claude Code link)' : ''}`);
-  if (connection) dbg('read', `${way}: connection.json: job ${connection.job ?? '-'}, link ${linkWord(claudeLinkOf({ connection }))}`);
-  else if (connectionAsked && way === 'direct') dbg('read', `${way}: connection.json: not there`);
-}
-
-/** Settings' "Connection" */
-async function connectionSettings(prefs: Prefs): Promise<ConnectionSettingsView> {
-  const W = WORDS.direct.settings;
-  const k = await keyStateNow();
-  const B = await session.get<BridgeNote>(BRIDGE_KEY);
-  const download = await helperDownloadNow();
-  const installed = B?.helper === 'available';
-  // 15.0.0: an installed helper of an older major than the package brings: LICENSE section 17 promises that the
-  // extension says so and offers the newer installer (the download link stays beside the line, ui/settings.ts).
-  // Versions that cannot be read, or the same major, read as today; a newer helper than ours is left alone.
-  const shipped = (await bridgeManifest())?.helper;
-  const installedMajor = majorOf(B?.helper_version);
-  const shippedMajor = majorOf(shipped);
-  const outdated = installed && installedMajor !== undefined && shippedMajor !== undefined && installedMajor < shippedMajor;
-  // 15.0.0: on Windows the script helper of 12.0.0 to 14.0.0 shares the signed installer's folder, manifest and
-  // registry values, and its uninstall.cmd, which the installer cannot take away, would remove them: so the student
-  // removes it before using the installer offered beside it (docs/guides/INSTALL.md, "Remove the helper")
-  const scriptFirst = installed && B?.helper_kind === 'script' && download?.os === 'windows' && download.signed;
-  return {
-    title: W.title,
-    mode: { label: W.modeLabel, value: prefs.connection ?? 'direct', options: [{ value: 'direct', label: W.modes.direct }, { value: 'vpn', label: W.modes.vpn }] },
-    protectKey: { label: W.protectKey, note: W.protectKeyNote, value: k.wrapped, available: mem.direct.protectOutcome !== 'unsupported', present: k.present, ...(k.present && !k.wrapped ? { laterNote: W.protectLaterNote } : {}) },
-    keyLine: !k.present ? W.keyNone : k.wrapped ? W.keyProtected : W.keyPlain,
-    forget: { label: W.forget, note: W.forgetNote, confirm: W.forgetConfirm, button: { label: W.forgetButton, tone: 'text', action: { kind: 'forget-computer' } }, disabled: !k.present, ...(k.locked && k.enrolled ? { locked: true } : {}) },
-    helper: {
-      label: W.helper,
-      text: outdated && B?.helper_version && shipped ? W.helperOutdated(B.helper_version, shipped) : scriptFirst && B?.helper_version ? W.helperScriptFirst(B.helper_version) : installed && B?.helper_version ? W.helperInstalled(B.helper_version) : W.helperMissing,
-      installed,
-      ...(download ? { download } : {}),
-      checkAgain: { label: WORDS.direct.installHelper.checkAgain, tone: 'text', action: { kind: 'check-bridge' } },
-    },
-  };
-}
-
-/** Details' direct section, for the lab lead */
-async function directDetails(): Promise<DirectDetails> {
-  const profile = await profileNow();
-  const door = doorOf(profile);
-  const mode = await modeNow();
-  const k = await keyStateNow();
-  const B = await session.get<BridgeNote>(BRIDGE_KEY);
-  const D = (await local.get<DirectNote>(DIRECT_KEY)) ?? {};
-  const dl = await helperDownloadNow();
-  return {
-    mode: mode === 'direct' ? 'direct (ssh through a bridge, the browser key, the gate)' : mode === 'vpn' ? 'vpn (11.0.0: the portal through GlobalProtect)' : 'setup (the direct way needs the student)',
-    bridges: mem.direct.probeDetail ?? (B ? [`chosen: ${B.chosen}`, `relay: ${B.relay}`, `helper: ${B.helper}${B.helper_version ? ` (${B.helper_version}, ${B.helper_kind ?? '-'}, ${B.helper_os ?? '-'})` : ''}`] : ['not probed yet']),
-    pin: door.pin,
-    host: `${door.host}:${door.port}`,
-    key: k.present ? `${k.keyType ?? k.alg ?? '?'} ${k.fingerprint ?? ''}, protected: ${k.wrapped ? 'yes' : 'no'}${k.locked ? ' (locked)' : ''}, enrolled: ${k.enrolledAt ?? 'no'}` : 'none',
-    reach: B ? `${B.reach22} (${B.checked_at})` : 'not checked',
-    ...(D.account ? { account: D.account } : {}),
-    ...(dl ? { helperFile: `${dl.file}${dl.bytes ? ` ${dl.bytes} bytes` : ''}${dl.sha256 ? ` sha256 ${dl.sha256}` : ''}${dl.signed ? ' signed' : ''}` } : {}),
-    unproven: WORDS.details.directUnproven,
-  };
+  dbg('read', `${s} -> phase ${rf.phase}, stale ${rf.stale ? 'yes' : 'no'}, alive_seen ${run.alive_seen ? 'yes' : 'no'}, link ${linkWord(rf.link)}${rf.badLink ? ' (the file names a link that is not a Claude Code link)' : ''}`);
+  if (connection) dbg('read', `connection.json: job ${connection.job ?? '-'}, link ${linkWord(claudeLinkOf({ connection }))}`);
 }
 
 // ---- Details ------------------------------------------------------------------------------------------
@@ -3668,7 +2796,6 @@ async function detailsText(): Promise<string> {
     `Beethoven ${version()} at ${s?.hostname ?? 'no portal'} (site profile ${s?.site ?? '-'}), account ${grid?.account ?? '-'}`,
     `channel: ${ch ? `${ch.mode}, shell ${ch.shell}` : 'not tested'}`,
     `setup: ${mem.setup.state}${mem.setup.detail ? ` (${mem.setup.detail})` : ''}`,
-    `direct way: ${await modeNow()}; bridge ${(await session.get<BridgeNote>(BRIDGE_KEY))?.chosen ?? 'not probed'}; key ${(await keyStateNow()).present ? 'present' : 'none'}`,
     `last failure: ${mem.connect.failure ?? 'none'}${mem.failDetail ? `: ${mem.failDetail}` : ''}`,
     run ? `run: ${run.run} job ${run.job}${run.status ? ` state ${run.status.state}` : ''}` : 'run: none',
     '',

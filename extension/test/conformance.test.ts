@@ -7,33 +7,22 @@
 // extension really uses, with what it must read. The pinned grammar is also run as an independent
 // reader over each vector line and some near misses of it, and the extension must read each the same.
 // Only tests read framework/contract/; nothing of it enters the package (test/hygiene.test.ts).
+// 16.0.0 removed the direct way, the one way that typed the gate's verbs and read its answers: the gate
+// and key families and the gate vectors are read by no code any more, and the last test names them so.
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  clean,
   commands,
   consentSourceWords,
-  contractLines,
   DEFAULT_WORKER_NAME,
-  gate,
-  GATE_EXIT,
-  GATE_FILES,
-  GATE_KEY_EXPIRED,
-  GATE_NAME_RE,
-  GATE_RE,
-  GATE_REFUSED,
-  gateLineFor,
-  gateOutcome,
-  gateReadFile,
-  gateText,
   INSTALL_RE,
   isClaudeAuthUrl,
   isClaudeCodeLink,
   isSubscriptionSignIn,
   KEEPALIVE_LINE,
-  KEY_EXIT,
-  KEY_RE,
   LOGIN_RE,
   LOGIN_SETUP_DONE,
   LOGIN_SETUP_NOTHING,
@@ -41,8 +30,6 @@ import {
   LOGINS,
   MODES,
   parseConnectLine,
-  parseGateJson,
-  parseGateVersion,
   parseProgressLine,
   parseStatusJson,
   parseStepLine,
@@ -60,13 +47,15 @@ import {
   type StopReason,
   type WorkerState,
 } from '../src/core/contract';
-import { applyConnection, applyStatus, applyStatusRead, claudeLinkOf, runFacts, type RunState } from '../src/core/facts';
+import { applyConnection, applyStatus, claudeLinkOf, runFacts, type RunState } from '../src/core/facts';
 import { ConnectWatcher } from '../src/core/login';
 import { INSTALL_ID_RE } from '../src/licensing/access';
 
 const CONTRACT = fileURLToPath(new URL('../../framework/contract/', import.meta.url));
 const json = <T>(rel: string): T => JSON.parse(readFileSync(path.join(CONTRACT, rel), 'utf8')) as T;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** an answer as the readers see it: control sequences out, one trimmed line per line (contract.ts's own reading until 16.0.0) */
+const contractLines = (output: string): string[] => clean(output).split('\n').map((l) => l.trim()).filter(Boolean);
 
 interface Line {
   id: string;
@@ -128,8 +117,9 @@ const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
 const ID = '0123456789abcdef0123456789abcdef';
 
 describe('the line patterns contract.ts types are lines.json\'s, character for character', () => {
-  it('reads the families it uses, and says which one it does not', () => {
-    // version: the extension reads the shared copy's VERSION file, and never runs `hpcworker version`
+  it('reads the families it uses, and says which ones it does not', () => {
+    // version: the extension reads the shared copy's VERSION file, and never runs `hpcworker version`;
+    // gate and key: the direct way's answers over ssh, typed and read by no code since 16.0.0
     expect(Object.keys(LINES).sort()).toEqual(['gate', 'key', 'login', 'login-setup', 'progress', 'step', 'version']);
   });
 
@@ -140,22 +130,6 @@ describe('the line patterns contract.ts types are lines.json\'s, character for c
   it('login: every line, whole, and the keepalive', () => {
     expect(sourceOf(LOGIN_RE)).toEqual(Object.fromEntries(linesOf('login').map((l) => [l.id, l.pattern])));
     expect(KEEPALIVE_LINE).toBe(family('login').keepalive);
-  });
-
-  it('gate and key: each line it reads, with the exit status lines.json gives it', () => {
-    for (const [fam, held, exits] of [
-      ['gate', GATE_RE, GATE_EXIT],
-      ['key', KEY_RE, KEY_EXIT],
-    ] as const) {
-      const pinned = Object.fromEntries(linesOf(fam).map((l) => [l.id, l]));
-      for (const [id, rx] of Object.entries(held)) expect(rx.source, `${fam} ${id}`).toBe(pinned[id]?.pattern);
-      for (const [id, code] of Object.entries(exits)) expect(code, `${fam} ${id} exit`).toBe(pinned[id]?.exit);
-      // a line it holds that has an exit status is held with it (missing, not-plain and too-large are read by status alone: gateReadFile)
-      for (const id of Object.keys(held)) if (pinned[id]?.exit !== undefined) expect((exits as Record<string, number>)[id], `${fam} ${id} exit`).toBe(pinned[id]?.exit);
-    }
-    expect(GATE_EXIT.limit).toBe(CLI.gate.limits.exit);
-    expect(GATE_RE.refused.test(GATE_REFUSED)).toBe(true);
-    expect(KEY_RE.expired.test(GATE_KEY_EXPIRED)).toBe(true);
   });
 
   it('progress: the line pattern and the fixed sentences, those with an argument taking one', () => {
@@ -213,7 +187,6 @@ function templateRe(line: string, fill: Record<string, string>): RegExp {
 }
 
 const cliLine = (id: string) => CLI.commands.find((c) => c.id === id)?.line ?? '';
-const gateLine = (id: string) => CLI.gate.verbs.find((v) => v.id === id)?.line ?? '';
 const TOOL = { tool: `${SHARED}/bin/hpcworker`, shared_install: SHARED };
 
 /**
@@ -236,13 +209,11 @@ describe('the commands it types, against cli.json', () => {
   it('holds the values cli.json checks, pattern for pattern', () => {
     expect(WORKER_NAME_RE.source).toBe(CLI.values.name?.pattern);
     expect(DEFAULT_WORKER_NAME).toBe(CLI.values.name?.default);
-    expect(GATE_NAME_RE.source).toBe(CLI.values.gate_name?.pattern);
     expect(SITE_RE.source).toBe(CLI.values.site?.pattern);
     expect(INSTALL_RE.source).toBe(CLI.values.install_id?.pattern);
     expect(INSTALL_ID_RE.source).toBe(CLI.values.install_id?.pattern);
     expect([...LOGINS]).toEqual(CLI.values.login?.enum);
     expect([...MODES]).toEqual(CLI.values.permission_mode?.enum);
-    expect([...GATE_FILES]).toEqual(CLI.values.gate_file?.enum);
     // the build refuses a profile whose name the commands could not carry (scripts/sync-profiles.mjs)
     const sync = readFileSync(fileURLToPath(new URL('../scripts/sync-profiles.mjs', import.meta.url)), 'utf8');
     expect(/if \(!\/(.+?)\/\.test\(site\)\)/.exec(sync)?.[1]).toBe(CLI.values.site?.pattern);
@@ -255,7 +226,6 @@ describe('the commands it types, against cli.json', () => {
     expect(CLI.commands.filter((c) => c.line.includes('browser-key'))).toEqual([]);
     expect(Object.keys(commands).sort()).toEqual([...Object.keys(TYPED), ...Object.keys(NOT_IN_CLI)].sort());
     for (const cmd of Object.values(TYPED)) expect(cliLine(cmd), cmd).not.toBe('');
-    expect(Object.keys(gate).sort()).toEqual(CLI.gate.verbs.map((v) => v.id).sort());
   });
 
   it('types each cli.json line as cli.json writes it, for every value it may carry', () => {
@@ -288,43 +258,9 @@ describe('the commands it types, against cli.json', () => {
     for (const site of ['-wayne', 'Wayne', '', 'a'.repeat(33)]) {
       expect(() => commands.connect(SHARED, { ...ok, site }), site).toThrow();
       expect(() => commands.installShared(SHARED, site), site).toThrow();
-      expect(() => gate.connect({ ...ok, site }), site).toThrow();
     }
     expect(() => commands.installShared('relative/x', 'wayne')).toThrow();
     for (const bad of ['xyz', ID.toUpperCase(), `${ID}0`]) expect(() => commands.consentRecord(SHARED, bad), bad).toThrow();
-  });
-
-  it('carries each gate verb as cli.json writes it', () => {
-    const v = (id: string, line: string) => expect(templateRe(gateLine(id), {}).test(line), `${id}: ${line}`).toBe(true);
-    v('version', gate.version());
-    v('forget', gate.forget());
-    for (const name of ['worker', 'w_2', 'A-b']) {
-      v('status', gate.status(name));
-      v('watch', gate.watch(name));
-      v('stop', gate.stop(name));
-      v('restrict', gate.restrict(name));
-      for (const f of GATE_FILES) v('read', gate.read(name, f));
-      for (const permissionMode of MODES)
-        for (const chain of [true, false]) {
-          v('connect', gate.connect({ name, site: 'wayne', permissionMode, chain }));
-          v('connect', gate.connect({ name, site: 'wayne', installId: ID, permissionMode, chain }));
-        }
-    }
-    // gate_name, not name: never a leading - or _
-    for (const name of ['-x', '_x']) expect(() => gate.status(name), name).toThrow();
-  });
-
-  it('builds the very gate lines hpcworker\'s vectors were made with', () => {
-    const asked = (name: string) => /^SSH_ORIGINAL_COMMAND='([^']*)' hpcworker gate$/.exec(vector(name).command ?? '')?.[1];
-    expect(asked('gate-version')).toBe(gate.version());
-    expect(asked('gate-status')).toBe(gate.status('worker'));
-    expect(asked('gate-status')).toBe(gateLineFor(commands.statusJson(SHARED, 'worker')));
-    expect(asked('gate-connect')).toBe(gate.connect({ name: 'worker', site: 'testsite', permissionMode: 'default', chain: true }));
-    expect(asked('gate-read-progress')).toBe(gate.read('worker', 'progress.log'));
-    expect(asked('gate-read-missing')).toBe(gate.read('worker', 'node'));
-    // the one the gate refuses is one the extension cannot build
-    expect(asked('gate-refused')).toBe('read worker rc.log');
-    expect(() => gate.read('worker', 'rc.log' as never)).toThrow();
   });
 });
 
@@ -441,7 +377,7 @@ function connectKind(e: ConnectEvent | undefined): string | undefined {
 /** a line and some near misses of it: words after it, a prompt before it, a full stop at its end */
 const nearMisses = (l: string) => [l, `${l} x`, `> ${l}`, `${l}.`, `${l}${KEEPALIVE_LINE}`];
 
-const CONNECT_VECTORS = VECTORS.filter((v) => v.kind === 'command' && (v.vector.startsWith('connect-') || v.vector === 'gate-connect'));
+const CONNECT_VECTORS = VECTORS.filter((v) => v.kind === 'command' && v.vector.startsWith('connect-'));
 
 describe('the connect vectors, through ConnectWatcher', () => {
   it('has them', () => {
@@ -457,7 +393,7 @@ describe('the connect vectors, through ConnectWatcher', () => {
       if (k && k !== 'keepalive') want.push(k);
       if (k === 'step:done' || k?.startsWith('step:failed:')) break;
     }
-    // as a pseudo-terminal brings it (the direct way's sitting) and as the gate's answer is fed (background.ts)
+    // as the portal's terminal brings it (CR LF) and as plain lines
     for (const text of [lines.map((l) => `${l}\r\n`).join(''), `${lines.join('\n')}\n`]) {
       const w = new ConnectWatcher();
       w.feed(text);
@@ -499,7 +435,7 @@ describe('the status line, the files and the gate\'s answers, through the reader
   const fresh = (job: string): RunState => ({ stateDir: '/scratch/state', run: 'worker', job });
   const file = <T>(name: string): T => vector(name).json as T;
 
-  it('status.json, as the portal\'s Files app and as the gate bring it', () => {
+  it('status.json, as the portal\'s Files app brings it', () => {
     const cases: Array<[string, string, Partial<ReturnType<typeof runFacts>>]> = [
       ['status-queued', '40501234', { phase: 'queued', live: true }],
       ['status-online', '4242', { phase: 'online', live: true, link: 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', claude: { loggedIn: true, plan: 'max', email: 'st1234@wayne.edu' } }],
@@ -509,30 +445,24 @@ describe('the status line, the files and the gate\'s answers, through the reader
       const viaFiles = applyStatus(fresh(job), file<StatusFile>(name), NOW / 1000);
       expect(viaFiles.taken, name).toBe(true);
       expect(runFacts(viaFiles.run, NOW), name).toMatchObject(want);
-      const read = parseGateJson<StatusFile>(gateReadFile(0, JSON.stringify(file(name))));
-      expect(read, name).toEqual(file(name));
-      const viaGate = applyStatusRead(fresh(job), read!, NOW / 1000);
-      expect(viaGate.taken, name).toBe(true);
-      expect(runFacts(viaGate.run, NOW), name).toMatchObject(want);
     }
     // R1: the file of another job says nothing about this run
     expect(applyStatus(fresh('1'), file<StatusFile>('status-online')).taken).toBe(false);
   });
 
   it('connection.json: the link, for this job only', () => {
-    const conn = parseGateJson<ConnectionFile>(gateReadFile(0, JSON.stringify(file('connection-online'))));
-    const r = applyConnection(fresh('4242'), conn!);
+    const conn = file<ConnectionFile>('connection-online');
+    const r = applyConnection(fresh('4242'), conn);
     expect(r.taken).toBe(true);
     expect(claudeLinkOf(r.run)).toBe('https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt');
     const online = applyStatus(r.run, file<StatusFile>('status-online')).run;
     expect(runFacts(online, NOW)).toMatchObject({ phase: 'online', link: 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', onlineAt: '2026-10-01T12:00:00.000Z' });
-    expect(applyConnection(fresh('1'), conn!).taken).toBe(false);
+    expect(applyConnection(fresh('1'), conn).taken).toBe(false);
   });
 
-  it('worker status --json, from the portal\'s shell and through the gate', () => {
-    for (const name of ['worker-status-queued', 'gate-status']) {
+  it('worker status --json, from the portal\'s shell', () => {
+    for (const name of ['worker-status-queued']) {
       const v = vector(name);
-      expect(gateOutcome((v.stdout ?? []).join('\n'), (v.stderr ?? []).join('\n'), v.exit ?? null), name).toBeUndefined();
       const j = parseStatusJson(`${(v.stdout ?? []).join('\n')}\n${(v.stderr ?? []).join('\n')}`);
       expect(j, name).toMatchObject({ v: 1, run: 'worker', job: '40501234', next_job: '', status: { state: 'queued' }, connection: null, scheduler: { state: 'PENDING', reason: 'Priority' } });
       const run = { ...applyStatus(fresh('40501234'), j!.status!).run, scheduler: j!.scheduler };
@@ -542,14 +472,10 @@ describe('the status line, the files and the gate\'s answers, through the reader
     expect(parseStatusJson(`${(missing.stdout ?? []).join('\n')}\n${(missing.stderr ?? []).join('\n')}`)).toBeUndefined();
   });
 
-  it('progress.log, as a file and through the gate\'s read', () => {
+  it('progress.log, as a file', () => {
     const kinds = (lines: string[]) => lines.map((l) => parseProgressLine(l)).map((p) => (p ? (p.arg ? `${p.kind}: ${p.arg}` : p.kind) : undefined));
     expect(kinds(vector('progress-queued').lines ?? [])).toEqual(['asked']);
     expect(kinds(vector('progress-stopped').lines ?? [])).toEqual(['asked', 'got-computer', 'connecting', 'online: https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', 'stopped']);
-    const v = vector('gate-read-progress');
-    expect(gateOutcome((v.stdout ?? []).join('\n'), '', v.exit ?? null)).toBeUndefined();
-    const text = gateText(gateReadFile(v.exit ?? null, `${(v.stdout ?? []).join('\n')}\n`), 'progress.log') ?? '';
-    expect(kinds(contractLines(text))).toEqual(['asked']);
     // each line as the grammar reads it: the longest sentence that matches
     const pinned = (l: string): string | undefined => {
       const m = new RegExp(family('progress').line_pattern ?? '$^').exec(l);
@@ -559,43 +485,22 @@ describe('the status line, the files and the gate\'s answers, through the reader
     };
     for (const l of [...(vector('progress-stopped').lines ?? [])].flatMap(nearMisses)) expect(parseProgressLine(l)?.kind as ProgressKind | undefined, l).toBe(pinned(l));
   });
-
-  it('the gate\'s version, refusal and missing file', () => {
-    const version = vector('gate-version');
-    expect(gateOutcome((version.stdout ?? []).join('\n'), '', version.exit ?? null)).toBeUndefined();
-    expect(parseGateVersion((version.stdout ?? []).join('\n'))).toEqual({ framework: '17', due: 'never', account: 'st1234', claude: 'unknown' });
-    // a ~/.bashrc may print first; a line with more after it is no version line
-    expect(parseGateVersion(`welcome\n${(version.stdout ?? []).join('\n')}\r\n`)?.account).toBe('st1234');
-    expect(parseGateVersion(`${(version.stdout ?? []).join('\n')} x`)).toBeUndefined();
-    expect(parseGateVersion('HPCW-GATE ok 17 soon st1234 claude=yes')).toBeUndefined();
-    const refused = vector('gate-refused');
-    expect(gateOutcome((refused.stdout ?? []).join('\n'), (refused.stderr ?? []).join('\n'), refused.exit ?? null)).toEqual({ kind: 'refused' });
-    // the line with another exit status is not the gate's refusal
-    expect(gateOutcome((refused.stdout ?? []).join('\n'), '', 0)).toBeUndefined();
-    const missing = vector('gate-read-missing');
-    expect(gateOutcome((missing.stdout ?? []).join('\n'), (missing.stderr ?? []).join('\n'), missing.exit ?? null)).toBeUndefined();
-    expect(gateReadFile(missing.exit ?? null, (missing.stdout ?? []).join('\n'))).toBeUndefined();
-  });
-
-  it('the gate\'s caps and the key\'s expiry, by line and exit status', () => {
-    for (const which of ['names', 'hourly', 'watch', 'busy'] as const) {
-      expect(gateOutcome(`HPCW-GATE limit ${which}\n`, '', GATE_EXIT.limit)).toEqual({ kind: 'limit', which });
-      expect(gateOutcome(`HPCW-GATE limit ${which} now\n`, '', GATE_EXIT.limit)).toBeUndefined();
-      expect(gateOutcome(`HPCW-GATE limit ${which}\n`, '', 0)).toBeUndefined();
-    }
-    expect(gateOutcome('', '', KEY_EXIT.expired)).toEqual({ kind: 'key-expired' });
-    expect(gateOutcome(`${GATE_KEY_EXPIRED}\n`, '', 1)).toEqual({ kind: 'key-expired' });
-  });
 });
 
 describe('every vector is read here, or named with the reason it is not', () => {
   const READ = new Set([
     ...CONNECT_VECTORS.map((v) => v.vector),
-    'connection-online', 'gate-read-missing', 'gate-read-progress', 'gate-refused', 'gate-status', 'gate-version',
-    'progress-queued', 'progress-stopped', 'status-online', 'status-queued', 'status-stopped', 'worker-status-missing', 'worker-status-queued',
+    'connection-online', 'progress-queued', 'progress-stopped', 'status-online', 'status-queued', 'status-stopped', 'worker-status-missing', 'worker-status-queued',
   ]);
+  const GATE = 'the gate\'s answer over ssh, read only on the direct way, which 16.0.0 removed: no code types a gate line or reads one';
   const NOT_READ: Record<string, string> = {
     'version-shared': 'the extension never runs `hpcworker version`: it reads the shared copy\'s VERSION file',
+    'gate-connect': GATE,
+    'gate-read-missing': GATE,
+    'gate-read-progress': GATE,
+    'gate-refused': GATE,
+    'gate-status': GATE,
+    'gate-version': GATE,
   };
   it('has no vector it neither reads nor names', () => {
     expect(VECTORS.map((v) => v.vector).filter((n) => !READ.has(n) && !(n in NOT_READ))).toEqual([]);

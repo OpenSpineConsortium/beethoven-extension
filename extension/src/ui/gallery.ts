@@ -6,17 +6,16 @@
 // Add &theme=system to see the dark palette under "Match system".
 import './gallery.css';
 import { applyAppearance, el } from './dom';
+import type { Action } from '../core/model';
 import { FIXTURES, SAMPLE_LOG, fixture } from './fixtures';
-import type { Action12 } from './model12';
 import { mountPanel } from './panel';
-import { manifestVersion, packaged, registerKeyGesture, type Act } from './rpc';
+import { manifestVersion, packaged, type Act } from './rpc';
 import { mountSettings } from './settings';
 import { mountWelcome, type Gestures } from './welcome';
 
 /** the gallery's background: every action is logged; a few answer the way the real one would */
-const stubAct: Act = async (action: Action12) => {
-  // the sheet's answers are a password and a code: the gallery logs that one was sent, never what
-  console.info('[gallery] action', action.kind === 'grid-signin-answer' ? '{"kind":"grid-signin-answer","text":"(not shown)"}' : JSON.stringify(action));
+const stubAct: Act = async (action: Action) => {
+  console.info('[gallery] action', JSON.stringify(action));
   switch (action.kind) {
     case 'log':
       return { lines: SAMPLE_LOG } as never;
@@ -27,19 +26,11 @@ const stubAct: Act = async (action: Action12) => {
     case 'audit':
       return { text: '{"ts":"2026-10-01T12:44:01Z","method":"GET","endpoint":"/pun/sys/dashboard/","outcome":"200"}\n' } as never;
     case 'copy-debug-log':
-      return { text: 'Beethoven 14.0.0 debug log · mode direct · portal ondemand.grid.wayne.edu · account st1234 · worker worker · 2026-10-03T12:00:00.000Z · 1 line, newest last\n2026-10-03T11:59:58.000Z sw service worker started: Beethoven 14.0.0\n' } as never;
+      return { text: 'Beethoven 16.0.0 debug log · mode direct · portal ondemand.grid.wayne.edu · account st1234 · worker worker · 2026-10-03T12:00:00.000Z · 1 line, newest last\n2026-10-03T11:59:58.000Z sw service worker started: Beethoven 16.0.0\n' } as never;
     default:
       return undefined;
   }
 };
-
-// 12.0.0: the passkey steps, stood in for: a second and a half of "Windows Hello", then done. The real
-// ones are the core's keyring (rpc.ts registerKeyGesture); this stand-in never touches WebAuthn.
-registerKeyGesture({
-  protect: (on) => new Promise((r) => setTimeout(() => r(on ? 'on' : 'off'), 1500)),
-  createProtected: () => new Promise((r) => setTimeout(() => r('on'), 1500)),
-  unlock: () => new Promise((r) => setTimeout(() => r('unlocked'), 1500)),
-});
 
 const stubGestures: Gestures = {
   hasPanel: true,

@@ -109,9 +109,9 @@ Have these in hand, and check each once:
    form. A student approved for lab membership only is not added.
 7. The developer account, one person, with a hardware security key or an authenticator app as the
    second factor. The one OAuth grant on it is the maintainer's own upload tool
-   (`helper/release/publish-store.mjs`: a Desktop OAuth client in his own Google Cloud project, its
-   saved sign-in in the vendor folder on his Mac; the runbook's "Uploading to the Chrome Web
-   Store"); nothing else should hold one. No store sign-in or API key goes into any CI.
+   (`extension/scripts/publish-store.mjs`: a Desktop OAuth client in his own Google Cloud project, its
+   saved sign-in in the vendor folder on his own computer; the tool's own header says how it is run);
+   nothing else should hold one. No store sign-in or API key goes into any CI.
 8. The name. Beethoven runs Claude Code and is not an Anthropic product; the name carries no
    Anthropic mark, and "Claude" and "Claude Code" appear in the listing only to say what it runs.
 9. **New in 12.0.0: the grid side.** Framework 11 or later (14 since 14.0.0, `LAB_LEAD.md`, section

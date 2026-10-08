@@ -36,7 +36,7 @@ const ICONS: Record<string, Part[]> = {
   arrowRight: [['path', 'M4.5 12h15M14 6.5l5.5 5.5-5.5 5.5']],
   power: [['path', 'M12 3.75v7.5'], ['path', 'M7.4 6.6a7.5 7.5 0 1 0 9.2 0']],
   rack: [['rect', 5, 3.5, 14, 17, 2.25], ['path', 'M8.25 8h7.5M8.25 12h7.5M8.25 16h3.25'], ['circle', 15.25, 16, 0.9, true]],
-  // 12.0.0: the bundled download, the opt-in protection, the two routes, the direct way to the grid
+  // 12.0.0's set, kept where a page still draws one (the GlobalProtect shield, the phone)
   download: [['path', 'M12 4v11M7.25 10.5L12 15.25l4.75-4.75'], ['path', 'M4.5 16.5v1.75A1.75 1.75 0 0 0 6.25 20h11.5a1.75 1.75 0 0 0 1.75-1.75V16.5']],
   fingerprint: [['path', 'M6.6 6.9A7.5 7.5 0 0 1 19.5 12v1.25'], ['path', 'M4.5 14.75V12c0-.9.16-1.75.45-2.55'], ['path', 'M8.25 18.6A9.6 9.6 0 0 0 9 15V12a3 3 0 0 1 6 0v1.5'], ['path', 'M12 12v3a12.5 12.5 0 0 1-1.6 5.4'], ['path', 'M15 16.5a17 17 0 0 1-.9 3.75'], ['path', 'M19.1 16.6a19 19 0 0 1-.45 1.9']],
   laptop: [['rect', 4.75, 5.5, 14.5, 10, 1.75], ['path', 'M2.75 18.5h18.5']],

@@ -1,17 +1,16 @@
 // Uploads a built Beethoven package to its Chrome Web Store item and, with --publish, submits it for
-// review: the maintainer's last release step, run on his own Mac (helper/release/README.md, "Uploading to
-// the Chrome Web Store"). greg, 2026-10-04 19:26Z: "i want the chrome extension to automatically upload
-// the newest version to the chrome marketplace when its ready."
+// review: the maintainer's last release step, run on his own computer after npm run zip
+// (docs/store/SUBMISSION.md). greg, 2026-10-04 19:26Z: "i want the chrome extension to automatically
+// upload the newest version to the chrome marketplace when its ready." Until 15.0.0 it lived in
+// helper/release/ beside the bridge's release script; 16.0.0 removed the bridge and kept this.
 //
-//   node helper/release/publish-store.mjs sign-in [--client FILE]
-//   node helper/release/publish-store.mjs status  --publisher ID --item ID
-//   node helper/release/publish-store.mjs upload  --publisher ID --item ID --zip FILE [--publish] [--require-signed]
-//   node helper/release/publish-store.mjs publish --publisher ID --item ID
+//   node extension/scripts/publish-store.mjs sign-in [--client FILE]
+//   node extension/scripts/publish-store.mjs status  --publisher ID --item ID
+//   node extension/scripts/publish-store.mjs upload  --publisher ID --item ID --zip FILE [--publish]
+//   node extension/scripts/publish-store.mjs publish --publisher ID --item ID
 //
-// Never in CI: from 15.0.0 the package carries the bridge installers only the maintainer's own machines
-// sign (his Mac, with a Windows machine as the fallback for the .msi), so the zip the store gets exists
-// only there; and a Google sign-in held as a CI secret is the standing credential this project keeps
-// out of CI altogether.
+// Never in CI: a Google sign-in held as a CI secret is the standing credential this project keeps out
+// of CI altogether.
 //
 // The sign-in is Google's installed-app loopback flow: a "Desktop app" OAuth client, a one-shot listener
 // on 127.0.0.1 at an ephemeral port, PKCE (S256) and a random state. The store's API page reaches a
@@ -30,10 +29,7 @@
 //
 // Before any request, upload checks the zip: a zip, whose manifest.json is Manifest V3 with
 // extension/package.json's version, no "key" (a pinned development identity) and no localhost, 127.x or
-// [::1] origin (a development build); with --require-signed, its bridge/ holds beethoven-bridge-mac.pkg
-// and beethoven-bridge-windows.msi, each listed once in bridge/manifest.json as kind "binary" with the
-// size and sha256 of the file in the zip and with this item's origin, since the panel offers an installer
-// only to the extension its origins name.
+// [::1] origin (a development build).
 //
 // The answers of upload, fetchStatus and publish are not described on the store's API page, so nothing
 // here depends on one of their field names: HTTP 2xx is success and anything else failure, with the
@@ -63,10 +59,9 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..', '..');
-const ME = 'node helper/release/publish-store.mjs';
+const ME = 'node extension/scripts/publish-store.mjs';
 const SCOPE = 'https://www.googleapis.com/auth/chromewebstore';
 const SIGN_IN_MS = 5 * 60_000;
-const SIGNED_FILES = ['bridge/beethoven-bridge-mac.pkg', 'bridge/beethoven-bridge-windows.msi'];
 
 class Stop extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -101,13 +96,13 @@ const tell = (msg) => process.stderr.write(redact(msg) + '\n');
 const COMMANDS = {
   'sign-in': { values: ['--client'], flags: [] },
   status: { values: ['--publisher', '--item'], flags: [] },
-  upload: { values: ['--publisher', '--item', '--zip'], flags: ['--publish', '--require-signed'] },
+  upload: { values: ['--publisher', '--item', '--zip'], flags: ['--publish'] },
   publish: { values: ['--publisher', '--item'], flags: [] },
 };
 const USAGE = [
   `${ME} sign-in [--client FILE]`,
   `${ME} status  --publisher ID --item ID`,
-  `${ME} upload  --publisher ID --item ID --zip FILE [--publish] [--require-signed]`,
+  `${ME} upload  --publisher ID --item ID --zip FILE [--publish]`,
   `${ME} publish --publisher ID --item ID`,
 ].join('\n');
 
@@ -372,7 +367,7 @@ function localOrigins(m) {
 
 const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
-function checkZip(file, item, requireSigned) {
+function checkZip(file) {
   const name = path.basename(file);
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Stop(REFUSED, `${file} is not a file`);
   const refuse = (why) => { throw new Stop(REFUSED, `${name} is not uploaded: ${why}`); };
@@ -394,30 +389,7 @@ function checkZip(file, item, requireSigned) {
   if (Object.hasOwn(m, 'key')) refuse('its manifest.json has a "key" field, which pins a development identity; the store gives the item its own');
   const local = localOrigins(m);
   if (local.length) refuse(`its manifest names ${local.join(', ')}, so it is a development build (npm run build:dev); zip a release build with npm run zip`);
-  const have = SIGNED_FILES.filter((n) => z.entries.has(n));
-  if (requireSigned) {
-    for (const n of SIGNED_FILES) if (!have.includes(n)) refuse(`--require-signed: it holds no ${n}; merge the signed installers (helper/release/README.md, "The order", steps 3 to 6) and zip again`);
-    if (!z.entries.has('bridge/manifest.json')) refuse('--require-signed: it holds no bridge/manifest.json');
-    const bm = json('bridge/manifest.json');
-    const files = bm && Array.isArray(bm.files) ? bm.files : [];
-    const origin = `chrome-extension://${item}/`;
-    for (const n of SIGNED_FILES) {
-      const base = n.slice('bridge/'.length);
-      const listed = files.filter((f) => f && f.name === base);
-      if (listed.length !== 1) refuse(`--require-signed: bridge/manifest.json lists ${base} ${listed.length} times, not once`);
-      const e = listed[0];
-      if (e.kind !== 'binary') refuse(`--require-signed: bridge/manifest.json lists ${base} as kind ${JSON.stringify(e.kind)}, not "binary"`);
-      let data;
-      try { data = z.read(n); } catch (err) { refuse(err.message); }
-      const sum = sha256(data);
-      if (e.sha256 !== sum) refuse(`--require-signed: bridge/manifest.json gives ${base} the sha256 ${JSON.stringify(e.sha256)}, and the file in the zip has ${sum}`);
-      if (e.size !== data.length) refuse(`--require-signed: bridge/manifest.json gives ${base} the size ${JSON.stringify(e.size)}, and the file in the zip has ${data.length} bytes`);
-      if (!Array.isArray(e.allowed_origins) || !e.allowed_origins.includes(origin)) {
-        refuse(`--require-signed: ${base} is built for ${JSON.stringify(e.allowed_origins)}, not for this item (${origin}), so the panel would never offer it; build it with --store-id ${item}`);
-      }
-    }
-  }
-  return { buf, version, have };
+  return { buf, version };
 }
 
 // ---- the sign-in --------------------------------------------------------------------------
@@ -581,12 +553,9 @@ async function upload(o) {
   const b = bases();
   const file = path.resolve(o.values['--zip']);
   const item = o.values['--item'];
-  const z = checkZip(file, item, o.flags.has('--require-signed'));
+  const z = checkZip(file);
   const s = savedSignIn(storeDir());
   say(`${path.basename(file)}: Beethoven ${z.version}, ${z.buf.length} bytes, sha256 ${sha256(z.buf)}`);
-  say(z.have.length === SIGNED_FILES.length
-    ? 'It carries the signed installers for Mac and Windows.'
-    : 'NOTE: it does not carry both signed installers, so students on Mac and Windows get the script zips (--require-signed refuses such a package).');
   const access = await accessToken(b, s);
   const up = await call('POST', `${b.store}/upload/v2/publishers/${o.values['--publisher']}/items/${item}:upload`, {
     headers: { Authorization: `Bearer ${access}` },

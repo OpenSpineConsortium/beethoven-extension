@@ -164,9 +164,9 @@ Release pipeline and keys:
 - No long-lived store API key in CI. The publisher accounts and the kill-list signing key sit behind
   a hardware security key with no third-party OAuth grants; private keys never enter the repository.
   The access service's admin token lives in the vendor folder and is never on a command line. Since
-  15.0.0 the store upload is the maintainer's own tool (`helper/release/publish-store.mjs`): a
-  Desktop OAuth client in his own Google Cloud project, whose client file and refresh token sit in
-  the vendor folder on his Mac (mode 0600), never on a command line, in a log or in CI.
+  15.0.0 the store upload is the maintainer's own tool (`extension/scripts/publish-store.mjs` since
+  16.0.0): a Desktop OAuth client in his own Google Cloud project, whose client file and refresh token
+  sit in the vendor folder on his own computer (mode 0600), never on a command line, in a log or in CI.
 - The bridge's signing identities (15.0.0) stay on the maintainer's own machines and out of every
   build service. The Developer ID Application and Developer ID Installer certificates, with their
   private keys, sit in the login keychain of the maintainer's Mac, and so do the notarization
