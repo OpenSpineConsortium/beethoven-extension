@@ -332,6 +332,14 @@ folder has an `ORIGIN` and is taken only by `bash interface/pull.sh` (`interface
 `framework/profiles/`, the site profiles **as data** for `extension/scripts/sync-profiles.mjs`, the
 only server-side files that enter the package; `framework/contract/` and `framework/contract-text/`,
 read by tests and people only. Since 8.0.0 nothing else of the cluster side may enter the package.
+Since 17.0.0 a fourth pin, `extension/src/base/`, is beethoven-base's `browser` export (`profile.ts`:
+the site profile's reader with module-schema 1's keys and types, the path rules, the portal's origin
+and the deployment a portal belongs to, by what its own profile declares and never a default site or
+a host-name guess), the one import compiled into the package: `extension/src/core/deployments.ts` and
+`contract.ts` read through it, `extension/scripts/sync-profiles.mjs` writes `public/deployments.json`
+(the carried profiles' ids, read by the welcome page's "Your grid", the Wayne State profile first,
+greg's default of 2026-10-08), and a portal no carried profile declares is stored with no site at all.
+The copy is taken the same way (`bash interface/pull.sh extension/src/base`) and never edited here.
 
 CI (`.github/workflows/ci.yml`) runs the whole client suite hermetically on ubuntu: typecheck,
 vitest, the mock portal's full selftest with Playwright's Chromium for the terminal section, and a

@@ -331,7 +331,7 @@ openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -subj /C
 2. In bash (use no other --user):
 MOCK_LOGGED_IN=false node server.mjs --port 8443 --host localhost --user st1234 --cert cert.pem --key key.pem
 3. Open https://localhost:8443/login, choose Advanced, "Proceed to localhost (unsafe)", then "Sign in as st1234". No password. Our access service approves st1234 from any installation only when the portal is localhost.
-4. In a fresh profile with the item installed: on the welcome page press "Not at Wayne State? Use another portal", type https://localhost:8443, "Use this portal", tick, "Agree and continue", and Allow Chrome's prompt.
+4. In a fresh profile with the item installed: on the welcome page press "Another university? Use another portal", type https://localhost:8443, "Use this portal", tick, "Agree and continue", and Allow Chrome's prompt.
 5. The panel then works by itself: it looks for the grid, which on localhost answers at once, and reads the sign-in. At the data statement tick and press Connect. A sign-in tab opens at the stand-in's dummy Anthropic link (client_id=mock-client); close it, type ABC123 in the panel's code box, press Continue. After a short wait in line the panel says "You're online." with "Open my session" (a made-up claude.ai/code link; no real session).
 
 WHAT IT NEVER DOES

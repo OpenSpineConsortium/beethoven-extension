@@ -4,3 +4,4 @@ node_modules/
 public/framework/
 *.log
 public/profiles/
+public/deployments.json

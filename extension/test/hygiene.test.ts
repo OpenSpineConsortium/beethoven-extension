@@ -258,10 +258,15 @@ describe('the built package', () => {
         expect(`profiles/${String(p.site)}.json`, label).toBe(e.name);
       }
       if (framework) expect(profiles.map((e) => e.name.slice('profiles/'.length)).sort(), label).toEqual(framework);
+      // 17.0.0: deployments.json lists exactly the carried profiles' ids (the welcome page's "Your grid" reads it)
+      const list = entries.find((e) => e.name === 'deployments.json');
+      expect(list, `${label} deployments.json`).toBeDefined();
+      const sites = (JSON.parse(list!.bytes().toString('utf8')) as { sites: string[] }).sites;
+      expect([...sites].sort(), label).toEqual(profiles.map((e) => e.name.slice('profiles/'.length, -'.json'.length)).sort());
       // nothing beside the manifest, the pages, the scripts, the styles, the icons (11.0.0: and their lit variants), the
-      // profiles, the texts, the bundled fonts with their licences (9.0.0) and the tour's copy of the site diagram
-      // (11.0.0); since 16.0.0 no bridge/ (the installers of 12.0.0 to 15.0.0 went with the direct way)
-      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css))$/.test(n));
+      // profiles with their list (17.0.0), the texts, the bundled fonts with their licences (9.0.0) and the tour's copy
+      // of the site diagram (11.0.0); since 16.0.0 no bridge/ (the installers of 12.0.0 to 15.0.0 went with the direct way)
+      const other = names.filter((n) => !/^(manifest\.json|[^/]+\.html|LICENSE\.txt|PRIVACY\.md|THIRD_PARTY_NOTICES\.md|icon\/(?:on-|off-)?\d+\.png|profiles\/[^/]+\.json|deployments\.json|(?:chunks|content-scripts|assets)\/[^/]+\.(?:js|css)|[^/]+\.js|fonts\/[A-Za-z0-9-]+\.woff2|fonts\/[A-Za-z0-9-]+-OFL\.txt|tour\/diagram\.(?:js|css))$/.test(n));
       expect(other, label).toEqual([]);
       // 11.0.0: what the pages need is there: the lit icons, the tour's diagram, the notices
       for (const need of ['icon/on-16.png', 'icon/on-32.png', 'icon/on-48.png', 'icon/on-128.png', 'icon/off-16.png', 'icon/off-32.png', 'icon/off-48.png', 'icon/off-128.png', 'tour/diagram.js', 'tour/diagram.css', 'THIRD_PARTY_NOTICES.md']) expect(names, `${label} ${need}`).toContain(need);

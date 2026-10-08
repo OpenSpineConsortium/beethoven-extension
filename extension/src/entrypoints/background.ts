@@ -42,7 +42,8 @@ import { commands, isClaudeCodeLink, isEnvironmentUrl, parseJobId, paths, planAl
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
-import { bundledProfile, usesSharedCopy } from '../core/install';
+import { bundledDeployments, bundledProfile, deploymentOfPortal, portalOf, PRESELECTED_SITE, type Deployment } from '../core/deployments';
+import { noSharedForSite, usesSharedCopy } from '../core/install';
 import {
   ACCESS_KEY,
   ACTIVITY_KEY,
@@ -52,7 +53,6 @@ import {
   CHECKS_KEY,
   CLAUDE_TAB_KEY,
   DEFAULT_PREFS,
-  defaultPortalFrom,
   GRID_KEY,
   IDENTITY_KEY,
   KILLLIST_KEY,
@@ -70,7 +70,6 @@ import {
   RUN_KEY,
   SERVICES_KEY,
   SIGNIN_TAB_KEY,
-  siteFromHostname,
   STATEMENTS_KEY,
   TERMINAL_TAB_KEY,
   TOUR_SEEN_KEY,
@@ -123,8 +122,8 @@ const ACCESS_ALARM = 'bridge.access';
 /** the daily alarm leaves the kill-list alone when it was fetched this recently */
 const KILLLIST_ALARM_SKIP_MS = 60 * 60_000;
 
-/** the bundled site profile the welcome page offers first (public/profiles/wayne.json) */
-const DEFAULT_SITE = 'wayne';
+// 17.0.0: the deployment the welcome page offers first is core/deployments.ts PRESELECTED_SITE (the
+// Wayne State profile, greg's default); the page's "Your grid" picks among the ones this build carries
 const HELP_URL = 'https://openspineconsortium.com/beethoven/support.html';
 
 // cadences (framework/contract-text/V11_CONTRACT.md §12)
@@ -205,6 +204,10 @@ const mem = {
   keptTabId: undefined as number | undefined,
   sharedDir: undefined as { key: string; dir?: string } | undefined,
   profile: undefined as { site: string; profile?: SiteProfile } | undefined,
+  /** 17.0.0: the deployments this build carries, read once per service worker life */
+  deployments: undefined as Deployment[] | undefined,
+  /** 17.0.0: the site picked under "Your grid" on the welcome page; nothing stored until the press */
+  welcomeSite: undefined as string | undefined,
   client: undefined as { key: string; client: PortalClient } | undefined,
   failDetail: '',
   last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0, keep: 0 },
@@ -519,11 +522,30 @@ async function siteProfile(site: string): Promise<SiteProfile | undefined> {
   return profile;
 }
 
+/** 17.0.0: the deployments this build carries (public/deployments.json, each profile read with base's reader), cached */
+async function deploymentsNow(): Promise<Deployment[]> {
+  mem.deployments ??= await bundledDeployments((p) => fetch(assetUrl(p)));
+  return mem.deployments;
+}
+
+/**
+ * The deployment the welcome page shows before a portal is stored: the one picked under "Your grid",
+ * else the Wayne State profile where this build carries it (PRESELECTED_SITE, greg's default), else
+ * the first carried. It chooses nothing: the press stores the deployment whose own profile declares
+ * the portal Chrome granted (rememberPortal).
+ */
+async function welcomeSite(): Promise<string> {
+  const ds = await deploymentsNow();
+  return mem.welcomeSite ?? (ds.find((d) => d.site === PRESELECTED_SITE) ?? ds[0])?.site ?? PRESELECTED_SITE;
+}
+
 /** the words the site profile gives (D20 when there is none) */
 function siteWords(profile: SiteProfile | undefined, workerName: string): SiteWords {
   return {
     ...(profile?.vpn_app ? { vpnApp: profile.vpn_app } : {}),
     ...(profile?.vpn_portal ? { vpnPortal: profile.vpn_portal } : {}),
+    ...(profile?.vpn_required === false ? { vpnRequired: false } : {}),
+    ...(profile?.session_title ? { grid: profile.session_title } : {}),
     title: sessionTitleFor(profile?.session_title, workerName),
     hours: Number(profile?.worker_defaults?.hours) || 8,
     ...(profile?.grid_account_help_url ? { gridAccountHelpUrl: profile.grid_account_help_url } : {}),
@@ -557,9 +579,10 @@ async function channelNow(): Promise<ChannelNote | undefined> {
  */
 async function sharedDirNow(): Promise<string | undefined> {
   const s = await settingsNow();
-  // the site: the portal's, else the one this build is for (losing the stored portal on Disconnect must
-  // not lose the site: a sign-in failed "no-shared" only because the portal record was gone, 2026-10-03)
-  const site = s?.site ?? DEFAULT_SITE;
+  // the site: the portal's (none for a portal no bundled profile declares), else the welcome page's
+  // (losing the stored portal on Disconnect must not lose the site: a sign-in failed "no-shared" only
+  // because the portal record was gone, 2026-10-03)
+  const site = s ? s.site : await welcomeSite();
   const key = `${s?.origin ?? '-'}|${site}`;
   if (mem.sharedDir?.key === key && mem.sharedDir.dir) return mem.sharedDir.dir;
   let dir = sharedRootOf((await siteProfile(site))?.shared_install);
@@ -576,9 +599,13 @@ async function sharedDirNow(): Promise<string | undefined> {
   return dir;
 }
 
-/** the site name connect is given: the portal's (a bundled profile's name), else the account's own profile's */
+/**
+ * The site name connect is given: the portal's (a bundled profile's name), else the account's own
+ * profile's; "" when neither names one (a portal no bundled profile declares and an account whose
+ * profile cannot be read), and the caller types nothing: never a guessed name.
+ */
 async function siteForConnect(s: PortalSettings): Promise<string> {
-  if (await siteProfile(s.site)) return s.site;
+  if (s.site && (await siteProfile(s.site))) return s.site;
   try {
     const c = await directClient();
     const ctx = c ? await clusterContext(c) : undefined;
@@ -639,7 +666,7 @@ async function buildFacts(): Promise<Facts> {
   const settings = acceptedSettings(L[PORTAL_KEY] as PortalSettings | undefined);
   const prefs: Prefs = { ...DEFAULT_PREFS, ...((L[PREFS_KEY] as Partial<Prefs> | undefined) ?? {}) };
   const granted = settings ? await connectApi.containsOrigin(settings.origin).catch(() => false) : false;
-  const profile = settings ? await siteProfile(settings.site) : await siteProfile(DEFAULT_SITE);
+  const profile = await siteProfile(settings ? settings.site : await welcomeSite());
   const grid = (S[GRID_KEY] as GridNote | undefined) ?? { reach: 'unknown', session: 'unknown', checked_at: '' };
   const account = grid.account ?? (L[IDENTITY_KEY] as IdentityNote | undefined)?.username;
   const verdict = killListVerdict(L[KILLLIST_KEY] as StoredKillList | undefined, version());
@@ -696,10 +723,15 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       return { surface: 'panel', view: panelView(f) };
     case 'welcome': {
       const settings = await settingsNow();
-      const def = defaultPortalFrom(await siteProfile(DEFAULT_SITE));
-      const portal = settings ? { origin: settings.origin, hostname: settings.hostname } : def ? { origin: def.origin, hostname: def.hostname } : { origin: 'https://ondemand.grid.wayne.edu', hostname: 'ondemand.grid.wayne.edu' };
+      const deployments = await deploymentsNow();
+      const picked = await welcomeSite();
+      // the portal the press asks Chrome for: the stored one, else the picked deployment's; a build that
+      // carries no profile offers none, and "Use another portal" is the way
+      const def = portalOf(deployments.find((d) => d.site === picked)?.profile);
+      const portal = settings ? { origin: settings.origin, hostname: settings.hostname } : (def ?? { origin: '', hostname: '' });
+      const grids = { options: deployments.map((d) => ({ site: d.site, name: d.profile.display_name || d.site })), selected: picked };
       const state: WelcomeView['state'] = f.terms && mem.welcome.state === 'idle' && settings ? 'handoff' : mem.welcome.state;
-      return { surface: 'welcome', view: welcomeView({ portal, site: f.site, state, ...(mem.welcome.problem ? { problem: mem.welcome.problem } : {}), ...(state === 'handoff' && firstRunDone(f) ? { hero: home(f).hero } : state === 'handoff' ? { hero: (({ live: _l, ...h }) => h)(heroOf(f)) } : {}), licenseUrl: browser.runtime.getURL('/LICENSE.txt' as never), privacyUrl: browser.runtime.getURL('/PRIVACY.md' as never) }) };
+      return { surface: 'welcome', view: welcomeView({ portal, grids, site: f.site, state, ...(mem.welcome.problem ? { problem: mem.welcome.problem } : {}), ...(state === 'handoff' && firstRunDone(f) ? { hero: home(f).hero } : state === 'handoff' ? { hero: (({ live: _l, ...h }) => h)(heroOf(f)) } : {}), licenseUrl: browser.runtime.getURL('/LICENSE.txt' as never), privacyUrl: browser.runtime.getURL('/PRIVACY.md' as never) }) };
     }
     case 'details': {
       const settings = await settingsNow();
@@ -724,7 +756,7 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       const settings = await settingsNow();
       // the same default the welcome page shows: with no stored portal (after Disconnect) the
       // Change field must refill from the bundled profile, not come back empty (hy9698, 2026-10-03)
-      const settingsDef = settings ? undefined : defaultPortalFrom(await siteProfile(DEFAULT_SITE));
+      const settingsDef = settings ? undefined : portalOf(await siteProfile(await welcomeSite()));
       const oldKey = await local.get<OldKeyNote>(OLD_KEY_KEY);
       const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}) });
       return { surface: 'settings', view: sv };
@@ -963,7 +995,7 @@ async function onPinChanged(pinned: boolean): Promise<void> {
 // ---- actions ----------------------------------------------------------------------------------------
 
 /** what a page may ask before the agreement is accepted: nothing that reaches the network or opens a tab of Beethoven's own doing */
-const BEFORE_TERMS: ReadonlySet<Action['kind']> = new Set(['agree', 'use-portal', 'open-settings', 'open-help', 'open-details', 'set-pref', 'tour', 'dismiss', 'log', 'audit', 'copy-details', 'copy-debug-log', 'drive-connected']);
+const BEFORE_TERMS: ReadonlySet<Action['kind']> = new Set(['agree', 'use-portal', 'pick-grid', 'open-settings', 'open-help', 'open-details', 'set-pref', 'tour', 'dismiss', 'log', 'audit', 'copy-details', 'copy-debug-log', 'drive-connected']);
 
 async function act(a: Action): Promise<unknown> {
   // PRIVACY.md: nothing is sent anywhere before the agreement; the pages offer nothing else then, and
@@ -993,6 +1025,8 @@ async function actInner(a: Action): Promise<unknown> {
     case 'use-portal':
     case 'change-portal':
       return onUsePortal(a.origin, a.granted, a.kind === 'change-portal');
+    case 'pick-grid':
+      return onPickGrid(a.site);
     case 'sign-in-grid':
       if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
       return { opened: await openSigninTab('press') } satisfies ActionResults['sign-in-grid'];
@@ -1211,12 +1245,27 @@ async function onAgree(a: Extract<Action, { kind: 'agree' }>): Promise<ActionRes
   return { navigated: opened && a.tabId !== undefined, signedInAlready: false };
 }
 
-/** store the portal the student granted (its site from the bundled profile that names it, else from its hostname) */
+/** 17.0.0: "Your grid" on the welcome page: one of the deployments this build carries; an id it does not carry leaves the pick as it was */
+async function onPickGrid(site: string): Promise<ActionResults['pick-grid']> {
+  const d = (await deploymentsNow()).find((x) => x.site === site);
+  if (d) {
+    mem.welcomeSite = d.site;
+    // a portal Chrome refused is not this grid's: the page starts afresh with the picked one
+    if (mem.welcome.state === 'denied') mem.welcome = { state: 'idle', problem: undefined };
+  }
+  return { site: await welcomeSite() };
+}
+
+/**
+ * Store the portal the student granted, with the deployment whose own profile declares it (the picked
+ * one where two carried profiles declare the same portal), or with no site at all for a portal this
+ * build carries no profile for: never a name guessed from the host (Linear BEE-210).
+ */
 async function rememberPortal(origin: string): Promise<PortalSettings> {
   const hostname = new URL(origin).hostname;
-  const def = defaultPortalFrom(await siteProfile(DEFAULT_SITE));
-  const site = def && def.origin === origin ? def.site : siteFromHostname(hostname);
-  const profile = await siteProfile(site);
+  const d = deploymentOfPortal(origin, await deploymentsNow(), await welcomeSite());
+  const site = d?.site ?? '';
+  const profile = d?.profile;
   const prev = await settingsNow();
   const s: PortalSettings = prev && prev.origin === origin ? prev : { origin, hostname, connected_at: nowIso(), shell_host: profile?.ood_shell_host || 'default', site };
   const out = await savePortal(s);
@@ -1639,6 +1688,12 @@ async function ensureSetup(): Promise<void> {
     mem.setup = { state: 'setting-up' };
     schedulePush();
     const site = await siteForConnect(s);
+    if (!SITE_RE.test(site)) {
+      // 17.0.0: no bundled profile declares this portal and the account's own names no site: nothing is typed
+      mem.setup = { state: 'failed', detail: noSharedForSite(site) };
+      setFail(mem.setup.detail ?? '');
+      return;
+    }
     try {
       const r = await withShell((p) => withFloor(() => p.shell(commands.installShared(dir, site), { timeoutMs: 120_000 })));
       if (r.exitCode === 0) {
@@ -1862,9 +1917,16 @@ async function startConnectClaimed(id: number, login: ConnectLogin): Promise<boo
     return false;
   }
   const ack = statementFor(await local.get<Statements>(STATEMENTS_KEY), prefs.worker_name);
+  const site = await siteForConnect(s);
+  if (!SITE_RE.test(site)) {
+    // 17.0.0: no bundled profile declares this portal and the account's own names no site: nothing is typed
+    mem.connect = { ...freshConnect(), failure: 'setup' };
+    setFail(noSharedForSite(site));
+    return false;
+  }
   const opts: ConnectOptions = {
     name: prefs.worker_name,
-    site: await siteForConnect(s),
+    site,
     ...(ack ? { installId: await installId() } : {}),
     login,
     permissionMode: prefs.permission_mode,
@@ -2654,7 +2716,7 @@ async function afterRead(): Promise<void> {
   if (online) {
     dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? '; opening it in a new tab' : ''}`);
     await once({ first_online_at: nowIso() });
-    await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? DEFAULT_SITE))?.session_title, prefs.worker_name)));
+    await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? (await welcomeSite())))?.session_title, prefs.worker_name)));
     if (open) await openSessionTab(open);
     await releaseKeptTab();
     setTimeout(() => schedulePush(), 4_100);

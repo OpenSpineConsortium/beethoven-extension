@@ -1,0 +1,4 @@
+repository OpenSpineConsortium/beethoven-base
+commit c7682f611b289236a35f7bbdde70a9e29e5ed603
+export browser 1
+sha256 7678a99b3d76fa9fb70ac957ba5df126eabcbe0d1ccee4637c07565947a7f3c3 profile.ts

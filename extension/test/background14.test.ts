@@ -55,6 +55,8 @@ describe('after Disconnect: no stored portal at all', () => {
     vi.resetModules();
     world = install();
     world.files.set('/profiles/wayne.json', JSON.stringify(PROFILE));
+    // 17.0.0: the list the welcome page's "Your grid" reads; the press stores the deployment whose profile declares the portal
+    world.files.set('/deployments.json', JSON.stringify({ sites: ['wayne'] }));
   });
   afterEach(() => {
     for (const s of [...world.sockets]) s.close(1000);
@@ -75,6 +77,8 @@ describe('Start over', () => {
     vi.resetModules();
     world = install();
     world.files.set('/profiles/wayne.json', JSON.stringify(PROFILE));
+    // 17.0.0: the list the welcome page's "Your grid" reads; the press stores the deployment whose profile declares the portal
+    world.files.set('/deployments.json', JSON.stringify({ sites: ['wayne'] }));
   });
   afterEach(() => {
     for (const s of [...world.sockets]) s.close(1000);

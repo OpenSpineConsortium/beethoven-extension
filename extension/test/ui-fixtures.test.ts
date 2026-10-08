@@ -82,17 +82,24 @@ describe('the fixtures of 16.0.0', () => {
     expect(of('globalprotect').filter((g) => g.note).length).toBe(1);
   });
 
-  it('show the welcome page with the three prerequisites, each with a page to open', () => {
+  it('show the welcome page with the three prerequisites, each with a page to open, and the Wayne State profile picked', () => {
     for (const f of FIXTURES) {
       if (f.surface !== 'welcome') continue;
       expect(f.view.needs.length, f.name).toBe(3);
       for (const n of f.view.needs) {
-        const u = new URL(n.link.url);
+        // the Wayne State profile names a page for each need; a profile without one shows the words alone (17.0.0)
+        expect(n.link, `${f.name}: ${n.title}`).toBeDefined();
+        const u = new URL(n.link!.url);
         expect(u.protocol, `${f.name}: ${n.title}`).toBe('https:');
-        expect(LINK_HOSTS.has(u.hostname), `${f.name}: ${n.link.url}`).toBe(true);
+        expect(LINK_HOSTS.has(u.hostname), `${f.name}: ${n.link!.url}`).toBe(true);
         expect(u.hash, f.name).toBe('');
       }
+      // 17.0.0: "Your grid" is the Wayne State profile first, and the one fixture with two grids keeps it picked
+      expect(f.view.grids.options[0]?.site, f.name).toBe('wayne');
+      expect(f.view.grids.selected, f.name).toBe('wayne');
     }
+    const two = fixture('welcome-two-grids');
+    expect(two?.surface === 'welcome' ? two.view.grids.options.length : 0).toBe(2);
   });
 
   it("show Settings' note on a key an earlier version added, with its Forget, and Settings without it", () => {

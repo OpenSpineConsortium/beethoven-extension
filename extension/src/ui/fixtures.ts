@@ -206,15 +206,21 @@ const onlineMoment = (extra: Partial<Extract<JourneyView, { moment: 'online' }>>
 });
 
 // ---- the welcome page -----------------------------------------------------------------------------------
+/** a need with the university's own page */
+const need = (n: { title: string; detail: string; link: string }, url: string) => ({ title: n.title, detail: n.detail, link: { label: n.link, url } });
+/** 17.0.0: the deployments a build carries, by display name; the Wayne State profile first */
+const GRIDS = { label: WORDS.welcome.gridPicker, options: [{ site: 'wayne', name: 'Wayne State University HPC grid' }], selected: 'wayne' };
+const TWO_GRIDS = { ...GRIDS, options: [...GRIDS.options, { site: 'example', name: 'Example University research cluster' }] };
 const welcomeView = (extra: Partial<WelcomeView> = {}): WelcomeView => ({
   headline: WORDS.welcome.headline,
-  subline: WORDS.welcome.subline,
+  subline: WORDS.welcome.subline(TITLE),
+  grids: GRIDS,
   needsTitle: WORDS.welcome.needsTitle,
   // the three prerequisites, each with the university's own page (the site profile's addresses)
   needs: [
-    { ...WORDS.welcome.needs[0], link: { label: WORDS.welcome.needs[0].link, url: 'https://services.wayne.edu/TDClient/277/Portal/KB/ArticleDet?ID=20199' } },
-    { ...WORDS.welcome.needs[1], link: { label: WORDS.welcome.needs[1].link, url: VPN_HELP } },
-    { ...WORDS.welcome.needs[2], link: { label: WORDS.welcome.needs[2].link, url: 'https://claude.ai/upgrade' } },
+    need(WORDS.welcome.needs.account(TITLE), 'https://services.wayne.edu/TDClient/277/Portal/KB/ArticleDet?ID=20199'),
+    need(WORDS.welcome.needs.vpn('GlobalProtect', 'protect.wayne.edu'), VPN_HELP),
+    need(WORDS.welcome.needs.claude, 'https://claude.ai/upgrade'),
   ],
   summaryTitle: WORDS.welcome.summaryTitle,
   summary: [...SUMMARY],
@@ -302,6 +308,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'welcome-save-failed', surface: 'welcome', note: 'the record could not be saved', view: welcomeView({ state: 'save-failed', problem: WORDS.welcome.saveFailed }), local: { ticked: { agree: true } } },
   { name: 'welcome-other-portal', surface: 'welcome', note: 'Use another portal: the field slid open', view: welcomeView(), local: { portalOpen: true, portalInput: HOST } },
   { name: 'welcome-claude-address', surface: 'welcome', note: 'an Anthropic address refused before any prompt', view: welcomeView(), local: { portalOpen: true, portalInput: 'claude.ai', portalError: WORDS.welcome.anthropicRefused } },
+  { name: 'welcome-two-grids', surface: 'welcome', note: '17.0.0: a build carrying two deployments: "Your grid" under the lede, the Wayne State profile first', view: welcomeView({ grids: TWO_GRIDS }) },
   { name: 'welcome-handoff', surface: 'welcome', note: 'after the press: the panel carries on', view: welcomeView({ state: 'handoff', handoff: { text: WORDS.welcome.handoff, hero: { state: 'asked', orb: 'starting', word: WORDS.connect.hero, sub: WORDS.connect.gettingSignin, announce: WORDS.connect.hero } } }) },
 
   // the panel before the agreement, and while the welcome page carries moment 2

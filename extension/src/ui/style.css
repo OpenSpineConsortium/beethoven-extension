@@ -551,6 +551,10 @@ body.page > #app { overflow-x: clip; }
 .w-left::before { content: ""; position: absolute; inset: -48px -40px -24px -40px; background-image: linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px); background-size: 64px 64px; -webkit-mask-image: radial-gradient(ellipse 70% 60% at 35% 30%, #000 0%, transparent 78%); mask-image: radial-gradient(ellipse 70% 60% at 35% 30%, #000 0%, transparent 78%); pointer-events: none; z-index: -1; }
 .w-lede { font: 400 20px/1.45 var(--font-display); color: var(--ink-soft); max-width: 30em; text-wrap: pretty; }
 .w-needs { margin-top: 32px; }
+/* 17.0.0: "Your grid", only when the build carries two or more deployments */
+.w-grids { margin-top: 20px; display: flex; align-items: center; gap: 12px; max-width: 30em; }
+.w-grids-label { font: 500 13px/1 var(--font-body); color: var(--ink-soft); letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; }
+.w-grids-select { font: 14.5px var(--font-body); appearance: auto; cursor: pointer; }
 .w-needs > h2 { margin-bottom: 6px; }
 .need { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 16px; align-items: center; min-height: 64px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
 .need:first-of-type { border-top: 0; }

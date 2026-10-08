@@ -6,7 +6,7 @@
 // and the shared formatters. The architect's 71 scratch cases (scratchpad/v11/contract/check.ts), as tests.
 import { describe, expect, it } from 'vitest';
 import { commands, isLoginSetupLine, isSubscriptionSignIn, KEEPALIVE_LINE, LOGIN_SETUP_DONE, loginSetupOutcome, parseConnectLine, parseProgressLine, parseStatusJson, parseStepLine, planAllowsRemoteControl, planWord, plausibleCode, reasonClass, sessionTitleFor, withoutKeepalive } from '../src/core/contract';
-import { defaultPortalFrom } from '../src/core/keys';
+import { portalOf } from '../src/core/deployments';
 import { formatAgo, formatClock, formatTimer, formatUp, WORDS } from '../src/core/model';
 
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
@@ -183,7 +183,9 @@ describe('the small words', () => {
     expect(formatClock(new Date(2026, 9, 1, 9, 12), false)).toBe('9:12');
     expect(formatClock(new Date(2026, 9, 1, 0, 5), true)).toBe('12:05 AM');
     expect(WORDS.claude.signedIn('alex@wayne.edu', 'Max')).toBe('Signed in as alex@wayne.edu · Max');
-    expect(defaultPortalFrom({ ood_base_url: 'https://ondemand.grid.wayne.edu', site: 'wayne' })).toEqual({ origin: 'https://ondemand.grid.wayne.edu', hostname: 'ondemand.grid.wayne.edu', site: 'wayne' });
-    expect(defaultPortalFrom({ ood_base_url: 'http://x.edu' })).toBeUndefined();
+    // 17.0.0: the portal the welcome page offers is the picked deployment's (base's portalOriginOf); the site is the deployment's own id, never read from the address
+    expect(portalOf({ ood_base_url: 'https://ondemand.grid.wayne.edu', site: 'wayne' })).toEqual({ origin: 'https://ondemand.grid.wayne.edu', hostname: 'ondemand.grid.wayne.edu' });
+    expect(portalOf({ ood_base_url: 'http://x.edu' })).toBeUndefined();
+    expect(portalOf(undefined)).toBeUndefined();
   });
 });

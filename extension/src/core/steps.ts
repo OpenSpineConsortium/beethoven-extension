@@ -18,13 +18,17 @@ import type { AccessFact } from '../licensing/access';
 
 // ---- the facts ---------------------------------------------------------------------------------------
 
-/** what the site profile gives the words (contract.ts SiteProfile, read by the background) */
+/** what the site profile gives the words (base's SiteProfile, read by the background) */
 export interface SiteWords {
   /** the VPN app's name ("GlobalProtect"); absent: the words for a portal with no site profile (D20) */
   vpnApp?: string;
   /** the VPN's address the student types into the app ("protect.wayne.edu") */
   vpnPortal?: string;
-  /** the session title ("Wayne State grid") */
+  /** 17.0.0: the profile's vpn_required; false leaves the VPN off the welcome page's needs; absent reads as required */
+  vpnRequired?: boolean;
+  /** 17.0.0: the grid's name, the profile's session_title ("Wayne State grid"); absent for a portal with no site profile */
+  grid?: string;
+  /** the session title ("Wayne State grid", with the worker's name after it for a worker not named "worker") */
   title: string;
   /** a job's hours: "Your worker restarts itself every 8 hours" */
   hours: number;
@@ -1152,8 +1156,10 @@ export function lastKnownOf(f: Facts): Omit<LastKnown, 'seen_at'> | undefined {
 // ---- the welcome page ------------------------------------------------------------------------------
 
 export interface WelcomeInput {
-  /** the portal the press asks Chrome for: the profile's ood_base_url, or the one stored */
+  /** the portal the press asks Chrome for: the picked deployment's ood_base_url, or the one stored */
   portal: { origin: string; hostname: string };
+  /** 17.0.0: the deployments this build carries, each by its display name, and the one the words below are for */
+  grids: { options: Array<{ site: string; name: string }>; selected: string };
   site: SiteWords;
   state: WelcomeView['state'];
   problem?: string;
@@ -1163,13 +1169,24 @@ export interface WelcomeInput {
   privacyUrl: string;
 }
 
+/** a need with the university's own page when the profile names one; without a page, the words alone */
+function need(n: { title: string; detail: string; link: string }, url: string | undefined): WelcomeView['needs'][number] {
+  return { title: n.title, detail: n.detail, ...(url ? { link: { label: n.link, url } } : {}) };
+}
+
 export function welcomeView(i: WelcomeInput): WelcomeView {
   const W = WORDS.welcome;
-  const links = [i.site.gridAccountHelpUrl ?? 'https://services.wayne.edu/TDClient/277/Portal/KB/ArticleDet?ID=20199', i.site.vpnHelpUrl ?? 'https://services.wayne.edu/TDClient/277/Portal/KB/Article/20314/Wayne-State-VPN-and-the-Global-Protect-client', 'https://claude.ai/upgrade'];
-  const needs = W.needs.map((n, idx) => ({ title: n.title, detail: idx === 1 && i.site.vpnPortal ? `Connected to ${i.site.vpnPortal}.` : n.detail, link: { label: n.link, url: links[idx]! } }));
+  const s = i.site;
+  // the needs in Greg's order: the account, the VPN (unless the profile says none is required), the plan
+  const needs = [
+    need(W.needs.account(s.grid), s.gridAccountHelpUrl),
+    ...(s.vpnRequired === false ? [] : [need(W.needs.vpn(s.vpnApp, s.vpnPortal), s.vpnHelpUrl)]),
+    need(W.needs.claude, 'https://claude.ai/upgrade'),
+  ];
   return {
     headline: W.headline,
-    subline: W.subline,
+    subline: W.subline(s.grid),
+    grids: { label: W.gridPicker, options: i.grids.options.map((o) => ({ site: o.site, name: o.name })), selected: i.grids.selected },
     needsTitle: W.needsTitle,
     needs,
     summaryTitle: W.summaryTitle,

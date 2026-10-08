@@ -52,6 +52,13 @@
    "version": 1,
    "into": "framework/contract-text",
    "origin": "framework/contract-text/ORIGIN"
+  },
+  {
+   "repository": "OpenSpineConsortium/beethoven-base",
+   "export": "browser",
+   "version": 1,
+   "into": "extension/src/base",
+   "origin": "extension/src/base/ORIGIN"
   }
  ]
 }

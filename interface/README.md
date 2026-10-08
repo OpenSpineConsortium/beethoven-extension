@@ -17,24 +17,26 @@ website takes the new copy and renders it.
 
 ## What it takes
 
-Three exports of `OpenSpineConsortium/hpcworker`, each at version 1 into its own folder with an `ORIGIN`
-(the repository, the commit, `export <id> <version>`, and each file's sha256, sorted by path):
+Three exports of `OpenSpineConsortium/hpcworker` and, since 17.0.0, one of
+`OpenSpineConsortium/beethoven-base`, each at version 1 into its own folder with an `ORIGIN` (the
+repository, the commit, `export <id> <version>`, and each file's sha256, sorted by path):
 
 | Folder | Export | Kind | What reads it |
 | --- | --- | --- | --- |
 | `framework/profiles` | `profiles` | data | the build, which copies the JSON files into the package without their `notes` (`extension/scripts/sync-profiles.mjs`); nothing else of hpcworker enters the package |
 | `framework/contract` | `contract` | data | the tests only: `extension/test/conformance.test.ts` holds every pattern, code, value and command `extension/src/core/contract.ts` types by hand equal to `cli.json`, `lines.json`, `rules.json` and the three schemas, and runs every vector through the reader the extension really uses |
 | `framework/contract-text` | `contract-text` | text | people: `V11_CONTRACT.md` and `V12_CONTRACT.md`, the prose the code cites; no code reads it |
+| `extension/src/base` | `browser` (beethoven-base) | code | the extension itself: `profile.ts`, the site profile's reader (module-schema 1's keys and types), the path rules, the portal's origin and the deployment a portal belongs to, compiled in through `extension/src/core/deployments.ts` and `contract.ts`; the folder's own `README.md` says so, and `extension/test/boundary.test.ts` holds it to `ORIGIN` |
 
-No code under `extension/src/` names any of these folders (`extension/test/hygiene.test.ts`), and the
-built package is checked to carry nothing of them but the profiles. Until 15.0.0 two more, hpcworker's
+No code under `extension/src/` names any of hpcworker's folders (`extension/test/hygiene.test.ts`), and the
+built package is checked to carry nothing of them but the profiles (with `deployments.json`, their list). Until 15.0.0 two more, hpcworker's
 program exports `framework` and `testbed`, were pinned for the harness's direct-way lane; none is now:
 16.0.0 removed that way and the lane, and takes no program from any repository.
 
 One script takes them all, with your own `gh` sign-in and from GitHub only, never from a checkout:
 
 ```
-bash interface/pull.sh [--ref REF] framework/profiles framework/contract framework/contract-text
+bash interface/pull.sh [--ref REF] framework/profiles framework/contract framework/contract-text extension/src/base
 ```
 
 It takes only a commit hpcworker's default branch contains (REF: `main`), and only the files hpcworker's
