@@ -50,13 +50,16 @@ MOCK_QUEUE_S=75 MOCK_LOGGED_IN=false node mock-ood/server.mjs --port 8443 --host
 
 Open it as `https://ondemand.wayne.localhost:8443`: Chrome resolves `*.localhost` to this computer,
 and the site then reads as `wayne`, so the bundled Wayne profile, its shared copy's path and "Wayne
-State grid" apply. Sign in with `st1234` / `mockpass` in Chrome's own box.
+State grid" apply. Sign in with `st1234` / `mockpass` in Beethoven's sheet in the panel (19.0.0), or
+in Chrome's own box after *Use Chrome's sign-in box instead* (and in the Firefox build, which has only the box).
 
 ### Switches
 
 | Switch | Default | What it plays |
 |---|---|---|
 | `--auth basic` / `MOCK_AUTH=basic` | cookie | the live portal as it answered on 2026-10-01: `401` with `WWW-Authenticate: Basic realm="private"` on `/pun/*` and on the shell's handshake; `/` answers `302` to `/public/start.html` ("LOGIN TO ONDEMAND"); `--password` / `MOCK_PASSWORD` (default `mockpass`) |
+| `--realm R` / `MOCK_REALM` | private | the realm every Basic challenge names (19.0.0: Beethoven records the realm of a sign-in that worked and answers no challenge of another realm) |
+| `--lockout N` / `MOCK_LOCKOUT` | 0 (never) | the Nth wrong Basic answer locks the account, as a university may disable an account after a few wrong passwords: from then on even the right password gets `401` until `POST /_mock/reset` |
 | `--samesite lax\|none\|strict` | lax | cookie mode's session cookie (`none` adds `Secure`); `lax` and `strict` do not travel on an extension's WebSocket, so Beethoven must use tab mode |
 | `--keyless` / `MOCK_SHELL_KEYLESS=1` | off | AM2's student without a key: every shell asks `st1234@login1's password: ` until `hpcworker login-setup` has authorised `from="10.0.0.1"`; wrong password: "Permission denied, please try again."; three: the session ends |
 | `--terminal stub\|xterm\|hterm` | stub (xterm when keyless) | the Shell page: 10.0.0's token-only page, a working terminal with xterm.js's helper textarea (keys, a `paste` event, an `insertText` input event; the title follows OSC 0/2 and starts "Shell"), or a working terminal without that textarea (an older OnDemand) |
@@ -84,13 +87,36 @@ Without any `MOCK_QUEUE_S`/`MOCK_START_S`/`MOCK_SIM=1`, a `worker start` typed b
 with the command lines typed at its prompt, never what was typed into a running command or at the
 password prompt), `GET /_mock/state` (counters: shells, `{}` frames, idle kills, password prompts,
 lines typed at a password prompt, scheduler calls, the jobs, the Claude sign-in, whether login-setup
-ran), `GET /_mock/access?mode=`, `POST /_mock/reset`.
+ran; and, for the HTTP Basic sign-in, `realm`, `basicGood` and `basicBad` (right and wrong answers the
+portal checked), `basicLocked` (right answers turned down while locked), `lockoutAfter`, `lockedOut` and
+`passwordChanges`, never the password), `GET /_mock/access?mode=`, `POST /_mock/password` (19.0.0: the
+body is the new password, as text or as JSON `{"password": "..."}`, as a student's password changes on
+the grid; it is never echoed, logged or answered back), `POST /_mock/reset` (the log, and the Basic
+counters with the lockout, as the help desk reactivating the account).
 
 ### The unit tests that start the mock
 
 `test/portal.integration.test.ts`, `test/install.integration.test.ts` and `test/access.test.ts` call
 `createMockPortal` (and `cliOptions` for the reviewer's recipe); `test/hygiene.test.ts` reads every
 file under `mock-ood/` (no banned word, no old name). Every option and default those tests use is kept.
+
+## The sign-in sheet at the panel's smallest size (19.0.0)
+
+```
+npm run build:dev                                     # only the development build carries the gallery
+node e2e/sheet-fit.mjs                                # every phase of the sheet at 360 x 658
+node e2e/sheet-fit.mjs --height 580 j-grid-sheet-type-refused-later
+```
+
+It serves the development build from 127.0.0.1 and draws each sheet fixture (`sidepanel.html?fixture=…`)
+in Playwright's Chromium (`PLAYWRIGHT_DIR`), with the fonts loaded. It fails when Sign in or Unlock, Chrome's
+own box or Not now ends below the window, or when the field the caret is in, with the sentence under it,
+sits under the foot (which sticks to the panel's bottom). Measured on 2026-10-09: before the sticky foot,
+nine of the eleven phases put the box link below 658 px, and after a refusal Sign in too; with it, every
+phase passes at 658, 580 and 520 px. The full run also makes two caret runs: Enter in the password field
+and then the refusal, and a problem appearing above the field being typed. Both passed at 520, 560, 580,
+600, 640 and 658 px on 2026-10-09; without the reveal when the sheet is drawn, the Enter run failed at 560
+and 600 px and the problem run at 560, 600 and 640 px.
 
 ## The harness
 
@@ -123,7 +149,7 @@ written; default the session scratchpad's `v11/e2e/out`), `E2E_PORT` (8443), `PL
 | 9 | long-signin | the student takes 6 minutes to paste, the panel closed meanwhile (the service worker alone holds the sitting) |
 | 10 | home-extras | the home's other buttons: Try asking's copy, Show log closed again when the panel is reopened, Stop then Keep it, every item of the ⋯ menu (See what it can do, Your files, Settings, Details for your lab lead, Help), then Stop, Connect from the home (what the panel says while the press waits for the scheduler floor; no "Sign in to Claude" moment when already signed in), the home in line (timer, Worker row, "Asked at", Cancel), Cancel with Keep it, Cancel for real |
 | 11 | queue-reasons | two runs with a 240 s queue: QOSMaxJobsPerUserLimit ("Waiting for your share of the grid") and ReqNodeNotAvail ("The grid is under maintenance"), with the toolbar's badge and title; "past 15 min" is not played |
-| 12 | welcome-extras | the welcome page at 1280 x 720: Show terms opened in place, then with the university's default address "Agree and continue" ("Opening the grid…" while Chrome asks) and Deny ("Beethoven needs ondemand.grid.wayne.edu to work." with Try again); nothing granted, nothing reaches the university |
+| 12 | welcome-extras | the welcome page at 1280 x 720: Show terms opened in place, then with the university's default address "Agree and continue" ("Opening the grid…" while Chrome asks) and Deny ("Beethoven needs the Wayne State University HPC grid to work." with Try again); nothing granted, nothing reaches the university |
 
 ### What a run leaves (under `E2E_OUT/<scenario>/`)
 

@@ -3,8 +3,14 @@
 // until the student dismisses the note), The agreement, Activity, Google Drive in Claude (optional), Start
 // over, and, folded, For your lab lead. A student never needs it. Every control sends one Action
 // (core/model.ts); "Change" asks Chrome for the new origin inside its own click.
+//
+// 19.0.0: Your grid carries the saved grid sign-in's row (where the browser can answer the grid's sign-in
+// itself): what is saved and how it opens, and Forget behind its confirm row. Nothing typed is ever on
+// this page; Forget hands the passkey's public credential id to the browser's own "unknown credential"
+// signal, best-effort and never awaited, then asks the background to forget.
 import type { Appearance } from '../core/keys';
 import { WORDS, type Action, type SettingsView } from '../core/model';
+import { signalUnknownPasskey } from '../ext/gridSignin';
 import { add, clear, copyText, downloadText, el, morph, toast } from './dom';
 import { icon } from './icons';
 import { LABELS } from './labels';
@@ -26,6 +32,13 @@ export interface SettingsLocal {
   confirmDisconnect: boolean;
   /** "Start over?" [Start over] [Keep going] */
   confirmStartOver: boolean;
+  /** 19.0.0: "Forget the saved sign-in?" [Keep it] [Forget] */
+  confirmForget: boolean;
+  /**
+   * 19.0.0: the sentence after Forget, kept from its confirming press (the next view no longer names the
+   * account); drawn while the view says nothing is saved, and dropped once a sign-in is saved again
+   */
+  signinForgotten?: string;
 }
 
 function seg<T extends string>(label: string, value: T, options: Array<{ value: T; label: string }>, onPick: (v: T) => void): HTMLElement {
@@ -62,7 +75,7 @@ function switchRow(id: string, label: string, on: boolean, onToggle: (on: boolea
 
 export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<SettingsLocal>; onAppearance?: (a: Appearance) => void }): { show: (v: SettingsView) => void } {
   const g = opts.gestures;
-  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmStartOver: false, ...(opts.local ?? {}) };
+  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmStartOver: false, confirmForget: false, ...(opts.local ?? {}) };
   let view: SettingsView | undefined;
   let texts: Texts | undefined;
   let page: HTMLElement | undefined;
@@ -92,6 +105,47 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
 
   function card(title: string, ...rows: Array<Node | null | false>): HTMLElement {
     return el('section', { class: 's-card' }, el('h2', { class: 'eyebrow', text: title }), ...rows);
+  }
+
+  /**
+   * Forget's confirming press: the browser's signal first (best-effort, never awaited), then the
+   * background, then the sentence, kept from this press (the next view no longer names the account)
+   */
+  const forgetSignin = (si: NonNullable<SettingsView['signin']>) => {
+    if (si.cred) {
+      try {
+        (g.unknownPasskey ?? signalUnknownPasskey)(si.cred);
+      } catch {
+        /* best-effort: the passkey list is the student's own to tidy */
+      }
+    }
+    void opts.act({ kind: 'forget-grid-signin' });
+    set({ confirmForget: false, signinForgotten: si.forgotten });
+  };
+
+  /** 19.0.0: the saved grid sign-in: what is saved and how it opens; Forget only while one is saved */
+  function signinRows(si: NonNullable<SettingsView['signin']>): Array<HTMLElement | null> {
+    const asking = local.confirmForget && !!si.forget;
+    return [
+      el(
+        'div',
+        { class: 's-row has-note', key: 'signin' },
+        // while confirming, the question takes the note's place, announced, as Start over's does
+        el('span', { class: 's-label' }, el('span', { text: si.title }), asking ? el('span', { class: 's-sub s-ask', role: 'alert', text: si.confirm }) : el('span', { class: 's-sub', text: si.text })),
+        !si.forget
+          ? null
+          : asking
+            ? el(
+                'div',
+                { class: 'btns' },
+                el('button', { type: 'button', class: 'btn btn-text', text: WORDS.home.keep, onClick: () => set({ confirmForget: false }) }),
+                el('button', { type: 'button', class: 'btn btn-brick', style: 'height:36px', 'aria-label': si.confirm, text: si.forget.label, onClick: () => forgetSignin(si) }),
+              )
+            : el('button', { type: 'button', class: 'btn btn-outline', text: si.forget.label, onClick: () => set({ confirmForget: true, signinForgotten: undefined }) }),
+      ),
+      // never under a saved sign-in: not before the background has forgotten it, nor under one saved again
+      local.signinForgotten && !si.forget ? el('p', { class: 's-note s-fine', role: 'status', key: 'signin-forgotten', text: local.signinForgotten }) : null,
+    ];
   }
 
   function render(): void {
@@ -146,7 +200,9 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         el(
           'div',
           { class: 's-row' },
-          el('span', { class: 's-label mono', text: v.grid.address ?? '—' }),
+          // 19.0.0: Disconnect also forgets a saved sign-in; Chrome's own copy stays until it closes, and the
+          // confirming press says so
+          el('span', { class: 's-label' }, el('span', { class: 'mono', text: v.grid.address ?? '—' }), local.confirmDisconnect ? el('span', { class: 's-sub s-ask', role: 'alert', text: WORDS.settings.disconnectNote }) : null),
           el('div', { class: 'btns' },
             el('button', { type: 'button', class: 'btn btn-outline', 'aria-expanded': local.changeOpen ? 'true' : 'false', 'aria-controls': 'change-fold', text: v.grid.change, onClick: () => set({ changeOpen: !local.changeOpen, portalInput: local.portalInput ?? v.grid.address ?? v.grid.suggested ?? '' }) }),
             local.confirmDisconnect
@@ -155,13 +211,7 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
           ),
         ),
         portalField('change-fold', local.changeOpen, local.portalInput ?? v.grid.address ?? v.grid.suggested ?? '', local.portalError, WORDS.welcome.usePortal, { input: (val) => { local.portalInput = val; }, use: changePortal }),
-        // 18.0.0: the grid password lives in Chrome's own password manager, never in Beethoven
-        el(
-          'div',
-          { class: 's-row has-note' },
-          el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.savedSignin })),
-          el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.savedSigninOpen, onClick: () => g.openTab(LABELS.passwordSettingsUrl) }),
-        ),
+        ...(v.signin ? signinRows(v.signin) : []),
       ),
       // 16.0.0: a key an earlier version put in the grid account (the lab lead removes it); Forget drops the note
       v.oldKey
@@ -262,6 +312,8 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
 
   return {
     show(v: SettingsView) {
+      // the forget had landed (nothing saved) and a sign-in is saved again: that sentence is over
+      if (local.signinForgotten && v.signin?.forget && view?.signin && !view.signin.forget) delete local.signinForgotten;
       view = v;
       render();
     },

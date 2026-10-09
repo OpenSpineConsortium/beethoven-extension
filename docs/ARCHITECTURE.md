@@ -2,6 +2,8 @@
 
 Public name Beethoven since 7.0.0; the repository is `OpenSpineConsortium/beethoven-extension` since the split of 2026-10-03 (`OpenSpineConsortium/beethoven` from 2026-09-30 until then; `CLAUDE.md`).
 
+**19.0.0 (2026-10-09).** Beethoven signs in to the grid (greg's decision card, option B, tapped 2026-10-09 03:01:45Z). Whenever the portal wants a sign-in, the panel's sheet *Sign in to the grid* takes the AccessID and password, and on a portal that signs in with HTTP Basic, as Wayne State's does, the background answers the portal's challenge itself: one `webRequest.onAuthRequired` listener (the Chrome build's new `webRequest` and `webRequestAuthProvider` permissions, neither with an install warning; never `webRequestBlocking`) answers only the challenge of Beethoven's own background request to the portal's dashboard (no tab, the extension as initiator), on the one granted origin and, once a password Beethoven gave has worked, that sign-in's recorded realm, once per armed check, never a tab's (the tab gets Chrome's own box), a proxy's or another origin's. One refusal stops every automatic sign-in until the student types the password again; Beethoven itself sends a password the grid turns down at most once. Chrome re-sends its cached copy once for each request already started with it before the first refusal comes back; Beethoven then sends at most one; when the answered request is abandoned before the grid replies, Chrome may re-send that copy once. How many of these the grid counts is not yet measured. A try whose outcome cannot be told is neither proof nor a refusal: when the browser closed, or the extension reloaded, before the grid replied (found at the next start from the note's `attempt_at` or `typed_attempt_at`), or when, while the answer waited, a portal tab was challenged or had a request end without a 401 or 403, not from the cache (a sign-in in Chrome's box goes into the same auth cache, and Chrome may finish Beethoven's own request with that password and raise no event), the saved password is put on hold (`stopped_at` on the note, and at once in the session's attempt state, so a slow or failed write of the note never lets it go again), no refusal is counted, the panel says Beethoven couldn't tell whether it worked (never that it didn't), and nothing is sent from it until a typed password works or a new one is saved. The password is saved only if the student ticks *Remember it on this computer* (never pre-ticked): an AES-GCM record in the extension's IndexedDB (`beethoven-signin`), under a key derived with HKDF from the PRF output of a platform passkey named "<AccessID> (grid)" (Windows Hello, Touch ID or the screen lock), unlocked once per browser session; unticked, the password is kept in `storage.session` for one attempt and at most two minutes. It never crosses a message, a log, the audit log, `storage.local` or argv, and never reaches the vendor. No HTML sign-in page or identity provider is filled in, no multi-factor step is touched, no password is typed into a shell, and the approval check still names the account the dashboard shows, never the typed AccessID. *Use Chrome's sign-in box instead* keeps 18.0.0's tab path whole; on a portal that redirects to an identity provider no challenge comes, so the sheet signs no one in and that tab is the only way (the code never reads the profile's `ood_auth` to tell the two kinds apart). Settings' *Your grid* card shows the saved sign-in and *Forget*; Chrome's own HTTP sign-in cache keeps the grid signed in until the browser closes, whatever Forget or Disconnect do. The old passkey of 12.0.0 to 15.0.0 is named with the AccessID alone or "beethoven" ("Beethoven on this computer"; 15.0.0 named a newly made one so) and can go; the new one is deleted only after *Forget*. The design and build contract is the 19.0.0 build specification; the agreement is version 12 and the privacy statement version 13 (`LICENSE.txt`, `PRIVACY.md`). The manifest table in section 6 is 19.0.0's.
+
 **16.0.0 (2026-10-08).** One way to the grid: the Open OnDemand portal the student grants, behind the university's VPN, as this document describes it. From 12.0.0 to 15.0.0 the extension first tried a direct way (ssh to the login node with no VPN, through a bridge that shipped inside the package as a native-messaging host, a sign-in sheet for the first password-and-code sign-in, a key in the browser whose one line on the grid ran only the framework's gate, and from 15.0.0 signed installers for the bridge) and kept the portal path as its fallback. The maintainer removed it on 2026-10-08: it could not work without a program outside the browser, and a student with the VPN has the portal. Its records stay as history and describe nothing in the tree: `V12_CONTRACT.md` and `V12_STATUS.md` (that build's contract and where it stood), `BRIDGE_TRANSPORT.md` (the transport, native messaging, the transports set aside), `TEXTS_V9_V10.md` and `TEXTS_V10_V11.md` (its texts); `helper/` and its runbooks are gone. What 16.0.0 adds to the one way: a Connect pressed while the grid is out of reach is kept, the panel shows the GlobalProtect step again with "Beethoven carries on by itself as soon as the grid answers." and goes ahead on its own once the grid answers (reach re-checked every 3 s while the panel is open, once a minute without one); that step links the university's own page about its VPN (the profile's `vpn_help_url`); "Keep my worker running" also covers a run read as ended, at most three times; and Settings notes once, with *Forget*, a key an earlier version put in the grid account (nothing on the grid is touched). The manifest is 11.0.0's again (section 6).
 
 Distilled from the research report's "Build specification for the week of 28 September 2026"
@@ -682,9 +684,19 @@ shell bootstrap and the sign-in sitting run from the portal-origin content scrip
 `X-CSRF-Token`; polling GETs may run from the service worker on Chrome and Edge; Firefox and Safari use
 the content script for everything.
 
-The session the extension inherits lasts, with Open OnDemand's defaults, 8 hours of inactivity and
-8 hours maximum; the cookie is HttpOnly and SameSite=Lax; a 302 to an identity provider or a 401
-means "sign in again in a tab", and nothing is cached across the re-login.
+The session the extension inherits lasts, with Open OnDemand's defaults, 8 hours of inactivity and 8
+hours maximum; the cookie is HttpOnly and SameSite=Lax; a 302 to an identity provider or a 401 means
+the student must sign in again, and nothing is cached across the re-login. Without `webRequest` (the
+Firefox build) that is a tab, as before 19.0.0. In Chrome since 19.0.0 every signed-out reading (a
+401 or 403, or a redirect to another origin or off the dashboard; `core/portal.ts`) brings the
+panel's sheet. On a portal that signs in with HTTP Basic the background answers the 401 of its own
+dashboard request with the AccessID and password the student typed there, under the narrow rule of
+the 19.0.0 paragraph at the top (one answer per armed check, never a tab's challenge, stop at the
+first refusal), and without them the panel asks for them or, by the student's choice, opens the tab
+as before. On a portal that redirects to an identity provider no challenge comes, so a password
+typed on the sheet is never sent and *Use Chrome's sign-in box instead* (the tab) is the only way;
+nothing in the code reads the profile's `ood_auth` to choose, and no such portal has been tried (not
+yet measured).
 
 The shell is a login-node shell. It is used to open, run one `sbatch --parsable`, read the id and
 close, and, once, to hold the student's own sign-in sitting open for as long as the paste takes.
@@ -719,7 +731,11 @@ holds the run record (`bridge.run`: the run's name and state directory, job numb
 4,000 characters of `rc.log` for the tail under *Details*, and the last read error), the portal tab
 whose page script answers (`bridge.portalTab`), the tab the icon was last clicked from
 (`bridge.click`), when check 4 last passed (`bridge.sessionSeen`), what the last automatic start did
-(`bridge.autoStart`) and the last check results (`bridge.checks`); there is no durable secret (`PRIVACY.md` and `SECURITY.md` carry the same list; the report's own
+(`bridge.autoStart`) and the last check results (`bridge.checks`); the one durable secret, kept only
+when the student ticked *Remember it on this computer*, is the grid sign-in record in the extension's
+IndexedDB (`beethoven-signin`, AES-GCM under a key from the passkey's PRF output; `storage.local` keeps
+only `bridge.signin`, notes about it, and `storage.session` the unlock and an unticked password's one
+attempt) (`PRIVACY.md` and `SECURITY.md` carry the same list; the report's own
 sentence names four items and says "only", but the approval answer, the audit log and the last good
 kill-list that its security controls also require are durable, so the list here is the complete one).
 The content script is registered programmatically with `scripting.registerContentScripts` for the one
@@ -821,16 +837,17 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 
 | Key | Value | Justification (one sentence, as the stores will see it) |
 |---|---|---|
-| `permissions` | `storage` | Remembers the portal hostname you connected, your preferences, your acceptance of the agreement, the last answer of the approval check and your statement about each worker's workspace |
+| `permissions` | `storage` | Remembers the portal hostname you connected, your preferences, your acceptance of the agreement, the last answer of the approval check, your statement about each worker's workspace, and your grid sign-in, encrypted, if you chose to save it |
 | | `alarms` | Checks your running job no more than once a minute, repeats the approval check and the withdrawn-versions download about once a day, and reconnects after the browser suspends the extension |
-| | `scripting` | Loads the extension's page script on your university portal, and only there, after you connect it, including into the tab you clicked from |
-| | `activeTab` | Lets a click on the icon read the address of the portal tab you clicked from, so it can connect that one site; no install warning |
+| | `scripting` | Loads the extension's page script only into a tab the extension opened itself on the one portal site you allowed (a portal that does not share its sign-in with the extension's own requests, and the portal's terminal page for its one-time key step) |
 | | `sidePanel` (Chrome/Edge only) | Opens the job monitor beside your portal tab when you click the icon |
+| | `webRequest` (Chrome/Edge only, 19.0.0) | Lets the extension learn, on the one portal site you allowed, of sign-in requests and of when requests end, your tabs' included, so it knows whether the password it gave its own background request worked; it acts on no other request, and of your tabs' requests it keeps one mark only, while its own answer waits for its outcome: that a portal tab asked for a sign-in or had a request answered without a refusal, which puts a saved password on hold (a tab's sign-in goes back to Chrome's own box); no install warning |
+| | `webRequestAuthProvider` (Chrome/Edge only, 19.0.0) | Lets the extension answer that one sign-in request, once per check, with the AccessID and password you typed into its own sign-in sheet (the listener is `asyncBlocking`; a second challenge after its answer is cancelled, so the password is not sent twice); it never answers a sign-in a tab, a proxy or another site asks for, redirects or rewrites no request, and stops at the first refusal; no install warning |
 | `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab; access is requested at that click for that one origin only, and the extension refuses to work until it is granted |
 | `host_permissions` | none | |
 | `action` / `browser_action` | `{ default_title: "Beethoven" }`, no `default_popup` | a click runs the steps and opens the panel |
 | `options_ui` | the setup page | the agreement, the portal by address, the statement, the settings, the audit log, the Drive step |
-| never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`, `clipboardRead`, `nativeMessaging` (requested from 12.0.0 to 15.0.0 for Beethoven's own bundled bridge, and not since 16.0.0), any `claude.ai`, `anthropic.com` or `claude.com` origin | stated in the negative in the listing and the privacy policy |
+| never requested | `cookies`, `tabs`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`, `clipboardRead`, `activeTab` (requested until 10.0.0), `nativeMessaging` (requested from 12.0.0 to 15.0.0 for Beethoven's own bundled bridge, and not since 16.0.0), any `claude.ai`, `anthropic.com` or `claude.com` origin; `webRequest` was on this list until 18.0.0 | stated in the negative in the listing and the privacy policy |
 | `minimum_chrome_version` | `"148"` | `browser.*` namespace, Promise-returning `onMessage` |
 | `browser_specific_settings.gecko` | `id` `beethoven@openspineconsortium.com`; `data_collection_permissions: { required: ["personallyIdentifyingInfo"] }` | the approval check sends the institutional account name the portal shows (with the portal hostname, product and version); no crash reports and no usage data |
 | `content_security_policy` | MV3 default; no remote script sources | remote code: no |
@@ -850,7 +867,15 @@ From the report's "Security controls", in the order a reviewer will look for the
   which removes the DOM-injection and prototype-skimming classes for everything except the portal page
   itself. The two kinds of Anthropic page the extension opens (the sign-in page Claude Code printed;
   the session's claude.ai/code link) open in a new tab with `tabs.create` and are never read. The
-  extension never stores a credential and never touches the MFA approval step.
+  extension never stores a Claude credential and never touches the MFA approval step.
+- **The grid password, under a narrow rule (19.0.0).** The only answer the background gives to an
+  HTTP sign-in is the one in the 19.0.0 paragraph at the top: its own dashboard request, the granted
+  origin and, once one is recorded, realm, once per armed check, nothing after the first refusal
+  until the student types the password again. The password goes from the sheet straight to
+  `storage.session` (one attempt, at most two minutes) or, if the student ticked *Remember*, into
+  the IndexedDB record sealed with AES-GCM under a key from the passkey's PRF output; the page
+  empties the field before it waits on anything, no action or message carries it, and no log, audit
+  line, error text or `storage.local` key can.
 - **The pasted code passes through and is not kept.** The one-time sign-in code the student pastes
   into the panel goes over the login port to the page script and into the shell as keystrokes; it is
   held in a local variable only, the box is cleared as it is sent, and the chokepoint's one audit line
@@ -886,8 +911,8 @@ From the report's "Security controls", in the order a reviewer will look for the
   24 h and up to 7 days when the service is unreachable, a no for 10 minutes. The strip's `access`
   step sits before `install`, so an unapproved or withdrawn account starts nothing, by the strip or
   by the automatic start, and the one button is *Ask for access*. The name asked about is only the
-  one the dashboard page shows (`SessionInfo.username`), never a typed one and never the
-  home-directory fallback. Nothing is read from a cookie.
+  one the dashboard page shows (`SessionInfo.username`), never a typed one (the AccessID typed into
+  the 19.0.0 sign-in sheet is only the HTTP sign-in's user name) and never the home-directory fallback. Nothing is read from a cookie.
 - **One approved account, one installation (8.0.0).** The check also carries `install_id`, the
   random identifier `installId()` in `ext/storage.ts` makes once per installation (nothing about the
   device; a reinstall makes a new one). The service binds an approved account to the first

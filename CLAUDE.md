@@ -4,7 +4,8 @@ A university-agnostic HPC worker framework (`framework/`, `hpcworker`) plus a li
 extension (`extension/`, published as "Beethoven"; the repository and its code name stay Ashley
 Bridge) that make a student's own Claude Code worker, running as a batch job on their university
 cluster, available inside claude.ai through Claude Code Remote Control, using only the student's
-existing Open OnDemand browser session on the cluster side. Vendor: Gregory Schwing, trading as
+Open OnDemand sign-in on the cluster side, which Beethoven may make with the password the student gave
+it (19.0.0). Vendor: Gregory Schwing, trading as
 OpenSpineConsortium (an LLC is planned and becomes the named licensor when it exists). The product
 name and identifier carry no university name.
 
@@ -12,7 +13,9 @@ name and identifier carry no university name.
 
 - `docs/RESEARCH_REPORT.md`: the whole report, especially "Build specification for the week of
   28 September 2026". It governs. The two `docs/prior_analysis_*.txt` files proposed intercepting
-  claude.ai; the report rejects that, and nothing here may implement it.
+  claude.ai; the report rejects that, and nothing here may implement it. Its dated note of 2026-10-09
+  (at the top) names the passages greg's decision for 19.0.0 supersedes: the 401-means-a-tab rule,
+  "webRequest buys nothing", "no durable secret" and the never-requested row for `webRequest`.
 - `docs/ARCHITECTURE.md`, then `docs/DIAGNOSTICS.md`, `docs/OPEN_QUESTIONS.md` (what is measured and
   what is not), `SECURITY.md`, `docs/STORE_LISTING.md`, `docs/WAYNE_STATE_PILOT.md`.
 - The research notes behind the report:
@@ -63,14 +66,27 @@ name and identifier carry no university name.
   `extension/src/core/contract.ts`). Code that refuses, strips or warns against a key is the rule
   working and stays.
 - **Tokens and secrets never appear on command lines, in argv, in logs, in job files or in
-  `sbatch --export`.** Never echo one. The per-job token is a mode-0600 file.
+  `sbatch --export`,** and neither does the grid password. Never echo one. The per-job token is a
+  mode-0600 file.
 - **No code on claude.ai.** No content script, no host permission, no fetch patch. The extension's
   only content script runs on the one Open OnDemand origin the student grants at click time. Never
-  request `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`,
-  `debugger`, `identity` or `nativeMessaging` (requested from 12.0.0 to 15.0.0 for the bundled
-  bridge of the direct way, which 16.0.0 removed whole; see the bullet below), and never any
-  `claude.ai`, `anthropic.com` or `claude.com` origin. No automated login of the portal; the
-  university's sign-in pages are never filled in.
+  request `cookies`, `tabs`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`
+  or `nativeMessaging` (requested from 12.0.0 to 15.0.0 for the bundled bridge of the direct way,
+  which 16.0.0 removed whole; see the bullet below), and never any `claude.ai`, `anthropic.com` or
+  `claude.com` origin. Beethoven signs in to the grid (greg's card tap of 2026-10-09 03:01Z, 19.0.0;
+  until 18.0.0 the rule was "no automated login of the portal" and `webRequest` was never
+  requested). `webRequest` and `webRequestAuthProvider` serve one `onAuthRequired` listener. It
+  answers only the HTTP Basic challenge of Beethoven's own background dashboard request on the one
+  granted portal origin, once per armed check, with the AccessID and password the student typed into
+  Beethoven's sheet. It never answers a tab's, a proxy's, another origin's or another realm's
+  challenge, and one refusal stops every automatic sign-in until the student types the password
+  again. The password is saved only if the student ticks Remember (never pre-ticked), and then only
+  as AES-GCM ciphertext under a key derived from the passkey's PRF output. It never appears in a
+  message, a log, the audit log, storage.local or argv, and never reaches Licensor. No HTML sign-in
+  page or identity provider is filled in, no multi-factor step is touched, and no password is typed
+  into a shell. The approval check uses the account name the dashboard shows, never the typed
+  AccessID. "Use Chrome's sign-in box instead" keeps 18.0.0's tab, Chrome's own box, as the
+  fallback, and it is the only way where `browser.webRequest` is absent (the Firefox build).
 - **No remote code.** No `eval`, no `new Function`, no fetched scripts. The kill-list is JSON verified
   with WebCrypto against the bundled public key; the extension works offline on the last good list and
   refuses only on a verified revocation. Since 4.0.0 the list withdraws versions only.
@@ -121,7 +137,8 @@ name and identifier carry no university name.
   *Forget*, a key an earlier version put in the grid account (`bridge.oldKey`), and nothing on the
   grid is ever touched for it; the first run after the update removes the direct way's storage and
   deletes its key unread (`cleanupDirectWay`). The 11.0.0 one-time login-setup step on the portal's
-  terminal page stays.
+  terminal page stays. 19.0.0's sign-in sheet is not the direct way: no ssh, no bridge, no one-time
+  code, and the VPN is still needed; `cleanupDirectWay` never touches its names.
 - **Grid etiquette.** Nothing runs on the login node beyond one `sbatch`, `squeue` or `scancel` per
   action; no container command on the login node and nothing of ours under its `/tmp`; container
   temp and cache on the compute node's local disk (`/tmp/$USER/...` with a cleanup trap; on Wayne
@@ -157,11 +174,15 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-08 and extension 16.0.0 `LICENSE.txt` is version 11 and `PRIVACY.md`
-  version 12, which describe the one way (the university's VPN and the portal; no bridge, no sign-in
+  Edition; since 2026-10-09 and extension 19.0.0 `LICENSE.txt` is version 12 and `PRIVACY.md`
+  version 13, which describe Beethoven's own grid sign-in (the sheet, the answer to the portal's
+  HTTP sign-in under the narrow rule above, one wrong try and then stop, the Remember tick and the
+  passkey that unlocks the saved password, the one-shot password kept at most two minutes, Forget,
+  Chrome's box as the fallback, Chrome keeping the sign-in until it closes) on top of version 11 and
+  12 (16.0.0: the one way (the university's VPN and the portal; no bridge, no sign-in
   sheet, no key in the browser), what an earlier version may have left (the bridge on the computer,
   the gate line in the grid account, a passkey; `hpcworker browser-key remove` or the lab lead
-  removes the line) and 16.0.0's waiting press, keep-running and old-key note;
+  removes the line) and 16.0.0's waiting press, keep-running and old-key note);
   `THIRD_PARTY_NOTICES.md` lost the bridge's two notices with it. They replace version 10 and 11
   (15.0.0: the bridge as a compiled program of Licensor's in signed installers) and version 9 and 10
   (12.0.0: the direct way over ssh through the bridge, the sign-in sheet, the browser's key and its
@@ -175,7 +196,7 @@ name and identifier carry no university name.
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 11 to match, with `TERMS_DATE` 2026-10-08; the framework's
+  `extension/src/core/terms.ts` is 12 to match, with `TERMS_DATE` 2026-10-09; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and
@@ -227,7 +248,7 @@ eat backslashes, so write scripts with the Write tool and run them by path; line
 
 ```
 export PATH=/c/Users/grego/tools/node22:$PATH
-cd extension && npm ci                   # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0
+cd extension && npm ci                   # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0, linkedom 0.18.13
 npm run typecheck && npm test            # tsc --noEmit; vitest (the mock portal starts itself on an ephemeral port)
 npm run build                            # wxt build -b chrome && wxt build -b firefox --mv2 (sync-profiles runs first; only Chrome ships)
 npm run zip                              # the Chrome zip is the one uploaded (docs/store); the Firefox and sources zips are not submitted

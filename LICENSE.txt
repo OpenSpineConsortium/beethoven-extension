@@ -1,6 +1,6 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 11, 2026-10-08. Applies to the Trial Edition of Beethoven 16.0.0 and later versions that
+Version 12, 2026-10-09. Applies to the Trial Edition of Beethoven 19.0.0 and later versions that
 ship this text, as distributed through its private listing on the Chrome Web Store, which only the
 Google accounts Licensor has invited can open. You can read, copy, save and print this text at any
 time: it is in the file LICENSE.txt inside the extension and inside the framework (in your computing
@@ -37,18 +37,20 @@ that your institution's lab keeps in one shared copy on your institution's clust
 Extension points your computing account at, or that an earlier version of the Extension installed in
 your own computing account (either way, the "Framework"), the recipe for the container image the
 Framework runs, its documentation, and updates Licensor provides. The Extension starts, watches and
-stops a job in your own cluster account through your institution's Open OnDemand portal, in the
-browser session you have signed in to there; the job runs Claude Code, Anthropic's program, which
-you have signed in to yourself, and makes that session visible to you at claude.ai and in the Claude
-app through Anthropic's Remote Control feature. "Trial Edition" means the edition this agreement
-covers: free of charge during the evaluation period, for persons whose institutional account
-Licensor has approved. "Full Edition" means the paid edition, if Licensor offers one, governed by
-the separate Beethoven Full Edition License Agreement, which you accept only if you choose that
-edition. "Your portal" means your institution's Open OnDemand portal, and "your account name" means
-the name of your account on your institution's cluster as the cluster confirms it when you sign in:
-the name your portal's dashboard shows for the session you signed in to. It is the only identifier
-of you that Beethoven uses (the Extension also names its own installation with a random number,
-section 3(e)). "Named Dependencies" are the outside parties and conditions listed in section 7.
+stops a job in your own cluster account through your institution's Open OnDemand portal, in a
+browser session signed in to there, by you or, with the account name and password you give it, by
+the Extension (section 5(b)(i)); the job runs Claude Code, Anthropic's program, which you have
+signed in to yourself, and makes that session visible to you at claude.ai and in the Claude app
+through Anthropic's Remote Control feature. "Trial Edition" means the edition this agreement covers:
+free of charge during the evaluation period, for persons whose institutional account Licensor has
+approved. "Full Edition" means the paid edition, if Licensor offers one, governed by the separate
+Beethoven Full Edition License Agreement, which you accept only if you choose that edition. "Your
+portal" means your institution's Open OnDemand portal, and "your account name" means the name of
+your account on your institution's cluster as the cluster confirms it when you or the Extension
+signs in: the name your portal's dashboard shows for that session. It is the only identifier of you
+that Beethoven uses to know who you are (the Extension also names its own installation with a random
+number, section 3(e)); an account name you type to sign in (section 5(b)(i)) is used only to sign
+in. "Named Dependencies" are the outside parties and conditions listed in section 7.
 
 2. YOUR LICENSE, AND WHAT IT IS NOT
 
@@ -151,38 +153,127 @@ Claude Code's settings by the Framework when a worker starts. Beethoven gives Cl
 you have not given.
 
 (b) Your sign-in to your cluster. The Extension reaches your cluster in one way: through your
-institution's Open OnDemand portal, in the browser session you have signed in to there, which may
-need your institution's VPN (at Wayne State, GlobalProtect). It never signs in to Claude for you
-(see (a)). Versions 12.0.0 to 15.0.0 of the Extension also offered a direct way over ssh, through a
-helper program (the "Bridge") installed on your computer, a sign-in sheet of the Extension's own and
-a key kept in your browser; this version has none of that, and (ii) says what it leaves alone.
+institution's Open OnDemand portal, which may need your institution's VPN (at Wayne State,
+GlobalProtect), in a browser session signed in to there. It signs in to your portal for you with the
+account name and password you give it, or uses the sign-in you make yourself in your browser's own
+sign-in box, as (i) says. It never signs in to Claude for you (see (a)). Versions 12.0.0 to 15.0.0
+of the Extension also offered a direct way over ssh, through a helper program (the "Bridge")
+installed on your computer, a sign-in sheet of the Extension's own and a key kept in your browser;
+this version has no Bridge, no ssh connection of its own and no such key, and (ii) says what it
+leaves alone. The sign-in sheet of (i) is not that way: it signs in to your portal only, over the
+same connection as everything else the Extension does there, which still needs your institution's
+VPN where it requires one, and it asks for no verification code.
 
-(i) Your portal. The Extension uses the sign-in your browser already holds for your institution's
-Open OnDemand portal, on that one website only, from its own background and without a portal tab
-where your browser allows it. It never reads that sign-in, never reads, stores or types a portal
-password, never signs in for you and never touches a multi-factor step. When the portal asks for a
-sign-in, the Extension opens the portal in a tab for you to sign in there (in your browser's own
-sign-in box, or on the portal's own sign-in page), never sees what you type there, and closes that
-tab once you are signed in, while it is still on the portal. Where your portal does not share its
-sign-in with the Extension, it keeps that tab behind your other tabs until the work in hand is done
-and then closes it, and for a later action opens the portal in a background tab and closes it again.
+(i) Your portal. The Extension makes its requests to your institution's Open OnDemand portal, on
+that one website only, from its own background and without a portal tab where your browser allows
+it, with the sign-in your browser holds for that website. It never reads that sign-in and never
+touches a multi-factor step. When the portal asks for a sign-in, the Extension signs in for you with
+the password you give it, or you sign in yourself in your browser's own sign-in box.
+
+The Extension's own sign-in. Where your browser lets the Extension answer a website's request for a
+sign-in, as Chrome does, it asks for your account name and your cluster password on its own sign-in
+sheet, in its panel, whenever your portal wants a sign-in. By typing them there and pressing "Sign
+in" you ask the Extension to sign in to your portal for you with them, and agree that it may. It
+answers, through your browser and not with a page script, only the portal's request for a sign-in
+that its own background reading of your portal's dashboard page receives, at most once each time it
+checks whether you are signed in, and only when that request comes from your one portal website
+itself, not from a proxy, asks for the portal's plain ("Basic") sign-in and, once a password the
+Extension gave has worked, in this browser session or, for the saved password, at any time since it
+was saved, names the same sign-in realm as that one; a sign-in in your browser's own box records no
+realm, and Forget, Disconnect and a change of portal remove the one on record. It never answers such
+a request from one of your browser tabs, which gets your browser's own sign-in box, nor from a
+proxy, another website or another realm, nor for the checks that ask whether your portal answers,
+which carry no sign-in. Of your own portal tabs' requests it keeps one mark only, and only while an
+answer it gave still waits for its outcome: that one of those tabs asked for a sign-in, or had a
+request answered by your portal without a refusal, meanwhile (see "One wrong password at most"); it
+keeps nothing about the tab or the request itself. It sends your password only to your portal, over
+the encrypted connection, as your browser's own box would; never to Licensor or anyone else. It
+never writes the password to a log, the audit log or the activity list, and keeps it only as the
+next paragraphs say. It never fills in a sign-in web page or your institution's identity provider,
+and never types a password into a shell (see the one-time step below). The account name you type is
+used only to sign in: the account name of section 1, which the approval check sends, is still the
+one your portal's dashboard shows.
+
+One wrong password at most. The Extension sends a password your cluster turns down at most once. The
+first refusal stops every sign-in the Extension makes by itself, with a saved password or one you
+have just typed, until you type the password again on the sheet, and a saved password your cluster
+turned down is not tried again after a restart of the Extension or of your browser; the sheet then
+asks you to check the password before you try again. Where the Extension cannot tell whether a
+password it gave worked, because your browser closed, or the Extension updated or reloaded, before
+your cluster replied, or because one of your portal tabs asked for a sign-in or had a request
+answered while that answer waited (you may have signed in in your browser's own box, and your
+browser may have used that password for the Extension's request as well), it counts the try as
+neither a success nor a refusal and puts a saved password on hold: the Extension does not send it
+again until a password you type on the sheet works, or you save one again. Your browser also keeps
+its own copy of a password it is given (see below) and sends it again by itself: when your cluster
+turns that password down, your browser re-sends its cached copy once for each request already
+started with it before the first refusal comes back; the Extension then sends at most one; when the
+answered request is abandoned before your cluster replies, your browser may re-send that copy once.
+How many of these your cluster counts is not yet measured. Your institution may disable your account
+after a few wrong passwords, and getting it back may take days; a password you have just changed may
+not work everywhere yet.
+
+Saving the password. Saving it is optional and off unless you tick the box "Remember it on this
+computer" on the sheet; the box is never ticked for you. Section 4(a) applies to that choice: where
+your institution says to type your password each time you need it, as Wayne State's password
+standard does, leave the box unticked. Unticked, the Extension keeps the password only in your
+browser's memory, for that one sign-in, and removes it afterwards, whether or not it worked, and at
+the latest two minutes after you pressed "Sign in". Ticked, the Extension has your computer make a
+passkey for it, unlocked with Windows Hello, Touch ID or your screen lock and named with your
+account name followed by "(grid)" (for example, "ab1234 (grid)"), and keeps the password in this
+browser profile, on this computer only, encrypted under a key that only that passkey releases. To
+use it you unlock it with the passkey, once each time you open your browser, when the Extension next
+needs your portal; what the passkey released stays in your browser's memory until the browser closes
+or the Extension updates or reloads, and the Extension then signs in with it when your portal asks,
+also while none of its pages is open. The passkey is kept by Windows Hello, your Mac's Passwords app
+(iCloud Keychain) or Chrome's password manager, not by the Extension; that store may keep it in your
+Google account or in iCloud and offer it on your other devices, but the saved password itself stays
+only in this browser profile. Someone who can use this browser profile while the saved password is
+unlocked, or who can unlock your passkey, could sign in to your portal with it, and so could the
+Extension's own code. Where your computer's passkey cannot lock a password, the Extension says so,
+uses the password for that one sign-in and from then on offers no box. "Forget", beside "Grid
+sign-in" in the Extension's Settings, deletes the saved password and everything the Extension keeps
+about it; Disconnect and changing to another portal do the same, and uninstalling the Extension
+removes it with the rest of its data. Forget may ask your passkey store to remove the passkey, but
+some stores keep it: your list of passkeys may still show it, and you can delete it there, after
+Forget. If a password you typed works while your saved one is turned down or on hold, the Extension
+forgets the saved one by itself, unless it can tell that the saved one is the same password, which
+it then keeps and uses again.
+
+Your browser stays signed in. Once your cluster has accepted a password the Extension gave it, your
+browser keeps it in its memory, as it keeps one you type into its own box, and sends it to your
+portal from your own portal tabs as well, until the browser closes or you clear its browsing data
+with cookies; Forget and Disconnect do not end that.
+
+Your browser's own sign-in box. "Use Chrome's sign-in box instead", on the sheet, opens the portal
+in a tab for you to sign in there, in your browser's own sign-in box or on the portal's own sign-in
+page; where the Extension cannot answer your portal's request for a sign-in, this is the only way.
+That includes a portal that sends you to your institution's own sign-in page instead of asking your
+browser for a password: the sheet may still appear there, but the Extension sends no password typed
+on it. The Extension never sees what you type in that tab, and closes it once you are signed in,
+while it is still on the portal. Your browser may offer to save what you type there; that offer, and
+where your browser keeps what it saves, are your browser's own, and section 4(a) applies to them
+too. Where your portal does not share its sign-in with the Extension, it keeps that tab behind your
+other tabs until the work in hand is done and then closes it, and for a later action opens the
+portal in a background tab and closes it again.
+
 The one thing it reads about you from the portal is your account name, from the portal's own
 dashboard page. If your portal's shell asks for your cluster password, as it may for an account that
-has no key on the cluster, the Extension types nothing there and offers a one-time step instead: it
-opens the portal's own terminal page in a tab, and you type your password there yourself; the
-Extension never sees it. Once you say you are in, or the page's title shows that your shell is up,
-the Extension types one line into that terminal (or leaves it on your clipboard for you to paste),
-which runs the Framework's login-setup step in your own account. That step makes a key in your
-cluster account, in its ~/.ssh folder, that opens your account only from the computer the terminal
-came from, which at your institution is its Open OnDemand server (it is a file in your own account,
-protected as your other files are, and hidden from Claude Code inside your worker; anyone who
-obtained it and could connect from that server could use it), and has ssh offer it when the portal's
-shell connects you, so that the shell need not ask for your password; it never reads, changes or
-prints a key you already have. The key stays in your cluster account: the Extension never sees it,
-keeps nothing about it in your browser and sends nothing about it to Licensor. The command
-"hpcworker login-setup --remove", run in a terminal on the cluster, removes it. This step has been
-tried only against the Licensor's mock portal, not yet on a real cluster by an account without a
-key.
+has no key on the cluster, the Extension types nothing there, not even a password you gave it for
+the sign-in above, and offers a one-time step instead: it opens the portal's own terminal page in a
+tab, and you type your password there yourself; the Extension never sees it. Once you say you are
+in, or the page's title shows that your shell is up, the Extension types one line into that terminal
+(or leaves it on your clipboard for you to paste), which runs the Framework's login-setup step in
+your own account. That step makes a key in your cluster account, in its ~/.ssh folder, that opens
+your account only from the computer the terminal came from, which at your institution is its Open
+OnDemand server (it is a file in your own account, protected as your other files are, and hidden
+from Claude Code inside your worker; anyone who obtained it and could connect from that server could
+use it), and has ssh offer it when the portal's shell connects you, so that the shell need not ask
+for your password; it never reads, changes or prints a key you already have. The key stays in your
+cluster account: the Extension never sees it, keeps nothing about it in your browser and sends
+nothing about it to Licensor. The command "hpcworker login-setup --remove", run in a terminal on the
+cluster, removes it. This step has been tried only against the Licensor's mock portal, not yet on a
+real cluster by an account without a key.
 
 (ii) What an earlier version may have left. If you used the direct way of versions 12.0.0 to 15.0.0
 of the Extension on this computer, three things of it may remain, and this version uses none of
@@ -198,12 +289,16 @@ types a command for it. Your lab lead can remove the line for you, and the comma
 browser-key remove", run in a terminal on your cluster, removes it; withdrawing your approval under
 section 3 does not. Where that version recorded that it had added such a line, the Extension's
 Settings say so once, with the date, and offer "Forget", which removes only that note from your
-browser and changes nothing on your cluster. A passkey you made to protect that key is kept by your
-system or your browser's password manager, not by the Extension, and you delete it there.
+browser and changes nothing on your cluster. A passkey you made to protect that key, the old passkey
+of versions 12.0.0 to 15.0.0, is kept by your system or your browser's password manager, not by the
+Extension; it is named with your account name alone, or "beethoven", this version never uses it,
+and you can delete it there. It is not the passkey of (i), named with your account name followed by
+"(grid)", which this version uses for a saved password: delete that one only after Forget.
 
 (c) Your account name, as your cluster confirmed it, and the answer of the last approval check with
-its time are stored in the Extension's own storage in your browser. Nothing about your approval is
-copied to your cluster account; the Framework has no key, password or account list of Licensor's.
+its time are stored in the Extension's own storage in your browser. What the sign-in of (b)(i) keeps
+in your browser, and for how long, is listed in PRIVACY.md. Nothing about your approval is copied to
+your cluster account; the Framework has no key, password or account list of Licensor's.
 
 (d) The Framework makes a random token for each job so that only your own browser session can reach
 your worker. It is kept in a file only you can read, is never shown, and never appears on a command
@@ -234,7 +329,8 @@ institution's own pages about its computing accounts and its VPN; each opens in 
 you choose it, and the Extension learns nothing of your visit.
 
 (g) Of (a) to (f), only your account name in (c) is sent to Licensor, in the approval check that
-section 10 describes; nothing else is. Section 10 describes the only things that may be.
+section 10 describes; nothing else is, and in particular not your cluster password or the account
+name you type to sign in. Section 10 describes the only things that may be.
 
 6. RESTRICTIONS
 
@@ -358,9 +454,10 @@ in (a) and these two files are the only requests the Extension makes to Licensor
 activation step: it has no code for them and no address to send them to. Your acceptance record (the
 version and hash of this text, the summary and the sentence shown, what you ticked, whether you
 opened the full text, the time, the install id, your account name once known, the software
-versions), your statements, your audit log, your settings and what the Extension remembers about
-your worker stay in your browser; Licensor does not receive them. The install id is the installation
-identifier of section 3(e), which the approval check in (a) sends, as it sends your account name.
+versions), your statements, your audit log, your settings, a password you chose to save (section
+5(b)(i)) and what the Extension remembers about your worker stay in your browser; Licensor does not
+receive them. The install id is the installation identifier of section 3(e), which the approval
+check in (a) sends, as it sends your account name.
 
 (d) Access records. An access request on the request page records what you enter there: your account
 name, your name, your institutional e-mail, the Google account at which you are to receive the
@@ -428,15 +525,17 @@ Beethoven is protected by copyright and other laws; Licensor and its licensors k
 and interest in it. Beethoven bundles open-source packages listed in THIRD_PARTY_NOTICES.md; each is
 licensed to you under its own license, which this agreement does not limit. Claude Code, Node.js,
 the container image, the container runtime, the Open OnDemand portal, your institution's VPN
-program, your cluster's ssh service and your authenticator app are not part of Beethoven: they are
-provided by their own publishers or by your institution under their own terms. If you send Licensor
-suggestions about Beethoven, Licensor may use them without obligation. Beethoven runs Claude Code
-and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say
-what it runs; "Open OnDemand" is the mark of its publisher. Your institution's names and marks
-belong to it: Beethoven uses its name only in plain words, to say where your worker runs (for
-example, "Wayne State grid"), and carries none of its logos or other marks. "GlobalProtect" is the
-mark of Palo Alto Networks, named only to say which VPN program to turn on; "Windows" is Microsoft's
-mark and "macOS" Apple's, each named only to say which of your own systems is meant.
+program, your cluster's ssh service, your authenticator app and the passkey service of your system
+or browser are not part of Beethoven: they are provided by their own publishers or by your
+institution under their own terms. If you send Licensor suggestions about Beethoven, Licensor may
+use them without obligation. Beethoven runs Claude Code and is not an Anthropic product; "Claude"
+and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark
+of its publisher. Your institution's names and marks belong to it: Beethoven uses its name only in
+plain words, to say where your worker runs (for example, "Wayne State grid"), and carries none of
+its logos or other marks. "GlobalProtect" is the mark of Palo Alto Networks, named only to say which
+VPN program to turn on; "Windows" and "Windows Hello" are Microsoft's marks, "macOS", "Mac", "Touch
+ID" and "iCloud" Apple's, and "Chrome" Google's, each named only to say which of your own systems or
+programs is meant.
 
 16. SECURITY AND BREACH NOTICE
 
@@ -464,9 +563,11 @@ evaluation period last, or stop using Beethoven; earlier acceptance records are 
 You must comply with the export-control and sanctions laws that apply to you. You represent that you
 are not located in, and will not use Beethoven in, a country or region subject to a comprehensive US
 embargo, and that you are not on a US government restricted-party list. The Extension contains
-cryptography only to verify signatures (the list of withdrawn versions of section 3(d)), with your
-browser's own cryptography; the Framework generates random per-job tokens and, in the one-time step
-of section 5(b)(i), has the cluster's own ssh-keygen make a key in your account.
+cryptography only to verify signatures (the list of withdrawn versions of section 3(d)) and, if you
+choose to save your cluster password (section 5(b)(i)), to encrypt it under a key your passkey
+releases, with your browser's own cryptography; the Framework generates random per-job tokens and,
+in the one-time step of section 5(b)(i), has the cluster's own ssh-keygen make a key in your
+account.
 
 19. DISPUTES: NOTICE FIRST, THEN INDIVIDUAL CLAIMS IN MICHIGAN COURTS
 

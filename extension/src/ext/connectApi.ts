@@ -9,8 +9,9 @@
 // tab of the one-time key step). A registration an earlier build left is removed at start.
 import { browser } from 'wxt/browser';
 import { acceptedSettings, ANTHROPIC_REFUSAL, connectSequence, dropAnthropicGrants, guardedRequest, isAnthropicAddress, SCRIPT_FILE, SCRIPT_ID, type ConnectApi, type ConnectOutcome } from '../core/connect';
-import { ACCESS_KEY, CHANNEL_KEY, GRID_KEY, IDENTITY_KEY, LAST_KNOWN_KEY, PORTAL_KEY, PORTAL_TAB_KEY, PRESS_KEY, RUN_KEY, SIGNIN_TAB_KEY, type PortalSettings } from '../core/keys';
+import { ACCESS_KEY, CHANNEL_KEY, GRID_KEY, IDENTITY_KEY, LAST_KNOWN_KEY, PORTAL_KEY, PORTAL_TAB_KEY, PRESS_KEY, RUN_KEY, SIGNIN_NOPRF_KEY, SIGNIN_NOTE_KEY, SIGNIN_ONCE_KEY, SIGNIN_STATE_KEY, SIGNIN_TAB_KEY, SIGNIN_UNLOCK_KEY, type PortalSettings } from '../core/keys';
 import type { Answer } from '../core/messages';
+import { indexedDbRecords } from '../core/vault';
 import { local, portalSettings, session } from './storage';
 
 export const connectApi: ConnectApi = {
@@ -84,6 +85,8 @@ export async function disconnectPortal(): Promise<void> {
   await session.remove(GRID_KEY);
   await session.remove(PRESS_KEY);
   await session.remove(SIGNIN_TAB_KEY);
+  // the saved grid sign-in was for that portal (19.0.0)
+  await forgetGridSignin();
 }
 
 /** save the portal the student granted (welcome's "Agree and continue", "Use this portal", Settings' "Change"); a new origin forgets what belonged to the old one */
@@ -98,9 +101,24 @@ export async function savePortal(s: PortalSettings): Promise<{ changed: boolean 
     await local.remove(LAST_KNOWN_KEY);
     await session.remove(RUN_KEY);
     await session.remove(GRID_KEY);
+    await forgetGridSignin();
   }
   await local.set(PORTAL_KEY, s);
   return { changed: true };
+}
+
+/**
+ * 19.0.0: the saved grid sign-in and everything that goes with it (Forget, Disconnect, another portal): the
+ * sealed record in IndexedDB, the note, the no-PRF mark, the session's unlock, a one-shot and the attempt
+ * state. Each step is tried whatever the one before did. The passkey itself is the computer's (Windows Hello,
+ * the Mac's Passwords app or Chrome's password manager): nothing here removes it, and no text says it does.
+ */
+export async function forgetGridSignin(): Promise<void> {
+  await indexedDbRecords()
+    .delete()
+    .catch(() => undefined);
+  for (const k of [SIGNIN_NOTE_KEY, SIGNIN_NOPRF_KEY]) await local.remove(k).catch(() => undefined);
+  for (const k of [SIGNIN_UNLOCK_KEY, SIGNIN_ONCE_KEY, SIGNIN_STATE_KEY]) await session.remove(k).catch(() => undefined);
 }
 
 export async function originGranted(origin: string): Promise<boolean> {

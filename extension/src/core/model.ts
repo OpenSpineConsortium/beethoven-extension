@@ -1,15 +1,18 @@
 // The views the pages render and the actions they send (Beethoven 11.0.0; framework/contract-text/V11_CONTRACT.md,
 // "Views and actions". 12.0.0 to 15.0.0 added the direct way's moments, words, Settings and Details
 // sections and actions; 16.0.0 removed them all: the grid is reached one way, through the portal behind
-// the university's VPN). The pages are pure functions of a view: they hold no state of their own
-// beyond what is on screen (a tick being ticked, a fold being open, the text in the code box) and
-// never decide what the student sees next. The core computes every view from facts (core/facts.ts,
-// core/steps.ts) and the background pushes it to the open pages (messages.ts VIEW_PORT).
+// the university's VPN; 19.0.0 added Beethoven's own grid sign-in: the sheet in the grid moment, the
+// unlock on the home and the saved sign-in's row in Settings). The pages are pure functions of a view:
+// they hold no state of their own beyond what is on screen (a tick being ticked, a fold being open, the
+// text in the code box or the sign-in sheet's fields) and never decide what the student sees next. The
+// core computes every view from facts (core/facts.ts, core/steps.ts) and the background pushes it to the
+// open pages (messages.ts VIEW_PORT). No view and no action ever carries the grid password.
 //
 // Every sentence a student can read is in WORDS below, verbatim from the specification
 // (scratchpad/v11/SPEC.md) and the orchestrator's amendment AM2. The hygiene test reads WORDS and
 // the rendered pages: no student-facing string may contain job, node, partition, heartbeat, shell,
-// portal tab, probe, scheduler, hpcworker, OnDemand or "Failed to fetch" (Details is exempt).
+// portal tab, probe, scheduler, hpcworker, the portal software's name (in any case) or "Failed to
+// fetch" (Details is exempt).
 // Three families of sentences are NOT here because another module owns them and they are also part
 // of a legal record: the agreement's four summary lines and its tick (core/terms.ts SUMMARY,
 // AFFIRMATION), and the data statement's four lines and its tick (core/disclosure.ts
@@ -57,16 +60,22 @@ export const WORDS = {
     print: 'Print',
     agree: 'Agree and continue',
     opening: 'Opening the grid…',
-    allowNote: (host: string) => `Chrome will ask to let Beethoven reach ${host}. Choose Allow.`,
+    // 19.0.0: the place is placeOf below, the grid's own name where its profile gives one, so the
+    // portal's host stays off the screen wherever a profile names the grid
+    // Chrome's own prompt names the portal by its host (its exact words on the student's Chrome are not yet
+    // measured): the sentence says so without spelling the host, so the two never seem to disagree
+    allowNote: (place: string) => `Chrome will ask to let Beethoven reach ${place}, which Chrome names by its web address. Choose Allow.`,
     footerNothingLeaves: 'Nothing leaves this computer until you agree.',
     footerOtherPortal: 'Another university? Use another portal',
-    denied: (host: string) => `Beethoven needs ${host} to work.`,
+    denied: (place: string) => `Beethoven needs ${place} to work.`,
     tryAgain: 'Try again',
     panelNotOpened: 'Open Beethoven from the toolbar: the puzzle icon, then Beethoven.',
     usePortal: 'Use this portal',
     anthropicRefused: "That's a Claude address, not your grid.",
     saveFailed: "Couldn't save your agreement in this browser. Try again.",
     handoff: "You're set. Beethoven carries on in the panel →",
+    /** 19.0.0: the hand-off while the panel's sign-in sheet waits for the student: a step, not a check mark */
+    handoffSignin: 'Almost there. Sign in to the grid in the panel →',
   },
 
   /** the panel before the agreement is accepted (decision D19: TERMS_REFUSAL and one button) */
@@ -92,7 +101,8 @@ export const WORDS = {
     finishBody: "Your grid isn't connected yet. Open Settings and connect it under Your grid.",
     finishButton: 'Open Settings',
     revokedTitle: 'Allow Beethoven again',
-    revokedBody: (host: string) => `Chrome no longer lets Beethoven reach ${host}. Your worker on the grid is not affected.`,
+    /** 19.0.0: the place as in WORDS.welcome.allowNote (placeOf) */
+    revokedBody: (place: string) => `Chrome no longer lets Beethoven reach ${place}. Your worker on the grid is not affected.`,
     revokedButton: 'Allow again',
   },
 
@@ -117,7 +127,12 @@ export const WORDS = {
   /** moment 5 */
   grid: {
     title: 'Sign in to the grid',
-    /** 18.0.0: the last sentence: Chrome's own password manager keeps them (Settings, Your grid, links its settings) */
+    /**
+     * The box path's words, 18.0.0 to the letter (body to tryAgain below): the student chose "Use Chrome's
+     * sign-in box instead", or this browser cannot answer the grid's sign-in itself (the Firefox build).
+     * On that path the password goes into Chrome's own box and Beethoven never sees it, so every sentence
+     * here stays true. The last sentence of the body: Chrome's own password manager can keep them.
+     */
     body: 'Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time.',
     signedIn: (account: string) => `Signed in as ${account}.`,
     /**
@@ -136,6 +151,51 @@ export const WORDS = {
     notOod: "This doesn't look like your grid's website.",
     useAnother: 'Use another portal',
     tryAgain: 'Try again',
+
+    // 19.0.0 (greg's card tap of 2026-10-09 03:01Z, "Beethoven signs in"): Beethoven's own sheet. The
+    // student types the AccessID and password here; Beethoven gives them to the grid for its own background
+    // request only. `w` is the computer's own unlock, core/gridsignin.ts unlockWord: "Windows Hello",
+    // "Touch ID" or "your screen lock". The password is consented to by typing it and pressing Sign in;
+    // saving it takes the unticked box.
+    sheetBody: 'Type your AccessID and password. Beethoven signs in to the grid for you, in the background.',
+    accessId: 'AccessID',
+    password: 'Password',
+    /** the tick, never pre-ticked */
+    remember: (w: string) => `Remember it on this computer, unlocked with ${w}`,
+    /** the same tick when a saved sign-in already exists: ticked, the typed one replaces it */
+    replaceSaved: (w: string) => `Save this one instead, unlocked with ${w}`,
+    /** under the tick; the institution's own rule decides (LICENSE 4(a)) */
+    rememberNote: 'Off unless you tick it. Your university may ask you to type your password each time; if it does, leave this off.',
+    /** in place of the tick where this computer's passkey cannot lock a saved password */
+    noRemember: (w: string) => `This computer can't lock a saved password with ${w}, so Beethoven uses it this once and forgets it.`,
+    /** beside the lock icon */
+    privacy: 'Beethoven sends it only to the grid.',
+    signIn: 'Sign in',
+    signingIn: 'Signing in…',
+    notNow: 'Not now',
+    /** the way back to 18.0.0's tab and Chrome's own box (the box path above) */
+    useBox: "Use Chrome's sign-in box instead",
+    badAccessId: 'Type the AccessID you use for the grid, like ab1234.',
+    noPassword: 'Type your password.',
+    /** a saved sign-in after the browser restarted: it opens only with the computer's own unlock */
+    lockedTitle: 'Unlock your grid sign-in',
+    lockedBody: (w: string) => `Beethoven saved it on this computer. Unlock it with ${w} to sign in.`,
+    unlock: (w: string) => `Unlock with ${w}`,
+    typeInstead: 'Type it instead',
+    /** the grid turned the password down: Beethoven tries no password again until the student types one */
+    refused: "That password didn't work, and Beethoven stopped. Check it before you try again: after a few wrong tries your university may lock your AccessID. A password changed in the last half hour may not work yet.",
+    /** from the second refusal in a row */
+    refusedTwice: "Two tries haven't worked. Wait a while, or ask your university's help desk, before you try again.",
+    /**
+     * the saved sign-in is on hold: whether it worked could not be told (Chrome's box may have signed in
+     * meanwhile, or the browser closed first), so Beethoven sends it no more until one typed here works;
+     * never a wrong try, so no word of one
+     */
+    held: "Beethoven couldn't tell whether your saved password worked, so it won't use it again by itself. Type your password to sign in.",
+    /** the unlock was cancelled or failed (page-local) */
+    notUnlocked: 'Not unlocked. Try again, or type it instead.',
+    /** Remember was ticked and the passkey step was cancelled or failed: the password is used this once (page-local) */
+    notSaved: 'Not saved, but signing you in this once.',
   },
 
   /** moment 6 */
@@ -303,6 +363,10 @@ export const WORDS = {
     asOf: (clock: string) => `As of ${clock}. Sign in to the grid to see it live.`,
     /** 13.0.0: the last known state while signed in to the grid (the run's heartbeat stale): no sign-in to ask for */
     asOfSignedIn: (clock: string) => `As of ${clock}. Your worker isn't answering now.`,
+    /** 19.0.0: signed out with a saved sign-in that only needs the computer's unlock (`w`, as in WORDS.grid) */
+    asOfLocked: (clock: string, w: string) => `As of ${clock}. Unlock with ${w} to see it live.`,
+    /** 19.0.0: the Grid row's link in place of "Sign in" under the same condition (the page unlocks, no press) */
+    unlock: 'Unlock',
     unreachableHero: "Can't reach the grid",
     unreachableSub: (app: string) => `Is ${app} on? Your worker keeps running.`,
     openSession: 'Open my session',
@@ -401,6 +465,8 @@ export const WORDS = {
     grid: 'Your grid',
     change: 'Change',
     disconnect: 'Disconnect',
+    /** 19.0.0: beside Disconnect while it waits for its confirming press; Disconnect also forgets a saved sign-in */
+    disconnectNote: 'Chrome stays signed in to the grid until you close it.',
     agreement: 'The agreement',
     acceptedOn: (date: string) => `Accepted on ${date}`,
     /** LICENSE 19(a): a notice of a dispute names this id, so it is shown with the acceptance record */
@@ -420,13 +486,19 @@ export const WORDS = {
     startOverButton: 'Start over',
     labLead: 'For your lab lead',
     /**
-     * 18.0.0 (greg, 2026-10-09: the grid sign-in "savable under touch id or windows hello"): Chrome's own password
-     * manager saves the box's password and, with its "Use Windows Hello when filling passwords" (Windows) or "Use
-     * your screen lock when filling passwords" (Mac) setting, asks for it before filling the box (Chromium's
-     * HttpAuthManagerImpl::Autofill, read 2026-10-09). Beethoven never reads, stores or fills the password.
+     * 19.0.0: the saved sign-in's row under Your grid. `user` is the AccessID typed into the sheet, `w` the
+     * computer's own unlock (as in WORDS.grid). Forget removes the saved password, Beethoven's notes about
+     * it and the unlock in memory; the passkey itself is the operating system's or Chrome's to delete, so
+     * the sentence after Forget says where it may still be listed.
      */
-    savedSignin: 'Chrome can save your grid password. In its password settings, it can ask for Windows Hello or Touch ID before filling it in.',
-    savedSigninOpen: 'Password settings',
+    signinTitle: 'Grid sign-in',
+    signinSaved: (user: string, w: string) => `Saved on this computer for ${user}. It opens with ${w}.`,
+    // true whether or not the grid is signed in now (a sign-in in Chrome's box leaves the saved one as it was)
+    signinRefused: "Saved, but it didn't work last time. Forget it, or type the new one when Beethoven asks.",
+    signinNone: 'Not saved. Beethoven asks for it when the grid needs it.',
+    forget: 'Forget',
+    forgetConfirm: 'Forget the saved sign-in?',
+    forgotten: (user: string) => `Forgotten. Chrome stays signed in to the grid until you close it. Your passkey list may still show "${user} (grid)"; you can delete it there.`,
     /**
      * 16.0.0: a key a build from 12.0.0 to 15.0.0 added to the student's grid account for the direct way, which
      * 16.0.0 no longer has or can use (the key itself was dropped with its database, unread). The student
@@ -462,6 +534,14 @@ export const LOG_WORDS = {
   signinAbandoned: 'Stopped: waiting for your Claude sign-in timed out',
   error: "Couldn't start",
   keyStepDone: "Done. You won't need this again.",
+  // 19.0.0: Beethoven's own grid sign-in; the sign-in itself is logged as any other (gridSignedIn)
+  signinSaved: 'Saved your grid sign-in on this computer.',
+  signinRefused: "The grid turned the password down. Beethoven stopped and won't try it again.",
+  signinForgotten: 'Forgot your saved grid sign-in.',
+  /** a typed password worked where the saved one had been turned down: the saved one goes */
+  signinReplaced: 'Forgot the saved grid password that stopped working.',
+  /** a typed password worked while the saved one was on hold (a typed one had been turned down), and the saved one could not be shown to be the same: it goes */
+  signinSetAside: 'Forgot the saved grid password, because the one you typed worked instead. Tick Remember next time to save it.',
 } as const;
 
 // ---- shared pieces ---------------------------------------------------------------------------------
@@ -526,6 +606,14 @@ export interface Overlays {
   workingInTab?: boolean;
   /** a toast the core asks for once, on any panel view ("Signed in as alex@wayne.edu · Max" when no Claude moment was shown) */
   toast?: string;
+  /**
+   * 19.0.0: a saved grid sign-in waits only for the computer's unlock (`unlockWith`, "Windows Hello"): set
+   * exactly while it is saved, locked and not turned down, and the grid is not signed in. A press that needs
+   * the grid (Connect, Try again, Sign in to Claude) is sent at once and the page starts the unlock in the
+   * same click without waiting on it; the press waits on the grid until the unlock carries it. Open my
+   * session never needs the grid, so it never starts the unlock.
+   */
+  unlock?: { unlockWith: string };
 }
 
 /** the journey's moments, in order. "login-setup" (AM2) appears only when the shell asked for a password while a press waits. */
@@ -583,17 +671,50 @@ export interface GlobalProtectMoment {
   note?: string;
 }
 
-/** moment 5: Chrome's own sign-in box in the tab; advances by itself */
+/**
+ * moment 5: 19.0.0 Beethoven's own sheet in the panel (`sheet`), where the browser can answer the grid's
+ * sign-in; else, and after "Use Chrome's sign-in box instead", 18.0.0's: Chrome's own sign-in box in the
+ * tab. Advances by itself either way.
+ */
 export interface GridMoment {
   moment: 'grid';
   /** "Sign in to the grid" */
   title: string;
-  /** "Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time." */
+  /** the sheet: "Type your AccessID and password. Beethoven signs in to the grid for you, in the background."; the box path: "Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time." */
   body: string;
   /** "Signed in as st1234." with a drawn check, when it happened */
   signedIn?: string;
-  /** cancelled / tab closed [Sign in again]; the start page; unreachable [Try again]; not OnDemand [Use another portal] */
+  /** cancelled / tab closed [Sign in again]; the start page; unreachable [Try again]; not the grid's website [Use another portal]. With the sheet, only unreachable and not the grid's website */
   problem?: ProblemView;
+  /** 19.0.0: Beethoven's own sign-in; absent on the box path (18.0.0) and where the browser cannot answer the grid's sign-in */
+  sheet?: GridSheet;
+}
+
+/**
+ * 19.0.0: the sign-in sheet. Its fields' values are the page's alone: the AccessID may come from
+ * `username`, the password never comes from or goes into a view.
+ */
+export interface GridSheet {
+  /**
+   * working if a sign-in is under way; else type if the last one was turned down or nothing is saved;
+   * else locked if a saved one waits for the unlock; else type ("Type it instead" turns locked into type
+   * on the page alone)
+   */
+  phase: 'type' | 'locked' | 'working';
+  /** the portal's origin the sign-in is for (the page seals a saved one to it); never drawn */
+  origin: string;
+  /** the saved sign-in's AccessID, else the one the grid last showed */
+  username?: string;
+  /** "Windows Hello", "Touch ID" or "your screen lock" */
+  unlockWith: string;
+  /** none: nothing saved for this origin; locked: saved, waiting for the unlock; ready: saved and unlocked */
+  saved: 'none' | 'locked' | 'ready';
+  /** refused, refusedTwice or held, set by the core; page-local notes (not unlocked, not saved, field errors) are the panel's */
+  note?: string;
+  /** "Use Chrome's sign-in box instead" (sign-in-grid-box), soft */
+  box: ButtonView;
+  /** "Not now": grid-signin-later when the student asked for the sheet, cancel when a press waits on it */
+  later?: ButtonView;
 }
 
 /** moment 6: shown the moment the student is signed in, while approval and setup finish underneath */
@@ -761,7 +882,7 @@ export interface HeroView {
    * Connecting to Claude… · 0:20"). Set whenever `timer` is.
    */
   timerPlace?: 'before' | 'after';
-  /** "As of 9:02 AM. Sign in to the grid to see it live." when the live check is not possible */
+  /** "As of 9:02 AM. Sign in to the grid to see it live." when the live check is not possible ("… Unlock with Windows Hello to see it live." while a saved sign-in waits for the unlock) */
   asOf?: string;
   /** play the 600 ms ring burst once (going online) */
   burst?: boolean;
@@ -782,7 +903,7 @@ export type HomePrimary =
 
 /** the three status rows; a coloured dot always has a word beside it */
 export interface StatusRows {
-  /** "Signed in as st1234" / "Signed out · Sign in" (link) / "Can't reach · Is GlobalProtect on?" / "Checking…" */
+  /** "Signed in as st1234" / "Signed out · Sign in" (link; "Unlock", page-carried, while Overlays.unlock is set) / "Can't reach · Is GlobalProtect on?" / "Checking…" */
   grid: {
     state: 'signed-in' | 'signed-out' | 'unreachable' | 'checking';
     text: string;
@@ -898,17 +1019,21 @@ export interface WelcomeView {
   terms: { show: string; hide: string; licenseUrl: string; privacyUrl: string; links: { openInTab: string; save: string; print: string } };
   /** "Agree and continue": disabled until every tick is ticked; inside the one click the page calls sidePanel.open and permissions.request before any await */
   agree: { label: string; busyLabel: string };
-  /** "Chrome will ask to let Beethoven reach ondemand.grid.wayne.edu. Choose Allow." */
+  /** "Chrome will ask to let Beethoven reach the Wayne State University HPC grid, which Chrome names by its web address. Choose Allow." (placeOf: the host only where no profile names the grid) */
   allowNote: string;
   footer: { nothingLeaves: string; otherPortal: string };
   /** the portal the press asks Chrome for: the profile's ood_base_url, or the one typed under "Use another portal" */
   portal: { origin: string; hostname: string; fieldLabel: string; usePortal: string };
   /** the page's state after a press */
   state: 'idle' | 'opening' | 'denied' | 'no-panel' | 'save-failed' | 'handoff';
-  /** "Beethoven needs ondemand.grid.wayne.edu to work." [Try again]; "Open Beethoven from the toolbar: …"; "Couldn't save your agreement in this browser. Try again."; "That's a Claude address, not your grid." */
+  /** "Beethoven needs the Wayne State University HPC grid to work." [Try again]; "Open Beethoven from the toolbar: …"; "Couldn't save your agreement in this browser. Try again."; "That's a Claude address, not your grid." */
   problem?: string;
-  /** "You're set. Beethoven carries on in the panel →", with a live mirror of the panel's hero */
-  handoff?: { text: string; hero?: HeroView };
+  /**
+   * "You're set. Beethoven carries on in the panel →" (done: the drawn check and a live mirror of the panel's
+   * hero), or, while the panel's sign-in sheet waits for the student, "Almost there. Sign in to the grid in
+   * the panel →" (not done: neither)
+   */
+  handoff?: { text: string; done: boolean; hero?: HeroView };
 }
 
 // ---- Details and Settings --------------------------------------------------------------------------
@@ -972,6 +1097,13 @@ export interface SettingsView {
   labLead: { title: string; shellHost: string; siteProfile: string; hashes: string[] };
   /** 16.0.0: only while keys.ts OldKeyNote exists: the sentence about the earlier version's key, with "Forget" (forget-old-key) */
   oldKey?: { title: string; text: string; forget: ButtonView };
+  /**
+   * 19.0.0: the saved grid sign-in's row under Your grid, where the browser can answer the grid's sign-in.
+   * `text` is signinSaved, signinRefused or signinNone; `forget` (forget-grid-signin) only while one is
+   * saved, behind the confirm row (`confirm`), then `forgotten`, announced. `cred` is the passkey's public
+   * credential id (nothing secret), which the page hands to the browser's own "unknown credential" signal.
+   */
+  signin?: { title: string; text: string; username?: string; forget?: ButtonView; confirm: string; forgotten: string; cred?: string };
 }
 
 // ---- actions ---------------------------------------------------------------------------------------
@@ -991,10 +1123,29 @@ export type Action =
   /** 17.0.0: "Your grid" on the welcome page: the deployment whose words, links and portal the page shows next; nothing is stored until the press */
   | { kind: 'pick-grid'; site: string }
   // the grid
-  /** "Sign in again", "Sign in" (Grid row): opens or reloads the sign-in tab, in front, in the panel's window */
+  /**
+   * "Sign in again", "Sign in" (Grid row): 19.0.0, where the browser can answer the grid's sign-in, shows
+   * the grid moment with the sheet and opens no tab; else (18.0.0) opens or reloads the sign-in tab, in
+   * front, in the panel's window
+   */
   | { kind: 'sign-in-grid'; windowId?: number }
   /** "Try again" on can't reach: one reachability check and one dashboard GET now */
   | { kind: 'retry-grid' }
+  /**
+   * 19.0.0: the sheet's "Sign in" or "Unlock with …", sent after the page has put what the background needs
+   * where only Beethoven's own pages and background can read it: typed, the one-time password in session
+   * storage; saved, a newly sealed sign-in; unlocked, the unlock of the one saved before. It carries no
+   * secret itself: no action, and no action's result, ever holds the password.
+   */
+  | { kind: 'grid-signin'; how: 'typed' | 'saved' | 'unlocked' }
+  /** 19.0.0: "Not now" on the sheet the student asked for: back to the home */
+  | { kind: 'grid-signin-later' }
+  /** 19.0.0: "Use Chrome's sign-in box instead": 18.0.0's sign-in tab and Chrome's own box, in the panel's window */
+  | { kind: 'sign-in-grid-box'; windowId?: number }
+  /** 19.0.0: Settings, "Forget" after its confirm row: the saved sign-in, its notes, the unlock and the one-time password go */
+  | { kind: 'forget-grid-signin' }
+  /** 19.0.0: the Grid row's "Unlock": the page carries it itself (the unlock needs the click); one that reaches the background counts as sign-in-grid */
+  | { kind: 'unlock-grid' }
   // approval and setup (moment 6)
   /** "Ask for access": opens the request page with the AccessID filled in */
   | { kind: 'ask-access' }
@@ -1076,6 +1227,13 @@ export interface ActionResults {
   'pick-grid': { site: string };
   'sign-in-grid': { opened: boolean };
   'retry-grid': { reach: 'answers' | 'no-route'; session: 'signed-in' | 'signed-out' | 'unreachable' };
+  /** this call's own attempt: signed in, or turned down by the grid (neither: not tried, or no answer yet) */
+  'grid-signin': { signedIn: boolean; refused: boolean };
+  'grid-signin-later': { recorded: boolean };
+  'sign-in-grid-box': { opened: boolean };
+  'forget-grid-signin': { forgotten: boolean };
+  /** as sign-in-grid's */
+  'unlock-grid': { opened: boolean };
   'ask-access': { opened: boolean };
   'retry-access': { approved?: boolean };
   update: { opened: boolean };
@@ -1119,9 +1277,10 @@ export type ResultOf<K extends ActionKind> = ActionResults[K];
  * clipboard) or is purely visual. Listed so every control has a name. copy-link and show-phone use
  * HomeView.link; copy-prompt uses WORDS.home.prompts; copy-vpn uses GlobalProtectMoment.chip;
  * copy-log uses the lines Show log already holds; the login-setup line is copied from
- * LoginSetupMoment.line in the same click that sends "open-terminal-for-login-setup".
+ * LoginSetupMoment.line in the same click that sends "open-terminal-for-login-setup". 19.0.0: the
+ * sheet's Show/Hide password and "Type it instead", and Forget's confirm row in Settings, are visual.
  */
-export type PageAct = 'copy-link' | 'show-phone' | 'hide-phone' | 'copy-prompt' | 'copy-vpn' | 'copy-log' | 'copy-login-setup-line' | 'show-terms' | 'hide-terms' | 'save-terms' | 'print-terms' | 'open-terms-in-tab' | 'tick' | 'show-more' | 'confirm-stop' | 'keep-it' | 'open-menu';
+export type PageAct = 'copy-link' | 'show-phone' | 'hide-phone' | 'copy-prompt' | 'copy-vpn' | 'copy-log' | 'copy-login-setup-line' | 'show-terms' | 'hide-terms' | 'save-terms' | 'print-terms' | 'open-terms-in-tab' | 'tick' | 'show-more' | 'confirm-stop' | 'keep-it' | 'open-menu' | 'show-password' | 'hide-password' | 'type-instead' | 'confirm-forget';
 
 /** how the page script typed into the terminal (AM2): xterm.js's helper textarea, or not at all ("unsupported": an older terminal; the student pastes) */
 export type TerminalInput = 'xterm' | 'unsupported';
@@ -1130,6 +1289,16 @@ export type TerminalInput = 'xterm' | 'unsupported';
 export type ConnectFailure = StepFailCode | 'closed' | 'password';
 
 // ---- formatting shared by the core and the pages ---------------------------------------------------
+
+/**
+ * 19.0.0: where a sentence names the place Beethoven reaches: "the Wayne State University HPC grid" where
+ * the portal's deployment names its grid (the profile's display_name), else the portal's host, the only
+ * name there is for a portal no carried profile declares (greg, 2026-10-09: the student never needs to
+ * know the portal's name)
+ */
+export function placeOf(name: string | undefined, host: string): string {
+  return name ? `the ${name}` : host;
+}
 
 /** "2:41" (m:ss) under an hour, "1:02:41" past it: the queue timer and "Got a computer … · 0:20" */
 export function formatTimer(ms: number): string {

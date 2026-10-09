@@ -189,7 +189,7 @@ interface Pkg { manifest: Record<string, unknown>; files: Record<string, Buffer 
 /** a release package as npm run zip leaves it; `mutate` turns it wrong */
 function pkg(label: string, mutate?: (p: Pkg) => void): string {
   const p: Pkg = {
-    manifest: { manifest_version: 3, name: 'Beethoven', version: VERSION, permissions: ['storage', 'alarms', 'scripting', 'sidePanel'], optional_host_permissions: ['https://*/*'] },
+    manifest: { manifest_version: 3, name: 'Beethoven', version: VERSION, permissions: ['storage', 'alarms', 'scripting', 'sidePanel', 'webRequest', 'webRequestAuthProvider'], optional_host_permissions: ['https://*/*'] },
     files: { 'background.js': 'console.log(1);\n', 'chunks/panel.js': crypto.randomBytes(3000) },
   };
   mutate?.(p);

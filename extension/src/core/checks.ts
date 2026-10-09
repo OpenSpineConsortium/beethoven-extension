@@ -161,9 +161,10 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       layer: 'portal',
       dependsOn: ['origin-granted'],
       assumption: 'GET /pun/sys/dashboard/ from the extension\'s background answers 200 with the dashboard (a 401, or a redirect to a sign-in page, means signed out; no answer within 5 s means the grid cannot be reached)',
-      manualFix: `Connect the VPN and press "Sign in" on the Grid row; sign in in your browser's own box. ${PRODUCT_NAME} never signs in for you and never sees what you type there.`,
+      // 19.0.0: Beethoven signs in with the password the student gave it; Chrome's own box stays the other way
+      manualFix: `Connect the VPN. ${PRODUCT_NAME} signs in to the grid with the password you gave it; if it has none, or the grid turned it down, press "Sign in" on the Grid row and type it there (or choose Chrome's sign-in box). A password the grid turned down is not tried again until you type it again.`,
       fixAction: 'open-portal',
-      futureRisk: 'the browser keeps an HTTP sign-in until it closes; a 401 after a browser restart is the sign to sign in again',
+      futureRisk: `the browser keeps an HTTP sign-in until it closes, whichever way it was made (${PRODUCT_NAME}'s answer with the saved or typed password, or Chrome's own box); a 401 after a browser restart is the sign to sign in again, which ${PRODUCT_NAME} does by itself only with a saved password that is unlocked and was not turned down`,
       async check(ctx) {
         const s = await portalOf(ctx).session();
         ctx.cache.session = s;
@@ -426,8 +427,8 @@ export function buildNodes(): DiagNode<DiagCtx>[] {
       title: 'Portal session age',
       layer: 'portal',
       dependsOn: ['signed-in'],
-      assumption: 'the browser keeps the grid sign-in until it closes (an HTTP sign-in), or the portal session lasts about eight hours (a cookie); after that (or on the first 302/401) the student signs in again in the browser\'s own box and nothing is cached across the re-login',
-      manualFix: `Press "Sign in" on the Grid row and sign in in your browser's own box. ${PRODUCT_NAME} keeps nothing from the old session.`,
+      assumption: `the browser keeps the grid sign-in until it closes (an HTTP sign-in), or the portal session lasts about eight hours (a cookie); after that (or on the first 302/401) ${PRODUCT_NAME} signs in again with the saved or typed password, or the student signs in in Chrome's box, and nothing is cached across the re-login`,
+      manualFix: `${PRODUCT_NAME} signs in again with the saved or typed password; if it cannot, press "Sign in" on the Grid row and type it, or sign in in Chrome's box. ${PRODUCT_NAME} keeps nothing from the old session.`,
       fixAction: 'open-portal',
       async check(ctx) {
         const seen = await ctx.env.session.get<{ checked_at: string }>(SESSION_SEEN_KEY);

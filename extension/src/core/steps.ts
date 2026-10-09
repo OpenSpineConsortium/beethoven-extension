@@ -10,7 +10,7 @@
 // "probe", "heartbeat", a countdown for a wait Beethoven imposes on itself, "Failed to fetch", or raw
 // shell output. The words come from the state, the reason class and the failure code (D14).
 import type { ChannelNote, KnownState, LastKnown, OnceNotes, PendingPress, Prefs, TourSeen } from './keys';
-import { formatAgo, formatClock, LOG_WORDS, WORDS, type Action, type WelcomeMoment, type ButtonView, type ChecklistRow, type ConnectFailure, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
+import { formatAgo, formatClock, LOG_WORDS, placeOf, WORDS, type Action, type WelcomeMoment, type ButtonView, type ChecklistRow, type ConnectFailure, type GridSheet, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
 import { isEnvironmentUrl, planWord, type ReasonClass, type StopReason } from './contract';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_BUTTON, STATEMENT_TICK } from './disclosure';
 import { SUMMARY, TERMS_REFUSAL, ticks } from './terms';
@@ -28,6 +28,8 @@ export interface SiteWords {
   vpnRequired?: boolean;
   /** 17.0.0: the grid's name, the profile's session_title ("Wayne State grid"); absent for a portal with no site profile */
   grid?: string;
+  /** 19.0.0: the profile's display_name ("Wayne State University HPC grid"), the place the welcome sentences name in place of the host (model.ts placeOf) */
+  name?: string;
   /** the session title ("Wayne State grid", with the worker's name after it for a worker not named "worker") */
   title: string;
   /** a job's hours: "Your worker restarts itself every 8 hours" */
@@ -50,12 +52,43 @@ export interface GridFacts {
 }
 
 export interface SigninFacts {
-  /** a grid sign-in tab Beethoven opened or navigated is being watched */
+  /** a grid sign-in tab Beethoven opened or navigated is being watched (18.0.0's box, "Use Chrome's sign-in box instead" since 19.0.0) */
   waiting: boolean;
   /** what happened to it: a second load with no sign-in (Cancel or a wrong password; "cancelled"), the tab closed, or the portal's start page instead of the box */
   problem?: 'cancelled' | 'tab-closed' | 'start-page';
   /** when the dashboard first answered signed in, for the drawn check (ms) */
   signedInAt?: number;
+  /** 19.0.0: that sign-in was made in Chrome's box (the 18.0.0 tab), so the drawn check keeps the box's words */
+  box?: boolean;
+  /** 19.0.0: when the student asked for the sheet (the Grid row's Sign in); the background drops it after ten minutes */
+  asked?: number;
+  /** 19.0.0: Beethoven's own sign-in; absent where the browser cannot answer the grid's sign-in (the Firefox build) */
+  own?: OwnSigninFacts;
+}
+
+/** 19.0.0: Beethoven's own grid sign-in, as the background holds it (never a password) */
+export interface OwnSigninFacts {
+  /** none: nothing saved for this portal; locked: saved, waiting for the computer's unlock; ready: saved and unlocked */
+  saved: 'none' | 'locked' | 'ready';
+  /** the grid turned the last password down, or the saved one is on hold: nothing is tried by itself until the student types it again */
+  refused: boolean;
+  /**
+   * refused only because the saved sign-in is on hold, its last mark: whether it works could not be told (or
+   * a typed one was turned down in an earlier session), so the words never say that it didn't
+   */
+  held: boolean;
+  /** refusals in a row */
+  refusals: number;
+  /** a grid-signin is under way */
+  working: boolean;
+  /** the saved sign-in's AccessID, else the one the grid last showed */
+  username?: string;
+  /** "Windows Hello", "Touch ID" or "your screen lock" */
+  unlockWith: string;
+  /** the portal's origin */
+  origin: string;
+  /** what "Not now" does: the student asked for the sheet (grid-signin-later), or a press waits on it (cancel); none in the first run */
+  later: 'asked' | 'press' | undefined;
 }
 
 export interface SetupFacts {
@@ -270,6 +303,39 @@ function needsGridSignin(f: Facts): boolean {
   return f.grid.session !== 'signed-in';
 }
 
+/**
+ * 19.0.0: the saved grid sign-in waits only for the computer's unlock: saved, locked, not turned down, and the
+ * grid not signed in. Then Overlays.unlock is set, the Grid row's link is Unlock and the hero's as-of line says so.
+ */
+function unlockOffered(f: Facts): string | undefined {
+  const own = f.signin.own;
+  return own && own.saved === 'locked' && !own.refused && f.grid.session !== 'signed-in' ? own.unlockWith : undefined;
+}
+
+/**
+ * 19.0.0: the sheet, by the phase rule: working while a grid-signin runs; else type when the last password was
+ * turned down, the saved one is on hold or nothing is saved; else locked while the saved one waits for the
+ * unlock; else type. The core's note is the refusal's (refusedTwice from the second in a row, which a hold
+ * keeps: those tries did not work) or the hold's, which never says the password did not work; the page's own
+ * notes are the panel's.
+ */
+function gridSheet(own: OwnSigninFacts): GridSheet {
+  const G = WORDS.grid;
+  const phase: GridSheet['phase'] = own.working ? 'working' : own.refused || own.saved === 'none' ? 'type' : own.saved === 'locked' ? 'locked' : 'type';
+  const note = own.refused ? (own.refusals >= 2 ? G.refusedTwice : own.held ? G.held : G.refused) : undefined;
+  const later = own.later === 'asked' ? button(G.notNow, 'text', { kind: 'grid-signin-later' }) : own.later === 'press' ? button(G.notNow, 'text', { kind: 'cancel' }) : undefined;
+  return {
+    phase,
+    origin: own.origin,
+    ...(own.username ? { username: own.username } : {}),
+    unlockWith: own.unlockWith,
+    saved: own.saved,
+    ...(note ? { note } : {}),
+    box: button(G.useBox, 'text', { kind: 'sign-in-grid-box' }),
+    ...(later ? { later } : {}),
+  };
+}
+
 /** the access problem of moment 6, in the student's words; undefined while approved or still being checked */
 export function accessProblem(f: Facts): ProblemView | undefined {
   const a = f.access;
@@ -342,7 +408,8 @@ function studentMoment(f: Facts): JourneyView['moment'] | undefined {
   // GlobalProtect moment again, as the first run did, and carries on by itself once the grid answers (15.0.0 dropped
   // such a press at once with "Can't reach the grid", which left the student to press again after turning the VPN on)
   if (f.press && needsGridSignin(f) && (f.grid.session === 'unreachable' || f.grid.reach === 'no-route')) return 'globalprotect';
-  if (f.signin.waiting || (f.press && needsGridSignin(f))) return 'grid';
+  // 19.0.0: also when the student asked for the sheet (the Grid row's Sign in)
+  if (f.signin.waiting || (f.press && needsGridSignin(f)) || (f.signin.asked !== undefined && needsGridSignin(f))) return 'grid';
   if (claudeNeedsStudent(f)) return 'claude';
   // the data statement before a worker starts (LICENSE 5(e)): a new worker name, a new text, or an
   // account carried over from 10.0.0 shows the card again before its Connect
@@ -434,7 +501,7 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
         case 'denied':
           return { moment: 'welcome', state: st, title: W.almostTitle, body: W.deniedBody };
         case 'revoked':
-          return { moment: 'welcome', state: st, title: W.revokedTitle, body: W.revokedBody(f.portal!.hostname), button: button(W.revokedButton, 'ink', { kind: 'use-portal', origin: f.portal!.origin, granted: false }), origin: f.portal!.origin };
+          return { moment: 'welcome', state: st, title: W.revokedTitle, body: W.revokedBody(placeOf(f.site.name, f.portal!.hostname)), button: button(W.revokedButton, 'ink', { kind: 'use-portal', origin: f.portal!.origin, granted: false }), origin: f.portal!.origin };
         case 'finish':
         default:
           // the refusal sentence only when the terms really are unaccepted: with them accepted and no
@@ -461,17 +528,28 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
     }
 
     case 'grid': {
+      // 19.0.0: Beethoven's own sheet where the browser can answer the grid's sign-in, unless the student chose
+      // Chrome's box and its tab is being watched (the 18.0.0 way, whose problems and words stay for it)
+      const own = f.signin.own;
+      const sheetOn = !!own && !f.signin.waiting;
+      // on the box path "Sign in again" opens the box again; without the sheet at all it is 18.0.0's sign-in-grid
+      const again: Action = own ? { kind: 'sign-in-grid-box' } : { kind: 'sign-in-grid' };
       let problem: ProblemView | undefined;
       if (f.grid.session === 'unreachable') problem = { body: WORDS.grid.unreachable(vpnApp(f)), button: button(WORDS.grid.tryAgain, 'ink', { kind: 'retry-grid' }) };
       else if (f.grid.session === 'not-ood') problem = { body: WORDS.grid.notOod, button: button(WORDS.grid.useAnother, 'ink', { kind: 'open-settings' }) };
+      else if (sheetOn) problem = undefined;
       // a second load of the sign-in tab with no sign-in: Cancel in Chrome's box, or a wrong password
       // (the two look the same to an extension, so neither is claimed)
-      else if (f.signin.problem === 'cancelled') problem = { body: WORDS.grid.notYet, button: button(WORDS.grid.signInAgain, 'ink', { kind: 'sign-in-grid' }) };
-      else if (f.signin.problem === 'tab-closed') problem = { body: WORDS.grid.tabClosed, button: button(WORDS.grid.signInAgain, 'ink', { kind: 'sign-in-grid' }) };
+      else if (f.signin.problem === 'cancelled') problem = { body: WORDS.grid.notYet, button: button(WORDS.grid.signInAgain, 'ink', again) };
+      else if (f.signin.problem === 'tab-closed') problem = { body: WORDS.grid.tabClosed, button: button(WORDS.grid.signInAgain, 'ink', again) };
       else if (f.signin.problem === 'start-page') problem = { body: WORDS.grid.startPage };
-      else if (!f.signin.waiting && f.grid.session === 'signed-out' && f.signin.signedInAt === undefined) problem = { body: WORDS.home.gridSignedOut, button: button(WORDS.grid.signInAgain, 'ink', { kind: 'sign-in-grid' }) };
+      else if (!f.signin.waiting && f.grid.session === 'signed-out' && f.signin.signedInAt === undefined) problem = { body: WORDS.home.gridSignedOut, button: button(WORDS.grid.signInAgain, 'ink', again) };
       const signedIn = f.grid.session === 'signed-in' && f.grid.account ? WORDS.grid.signedIn(f.grid.account) : undefined;
-      return { moment: 'grid', title: WORDS.grid.title, body: WORDS.grid.body, ...(signedIn ? { signedIn } : {}), ...(problem && !signedIn ? { problem } : {}) };
+      const sheet = sheetOn && !signedIn ? gridSheet(own!) : undefined;
+      // the box's words ("Beethoven never sees them") only where the box was the way: after a sheet sign-in
+      // the drawn check keeps the sheet's
+      const sheetWords = !!sheet || (sheetOn && !!signedIn && !f.signin.box);
+      return { moment: 'grid', title: WORDS.grid.title, body: sheetWords ? WORDS.grid.sheetBody : WORDS.grid.body, ...(signedIn ? { signedIn } : {}), ...(problem && !signedIn ? { problem } : {}), ...(sheet ? { sheet } : {}) };
     }
 
     case 'statement': {
@@ -782,7 +860,9 @@ export function heroOf(f: Facts): HeroView & { live: boolean } {
       const base = staticHero(f, s === 'online-new' ? 'online' : s, title);
       // "As of …": signed out, it asks for the grid's sign-in; 13.0.0: signed in (the run stale, or not read yet),
       // that sign-in is done, and the second form says only that the worker is not answering now
-      const asOf = asOfClock && f.grid.session !== 'unknown' ? (f.grid.session === 'signed-in' ? WORDS.home.asOfSignedIn(asOfClock) : WORDS.home.asOf(asOfClock)) : undefined;
+      // 19.0.0: with the Grid row's Unlock, the as-of line names the unlock rather than the sign-in
+      const unlock = unlockOffered(f);
+      const asOf = asOfClock && f.grid.session !== 'unknown' ? (f.grid.session === 'signed-in' ? WORDS.home.asOfSignedIn(asOfClock) : unlock ? WORDS.home.asOfLocked(asOfClock, unlock) : WORDS.home.asOf(asOfClock)) : undefined;
       return { ...base, ...(asOf ? { asOf } : {}), live: false };
     }
     // 13.0.0: R12 with no last known state. A run found already in the folder and never seen alive here
@@ -926,7 +1006,7 @@ function rowsOf(f: Facts, hero: HeroView & { live: boolean }): StatusRows {
       : g.session === 'unreachable' || g.reach === 'no-route'
         ? { state: 'unreachable', text: H.gridUnreachable }
         : g.session === 'signed-out' || g.session === 'not-ood'
-          ? { state: 'signed-out', text: H.gridSignedOut, link: button(H.gridSignIn, 'link', { kind: 'sign-in-grid' }) }
+          ? { state: 'signed-out', text: H.gridSignedOut, link: unlockOffered(f) ? button(H.unlock, 'link', { kind: 'unlock-grid' }) : button(H.gridSignIn, 'link', { kind: 'sign-in-grid' }) }
           : { state: 'checking', text: H.checking };
   const c = f.run.claude;
   const claude: StatusRows['claude'] =
@@ -1114,11 +1194,13 @@ export function panelView(f: Facts): PanelView {
   // while Chrome's box is up
   if (!f.terms) return { kind: 'journey', journey: journey(f, 'welcome'), overlays: { toolbar: toolbarView(f) } };
   const toolbar = toolbarView(f);
+  const unlockWith = unlockOffered(f);
   const overlays = (moment?: JourneyView['moment']) => ({
     toolbar,
     ...(f.workingInTab ? { workingInTab: true } : {}),
     ...(f.toast ? { toast: f.toast } : {}),
     ...(f.tourFromMenu ? { tour: tourView('menu') } : moment && autoTour(f, moment) ? { tour: tourView('auto') } : {}),
+    ...(unlockWith ? { unlock: { unlockWith } } : {}),
   });
   // the portal's grant taken away after the first run: one press puts it back
   if (f.portal && !f.granted && firstRunDone(f)) return { kind: 'journey', journey: journey(f, 'welcome'), overlays: overlays('welcome') };
@@ -1165,6 +1247,8 @@ export interface WelcomeInput {
   problem?: string;
   /** the panel's hero, mirrored in the hand-off state */
   hero?: HeroView;
+  /** 19.0.0: the panel's grid moment shows the sign-in sheet: the hand-off asks for that step */
+  signinNext?: boolean;
   licenseUrl: string;
   privacyUrl: string;
 }
@@ -1194,12 +1278,13 @@ export function welcomeView(i: WelcomeInput): WelcomeView {
     ticks: ticks().map((t) => ({ id: t.id, bold: t.bold, ...(t.soft ? { soft: t.soft } : {}) })),
     terms: { show: W.showTerms, hide: W.hideTerms, licenseUrl: i.licenseUrl, privacyUrl: i.privacyUrl, links: { openInTab: W.openInTab, save: W.saveCopy, print: W.print } },
     agree: { label: W.agree, busyLabel: W.opening },
-    allowNote: W.allowNote(i.portal.hostname),
+    // 19.0.0: the place the portal's profile names, never its host where there is one (model.ts placeOf)
+    allowNote: W.allowNote(placeOf(s.name, i.portal.hostname)),
     footer: { nothingLeaves: W.footerNothingLeaves, otherPortal: W.footerOtherPortal },
     portal: { origin: i.portal.origin, hostname: i.portal.hostname, fieldLabel: "Your grid's address", usePortal: W.usePortal },
     state: i.state,
-    ...(i.problem ? { problem: i.problem } : i.state === 'denied' ? { problem: W.denied(i.portal.hostname) } : i.state === 'no-panel' ? { problem: W.panelNotOpened } : i.state === 'save-failed' ? { problem: W.saveFailed } : {}),
-    ...(i.state === 'handoff' ? { handoff: { text: W.handoff, ...(i.hero ? { hero: i.hero } : {}) } } : {}),
+    ...(i.problem ? { problem: i.problem } : i.state === 'denied' ? { problem: W.denied(placeOf(s.name, i.portal.hostname)) } : i.state === 'no-panel' ? { problem: W.panelNotOpened } : i.state === 'save-failed' ? { problem: W.saveFailed } : {}),
+    ...(i.state === 'handoff' ? { handoff: i.signinNext ? { text: W.handoffSignin, done: false } : { text: W.handoff, done: true, ...(i.hero ? { hero: i.hero } : {}) } } : {}),
   };
 }
 

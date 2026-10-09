@@ -30,6 +30,11 @@ export const OLD_DIRECT_LOCAL_KEYS = ['bridge.direct'] as const;
 export const OLD_DIRECT_SESSION_KEYS = ['bridge.bridges', 'bridge.keyUnlock', 'bridge.route', 'bridge.refusals'] as const;
 export const OLD_KEY_DB = 'beethoven-key';
 export const OLD_KEY_KEY = 'bridge.oldKey'; //          OldKeyNote: a key an earlier version added to the grid account, until the student presses "Forget"
+// 19.0.0: Beethoven signs in to the grid (PRIVACY.md version 13). Nothing secret here either: the saved password itself
+// is ciphertext in the IndexedDB database 'beethoven-signin' (core/vault.ts SIGNIN_DB), never in storage.local, which
+// the portal page's script can read. Not one of these names is in OLD_DIRECT_LOCAL_KEYS, OLD_DIRECT_SESSION_KEYS or OLD_KEY_DB.
+export const SIGNIN_NOTE_KEY = 'bridge.signin'; //       SigninNote: a saved grid sign-in exists, for whom, and how its last tries went
+export const SIGNIN_NOPRF_KEY = 'bridge.signinNoPrf'; // SigninNoPrf: a passkey on this computer could not lock a password, so the sheet offers no Remember
 // TERMS_KEY ('bridge.terms') and TERMS_HISTORY_KEY ('bridge.termsHistory', the earlier acceptance records, kept out of force) are in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):
@@ -48,6 +53,10 @@ export const ACTIVITY_KEY = 'bridge.activity'; //     ActivityEntry[]: Beethoven
 export const GRID_KEY = 'bridge.grid'; //             GridNote: whether the grid answers and whether the browser holds a grid sign-in, as last checked
 export const PRESS_KEY = 'bridge.press'; //           PendingPress: a press kept until the grid can carry it ("Connecting when ready…")
 export const WELCOME_PRESS_KEY = 'bridge.welcomePress'; // {at}: the welcome page's "Agree and continue" was pressed, written inside the click before Chrome asks, so the panel opening beside it can say "Almost there." instead of "not accepted yet"
+// 19.0.0 (memory only, trusted contexts: the portal page's script never sees storage.session, and its access level is never changed):
+export const SIGNIN_UNLOCK_KEY = 'bridge.signinUnlock'; // SigninUnlock: the passkey's output that opens the saved password, until the browser closes or Beethoven reloads
+export const SIGNIN_ONCE_KEY = 'bridge.signinOnce'; //     SigninOnce: a password typed without Remember, for one attempt and at most two minutes
+export const SIGNIN_STATE_KEY = 'bridge.signinState'; //   SigninState: which requests were given the password and how the last tries went; nothing typed
 
 export interface PortalSettings {
   origin: string;
@@ -216,6 +225,8 @@ export interface GridNote {
 export interface PendingPress {
   kind: 'connect' | 'stop' | 'sign-in-claude' | 'restrict' | 'open-files';
   at: string;
+  /** 19.0.0: the shell's 401 already ran one sign-in check for this press (no tab, never twice) */
+  shell401?: boolean;
 }
 
 /** the account name the portal's dashboard showed ("Logged in as <name>"), and when; the only identity the extension ever uses */
@@ -285,6 +296,92 @@ export interface OldKeyNote {
   enrolled_at?: string;
   /** when 16.0.0 found the record and wrote this note */
   noted_at: string;
+}
+
+// ---- 19.0.0 storage shapes: Beethoven signs in ----------------------------------------------------
+
+/**
+ * SIGNIN_NOTE_KEY (local): present only while a saved sign-in exists. A page writes it whole when it
+ * seals a password (origin, username, saved_at, cred and nothing else, so a new seal clears the tries);
+ * the background only adds or changes the attempt and outcome fields below, read-modify-write, and only
+ * while the stored note's seal is the one it expects. Nothing secret: the credential id is the passkey's name.
+ */
+export interface SigninNote {
+  origin: string;
+  /** the AccessID typed into the sheet (the Basic-auth user name; never the approval check's account) */
+  username: string;
+  saved_at: string;
+  /** base64url credential id of the passkey whose output opens the record; not secret */
+  cred: string;
+  /** when Beethoven last gave the saved password to the grid */
+  attempt_at?: string;
+  /**
+   * when Beethoven gave the grid a password the student typed while this one was saved, until that answer's
+   * outcome comes: a browser closed before it came puts this one on hold (stopped_at), since the record may
+   * hold the very password the grid was given. A time only, never what was typed
+   */
+  typed_attempt_at?: string;
+  /** when the grid last took it */
+  proven_at?: string;
+  /** when the grid last turned it down: no automatic sign-in with it again until a new seal */
+  refused_at?: string;
+  /**
+   * when automatic sign-ins with it were put on hold without it being turned down itself: a password the
+   * student typed was turned down while this one was saved, or a try's outcome could no longer be told (a
+   * sign-in made in Chrome's box meanwhile, or the browser closed before the grid replied). Lifted by a
+   * typed password that works (the same one keeps the record, another replaces it) or by a new seal
+   */
+  stopped_at?: string;
+  /** refusals in a row, of the saved or a typed password, while this sign-in was saved */
+  refusals?: number;
+  /** the realm of the grid's challenge when it took it */
+  realm?: string;
+}
+
+/** SIGNIN_NOPRF_KEY (local): when a passkey on this computer gave no PRF output, and the operating system's name */
+export interface SigninNoPrf {
+  at: string;
+  os: string;
+}
+
+/** SIGNIN_UNLOCK_KEY (session): base64 of the 32 bytes the passkey gave, and the credential they belong to */
+export interface SigninUnlock {
+  prf: string;
+  cred: string;
+}
+
+/** SIGNIN_ONCE_KEY (session): a typed password for one attempt; removed after it, right or wrong, and by the alarm after two minutes */
+export interface SigninOnce {
+  origin: string;
+  username: string;
+  password: string;
+  at: string;
+}
+
+/**
+ * SIGNIN_STATE_KEY (session): the background's record of its own answers, so a worker restart keeps the
+ * one-wrong-try rule. `sent` holds the request ids given the password (the last 20): Chrome asks again
+ * for the same id when the grid turns the password down, and that repeat is the refusal.
+ */
+export interface SigninState {
+  sent: string[];
+  /**
+   * an answer whose outcome is not known yet: when it was given, and which password it was (the saved
+   * one's seal, saved_at; a one-shot's time of typing); `tainted` once a sign-in was asked for again on
+   * the portal meanwhile, so a later reading signed in may be another password's doing
+   */
+  pending?: { requestId: string; at: string; source: 'once' | 'saved'; seal?: string; onceAt?: string; tainted?: boolean };
+  /** the last refusal, until the student gives a password again: when it came, and when and with which seal the refused answer was given */
+  refused?: { at: string; source: 'once' | 'saved'; given?: string; seal?: string };
+  /**
+   * the last answer whose outcome could no longer be told: when, which source, when it was given and the
+   * seal it gave. It holds the saved sign-in at once, as the note's stopped_at does once written, so a slow
+   * or failed write of the note never lets that password go again (I1): the seal given, or for a typed
+   * answer any seal made before it
+   */
+  held?: { at: string; source: 'once' | 'saved'; given: string; seal?: string };
+  refusals: number;
+  realm?: string;
 }
 
 export const DEFAULT_PREFS: Prefs = { worker_name: 'worker', permission_mode: 'default', auto_start: true, open_claude_on_connect: true, appearance: 'cream' };

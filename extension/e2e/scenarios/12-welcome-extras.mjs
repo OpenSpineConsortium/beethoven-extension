@@ -1,9 +1,10 @@
 // Scenario 12 (added by the verifier): the welcome page's states scenarios 1 to 8 do not picture (SPEC moment
 // 2). At 1280 x 720: "Show terms" opened in place; then, with the university's own default address (the
 // harness maps it to NOTFOUND and aborts any request to it), the tick and "Agree and continue": the button's
-// "Opening the grid…" while Chrome's prompt is up, then Deny in Chrome's prompt: "Beethoven needs
-// ondemand.grid.wayne.edu to work." with "Try again". Nothing is granted and nothing reaches the university.
-import { expectWords, moment, setup, Stop, teardown, welcomePage } from '../lib/flows.mjs';
+// "Opening the grid…" while Chrome's prompt is up (Chrome names ondemand.grid.wayne.edu), then Deny in Chrome's
+// prompt: "Beethoven needs the Wayne State University HPC grid to work." with "Try again" (19.0.0: the place,
+// never the host, in Beethoven's own words). Nothing is granted and nothing reaches the university.
+import { expectWords, moment, PLACE, setup, Stop, teardown, welcomePage } from '../lib/flows.mjs';
 import { sleep } from '../lib/harness.mjs';
 import { AFFIRMATION, loose, WORDS } from '../lib/words.mjs';
 
@@ -41,10 +42,10 @@ export default async function welcomeExtras(opts = {}) {
     h.run.check(`while Chrome asks, the button reads "${W.opening}"`, !!opening);
     h.run.check("Chrome's prompt names ondemand.grid.wayne.edu", h.br.prompts.some((p) => /ondemand\.grid\.wayne\.edu/.test(p.text)), JSON.stringify(h.br.prompts));
     h.br.watchPrompts('Deny');
-    const denied = await h.welcome.waitText(W.denied('ondemand.grid.wayne.edu'), 15_000);
+    const denied = await h.welcome.waitText(W.denied(PLACE), 15_000);
     await sleep(500);
     const md = await moment(h, 'welcome, denied', { page: h.welcomePage });
-    h.run.check(`Deny: "${W.denied('ondemand.grid.wayne.edu')}" with "${W.tryAgain}"`, !!denied && (md.page ?? '').includes(W.tryAgain), (md.page ?? '').slice(0, 0));
+    h.run.check(`Deny: "${W.denied(PLACE)}" with "${W.tryAgain}"`, !!denied && (md.page ?? '').includes(W.tryAgain), (md.page ?? '').slice(0, 0));
     const perms = await h.br.permissions().catch(() => ({ origins: [] }));
     h.run.check('after Deny nothing is granted', perms.origins.length === 0, JSON.stringify(perms.origins));
     await sleep(4000);

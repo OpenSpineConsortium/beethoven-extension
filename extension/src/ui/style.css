@@ -599,6 +599,40 @@ body.page > #app { overflow-x: clip; }
 .field:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal), 0 0 0 5px var(--teal-tint); }
 .field-row .btn { height: 44px; }
 .field-error { font-size: 13px; color: var(--brick); }
+
+/* 19.0.0: the grid sign-in sheet in the panel (journey.ts gridSheet). Each field under its label; the
+   sentence under a field is always there (the password's aria-describedby points at it) and takes no room
+   while it is empty; the eye sits inside the password field; the quiet ways out share one line */
+.gs-form { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
+.gs-q { display: flex; flex-direction: column; gap: 6px; }
+.gs-label { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+.gs-field { flex: none; width: 100%; height: 48px; font-size: 16px; }
+.gs-field.bad, .gs-field[aria-invalid="true"] { border-color: var(--brick); }
+.gs-note { line-height: 1.45; text-wrap: pretty; }
+.gs-note:empty { display: block; height: 0; margin-top: -6px; }
+.m-col > .gs-note { margin-top: 12px; }
+.m-col > .gs-note:empty { margin-top: 0; }
+.field-wrap { position: relative; }
+.field-wrap.has-eye .field { padding-right: 48px; }
+.field-eye { position: absolute; right: 8px; top: 8px; }
+.gs-remember { margin-top: 2px; }
+.gs-fine { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--ink-soft); text-wrap: pretty; }
+.gs-remember.gs-fine { margin-top: 0; font-size: 13px; }
+.gs-privacy { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink-soft); }
+.gs-privacy .ico { color: var(--teal); flex: none; }
+.m-foot > .gs-status { justify-content: center; min-height: 0; margin-top: -4px; }
+.m-foot > .gs-status:empty { margin-top: -10px; }
+.m-alts { display: flex; justify-content: center; flex-wrap: wrap; gap: 0 18px; margin-top: -4px; }
+.m-alt { font-size: 13.5px; }
+/* the sheet's foot (the privacy line, Sign in or Unlock, Chrome's own box and Not now) stays at the
+   panel's bottom while the fields scroll under it, as the welcome page's action bar does: a refusal or a
+   problem above never pushes the press or the fallback below the fold (e2e/sheet-fit.mjs measures it at
+   360 x 658); the panel brings a focused field and its sentence out from under it (panel.ts) */
+.m-grid > .m-foot { position: sticky; bottom: 0; z-index: 5; padding: 10px 0 14px; background: var(--paper); box-shadow: 0 -12px 16px -12px var(--paper); }
+html:has(.m-grid > .m-foot) { scroll-padding: 56px 0 180px; }
+/* Settings: a confirm row's question takes its note's place in brick (Start over, Forget, Disconnect) */
+.s-row .s-sub.s-ask { font-size: 14px; color: var(--brick); }
+.s-note { font-size: 13px; line-height: 1.45; color: var(--ink-soft); padding: 2px 0 12px; }
 .handoff { padding: 28px 24px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); display: flex; flex-direction: column; gap: 22px; animation: rise 420ms var(--ease); }
 .handoff-head { display: flex; align-items: center; gap: 14px; font: 500 24px/1.25 var(--font-display); letter-spacing: -0.01em; }
 .handoff .hero { padding-top: 18px; border-top: 1px solid var(--line-soft); }

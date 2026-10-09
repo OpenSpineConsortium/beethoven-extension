@@ -1,11 +1,21 @@
 # Install Beethoven
 
-For Beethoven 16.0.0. Written 2026-10-02, updated 2026-10-08.
+For Beethoven 19.0.0. Written 2026-10-02, updated 2026-10-09.
+
+**Updating from 16.0.0, 17.0.0 or 18.0.0.** Chrome updates Beethoven by itself from its page in the
+Chrome Web Store, and asks you nothing: 19.0.0 needs nothing Chrome shows in its list. Beethoven
+asks you to accept its terms once more, because they now describe its sign-in. What changes: when
+the grid needs your sign-in, Beethoven's panel asks for your AccessID and password in its own sheet,
+**Sign in to the grid**, and signs in for you in the background; **Use Chrome's sign-in box
+instead** keeps the way you know. Saving the password on this computer is off unless you tick it,
+and at Wayne State you should leave it off ([Use Beethoven](USE.md), part 2, "Save your grid
+sign-in, or not"). GlobalProtect is still needed. Your worker and your files on the grid stay as
+they are.
 
 **Updating from 15.0.0, or from 12.0.0 to 14.0.0.** If Beethoven came from its page in the Chrome
 Web Store, Chrome updates it by itself. If you have a copy loaded any other way, remove it first:
 click the puzzle icon, then **⋮** next to Beethoven, then **Remove from Chrome**; then install
-16.0.0 as below. Keep only one copy. Beethoven asks you to accept its terms once more: they no
+Beethoven as below. Keep only one copy. Beethoven asks you to accept its terms once more: they no
 longer describe the helper. What changes: 16.0.0 has one way to the grid, GlobalProtect and the
 grid's website, as 11.0.0 had. The helper that 12.0.0 to 15.0.0 installed on your computer is not
 used any more and is never started; you can remove it ([If an earlier version installed the
@@ -54,14 +64,16 @@ invitation was sent to and open the link again.
 ## Check that it works
 
 - With GlobalProtect on, the panel's **Grid** line says **Signed in as** your AccessID once you have
-  signed in to the grid's website ([Use Beethoven](USE.md), part 1).
+  signed in to the grid, in Beethoven's **Sign in to the grid** or in Chrome's box ([Use
+  Beethoven](USE.md), part 1).
 - With GlobalProtect off, it says **Can't reach**, and the panel asks you to turn GlobalProtect on.
   Your worker on the grid keeps running either way.
 
 ## If an earlier version installed the helper
 
 Beethoven 12.0.0 to 15.0.0 installed a small program, the Beethoven bridge, on your computer. 16.0.0
-does not use it and cannot start it: it no longer has Chrome's permission to. You can leave it or
+and later do not use it and cannot start it: they no longer have Chrome's permission to. The sign-in
+sheet of 19.0.0 needs no program on your computer. You can leave it or
 remove it; removing it changes nothing on the grid.
 
 - **Windows.** Open **Settings**, then **Apps** (on Windows 11, **Installed apps**; on Windows 10,
@@ -82,13 +94,19 @@ your computer removes it: ask your lab lead ([Use Beethoven](USE.md), part 4).
 
 ## Remove Beethoven completely
 
-1. If an earlier version installed the helper, remove it (above).
-2. Remove Beethoven from Chrome: click the puzzle icon, then **⋮** next to Beethoven, then **Remove
-   from Chrome**.
-3. If an earlier version made a passkey named **Beethoven** (Windows Hello or Touch ID protection,
-   in 12.0.0 to 15.0.0), 16.0.0 does not remove it. Delete it yourself: on Windows, **Settings**,
+1. If you saved your grid sign-in, open **Settings**, **Your grid**, **Grid sign-in** and press
+   **Forget** first. (Removing Beethoven deletes the saved password with the rest of its data too,
+   but Forget says so and tells you about the passkey.)
+2. If an earlier version installed the helper, remove it (above).
+3. Remove Beethoven from Chrome: click the puzzle icon, then **⋮** next to Beethoven, then **Remove
+   from Chrome**. Chrome stays signed in to the grid until you close it.
+4. Delete Beethoven's passkeys, if you have any; Beethoven does not remove them. Tell them apart
+   by their user names (what each list shows beside them is not yet measured). The old passkey (12.0.0 to 15.0.0, Windows
+   Hello or Touch ID protection of the key) is named with your AccessID alone, or "beethoven" ("Beethoven on this computer"), and can go. The
+   one 19.0.0 uses for your grid sign-in is named "<AccessID> (grid)", for example "ab1234 (grid)";
+   delete that one only after **Forget** (step 1). Where to delete them: on Windows, **Settings**,
    **Accounts**, **Passkeys**; on a Mac, the **Passwords** app (or **System Settings**,
    **Passwords**); in Google Password Manager, open `chrome://password-manager/passwords` in Chrome.
 
 Your worker and your files on the grid are not touched by any of this. To stop the worker, press
-**Stop** in Beethoven before step 2.
+**Stop** in Beethoven before step 3.

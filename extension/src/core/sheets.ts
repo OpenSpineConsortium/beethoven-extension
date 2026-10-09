@@ -6,7 +6,7 @@ import { LOGIN_SETUP_PROVEN, type SiteProfile, type StatusFile } from './contrac
 import { DEBUG_DETAILS_LINES } from './debuglog';
 import type { NodeReport } from './diagnostics';
 import type { RunState } from './facts';
-import type { Appearance, ChannelNote, OldKeyNote, PortalSettings, Prefs } from './keys';
+import type { Appearance, ChannelNote, OldKeyNote, PortalSettings, Prefs, SigninNote } from './keys';
 import { WORDS, type ButtonView, type DetailsView, type SettingsView } from './model';
 import { recordText, type TermsRecord } from './terms';
 
@@ -87,6 +87,29 @@ export interface SettingsInput {
   defaultHostname?: string;
   /** 16.0.0: the note an earlier version's key left (keys.ts OldKeyNote), while it stands */
   oldKey?: OldKeyNote;
+  /**
+   * 19.0.0: Beethoven's own grid sign-in, only where the browser can answer the grid's sign-in itself
+   * (absent on the box path, the Firefox build). `note` is the saved sign-in's note (keys.ts SigninNote)
+   * when it is for the stored portal; `unlockWith` the computer's own unlock ("Windows Hello"); `refused`
+   * whether the grid turned a password down since the student last typed one.
+   */
+  signin?: { note?: SigninNote; unlockWith: string; refused: boolean };
+}
+
+/** 19.0.0: the saved sign-in's row: what is saved and how it opens, and Forget only while something is saved */
+function signinRow(s: NonNullable<SettingsInput['signin']>): NonNullable<SettingsView['signin']> {
+  const S = WORDS.settings;
+  const n = s.note;
+  // the grid turned a password down: the saved one is not tried again until the student types one
+  const refused = !!n && (s.refused || !!n.refused_at);
+  return {
+    title: S.signinTitle,
+    text: !n ? S.signinNone : refused ? S.signinRefused : S.signinSaved(n.username, s.unlockWith),
+    ...(n ? { username: n.username, cred: n.cred, forget: { label: S.forget, tone: 'outline', action: { kind: 'forget-grid-signin' } } } : {}),
+    confirm: S.forgetConfirm,
+    // the page keeps this sentence from the moment of its confirming press, while the note still names the account
+    forgotten: S.forgotten(n?.username ?? ''),
+  };
 }
 
 export function settingsView(i: SettingsInput): SettingsView {
@@ -118,5 +141,6 @@ export function settingsView(i: SettingsInput): SettingsView {
     drive: { title: S.drive, connected: i.driveConnected },
     labLead: { title: S.labLead, shellHost: i.settings?.shell_host ?? 'default', siteProfile: i.settings?.site ?? '', hashes: i.hashes },
     ...(i.oldKey ? { oldKey: { title: S.oldKey, text: S.oldKeyNote((i.oldKey.enrolled_at ?? i.oldKey.noted_at).slice(0, 10)), forget: { label: S.oldKeyForget, tone: 'text', action: { kind: 'forget-old-key' } } } } : {}),
+    ...(i.signin ? { signin: signinRow(i.signin) } : {}),
   };
 }

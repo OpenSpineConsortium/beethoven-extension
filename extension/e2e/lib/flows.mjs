@@ -14,6 +14,8 @@ export const HOST = process.env.E2E_HOST || 'ondemand.wayne.localhost';
 export const ACCOUNT = 'st1234';
 export const PASSWORD = 'mockpass';
 export const TITLE = 'Wayne State grid';
+/** 19.0.0: the grid as Beethoven's own sentences name it (model.ts placeOf over wayne.json's display_name), never by its host */
+export const PLACE = 'the Wayne State University HPC grid';
 
 export class Stop extends Error {}
 
@@ -96,7 +98,7 @@ export async function welcomePage(h) {
 export async function welcomeMoment(h) {
   const m = await moment(h, 'welcome', { page: h.welcomePage });
   const w = WORDS.welcome;
-  expectWords(h, 'moment 2 welcome', m.page, [w.headline, w.subline, w.needsTitle, ...w.needs.flatMap((n) => [n.title, n.detail, n.link]), w.summaryTitle, ...SUMMARY, w.showTerms, AFFIRMATION.bold, AFFIRMATION.soft, w.agree, w.allowNote('ondemand.grid.wayne.edu'), w.footerNothingLeaves, /Use another portal/]);
+  expectWords(h, 'moment 2 welcome', m.page, [w.headline, w.subline, w.needsTitle, ...w.needs.flatMap((n) => [n.title, n.detail, n.link]), w.summaryTitle, ...SUMMARY, w.showTerms, AFFIRMATION.bold, AFFIRMATION.soft, w.agree, w.allowNote(PLACE), w.footerNothingLeaves, /Use another portal/]);
   const order = w.needs.map((n) => (m.page ?? '').indexOf(n.title));
   h.run.check("the three requirements in Greg's order: grid account, GlobalProtect, Claude Pro or Max", order.every((x, i) => x >= 0 && (i === 0 || x > order[i - 1])), JSON.stringify(order));
   h.run.check('the first screen says nothing about GitHub (AM3)', !/github/i.test(m.page ?? ''));
@@ -165,9 +167,17 @@ export async function agree(h, { expectPrompt = true } = {}) {
   });
 }
 
-/** moment 5: Chrome's own sign-in box in the same tab, typed through UI Automation; the tab closes itself */
-export async function gridSignIn(h, { expectTabClose = true, cancel = false } = {}) {
+/**
+ * moment 5: 19.0.0 signs in with Beethoven's own sheet in the panel (the AccessID and password typed as a
+ * person types them, no tab); `way: 'box'` presses "Use Chrome's sign-in box instead" first and walks
+ * 18.0.0's tab with Chrome's own box, typed through UI Automation, which the tab path keeps as the fallback
+ */
+export async function gridSignIn(h, { expectTabClose = true, cancel = false, way = 'sheet' } = {}) {
+  if (way === 'sheet' && !cancel) return sheetSignIn(h);
   return step(h, 'moment 5: sign in to the grid', async () => {
+    if (way === 'box' && (await h.br.panel?.find(WORDS.grid.useBox).catch(() => null))?.visible) {
+      await studentPress(h, h.br.panel, WORDS.grid.useBox);
+    }
     const t0 = Date.now();
     let tab;
     while (!tab && Date.now() - t0 < 15_000) {
@@ -196,6 +206,27 @@ export async function gridSignIn(h, { expectTabClose = true, cancel = false } = 
     h.run.check(fromHome ? `the home's Grid row says "${WORDS.home.gridSignedIn(ACCOUNT)}"` : `the panel says "${WORDS.grid.signedIn(ACCOUNT)}"`, !!t);
     if (t && !fromHome) await moment(h, 'signed in to the grid');
     return tab;
+  });
+}
+
+/** moment 5 on the sheet: no tab opens; the password goes in by insertText, never through argv or a log */
+async function sheetSignIn(h, { user = ACCOUNT, pass = 'mockpass' } = {}) {
+  return step(h, 'moment 5: sign in to the grid (the sheet)', async () => {
+    const p = h.br.panel;
+    const tabsBefore = [...h.br.tabs.values()].filter((t) => t.kind === 'tab' && !t.closedAt && t.url.includes(`${HOST}:${PORT}`)).length;
+    const m = await moment(h, 'grid sign-in sheet');
+    expectWords(h, 'moment 5 panel', m.panel, [WORDS.grid.title, WORDS.grid.sheetBody, WORDS.grid.useBox]);
+    await p.press(WORDS.grid.accessId, { selector: 'input' });
+    await p.type(user);
+    await p.press(WORDS.grid.password, { selector: 'input' });
+    await p.type(pass);
+    h.run.ev('TYPE', 'panel: the AccessID and the password (not written here)');
+    await studentPress(h, p, WORDS.grid.signIn);
+    const t = await p.waitText(loose(WORDS.grid.signedIn(ACCOUNT)), 20_000);
+    h.run.check(`the panel says "${WORDS.grid.signedIn(ACCOUNT)}"`, !!t);
+    const tabsAfter = [...h.br.tabs.values()].filter((t) => t.kind === 'tab' && !t.closedAt && t.url.includes(`${HOST}:${PORT}`)).length;
+    h.run.check('no portal tab opened for the sign-in', tabsAfter <= tabsBefore, `${tabsBefore} before, ${tabsAfter} after`);
+    if (t) await moment(h, 'signed in to the grid');
   });
 }
 

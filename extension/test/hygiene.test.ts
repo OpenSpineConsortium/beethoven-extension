@@ -39,15 +39,26 @@ describe('what the source must not contain', () => {
     expect(hits).toEqual([]);
   });
 
-  // 16.0.0: nativeMessaging went with the bridge (12.0.0 to 15.0.0); the one way to the grid is the portal
-  it('asks for exactly storage, alarms, scripting and sidePanel (no activeTab since 11.0.0, no nativeMessaging since 16.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
+  // 16.0.0: nativeMessaging went with the bridge (12.0.0 to 15.0.0); the one way to the grid is the portal.
+  // 19.0.0: webRequest and webRequestAuthProvider on the Chromium builds, for the one onAuthRequired listener
+  // (Beethoven signs in); the Firefox build gets neither, and nothing ever asks for webRequestBlocking.
+  it('asks for exactly storage, alarms, scripting, and on Chromium sidePanel, webRequest and webRequestAuthProvider (no activeTab since 11.0.0, no nativeMessaging since 16.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
     const cfg = read(path.join(ROOT, 'wxt.config.ts'));
-    const perms = /permissions:\s*\[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
-    const named = [...perms.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(named.sort()).toEqual(['alarms', 'scripting', 'sidePanel', 'storage']);
-    expect(/'nativeMessaging'/.test(cfg)).toBe(false);
-    expect(/'activeTab'/.test(perms)).toBe(false);
-    expect(/'cookies'|"cookies"/.test(perms)).toBe(false);
+    // the one manifest line: the list every build gets, then the Chromium builds' spread, then nothing for Firefox
+    const line = /^\s*permissions:\s*\[(.*)\],\s*$/m.exec(cfg)?.[1] ?? '';
+    const split = /^(.*?),\s*\.\.\.\(chromium \? \[([^\]]*)\] : \[\]\)$/.exec(line);
+    expect(split, line).not.toBeNull();
+    const quoted = (t: string) => [...t.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const every = quoted(split?.[1] ?? '');
+    const chromium = quoted(split?.[2] ?? '');
+    expect(every.sort()).toEqual(['alarms', 'scripting', 'storage']);
+    expect([...every, ...chromium].sort()).toEqual(['alarms', 'scripting', 'sidePanel', 'storage', 'webRequest', 'webRequestAuthProvider']);
+    // nothing else in the line, and no other permissions list anywhere in the config
+    expect(line.replace(/'[^']+'/g, '').replace(/[\s,]/g, '')).toBe('...(chromium?[]:[])');
+    expect([...cfg.matchAll(/permissions:\s*\[/g)].length).toBe(1);
+    for (const never of ['nativeMessaging', 'activeTab', 'cookies', 'tabs', 'debugger', 'identity', 'declarativeNetRequest', 'webRequestBlocking']) {
+      expect(new RegExp(`['"]${never}['"]`).test(cfg), never).toBe(false);
+    }
     const hosts = /const hosts = \[([^\]]*)\]/.exec(cfg)?.[1] ?? '';
     expect(hosts).toMatch(/'https:\/\/\*\/\*'/);
     expect(/host_permissions\s*:/.test(cfg.replace(/optional_host_permissions/g, ''))).toBe(false);
@@ -321,10 +332,14 @@ describe('the built package', () => {
 // the lab lead and Settings' folded "For your lab lead" are exempt. Three sentences of the specification itself
 // break the rule and are allowed by name: the third Try asking question, the share subline and the tour's third
 // caption ("job", "jobs"). 18.0.0 took the portal's name out of the two grid sign-in sentences that carried it
-// (greg, 2026-10-09: the student never needs to know it), so OnDemand has no exception left.
+// (greg, 2026-10-09: the student never needs to know it), so OnDemand has no exception left; 19.0.0 makes the
+// rule case-blind, so a host such as ondemand.grid.wayne.edu inside a sentence fails too (the welcome page and
+// the welcome moment say the place a profile names, core/model.ts placeOf). An address on its own, as Settings
+// shows the stored portal and the welcome page fills its portal field, is not a sentence and is left out.
 // The one-time key step's line is a command the student pastes, not a sentence; it is not in these tables.
 describe('the words a student reads', () => {
-  const BANNED = (t: string) => /\b(jobs?|nodes?|partition|heartbeat|shell|scheduler|hpcworker|probe)\b|portal tab|Failed to fetch/i.test(t) || /OnDemand|ONDEMAND/.test(t);
+  const ADDRESS = (t: string) => /^[a-z0-9-]+(?:\.[a-z0-9-]+)+$/i.test(t);
+  const BANNED = (t: string) => /\b(jobs?|nodes?|partition|heartbeat|shell|scheduler|hpcworker|probe)\b|portal tab|Failed to fetch/i.test(t) || (/ondemand/i.test(t) && !ADDRESS(t));
   const ALLOWED = new Set<string>([WORDS.home.prompts[2], WORDS.queue.shareSub, WORDS.tour.captions[2]]);
   const strings = (v: unknown, skip: string[] = []): string[] => {
     if (typeof v === 'string') return [v];
@@ -335,6 +350,10 @@ describe('the words a student reads', () => {
   };
 
   it('the sentence tables hold none of the internal words', () => {
+    // the rule itself: case-blind, inside a sentence; an address alone is not a sentence
+    expect(BANNED('Chrome asks to allow ondemand.grid.wayne.edu.')).toBe(true);
+    expect(BANNED('Open Ondemand')).toBe(true);
+    expect(BANNED('ondemand.grid.wayne.edu')).toBe(false);
     const all = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS)];
     expect(all.length).toBeGreaterThan(200);
     expect(all.filter((t) => BANNED(t) && !ALLOWED.has(t))).toEqual([]);

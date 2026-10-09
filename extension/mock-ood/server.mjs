@@ -30,6 +30,14 @@
 // get "401 Unauthorized" with 'WWW-Authenticate: Basic realm="private"' unless the browser sends
 // Basic credentials for --user and --password (MOCK_PASSWORD, default mockpass), so Chrome shows its
 // own sign-in box; "/" answers 302 to /public/start.html. HTML pages carry a CSP frame-ancestors header.
+// 19.0.0 (Beethoven signs in): the password can change while the mock runs (setPassword() on the
+// returned object, or POST /_mock/password with the new one as the body, text or {"password"}, read and
+// never echoed or logged), as a student's password changes on the grid; every Basic answer the portal
+// checks is counted, right or wrong (basicGood, basicBad in /_mock/state, never the password); with
+// --lockout N (MOCK_LOCKOUT) the Nth wrong answer locks the account, as Wayne State disables an AccessID
+// after the fifth wrong password, and from then on even the right one gets 401 until POST /_mock/reset;
+// --realm R (MOCK_REALM, default "private") is the realm every challenge names. The cold PUN (below)
+// answers only after the sign-in: a request turned down by Basic never warms it.
 //
 // The shell. Each typed line runs in a real bash (Git Bash on Windows) with the mock's scheduler
 // commands (bin/) first on PATH, so the shell semantics the extension relies on are real; only the
@@ -74,7 +82,8 @@
 // For the harness (never part of a real portal; no sign-in): GET /_mock/log (every request and
 // WebSocket, with the sign-in it carried and its answer; every shell with the command lines typed at
 // its prompt, never what was typed into a running command or at the password prompt), GET
-// /_mock/state, GET|POST /_mock/access?mode=..., POST /_mock/reset.
+// /_mock/state, GET|POST /_mock/access?mode=..., POST /_mock/password (19.0.0), POST /_mock/reset (the
+// log, and the Basic counters with the lockout).
 //
 // Two behaviours measured on the live portal (ondemand.grid.wayne.edu, 2026-09-29) are reproduced:
 // the first /pun/ request after a while answers 500 "Error: Server Error ... try again in 30 seconds"
@@ -189,6 +198,10 @@ export async function createMockPortal(opts = {}) {
     auth: 'cookie',
     /** the Basic password; undefined: MOCK_PASSWORD, else mockpass */
     password: undefined,
+    /** the realm every Basic challenge names (the live portal's is "private") */
+    realm: 'private',
+    /** wrong Basic answers after which the account is locked (even the right password gets 401 until /_mock/reset); 0 = never */
+    lockoutAfter: 0,
     /** the session cookie's SameSite: lax (10.0.0's mock), none (with Secure), strict */
     sameSite: 'lax',
     requireCookie: true,
@@ -263,7 +276,9 @@ export async function createMockPortal(opts = {}) {
     ...opts,
   };
   if (o.terminal === undefined) o.terminal = o.keyless ? 'xterm' : 'stub';
-  const password = o.password ?? process.env.MOCK_PASSWORD ?? 'mockpass';
+  // a quote or a line break would end the challenge header early
+  const realm = String(o.realm ?? 'private').replace(/["\r\n]/g, '');
+  const challenge = `Basic realm="${realm}"`;
   const realHome = o.home ? path.resolve(o.home) : fs.mkdtempSync(path.join(os.tmpdir(), 'mock-ood-home-'));
   fs.mkdirSync(realHome, { recursive: true });
   const virtualHome = `/home/${o.user}`;
@@ -395,6 +410,17 @@ export async function createMockPortal(opts = {}) {
     passwordFailures: 0,
     /** lines that arrived at a password prompt and looked like a command (the setup line typed too early) */
     typedAtPasswordPrompt: 0,
+    /** what the grid accepts now, for Basic and the keyless shell's prompt; never in /_mock/state, /_mock/log or a log line */
+    password: o.password ?? process.env.MOCK_PASSWORD ?? 'mockpass',
+    /** times the password was changed while running */
+    passwordChanges: 0,
+    /** Basic answers the portal checked (requests and handshakes past the public pages): the right pair let in, and any other pair */
+    basicGood: 0,
+    basicBad: 0,
+    /** lockoutAfter reached: every answer gets 401 until /_mock/reset */
+    lockedOut: false,
+    /** right answers turned down because the account was locked */
+    basicLocked: 0,
     /** every request and WebSocket, newest last (at most 3000) */
     requests: [],
     /** every shell (at most 500) */
@@ -509,10 +535,36 @@ export async function createMockPortal(opts = {}) {
     const m = /^Basic\s+([A-Za-z0-9+/=]+)\s*$/i.exec(req.headers.authorization ?? '');
     if (!m) return 'none';
     const [u, ...rest] = Buffer.from(m[1], 'base64').toString('utf8').split(':');
-    return u === o.user && rest.join(':') === password ? 'good' : 'bad';
+    return u === o.user && rest.join(':') === state.password ? 'good' : 'bad';
   };
   const authOf = (req) => (o.auth === 'basic' ? basicState(req) : hasCookie(req) ? (o.requireCookie ? 'cookie' : 'open') : 'none');
-  const signedIn = (req) => (o.auth === 'basic' ? basicState(req) === 'good' : hasCookie(req));
+  /**
+   * Basic, where the portal asks for it (every request past the public pages, and the shell's handshake):
+   * each answer is counted once here, so a test can tell how many wrong tries reached the grid, and the
+   * lockout is the account's, as the university's directory keeps it (a right answer does not undo it)
+   */
+  const basicAdmits = (req) => {
+    const a = basicState(req);
+    if (a === 'bad') {
+      state.basicBad++;
+      if (o.lockoutAfter > 0 && state.basicBad >= o.lockoutAfter) state.lockedOut = true;
+      return false;
+    }
+    if (a !== 'good') return false;
+    if (state.lockedOut) {
+      state.basicLocked++;
+      return false;
+    }
+    state.basicGood++;
+    return true;
+  };
+  const signedIn = (req) => (o.auth === 'basic' ? basicAdmits(req) : hasCookie(req));
+  /** the password the grid accepts from now on; never echoed, logged or answered back */
+  const setPassword = (pw) => {
+    if (typeof pw !== 'string' || !pw || pw.length > 1024) throw new Error('the new password is a string of 1 to 1024 characters');
+    state.password = pw;
+    state.passwordChanges++;
+  };
   const serverOrigin = (req) => `${o.tls ? 'https' : 'http'}://${req.headers.host}`;
   const send = (res, status, body, headers = {}) => {
     const isHtml = typeof body === 'string' && body.startsWith('<!DOCTYPE');
@@ -524,7 +576,7 @@ export async function createMockPortal(opts = {}) {
     res.end(html('Redirecting', `<a href="${to}">Redirecting</a>`));
   };
   const unauthorized = (res) => {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="private"', 'Content-Type': 'text/html; charset=iso-8859-1', Server: 'Apache/2.4.34 (mock-ood)' });
+    res.writeHead(401, { 'WWW-Authenticate': challenge, 'Content-Type': 'text/html; charset=iso-8859-1', Server: 'Apache/2.4.34 (mock-ood)' });
     res.end(APACHE_401);
   };
   // Rails: request.origin.nil? || request.origin == request.base_url, then the token
@@ -705,7 +757,32 @@ export async function createMockPortal(opts = {}) {
     if (p === '/_mock/reset' && req.method === 'POST') {
       state.requests.length = 0;
       state.shellLog.length = 0;
+      // the help desk reactivates the account: the counters start again
+      state.basicGood = 0;
+      state.basicBad = 0;
+      state.basicLocked = 0;
+      state.lockedOut = false;
       return json({ ok: true });
+    }
+    if (p === '/_mock/password') {
+      if (req.method !== 'POST') return send(res, 405, JSON.stringify({ error: 'POST the new password here' }));
+      // the body only, never the query, so the password is in no address and no log line; it is not answered back
+      const body = (await readBody(req)).toString('utf8');
+      // a text body as a shell sends it ends in a line break no sign-in box can type
+      let pw = body.replace(/\r?\n$/, '');
+      if (/json/i.test(String(req.headers['content-type'] ?? ''))) {
+        try {
+          pw = JSON.parse(body)?.password;
+        } catch {
+          pw = undefined;
+        }
+      }
+      try {
+        setPassword(pw);
+      } catch {
+        return send(res, 400, JSON.stringify({ error: 'the body is the new password, as text or as JSON {"password": "..."}' }));
+      }
+      return json({ ok: true, passwordChanges: state.passwordChanges });
     }
     if (p === '/_mock/state') {
       let schedulerCalls = 0;
@@ -723,6 +800,14 @@ export async function createMockPortal(opts = {}) {
       return json({
         auth: o.auth,
         user: o.user,
+        // the Basic answers and the lockout; the password itself never leaves the mock
+        realm,
+        basicGood: state.basicGood,
+        basicBad: state.basicBad,
+        basicLocked: state.basicLocked,
+        lockoutAfter: o.lockoutAfter,
+        lockedOut: state.lockedOut,
+        passwordChanges: state.passwordChanges,
         keyless: o.keyless,
         terminal: o.terminal,
         loginSetupDone: loginSetupDone(),
@@ -752,7 +837,8 @@ export async function createMockPortal(opts = {}) {
   async function handle(req, res) {
     const url = new URL(req.url, serverOrigin(req));
     const p = url.pathname;
-    log(`${req.method} ${p}${url.search}`);
+    // a password put in the address of the password route by mistake is not logged either
+    log(`${req.method} ${p}${p === '/_mock/password' ? '' : url.search}`);
     if (!p.startsWith('/_mock/')) {
       const rec = { t: new Date().toISOString(), kind: 'http', method: req.method, path: redact(`${p}${url.search}`), auth: authOf(req), origin: req.headers.origin ?? '', site: req.headers['sec-fetch-site'] ?? '', mode: req.headers['sec-fetch-mode'] ?? '', status: 0 };
       res.on('finish', () => {
@@ -884,7 +970,7 @@ export async function createMockPortal(opts = {}) {
     if (o.auth === 'basic' && !signedIn(req)) {
       // Apache answers the handshake as it answers a page: 401 with the Basic challenge
       rec.status = 401;
-      socket.write('HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm="private"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n');
+      socket.write(`HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: ${challenge}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n`);
       socket.destroy();
       return;
     }
@@ -999,7 +1085,7 @@ export async function createMockPortal(opts = {}) {
     };
     const enterPassword = (pw) => {
       out('\r\n');
-      if (pw === password) {
+      if (pw === state.password) {
         phase = 'shell';
         rec.password = 'accepted';
         greet();
@@ -1141,8 +1227,13 @@ export async function createMockPortal(opts = {}) {
     railsToken,
     state,
     cookie: `${COOKIE}=1`,
-    /** the Authorization header of a signed-in request in auth basic */
-    basicAuth: `Basic ${Buffer.from(`${o.user}:${password}`).toString('base64')}`,
+    /** the Authorization header of a signed-in request in auth basic, with the password the grid accepts now */
+    get basicAuth() {
+      return `Basic ${Buffer.from(`${o.user}:${state.password}`).toString('base64')}`;
+    },
+    /** 19.0.0: the password changes on the grid (the keyless shell's prompt follows it too) */
+    setPassword,
+    realm,
     auth: o.auth,
     /** the lab's shared copy as the portal shows it (the virtual path), when the mock keeps one */
     sharedInstall: sharedVirtual,
@@ -1188,6 +1279,9 @@ export function cliOptions(a, env = process.env) {
     user: val('--user', 'student'),
     auth: String(val('--auth', env.MOCK_AUTH || 'cookie')).toLowerCase() === 'basic' ? 'basic' : 'cookie',
     password: val('--password', env.MOCK_PASSWORD || undefined),
+    // 19.0.0: the realm every challenge names, and the wrong Basic answers after which the account is locked (0: never)
+    realm: val('--realm', env.MOCK_REALM || 'private'),
+    lockoutAfter: Math.max(0, Math.floor(n('--lockout', 'MOCK_LOCKOUT', 0))),
     sameSite: String(val('--samesite', env.MOCK_SAMESITE || 'lax')).toLowerCase(),
     approved: String(val('--approve', 'st1234')).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     accessLimit: Number(val('--access-limit', 0)) || 0,
@@ -1222,8 +1316,8 @@ export function cliOptions(a, env = process.env) {
   };
 }
 
-// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--auth basic|cookie] [--password P] [--samesite lax|none|strict] [--approve a,b] [--access MODE] [--access-limit N] [--seat id=install] [--install-optional] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--shared-install [PATH]] [--shared-version N] [--shared-unreadable] [--fresh-home] [--own-copy] [--keyless] [--terminal stub|xterm|hterm] [--no-shell-title] [--bracketed-paste] [--shell-idle S] [--shell-max S] [--shell-sweep S] [--queue S] [--queue-reason R] [--cert F --key F]
-// The environment carries the same switches (MOCK_AUTH, MOCK_PASSWORD, MOCK_SAMESITE, MOCK_ACCESS, MOCK_SHELL_KEYLESS, MOCK_TERMINAL, MOCK_SHELL_IDLE_S, ...) and the stand-in tool's knobs (MOCK_QUEUE_S, MOCK_QUEUE_REASON, MOCK_START_S, MOCK_SIGNIN_WAIT_S, MOCK_CODE_WAIT_S, MOCK_PLAN, MOCK_LOGGED_IN, MOCK_LOGIN_FAIL, ...).
+// CLI: node mock-ood/server.mjs [--port N] [--host H] [--home DIR] [--display-home DIR] [--user NAME] [--auth basic|cookie] [--password P] [--realm R] [--lockout N] [--samesite lax|none|strict] [--approve a,b] [--access MODE] [--access-limit N] [--seat id=install] [--install-optional] [--rnode enabled] [--no-clusters] [--cold] [--cold-pun MS] [--no-cookie] [--job-composer] [--shared-install [PATH]] [--shared-version N] [--shared-unreadable] [--fresh-home] [--own-copy] [--keyless] [--terminal stub|xterm|hterm] [--no-shell-title] [--bracketed-paste] [--shell-idle S] [--shell-max S] [--shell-sweep S] [--queue S] [--queue-reason R] [--cert F --key F]
+// The environment carries the same switches (MOCK_AUTH, MOCK_PASSWORD, MOCK_REALM, MOCK_LOCKOUT, MOCK_SAMESITE, MOCK_ACCESS, MOCK_SHELL_KEYLESS, MOCK_TERMINAL, MOCK_SHELL_IDLE_S, ...) and the stand-in tool's knobs (MOCK_QUEUE_S, MOCK_QUEUE_REASON, MOCK_START_S, MOCK_SIGNIN_WAIT_S, MOCK_CODE_WAIT_S, MOCK_PLAN, MOCK_LOGGED_IN, MOCK_LOGIN_FAIL, ...).
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const a = process.argv.slice(2);
   const opts = cliOptions(a);
@@ -1234,7 +1328,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       ? "the stand-in as the account's own copy, as a build before 8.0.0 left it"
       : `not set up (Beethoven sets it up when the site's bundled profile names ${portal.sharedInstall}: open the mock at https://ondemand.wayne.localhost:${portal.port} for wayne with --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current; otherwise it says the lab's shared copy is needed)`;
   console.log(`mock Open OnDemand portal at ${portal.origin}`);
-  console.log(opts.auth === 'basic' ? `  sign in:   the browser's own sign-in box (HTTP Basic, realm "private"): ${portal.user} / ${opts.password ? '(--password)' : 'mockpass'}; ${portal.origin}/ answers 302 to /public/start.html` : `  sign in:   ${portal.origin}/login   (then the dashboard is ${portal.origin}/pun/sys/dashboard/); cookie SameSite=${opts.sameSite}`);
+  console.log(opts.auth === 'basic' ? `  sign in:   Beethoven's sheet in the panel, or the browser's own sign-in box (HTTP Basic, realm "${portal.realm}"): ${portal.user} / ${opts.password ? '(--password)' : 'mockpass'}; ${portal.origin}/ answers 302 to /public/start.html${opts.lockoutAfter ? `; locked after ${opts.lockoutAfter} wrong answers until POST /_mock/reset` : ''}; POST /_mock/password changes it` : `  sign in:   ${portal.origin}/login   (then the dashboard is ${portal.origin}/pun/sys/dashboard/); cookie SameSite=${opts.sameSite}`);
   console.log(`  home dir:  ${portal.home}  (shown to the extension as ${portal.virtualHome}; the seeded tool prints it as ${portal.displayHome}; ${portal.rsRoot.virtual} is ${portal.rsRoot.dir})`);
   console.log(`  shared:    ${portal.sharedDir} (the lab's shared copy of the stand-in tool, shown as ${portal.sharedInstall}${opts.sharedReadable ? '' : '; this account cannot read it'})`);
   console.log(`  tool:      ${home}`);

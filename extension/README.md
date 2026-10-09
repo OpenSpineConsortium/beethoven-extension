@@ -21,10 +21,26 @@ used here to say what it runs; "Open OnDemand" is the mark of its publisher.
   strip's terminal); the extension opens Anthropic's page in a tab, passes the code the student pastes
   into its one box on to that shell as keystrokes, keeps the code nowhere, and reads only what the probe
   job and the worker report from `claude auth status`. It never reads an Anthropic page or the clipboard.
-- No `cookies`, `tabs`, `webRequest`, `nativeMessaging`, `debugger` or `identity` permission, and no
-  install-time host permission. The portal origin is requested from the toolbar click on a portal tab
-  (or the setup page's Connect button); the page script is registered for that origin at runtime
-  (`scripting.registerContentScripts`) and loaded into the already-open tab (`scripting.executeScript`).
+- No `cookies`, `tabs`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger` or
+  `identity` permission, and no install-time host permission. The portal origin is requested from the
+  toolbar click on a portal tab (or the setup page's Connect button); the page script is registered for
+  that origin at runtime (`scripting.registerContentScripts`) and loaded into the already-open tab
+  (`scripting.executeScript`). Since 19.0.0 the Chrome build asks for `webRequest` and
+  `webRequestAuthProvider` (neither shows a line at install), for one listener on the granted portal
+  origin; the Firefox build asks for neither.
+- No sign-in outside a narrow rule (19.0.0). The background answers the HTTP Basic challenge of its
+  own request to the portal's dashboard, on the one granted portal origin (and, once a password it
+  gave has worked, that sign-in's realm), once per check, with the AccessID and password the student
+  typed into the panel's sheet. A tab's challenge gets Chrome's own box; a proxy's, another origin's
+  or another realm's is never answered. The first refusal stops it until the student types the
+  password again; a try whose outcome cannot be told (the browser closed before the grid replied, or
+  a portal tab was challenged or had a request answered while the answer waited) puts a saved
+  password on hold without counting one. Chrome re-sends its cached copy once for each request
+  already started with it before the first refusal comes back; Beethoven then sends at most one;
+  when the answered request is abandoned before the grid replies, Chrome may re-send that copy once.
+  How many of these the grid counts is not yet measured. No HTML sign-in page or identity provider
+  is ever filled in, no multi-factor step is touched, and no password is typed into a shell. "Use
+  Chrome's sign-in box instead" keeps 18.0.0's tab path.
 - No remote code. The kill-list is JSON, verified with WebCrypto Ed25519 against the bundled public key.
 - No cookie read, anywhere (`test/hygiene.test.ts` checks the source), and no licence key: see *Access* below.
 - Nothing deleted on the cluster, ever: it writes files, touches the framework's stop file and the
@@ -34,7 +50,13 @@ used here to say what it runs; "Open OnDemand" is the mark of its publisher.
   account name the portal's dashboard showed with the access service's last answer (and the
   `services.json` it read), the on-device audit log, the last good kill-list, the per-workspace data statement, the
   student's own checklist ticks, and three small notes the strip keeps (the Claude links it opened, the
-  time of the last sign-in it saw, the probe job it submitted). Connection state lives in `storage.session`.
+  time of the last sign-in it saw, the probe job it submitted). The one durable secret is the grid
+  sign-in, and only when the student ticked *Remember it on this computer*: an AES-GCM record in the
+  extension's IndexedDB (`beethoven-signin`), under a key derived from the PRF output of a passkey named
+  "<AccessID> (grid)" (the old passkey of 12.0.0 to 15.0.0 is named with the AccessID alone or "beethoven" and
+  can go; delete the new one only after *Forget*); `storage.local` keeps only notes about it, never the
+  password. Connection state, the unlock and an unticked password's one attempt (two minutes at most)
+  live in `storage.session`.
 
 ## Layout
 
@@ -78,7 +100,7 @@ test/                       vitest: the step machine, connecting, the plain-logi
 Node 22. On the Windows machine: `export PATH=/c/Users/grego/tools/node22:$PATH` in Git Bash.
 
 ```
-npm ci                      # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0, @types/node 22
+npm ci                      # pinned: wxt 0.21.4, vite 8.3.1, typescript 5.9.3, vitest 5.0.2, ws 8.22.0, @types/node 22, linkedom 0.18.13
 npm run build               # -> .output/chrome-mv3 (what ships) and .output/firefox-mv2 (runs scripts/sync-profiles.mjs first)
 npm run zip                 # -> .output/*.zip; the chrome zip is the one uploaded, the Firefox and sources zips are not submitted
 npm run typecheck
@@ -246,6 +268,10 @@ the live portal's per-user nginx does), `--job-composer`, `--no-cookie`, `--cert
 self-signed pair, e.g. from `openssl req -x509 -newkey ed25519 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30`),
 `--display-home DIR` (the home the seeded tool prints and records in place of the mock home's real path; by default the
 portal's own `/home/<user>`, so the strip's output box reads like a cluster wherever the mock home sits on disk),
+`--auth basic` (`MOCK_AUTH=basic`: the live portal's HTTP Basic sign-in, realm `private` or `--realm R`, for
+`--user` and the fake password `mockpass`, or `MOCK_PASSWORD`; `/` goes to the public start page; `--lockout N`
+locks the account at the Nth wrong answer, until `POST /_mock/reset`; `POST /_mock/password` changes the password
+while it runs; `/_mock/state` counts `basicGood` and `basicBad`, never the password; the reviewer's recipe uses it).
 The lab's shared copy of the tool is always there on the CLI: a second directory, seeded with the stand-in tool, a
 `VERSION` (`--shared-version N`, 5 by default) and `profiles/mock.json`, served read-only by the Files routes at its
 path (`--shared-install PATH`, else `MOCK_SHARED_INSTALL=PATH` in the server's environment, else
@@ -337,7 +363,8 @@ handling (a 403 there is said, never taken for a portal that is asleep).
 
 There are no licence keys (decided 2026-09-29; `src/licensing/access.ts` has the contract in its header). Who
 the student is comes from their own sign-in to their Open OnDemand portal: the account name the dashboard shows
-for the signed-in session ("Logged in as ...", read by `PortalClient.session()`), never a typed name, never a
+for the signed-in session ("Logged in as ...", read by `PortalClient.session()`), never a typed name (the
+AccessID typed into the 19.0.0 sign-in sheet is only the HTTP sign-in's user name), never a
 cookie, and never the home directory's owner (that fallback names paths only). Whether they may use
 Beethoven is the maintainer's approved list, asked by the background alone: it reads `access_check` from
 `https://openspineconsortium.com/beethoven/services.json` (cached a day) and POSTs
