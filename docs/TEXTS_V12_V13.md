@@ -56,17 +56,18 @@ Kept as they were:
   2026-10-09.` at the start of a line, as `extension/scripts/sync-profiles.mjs` and
   `extension/test/terms.test.ts` read it; the privacy statement's is `Version 13, 2026-10-09.`,
   which `terms.test.ts` now reads too.
--  The welcome page's four summary lines (`SUMMARY` in `extension/src/core/terms.ts`, and with them
-  `summary_sha256`) and the tick's sentence, word for word. Line 2 ("To check your approval, it
-  sends the lab your AccessID and an ID for this browser.") stays true: nothing new reaches
+-  The welcome page's summary lines 1, 2 and 4 (`SUMMARY` in `extension/src/core/terms.ts`) and the
+  tick's sentence, word for word; line 3 changed with the fourth Known Risk (L13), and with it
+  `summary_sha256`. Line 2 ("To check your approval, it sends the lab your AccessID and an ID for
+  this browser.") stays true: nothing new reaches
   Licensor. The password is consented to in the sheet, by typing it and pressing *Sign in*, which
   5(b)(i) says in terms; saving it takes a box that is never ticked for the student.
--  Section 8's three Known Risks (Anthropic and Remote Control eligibility; the university and Open
-  OnDemand's shell, files or reverse proxy; a browser store), and sections 2, 3, 4, 6, 7, 8, 9, 11,
-  12, 13, 14, 16, 17 and 19 to 23, word for word; the changes are in sections 1, 5, 10, 15 and 18
-  only. The at-most-one-try rule, Chrome's re-sends and the institution's lockout are stated in
-  5(b)(i) as behaviour, not as an assumed risk; whether the lockout should become a fourth Known
-  Risk is question 1 below.
+-  Section 8's first three Known Risks (Anthropic and Remote Control eligibility; the university and
+  Open OnDemand's shell, files or reverse proxy; a browser store), and sections 2, 3, 4, 6, 7, 9,
+  11, 12, 13, 14, 16, 17 and 19 to 23, word for word; the changes are in sections 1, 5, 8, 10, 15
+  and 18 only. The at-most-one-try rule and Chrome's re-sends are stated in 5(b)(i) as behaviour;
+  the institution's lockout is stated there and, since greg's card answer "Add it now"
+  (2026-10-09 16:28Z), is section 8's fourth Known Risk (L13).
 -  Section 3(a) ("There is no key and no password of Licensor's: your own sign-in to your
   institution's cluster identifies you"; "only once your cluster has accepted your sign-in to your
   portal") stays true whoever makes the sign-in. Section 4(a) (the institution's rules for its
@@ -313,6 +314,44 @@ New:
 
 Why: src/core/vault.ts seals the password with WebCrypto (AES-GCM-256, HKDF-SHA-256); no
 cryptography of its own.
+
+### L13. Section 8 and the welcome page's summary: the lockout as the fourth Known Risk
+
+greg's answer on the decision card, "Add it now" (2026-10-09 16:28:55Z), to "Add the AccessID
+lockout to the agreement's Known Risks before 19.0.0 ships?". Version 12 was not released, so it
+folds into version 12 with no new number.
+
+Section 8, version 11:
+
+> In particular, and as Known Risks named on the welcome page, above the box you tick, you accept
+> the risk of these three events, which are specific to how Beethoven works: Anthropic changing or
+> enforcing Remote Control eligibility; your university disabling or reconfiguring Open OnDemand's
+> shell, files or reverse proxy; and a browser store removing or disabling the Extension.
+
+Version 12:
+
+> In particular, and as Known Risks named on the welcome page, above the box you tick, you accept
+> the risk of these four events, which are specific to how Beethoven works: Anthropic changing or
+> enforcing Remote Control eligibility; your university disabling or reconfiguring Open OnDemand's
+> shell, files or reverse proxy; a browser store removing or disabling the Extension; and your
+> institution disabling your account after wrong passwords, counting a password the Extension sent
+> for you in the way section 5(b)(i) describes or a copy your browser re-sent by itself, with
+> getting the account back taking days.
+
+5(b)(i)'s lockout sentence gains "You accept that risk as a Known Risk (section 8)." The welcome
+page's summary line 3, version 11: "The grid, Anthropic or the browser store can stop it working at
+any time. You accept that risk." Version 12: "The grid, Anthropic or the browser store can stop it
+working at any time, and wrong passwords can get your grid account disabled. You accept these
+risks." So `summary_sha256` changes, and `extension/test/terms.test.ts` and
+`extension/e2e/lib/words.mjs` pin the new line. The tick's sentence ("accepting the risks above")
+points at the summary and is unchanged.
+
+Why: a disabled AccessID is the worst thing the 19.0.0 sign-in can bring about. Getting it back can
+take up to three business days at Wayne State (KB 20082, from the search index). Before this
+change it was stated as behaviour only, so a student could tick without reading it. "In the way
+section 5(b)(i) describes" keeps the assumption to the behaviour the agreement states: a
+lockout caused by the Extension sending more than 5(b)(i) says is not assumed. Section 8's last
+sentence still leaves out Licensor's gross negligence, wilful misconduct and fraud.
 
 ## The privacy statement (`PRIVACY.md`), version 12 to 13
 
@@ -711,8 +750,8 @@ The second review of 19.0.0 (2026-10-09, before any release) found sentences in 
 described a design the code no longer had after the background's round-two changes. Both texts were
 corrected in place: `LICENSE.txt` stays version 12 and `PRIVACY.md` version 13, both dated
 2026-10-09, since neither has been released or accepted by anyone; `TERMS_VERSION` stays 12, and
-`SUMMARY`, the tick and `summary_sha256` are unchanged (no fix needed the summary: nothing new
-reaches Licensor). `extension/public/` holds byte-identical copies (`npm run sync-profiles`). Every
+the round's fixes left `SUMMARY`, the tick and `summary_sha256` unchanged (no fix needed the
+summary: nothing new reaches Licensor; summary line 3 changed afterwards, with L13). `extension/public/` holds byte-identical copies (`npm run sync-profiles`). Every
 sentence below was read against `extension/src/entrypoints/background.ts` as round two left it, and
 the quotations of L5, P5, P6, P12 and P16 above were taken again from the corrected files.
 
@@ -799,7 +838,8 @@ negative block.
 
 ## For Greg (and counsel)
 
-1.  **The lockout as a fourth Known Risk?** Wayne State disables an AccessID after the fifth wrong
+1.  **The lockout as a fourth Known Risk?** Decided: greg's card answer "Add it now"
+   (2026-10-09 16:28:55Z); done in version 12 (L13). The question as it was put: Wayne State disables an AccessID after the fifth wrong
    password, and reactivation may take up to three business days (KB 20082, from the search index).
    Whether failed HTTP Basic answers at the portal count toward those five is not yet measured, nor
    how many stale tries Chrome sends after a password change. The agreement now states the
@@ -809,7 +849,9 @@ negative block.
    accept that risk."), the `summary_sha256` every record carries, and `terms.test.ts`'s summary
    pin, together (the tick's "accepting the risks above" points at those lines). Done before 19.0.0
    ships, it folds into version 12; after, it is version 13.
-2.  **Wayne State's Strong Password Standard, and whether to offer the tick there at all.** The
+2.  **Wayne State's Strong Password Standard, and whether to offer the tick there at all.**
+   Decided: greg's card answer "Keep, ask C&IT" (2026-10-09 16:29:14Z): the tick stays with its
+   warning, and greg asks hpc@wayne.edu. The question as it was put: The
    standard says: "Never save passwords in web browsers or computer programs; instead, type them in
    each time you need them." (`https://tech.wayne.edu/policies/password-standard`, from the search
    index, 2026-10-09; the same standard says never to share the password with anyone, and the access

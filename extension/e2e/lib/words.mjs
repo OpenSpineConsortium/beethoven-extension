@@ -11,7 +11,7 @@ const SPEC = {
   SUMMARY: [
     "Free while you're approved. Licensed to you, not sold.",
     'To check your approval, it sends the lab your AccessID and an ID for this browser.',
-    'The grid, Anthropic or the browser store can stop it working at any time. You accept that risk.',
+    'The grid, Anthropic or the browser store can stop it working at any time, and wrong passwords can get your grid account disabled. You accept these risks.',
     'Disputes: written notice first, then one person at a time in Michigan courts, with no jury.',
   ],
   AFFIRMATION: { id: 'agree', bold: "I've read and agree to the Beethoven terms and privacy statement, and I'm 18 or older.", soft: 'That includes giving up a jury trial and class actions, and accepting the risks above.' },

@@ -51,7 +51,7 @@ export const TWO_TICKS = false;
 export const SUMMARY: readonly string[] = [
   "Free while you're approved. Licensed to you, not sold.",
   'To check your approval, it sends the lab your AccessID and an ID for this browser.',
-  'The grid, Anthropic or the browser store can stop it working at any time. You accept that risk.',
+  'The grid, Anthropic or the browser store can stop it working at any time, and wrong passwords can get your grid account disabled. You accept these risks.',
   'Disputes: written notice first, then one person at a time in Michigan courts, with no jury.',
 ];
 

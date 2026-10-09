@@ -211,7 +211,7 @@ started with it before the first refusal comes back; the Extension then sends at
 answered request is abandoned before your cluster replies, your browser may re-send that copy once.
 How many of these your cluster counts is not yet measured. Your institution may disable your account
 after a few wrong passwords, and getting it back may take days; a password you have just changed may
-not work everywhere yet.
+not work everywhere yet. You accept that risk as a Known Risk (section 8).
 
 Saving the password. Saving it is optional and off unless you tick the box "Remember it on this
 computer" on the sheet; the box is never ticked for you. Section 4(a) applies to that choice: where
@@ -381,13 +381,16 @@ section 9 says.
 You choose to use Beethoven knowing section 7. You accept the risk that any Named Dependency fails
 or changes, that Beethoven stops working as a result, and that work you had running, files you had
 in a worker's session, or time you had planned may be lost or delayed. In particular, and as Known
-Risks named on the welcome page, above the box you tick, you accept the risk of these three events,
+Risks named on the welcome page, above the box you tick, you accept the risk of these four events,
 which are specific to how Beethoven works: Anthropic changing or enforcing Remote Control
 eligibility; your university disabling or reconfiguring Open OnDemand's shell, files or reverse
-proxy; and a browser store removing or disabling the Extension. You agree that such an event is not
-a defect in Beethoven, not a breach of this agreement by Licensor, and gives no claim against
-Licensor. This section is one of the terms named in the sentence you tick on the welcome page. It
-does not cover loss caused by Licensor's own gross negligence, wilful misconduct or fraud.
+proxy; a browser store removing or disabling the Extension; and your institution disabling your
+account after wrong passwords, counting a password the Extension sent for you in the way section
+5(b)(i) describes or a copy your browser re-sent by itself, with getting the account back taking
+days. You agree that such an event is not a defect in Beethoven, not a breach of this agreement by
+Licensor, and gives no claim against Licensor. This section is one of the terms named in the
+sentence you tick on the welcome page. It does not cover loss caused by Licensor's own gross
+negligence, wilful misconduct or fraud.
 
 9. EVALUATION PERIOD, SUPPORT, NO FEES, AND THE FULL EDITION
 
