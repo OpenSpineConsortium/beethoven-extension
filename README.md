@@ -211,7 +211,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 17.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 18.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -223,7 +223,10 @@ the agreement's button grey until the text has been read; 11.0.0 reaches the por
 background and accepts the agreement with one tick; 12.0.0 to 15.0.0 tried a direct way over ssh
 first, through a bridge bundled in the package, with signed installers for it from 15.0.0; 16.0.0
 removes that way whole and keeps the one way, the university's VPN and the portal, with a press that
-waits for the VPN and goes ahead by itself; `release/<version>/README.md` lists a version's changes,
+waits for the VPN and goes ahead by itself; 17.0.0 reads the site profile through beethoven-base's
+reader and offers "Your grid" when a build carries two or more; 18.0.0 brings the grid's sign-in box
+to the front, keeps the sign-in tab long enough for Chrome's offer to save the password, and waits on
+GlobalProtect at once when the grid is known to be out of reach; `release/<version>/README.md` lists a version's changes,
 up to 14.0.0); the framework is the server repository's, `OpenSpineConsortium/hpcworker`, and the
 lab's shared copy at Wayne State is the version its `tools/deploy_shared.sh` last published (the
 panel shows it under *Details*); the agreement `LICENSE.txt` is version 11 and the extension's

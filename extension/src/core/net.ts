@@ -27,6 +27,13 @@ export interface PortalNet {
 
 /** how long the reachability check waits: a name the VPN alone resolves times out rather than failing at once */
 export const REACH_TIMEOUT_MS = 5_000;
+/**
+ * 18.0.0: how long it waits once the grid is already known to be out of reach (the GlobalProtect moment is
+ * up and the check runs again and again). A grid that answers through the tunnel answers well inside this;
+ * a check that runs out only means the next one, a few seconds later, asks again. Five seconds each time made
+ * the moment slow to notice GlobalProtect connecting (greg, 2026-10-09: "kinda laggy").
+ */
+export const REACH_LOOKING_TIMEOUT_MS = 2_500;
 
 /**
  * Does the grid answer at all? One request to the portal's address with no sign-in and no cookie

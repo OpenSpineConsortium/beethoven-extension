@@ -110,7 +110,7 @@ describe('journey: the first run, moment by moment', () => {
     expect(momentOf(f)).toBe('grid');
     const g = J(f, 'grid');
     expect(g.title).toBe('Sign in to the grid');
-    expect(g.body).toBe('Use your AccessID and password in the box Chrome shows. Beethoven never sees them.');
+    expect(g.body).toBe('Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time.');
     expect(g.problem).toBeUndefined();
     const done = facts({ ...firstRun, signin: { waiting: false, signedInAt: NOW - 500 } });
     expect(momentOf(done)).toBe('grid');
@@ -122,9 +122,9 @@ describe('journey: the first run, moment by moment', () => {
     const p = (signin: Partial<Facts['signin']>, grid: Partial<Facts['grid']> = { session: 'signed-out' }) => J(facts({ ...firstRun, grid, signin }), 'grid').problem;
     expect(p({ waiting: true, problem: 'cancelled' })).toEqual({ body: 'Not signed in yet.', button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-grid' } } });
     expect(p({ waiting: false, problem: 'tab-closed' })).toEqual({ body: 'The sign-in tab was closed.', button: { label: 'Sign in again', tone: 'ink', action: { kind: 'sign-in-grid' } } });
-    expect(p({ waiting: true, problem: 'start-page' })).toEqual({ body: 'Press LOGIN TO ONDEMAND on the grid page.' });
+    expect(p({ waiting: true, problem: 'start-page' })).toEqual({ body: "Press LOGIN on the grid's page." });
     expect(p({ waiting: true }, { session: 'unreachable' })).toEqual({ body: "Can't reach the grid. Is GlobalProtect on?", button: { label: 'Try again', tone: 'ink', action: { kind: 'retry-grid' } } });
-    expect(p({ waiting: true }, { session: 'not-ood' })).toEqual({ body: "This doesn't look like an OnDemand portal.", button: { label: 'Use another portal', tone: 'ink', action: { kind: 'open-settings' } } });
+    expect(p({ waiting: true }, { session: 'not-ood' })).toEqual({ body: "This doesn't look like your grid's website.", button: { label: 'Use another portal', tone: 'ink', action: { kind: 'open-settings' } } });
   });
 
   it('where your work goes: the four lines, the fold, the tick, Connect and the checklist that ticks itself', () => {
@@ -456,7 +456,7 @@ describe('the panel', () => {
     expect(TERMS_REFUSAL).toBe("The Beethoven terms haven't been accepted in this browser yet. Open Beethoven's welcome page to accept them.");
     // terms accepted, no portal yet: the body never claims the terms are unaccepted (hy9698, 2026-10-03)
     const accepted = panelView(facts({ portal: undefined, granted: false, once: {} }));
-    expect(accepted).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'finish', body: "Your portal isn't connected. Open Settings and connect it under Your grid.", button: { label: 'Open Settings' } } });
+    expect(accepted).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'finish', body: "Your grid isn't connected yet. Open Settings and connect it under Your grid.", button: { label: 'Open Settings' } } });
     // the panel opened by the press itself, Chrome's box up: "Almost there."
     const pressed = panelView(facts({ terms: false, welcome: { state: 'idle', pressAt: NOW - 2_000 } }));
     expect(pressed).toMatchObject({ kind: 'journey', journey: { moment: 'welcome', state: 'waiting', title: 'Almost there.', body: "Choose Allow in Chrome's box. Beethoven carries on here.", status: 'Waiting for Chrome…' } });

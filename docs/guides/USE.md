@@ -1,6 +1,13 @@
 # Use Beethoven
 
-For Beethoven 16.0.0. Written 2026-10-02, updated 2026-10-08.
+For Beethoven 18.0.0. Written 2026-10-02, updated 2026-10-09.
+
+**New in 18.0.0.** The grid's sign-in box comes to the front by itself, with its tab and window, so
+you no longer have to find its tab. Chrome can save your grid password: when it offers after you
+sign in, choose **Save**, and next time the box is filled in for you ([part
+2](#let-chrome-remember-your-grid-sign-in)). A press made while GlobalProtect is off now waits at
+once instead of after a few seconds, and Beethoven notices sooner when GlobalProtect connects. The
+panel calls the grid's start button by its first word: **Press LOGIN on the grid's page.**
 
 **New in 16.0.0.** One way to the grid: GlobalProtect, then the grid's website, as before 12.0.0.
 The helper, the sign-in sheet, the key in this browser, Windows Hello or Touch ID protection and
@@ -81,8 +88,11 @@ About ten minutes, plus the wait for a computer on the grid.
    says **Looking for the grid…**, then **Connected.** If it says **Still looking. Check that
    GlobalProtect says Connected.**, check that.
 6. **Sign in to the grid**: "Use your AccessID and password in the box Chrome shows. Beethoven never
-   sees them." Type them into Chrome's box. If the grid's page shows **LOGIN TO ONDEMAND** instead,
-   press it first. The panel says **Signed in as** your AccessID.
+   sees them. Chrome can save them for next time." Beethoven brings the box to the front; type them
+   into it. If the grid's page shows a **LOGIN** button instead, press it first. The panel says
+   **Signed in as** your AccessID. If Chrome offers to save the password, choose **Save** (part 2, "Let Chrome remember your grid
+   sign-in");
+   the grid's tab closes by itself once you move on, or after a few seconds.
 7. **One more thing, once.** The first time, the grid's shell may ask for your password itself.
    Beethoven then says: "Type your grid password in the grid's own terminal. Beethoven never sees
    it." Click **Open the grid terminal**: the grid's own terminal page opens in a tab. Type your
@@ -125,6 +135,18 @@ Your worker keeps running when you close the panel, the browser or the laptop, a
 GlobalProtect is off. **Open my session** works without GlobalProtect too: claude.ai is not on the
 grid. If **Keep my worker running** is on in **Settings** and Beethoven finds your worker ended
 without your **Stop**, it starts it again by itself, at most three times in a row.
+
+### Let Chrome remember your grid sign-in
+
+The grid's sign-in box is Chrome's own, so Chrome's password manager can keep your AccessID and
+password. When Chrome offers to save them after you sign in, choose **Save**. The next time the box
+appears, Chrome fills them in and you press **Sign in**. To have Chrome ask for Windows Hello (on a
+Mac, Touch ID or your Mac's password) before it fills them in, open **Settings** in Beethoven, then
+**Password settings** under **Your grid**, and turn on **Use Windows Hello when filling passwords**
+(on a Mac, **Use your screen lock when filling passwords**). The password stays in Chrome's password
+manager: Beethoven never reads it, stores it or fills it in. The switches' names are Chrome's own,
+read from Chromium's source on 2026-10-09; not yet tried with the grid's box on a real Windows or Mac
+computer.
 
 ## 3. When the grid is out of reach
 
@@ -169,7 +191,7 @@ list; delete it there ([Install Beethoven](INSTALL.md), "Remove Beethoven comple
 | **Turn on GlobalProtect.** and, after a while, **Still looking. Check that GlobalProtect says Connected.** | Open GlobalProtect, connect to `protect.wayne.edu` and approve in Microsoft Authenticator. **How to set it up** opens Wayne State's guide. Beethoven carries on by itself as soon as the grid answers (part 3). |
 | **Can't reach the grid. Is GlobalProtect on?** | The same. Your worker keeps running meanwhile. |
 | **Not signed in yet.** or **The sign-in tab was closed.** | Click **Sign in again** and sign in in the box Chrome shows. Type your AccessID, not your e-mail address. |
-| **Press LOGIN TO ONDEMAND on the grid page.** | Press it, then sign in. |
+| **Press LOGIN on the grid's page.** | Press it, then sign in. |
 | **One more thing, once.** stays on **Not done yet.** | Open the terminal again, type your password (and the code, if asked), press Enter, then click **I'm in** (part 1, step 7). If it says so again, tell your lab lead. |
 | **Your grid account can't use the lab's copy yet. Ask your lab lead.** (**Copy details** gives a line ending in `Permission denied`) | Your approval hasn't reached the grid yet. The lab's list of approved accounts is applied on the grid by itself, about every fifteen minutes. Wait a quarter of an hour, then close Chrome completely, open it again and click **Connect**. If it still says this after an hour, click **Copy details** and send your lab lead what it gives. |
 | **This Claude account has no Pro or Max plan. Remote Control needs one.** | Sign out of Claude on the grid first (your lab lead's guide shows how), then press **Sign in again** with a Claude account that has one. |

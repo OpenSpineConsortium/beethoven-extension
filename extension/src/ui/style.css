@@ -725,7 +725,9 @@ body.page > #app { overflow-x: clip; }
 /* 12.0.0 reviews (fixer A): Settings at panel width. A label never breaks a letter per line ("Helper"),
    the segmented control fills the row and wraps its words inside each segment, a row's buttons go under
    its label when the two do not fit side by side, and long values wrap only between words. */
-.s-row .s-label > .s-sub:first-child { white-space: nowrap; }
+/* 18.0.0: only a label followed by its value ("Installation ID"); a note alone in its row (Start over, the old
+   key, the saved sign-in) wraps, where nowrap had run it behind its button */
+.s-row .s-label > .s-sub:first-child:not(:last-child) { white-space: nowrap; }
 .s-row .s-label, .s-row .s-sub, .s-note { overflow-wrap: break-word; word-break: normal; }
 .s-note.s-fine { padding-top: 0; font-size: 12.5px; }
 @media (max-width: 480px) {

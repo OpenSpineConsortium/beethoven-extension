@@ -89,7 +89,7 @@ export const WORDS = {
     /** terms accepted, no portal connected yet: the truthful body (the refusal is for unaccepted terms
      * only), worded for where the button lands — the options page shows Settings once the agreement is
      * in force, and its Change field offers the portal */
-    finishBody: "Your portal isn't connected. Open Settings and connect it under Your grid.",
+    finishBody: "Your grid isn't connected yet. Open Settings and connect it under Your grid.",
     finishButton: 'Open Settings',
     revokedTitle: 'Allow Beethoven again',
     revokedBody: (host: string) => `Chrome no longer lets Beethoven reach ${host}. Your worker on the grid is not affected.`,
@@ -117,7 +117,8 @@ export const WORDS = {
   /** moment 5 */
   grid: {
     title: 'Sign in to the grid',
-    body: 'Use your AccessID and password in the box Chrome shows. Beethoven never sees them.',
+    /** 18.0.0: the last sentence: Chrome's own password manager keeps them (Settings, Your grid, links its settings) */
+    body: 'Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time.',
     signedIn: (account: string) => `Signed in as ${account}.`,
     /**
      * The spec's sentence for Cancel. Not shown by 11.0.0: measured in Chromium 153 (core build,
@@ -129,9 +130,10 @@ export const WORDS = {
     notYet: 'Not signed in yet.',
     tabClosed: 'The sign-in tab was closed.',
     signInAgain: 'Sign in again',
-    startPage: 'Press LOGIN TO ONDEMAND on the grid page.',
+    /** 18.0.0: the button on the grid's start page, named by its first word (greg: the student never needs to know the portal's name) */
+    startPage: "Press LOGIN on the grid's page.",
     unreachable: (app: string) => `Can't reach the grid. Is ${app} on?`,
-    notOod: "This doesn't look like an OnDemand portal.",
+    notOod: "This doesn't look like your grid's website.",
     useAnother: 'Use another portal',
     tryAgain: 'Try again',
   },
@@ -413,10 +415,18 @@ export const WORDS = {
     clear: 'Clear',
     drive: 'Google Drive in Claude (optional)',
     startOver: 'Start over',
-    startOverNote: "Returns the side panel to its first screen and forgets this journey's progress on this computer. Your agreement, your grid sign-in, your portal and your worker on the grid all stay.",
+    startOverNote: "Returns the side panel to its first screen and forgets this journey's progress on this computer. Your agreement, your grid sign-in, your grid's address and your worker on the grid all stay.",
     startOverConfirm: 'Start over?',
     startOverButton: 'Start over',
     labLead: 'For your lab lead',
+    /**
+     * 18.0.0 (greg, 2026-10-09: the grid sign-in "savable under touch id or windows hello"): Chrome's own password
+     * manager saves the box's password and, with its "Use Windows Hello when filling passwords" (Windows) or "Use
+     * your screen lock when filling passwords" (Mac) setting, asks for it before filling the box (Chromium's
+     * HttpAuthManagerImpl::Autofill, read 2026-10-09). Beethoven never reads, stores or fills the password.
+     */
+    savedSignin: 'Chrome can save your grid password. In its password settings, it can ask for Windows Hello or Touch ID before filling it in.',
+    savedSigninOpen: 'Password settings',
     /**
      * 16.0.0: a key a build from 12.0.0 to 15.0.0 added to the student's grid account for the direct way, which
      * 16.0.0 no longer has or can use (the key itself was dropped with its database, unread). The student
@@ -578,7 +588,7 @@ export interface GridMoment {
   moment: 'grid';
   /** "Sign in to the grid" */
   title: string;
-  /** "Use your AccessID and password in the box Chrome shows. Beethoven never sees them." */
+  /** "Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time." */
   body: string;
   /** "Signed in as st1234." with a drawn check, when it happened */
   signedIn?: string;

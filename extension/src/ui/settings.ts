@@ -155,6 +155,13 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
           ),
         ),
         portalField('change-fold', local.changeOpen, local.portalInput ?? v.grid.address ?? v.grid.suggested ?? '', local.portalError, WORDS.welcome.usePortal, { input: (val) => { local.portalInput = val; }, use: changePortal }),
+        // 18.0.0: the grid password lives in Chrome's own password manager, never in Beethoven
+        el(
+          'div',
+          { class: 's-row has-note' },
+          el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.savedSignin })),
+          el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.savedSigninOpen, onClick: () => g.openTab(LABELS.passwordSettingsUrl) }),
+        ),
       ),
       // 16.0.0: a key an earlier version put in the grid account (the lab lead removes it); Forget drops the note
       v.oldKey

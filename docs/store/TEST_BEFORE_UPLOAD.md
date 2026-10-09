@@ -57,10 +57,12 @@ not yet measured, so write each one down word for word.
    Connected.** Turn GlobalProtect on: within a few seconds **Connected.**, and the grid's sign-in
    follows by itself. Nothing is pressed.
 5. **Sign in to the grid.** The panel says **Sign in to the grid**: "Use your AccessID and password
-   in the box Chrome shows. Beethoven never sees them." The portal's tab shows the grid's page
-   (press **LOGIN TO ONDEMAND** if the panel asks for it); type both into Chrome's own box. The panel
-   says **Signed in as <AccessID>.** A cancelled box or a wrong password reads **Not signed in yet.**
-   with **Sign in again**; both look the same to Beethoven.
+   in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time." The
+   portal's tab comes to the front with its window (18.0.0) and shows the grid's page (press
+   **LOGIN** if the panel asks for it); type both into Chrome's own box. The panel says **Signed in
+   as <AccessID>.** If Chrome offers to save the password, the tab stays until you choose or move to
+   another tab (at most 15 s), then closes. A cancelled box or a wrong password reads **Not signed in
+   yet.** with **Sign in again**; both look the same to Beethoven.
 6. **The one-time key step**, only if the portal's shell asks for a password (AM2; not yet tried on
    the grid by a student without a key). The panel says **One more thing, once.**: "Type your grid
    password in the grid's own terminal. Beethoven never sees it.", **Open the grid terminal**; type
