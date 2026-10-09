@@ -180,6 +180,7 @@ export function install(): World {
   let nextTab = 10;
   const onUpdated = ev();
   const onRemoved = ev();
+  const onActivated = ev();
   const visible = (url: string) => {
     try {
       const u = new URL(url);
@@ -349,6 +350,7 @@ export function install(): World {
     tabs: {
       onUpdated,
       onRemoved,
+      onActivated,
       async get(id: number) {
         const t = world.tabs.get(id);
         if (!t) throw new Error(`No tab with id: ${id}`);
@@ -369,7 +371,13 @@ export function install(): World {
           L(`tabs.update #${id} url ${t.url} -> ${o.url}`);
           navigateImpl(id, o.url);
         }
-        if (o.active) t.active = true;
+        if (o.active) {
+          // 18.0.0: a tab brought to the front is the only active one in its window, and says so in the log
+          for (const x of world.tabs.values()) if (x.windowId === t.windowId) x.active = false;
+          t.active = true;
+          L(`tabs.update #${id} active`);
+          onActivated.fire({ tabId: id, windowId: t.windowId });
+        }
         return tabView(t);
       },
       async remove(id: number) {
@@ -397,7 +405,13 @@ export function install(): World {
         return undefined;
       },
     },
-    windows: { update: async () => ({}), getCurrent: async () => ({ id: 1 }) },
+    windows: {
+      async update(id: number, o: any) {
+        if (o?.focused) L(`windows.update #${id} focused`);
+        return {};
+      },
+      getCurrent: async () => ({ id: 1 }),
+    },
     action: {
       setBadgeText: async () => {},
       setBadgeBackgroundColor: async () => {},

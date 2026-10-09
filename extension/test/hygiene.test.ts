@@ -318,14 +318,14 @@ describe('the built package', () => {
 
 // No sentence a student can read may name the machinery: job, node, partition, heartbeat, shell, portal tab,
 // probe, scheduler, hpcworker, OnDemand or "Failed to fetch" (the specification's hygiene rule). Details for
-// the lab lead and Settings' folded "For your lab lead" are exempt. Five sentences of the specification itself
+// the lab lead and Settings' folded "For your lab lead" are exempt. Three sentences of the specification itself
 // break the rule and are allowed by name: the third Try asking question, the share subline and the tour's third
-// caption ("job", "jobs"), and the two grid sign-in sentences that name the portal's own page ("OnDemand",
-// "LOGIN TO ONDEMAND").
+// caption ("job", "jobs"). 18.0.0 took the portal's name out of the two grid sign-in sentences that carried it
+// (greg, 2026-10-09: the student never needs to know it), so OnDemand has no exception left.
 // The one-time key step's line is a command the student pastes, not a sentence; it is not in these tables.
 describe('the words a student reads', () => {
   const BANNED = (t: string) => /\b(jobs?|nodes?|partition|heartbeat|shell|scheduler|hpcworker|probe)\b|portal tab|Failed to fetch/i.test(t) || /OnDemand|ONDEMAND/.test(t);
-  const ALLOWED = new Set<string>([WORDS.home.prompts[2], WORDS.queue.shareSub, WORDS.tour.captions[2], WORDS.grid.notOod, WORDS.grid.startPage]);
+  const ALLOWED = new Set<string>([WORDS.home.prompts[2], WORDS.queue.shareSub, WORDS.tour.captions[2]]);
   const strings = (v: unknown, skip: string[] = []): string[] => {
     if (typeof v === 'string') return [v];
     if (typeof v === 'function') return [String((v as (...a: unknown[]) => unknown)('st1234', 'GlobalProtect', 'protect.wayne.edu', 'Wayne State grid'))];

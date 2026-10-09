@@ -227,11 +227,22 @@ export function slideSwap(stage: HTMLElement, next: HTMLElement, opts: { back?: 
   stage.append(next);
   for (const o of old) {
     o.classList.add('leaving', `leave-${mode}`);
-    o.setAttribute('aria-hidden', 'true');
+    // inert alone, never aria-hidden: the button just pressed still holds focus inside the leaving screen,
+    // and Chrome refuses aria-hidden over a focused element (greg's console, 2026-10-09: "Blocked
+    // aria-hidden on an element because its descendant retained focus", on the GlobalProtect moment).
+    // inert takes the screen out of the accessibility tree and out of focus; the focus is let go first
+    // so nothing is left focused inside it, and the panel focuses the new screen's [data-autofocus]
+    leaveFocus(o);
     o.setAttribute('inert', '');
     afterOwnAnimations(o, () => o.remove());
   }
   afterOwnAnimations(next, () => next.classList.remove(`enter-${mode}`));
+}
+
+/** let go of the focus when it sits inside `node` (a screen about to leave) */
+export function leaveFocus(node: Element): void {
+  const a = typeof document !== 'undefined' ? document.activeElement : null;
+  if (a && a !== document.body && node.contains(a) && typeof (a as HTMLElement).blur === 'function') (a as HTMLElement).blur();
 }
 
 /** the one-second clock: every element drawn with `tick` gets its text again (the queue timer, "up 2 h 14 min") */

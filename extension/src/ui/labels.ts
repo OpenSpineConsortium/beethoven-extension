@@ -30,6 +30,8 @@ export const LABELS = {
   driveOpen: 'Open claude.ai connectors',
   driveTick: 'Google Drive is connected in claude.ai',
   driveUrl: 'https://claude.ai/settings/connectors',
+  /** 18.0.0: Chrome's own password settings (Windows Hello or the screen lock before filling); a Chrome page, opened with tabs.create */
+  passwordSettingsUrl: 'chrome://password-manager/settings',
 } as const;
 
 /** Details for your lab lead: section names and field labels (exempt from the hygiene rule) */

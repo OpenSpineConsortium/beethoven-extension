@@ -97,7 +97,7 @@ import { LoginSetupFlow } from '../core/loginSetup';
 import { CONNECT_PORT, fail, succeed, unwrap, VIEW_PORT, type Answer, type ConnectOut, type Request, type TerminalTyped, type ViewIn, type ViewOut } from '../core/messages';
 import { BADGE_COLORS, LOG_WORDS, WORDS, type Action, type ActionResults, type ConnectFailure, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
 import type { WsConstructor } from '../core/net';
-import { reach } from '../core/net';
+import { reach, REACH_LOOKING_TIMEOUT_MS, REACH_TIMEOUT_MS } from '../core/net';
 import { DASHBOARD, PORTAL_OPS, PortalClient, type PortalApi, type SessionInfo } from '../core/portal';
 import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell';
 import { detailsView, settingsView } from '../core/sheets';
@@ -137,8 +137,10 @@ const STATUS_JSON_MS = 60_000;
 const GRID_LIVE_MS = 60_000;
 /** the sign-in watch on the panel's tick */
 const SIGNIN_WATCH_MS = 2_000;
-/** the GlobalProtect moment's reachability check */
+/** the GlobalProtect moment's reachability check: never more often than PRIVACY.md's "every three seconds" (on the panel's 2 s tick, every 4 s in practice) */
 const REACH_EVERY_MS = 3_000;
+/** 18.0.0: a press made within this long of a check that found no route waits on GlobalProtect at once, without the dashboard's 5 s */
+const REACH_FRESH_MS = 10_000;
 /** "Done. You won't need this again." holds this long before the waiting press carries on */
 const KEY_DONE_HOLD_MS = 1_500;
 /** a waiting press asks again for what it waits on (the approval, the setup) at most this often */
@@ -1318,7 +1320,8 @@ async function recheckReach(o: { fromAlarm?: boolean } = {}): Promise<'answers' 
   mem.busy.reach = true;
   mem.last.reach = Date.now();
   try {
-    const r = await reach(s.origin, (i, init) => fetch(i, init));
+    // 18.0.0: the first check waits the full 5 s; once the grid is known to be out of reach, 2.5 s (net.ts)
+    const r = await reach(s.origin, (i, init) => fetch(i, init), mem.lookingSince !== undefined ? REACH_LOOKING_TIMEOUT_MS : REACH_TIMEOUT_MS);
     const grid = await session.get<GridNote>(GRID_KEY);
     const before = grid?.reach;
     if (r === 'no-route') {
@@ -1396,6 +1399,11 @@ async function checkGrid(reason: string): Promise<'signed-in' | 'signed-out' | '
 /**
  * Open the grid's sign-in: the welcome tab itself (first run), or one tab in front in the panel's
  * window for a press. Watched by tabs.onUpdated, the panel's tick and a 30-second alarm.
+ *
+ * 18.0.0: whichever tab it is comes to the front, in a window brought forward. Chrome shows its sign-in
+ * box only over the tab in front: a welcome tab navigated while the student had another tab up (the
+ * GlobalProtect page "How to set it up" opens one) held the box out of sight until they clicked over to
+ * it (greg, 2026-10-09). The student pressed and is waiting on this box; it is the one thing to show.
  */
 async function openSigninTab(purpose: 'welcome' | 'press', tabId?: number, windowId?: number): Promise<boolean> {
   const s = await settingsNow();
@@ -1409,6 +1417,7 @@ async function openSigninTab(purpose: 'welcome' | 'press', tabId?: number, windo
     if (now && stillWhereLeft(existing, now)) {
       await session.set(SIGNIN_TAB_KEY, { ...existing, loaded: false, loads_after: 0 } satisfies OpenedTab);
       await browser.tabs.update(existing.tabId, { url, active: true }).catch(() => undefined);
+      await focusTab(existing.tabId, now.windowId);
       mem.signin = { waiting: true };
       await browser.alarms.create(SIGNIN_ALARM, { periodInMinutes: 0.5 });
       return true;
@@ -1418,7 +1427,7 @@ async function openSigninTab(purpose: 'welcome' | 'press', tabId?: number, windo
   let rec: OpenedTab | undefined;
   if (purpose === 'welcome' && tabId !== undefined) {
     try {
-      await browser.tabs.update(tabId, { url });
+      await browser.tabs.update(tabId, { url, active: true });
       rec = { tabId, windowId: windowId ?? mem.panelWindowId ?? -1, url, opened_at: nowIso(), purpose: 'welcome' };
     } catch {
       rec = undefined;
@@ -1433,6 +1442,7 @@ async function openSigninTab(purpose: 'welcome' | 'press', tabId?: number, windo
     if (!t) return false;
     rec = { tabId: t.tabId, windowId: t.windowId, url, opened_at: nowIso(), purpose: 'press', ...(ret !== undefined ? { return_tab_id: ret } : {}) };
   }
+  await focusTab(rec.tabId, rec.windowId >= 0 ? rec.windowId : undefined);
   await session.set(SIGNIN_TAB_KEY, rec);
   mem.signin = { waiting: true };
   await browser.alarms.create(SIGNIN_ALARM, { periodInMinutes: 0.5 });
@@ -1462,7 +1472,7 @@ async function onSignedIn(reason: string): Promise<void> {
         await browser.tabs.update(rec.tabId, { autoDiscardable: false } as never).catch(() => undefined);
         if (rec.return_tab_id !== undefined) await focusTab(rec.return_tab_id).catch(() => false);
       } else {
-        await closeUnderGuards(rec);
+        void closeSigninTabSoon(rec);
       }
       await session.remove(SIGNIN_TAB_KEY);
     }
@@ -1477,6 +1487,51 @@ async function onSignedIn(reason: string): Promise<void> {
   } finally {
     mem.busy.signedIn = false;
   }
+}
+
+/** 18.0.0: how long the grid sign-in tab may stay in front after the sign-in, for Chrome's offer to save the password */
+const SAVE_OFFER_MS = 15_000;
+
+/**
+ * 18.0.0: close the grid sign-in tab once the student has had a moment for Chrome's own "Save password?"
+ * offer. Chrome makes that offer on the tab whose sign-in box was answered, once its page has loaded, and the
+ * offer goes with the tab (Chromium's HttpAuthManagerImpl, read 2026-10-09), so closing it at once, as up to
+ * 17.0.0, threw the offer away (greg, 2026-10-09: the sign-in "should be savable"). A tab not in front closes
+ * at once; one in front closes when the student moves to another tab of its window or after SAVE_OFFER_MS,
+ * and is left alone if its page moved on meanwhile (the student is using it). Focus goes back to the tab the
+ * sign-in came from only when the student did not move on by themselves.
+ */
+async function closeSigninTabSoon(rec: OpenedTab): Promise<void> {
+  const now = await tabNow(rec.tabId);
+  if (!now) return;
+  if (!now.active) {
+    await closeUnderGuards(rec);
+    return;
+  }
+  const movedOn = await new Promise<boolean>((resolve) => {
+    let done = false;
+    const finish = (moved: boolean) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      browser.tabs.onActivated.removeListener(onActivated);
+      browser.tabs.onRemoved.removeListener(onRemoved);
+      resolve(moved);
+    };
+    const onActivated = (info: { tabId: number; windowId: number }) => {
+      if (info.windowId === now.windowId && info.tabId !== rec.tabId) finish(true);
+    };
+    const onRemoved = (id: number) => {
+      if (id === rec.tabId) finish(true);
+    };
+    const timer = setTimeout(() => finish(false), SAVE_OFFER_MS);
+    browser.tabs.onActivated.addListener(onActivated);
+    browser.tabs.onRemoved.addListener(onRemoved);
+  });
+  const later = await tabNow(rec.tabId);
+  if (!later || later.url !== now.url) return;
+  const { return_tab_id: _back, ...stay } = rec;
+  await closeUnderGuards(movedOn ? stay : rec);
 }
 
 /** the channel test after the first sign-in (core/channel.ts), stored per origin */
@@ -1731,6 +1786,13 @@ async function readyForPress(kind: PendingPress['kind']): Promise<{ go: boolean;
 }
 
 async function readyForPressInner(kind: PendingPress['kind']): Promise<{ go: boolean; waiting?: 'grid' | 'approval' | 'setup' | 'login-setup'; drop?: boolean }> {
+  // 18.0.0: a check moments ago found no route to the grid: the press waits on the GlobalProtect moment now,
+  // rather than after the dashboard's own 5 s of nothing, and the next tick asks again
+  const known = await session.get<GridNote>(GRID_KEY);
+  if (known?.reach === 'no-route' && known.session !== 'signed-in' && mem.lookingSince !== undefined && Date.now() - mem.last.reach < REACH_FRESH_MS) {
+    schedulePush();
+    return { go: false, waiting: 'grid' };
+  }
   const g = await checkGrid('press');
   // 16.0.0: out of reach, the press waits on the GlobalProtect moment and goes ahead by itself once the grid
   // answers (the tick and the alarm ask; afterReach, onSignedIn, carryPress). 15.0.0 dropped it here.
