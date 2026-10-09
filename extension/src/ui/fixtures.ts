@@ -3,11 +3,16 @@
 // and the welcome page before and after the press. The gallery (gallery.ts, development builds only)
 // renders any of them by name; test/hygiene.test.ts reads every string in them.
 //
+// 19.0.0: the grid sign-in sheet in every phase (with and without Not now) and with each of the page's own
+// sentences, the Grid row's Unlock with its as-of line, Settings' saved sign-in row with its confirm and
+// what Forget says, and the welcome sentences naming the grid by its profile's name, never its host.
+//
 // Built only from the words the core owns (model.ts WORDS and LOG_WORDS, terms.ts, disclosure.ts), so a
 // fixture shows exactly what the student would read. Nothing here touches the browser.
 import { commands } from '../core/contract';
+import { unlockWord } from '../core/gridsignin';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_TICK } from '../core/disclosure';
-import { LOG_WORDS, WORDS, formatClock, type Action, type ButtonView, type ChecklistRow, type DetailsView, type HeroView, type HomeView, type JourneyView, type LogLine, type Overlays, type PanelView, type SettingsView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from '../core/model';
+import { LOG_WORDS, WORDS, formatClock, placeOf, type Action, type ButtonView, type ChecklistRow, type DetailsView, type GridSheet, type HeroView, type HomeView, type JourneyView, type LogLine, type Overlays, type PanelView, type SettingsView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from '../core/model';
 import { SUMMARY, TERMS_DATE, ticks } from '../core/terms';
 import type { PanelLocal } from './panel';
 import type { SettingsLocal } from './settings';
@@ -32,6 +37,11 @@ const HOST = 'ondemand.grid.wayne.edu';
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
 const VPN_APP = 'GlobalProtect';
 const VPN = 'protect.wayne.edu';
+/** 19.0.0: the grid as the welcome sentences name it: the profile's display_name, never the host */
+const GRID_NAME = 'Wayne State University HPC grid';
+const PLACE = placeOf(GRID_NAME, HOST);
+/** 19.0.0: the computer's own unlock the sheet names (Windows here) */
+const UNLOCK_WITH = unlockWord('win');
 
 // ---- builders --------------------------------------------------------------------------------------
 const ink = (label: string, action?: Action, extra: Partial<ButtonView> = {}): ButtonView => ({ label, tone: 'ink', action, ...extra });
@@ -91,6 +101,9 @@ const onlineHome = (extra: Partial<HomeView> = {}, heroExtra: Partial<HeroView> 
     ...extra,
   }, { toolbar: { title: WORDS.toolbar.onlineFor(2 * 3600_000 + 14 * 60_000), lit: true } });
 
+/** 19.0.0: a saved sign-in waiting for the computer's unlock (Overlays.unlock): the presses that need the grid start it */
+const lockedHome = (v: PanelView): PanelView => (v.kind === 'terms-needed' ? v : { ...v, overlays: { ...v.overlays, unlock: { unlockWith: UNLOCK_WITH } } });
+
 const TRY: NonNullable<HomeView['tryAsking']> = { eyebrow: WORDS.home.tryAsking, prompts: WORDS.home.prompts, copied: WORDS.home.promptCopied, dismiss: { kind: 'dismiss', card: 'try-asking' } };
 
 const queuedHome = (word: string, sub: string, minutes: number, extra: Partial<HomeView> = {}): PanelView =>
@@ -128,6 +141,41 @@ const gp = (state: 'looking' | 'still' | 'connected', text: string, extra: Parti
 });
 
 const gridMoment = (extra: Partial<Extract<JourneyView, { moment: 'grid' }>> = {}): JourneyView => ({ moment: 'grid', title: WORDS.grid.title, body: WORDS.grid.body, ...extra });
+
+/** 19.0.0: the sheet as the core builds it (steps.ts gridSheet); `later` as when the student asked for it */
+const sheet = (s: Partial<GridSheet> = {}, later = false): GridSheet => ({
+  phase: 'type',
+  origin: `https://${HOST}`,
+  username: ACCOUNT,
+  unlockWith: UNLOCK_WITH,
+  saved: 'none',
+  box: { label: WORDS.grid.useBox, tone: 'text', action: { kind: 'sign-in-grid-box' } },
+  ...(later ? { later: { label: WORDS.grid.notNow, tone: 'text', action: { kind: 'grid-signin-later' } } } : {}),
+  ...s,
+});
+const sheetMoment = (s: Partial<GridSheet> = {}, later = false, extra: Partial<Extract<JourneyView, { moment: 'grid' }>> = {}): JourneyView => gridMoment({ body: WORDS.grid.sheetBody, sheet: sheet(s, later), ...extra });
+
+/** each phase the sheet is drawn in, with and without Not now (the page's probe answered: Remember can be offered) */
+const SHEETS: Array<{ name: string; note: string; s: Partial<GridSheet>; local?: Partial<PanelLocal> }> = [
+  { name: 'type', note: 'the first time: nothing saved, no AccessID known yet', s: { username: undefined } },
+  { name: 'type-refused', note: 'the grid turned the typed password down: Beethoven stopped', s: { note: WORDS.grid.refused } },
+  { name: 'type-refused-twice', note: 'the second refusal in a row', s: { note: WORDS.grid.refusedTwice } },
+  { name: 'type-held', note: 'the saved one is on hold: whether it worked could not be told', s: { saved: 'ready', note: WORDS.grid.held } },
+  { name: 'type-unsupported', note: "this computer's passkey cannot lock a saved password: no tick", s: {}, local: { gridSupport: false } },
+  { name: 'type-replace-saved', note: 'a sign-in is saved already: the tick saves the typed one instead', s: { saved: 'ready' } },
+  { name: 'locked', note: 'saved, after a browser restart: one press of the computer\u2019s unlock', s: { phase: 'locked', saved: 'locked' } },
+  { name: 'working', note: 'Sign in pressed: the grid is asked in the background', s: { phase: 'working' } },
+];
+const sheetFixtures = (): Fixture[] =>
+  SHEETS.flatMap((x) =>
+    [false, true].map((later): Fixture => ({
+      name: `j-grid-sheet-${x.name}${later ? '-later' : ''}`,
+      surface: 'panel',
+      note: `19.0.0: ${x.note}${later ? ' (asked for from the Grid row: Not now)' : ''}`,
+      view: journey(sheetMoment(x.s, later)),
+      local: { gridSupport: true, ...x.local },
+    })),
+  );
 
 const CHECK_ROWS = (a: ChecklistRow['state'], b: ChecklistRow['state'], c: ChecklistRow['state']): [ChecklistRow, ChecklistRow, ChecklistRow] => [
   { text: WORDS.statement.rowSignedIn(ACCOUNT), state: a },
@@ -209,7 +257,7 @@ const onlineMoment = (extra: Partial<Extract<JourneyView, { moment: 'online' }>>
 /** a need with the university's own page */
 const need = (n: { title: string; detail: string; link: string }, url: string) => ({ title: n.title, detail: n.detail, link: { label: n.link, url } });
 /** 17.0.0: the deployments a build carries, by display name; the Wayne State profile first */
-const GRIDS = { label: WORDS.welcome.gridPicker, options: [{ site: 'wayne', name: 'Wayne State University HPC grid' }], selected: 'wayne' };
+const GRIDS = { label: WORDS.welcome.gridPicker, options: [{ site: 'wayne', name: GRID_NAME }], selected: 'wayne' };
 const TWO_GRIDS = { ...GRIDS, options: [...GRIDS.options, { site: 'example', name: 'Example University research cluster' }] };
 const welcomeView = (extra: Partial<WelcomeView> = {}): WelcomeView => ({
   headline: WORDS.welcome.headline,
@@ -227,7 +275,7 @@ const welcomeView = (extra: Partial<WelcomeView> = {}): WelcomeView => ({
   ticks: ticks().map((t) => ({ ...t })),
   terms: { show: WORDS.welcome.showTerms, hide: WORDS.welcome.hideTerms, licenseUrl: '/LICENSE.txt', privacyUrl: '/PRIVACY.md', links: { openInTab: WORDS.welcome.openInTab, save: WORDS.welcome.saveCopy, print: WORDS.welcome.print } },
   agree: { label: WORDS.welcome.agree, busyLabel: WORDS.welcome.opening },
-  allowNote: WORDS.welcome.allowNote(HOST),
+  allowNote: WORDS.welcome.allowNote(PLACE),
   footer: { nothingLeaves: WORDS.welcome.footerNothingLeaves, otherPortal: WORDS.welcome.footerOtherPortal },
   portal: { origin: `https://${HOST}`, hostname: HOST, fieldLabel: WORDS.welcome.footerOtherPortal, usePortal: WORDS.welcome.usePortal },
   state: 'idle',
@@ -293,6 +341,13 @@ const settingsView = (appearance: 'cream' | 'system' = 'cream'): SettingsView =>
   labLead: { title: WORDS.settings.labLead, shellHost: 'Shell host: default', siteProfile: 'Site profile: wayne', hashes: ['LICENSE.txt sha256 3f1c…a9e2', 'PRIVACY.md sha256 77b0…41cd'] },
 });
 
+/** 19.0.0: the saved grid sign-in's row, as core/sheets.ts builds it: saved, turned down, or nothing saved */
+const SIGNIN_BASE = { title: WORDS.settings.signinTitle, confirm: WORDS.settings.forgetConfirm, forgotten: WORDS.settings.forgotten(ACCOUNT) };
+const SIGNIN_FORGET = { label: WORDS.settings.forget, tone: 'outline' as const, action: { kind: 'forget-grid-signin' as const } };
+const SIGNIN_SAVED: NonNullable<SettingsView['signin']> = { ...SIGNIN_BASE, text: WORDS.settings.signinSaved(ACCOUNT, UNLOCK_WITH), username: ACCOUNT, cred: 'q8Hc2bX0VYk3mR1tZpL6wA', forget: SIGNIN_FORGET };
+const SIGNIN_REFUSED: NonNullable<SettingsView['signin']> = { ...SIGNIN_SAVED, text: WORDS.settings.signinRefused };
+const SIGNIN_NONE: NonNullable<SettingsView['signin']> = { title: WORDS.settings.signinTitle, text: WORDS.settings.signinNone, confirm: WORDS.settings.forgetConfirm, forgotten: WORDS.settings.forgotten('') };
+
 /** 16.0.0: the note over a key an earlier version put in the grid account */
 const OLD_KEY: NonNullable<SettingsView['oldKey']> = { title: WORDS.settings.oldKey, text: WORDS.settings.oldKeyNote('2026-10-02'), forget: { label: WORDS.settings.oldKeyForget, tone: 'text', action: { kind: 'forget-old-key' } } };
 
@@ -303,13 +358,14 @@ export const FIXTURES: Fixture[] = [
   { name: 'welcome-ticked', surface: 'welcome', note: 'ticked, ready to press', view: welcomeView(), local: { ticked: { agree: true } } },
   { name: 'welcome-terms', surface: 'welcome', note: 'Show terms expanded in place', view: welcomeView(), local: { termsOpen: true, termsOpenedAt: ago(10) } },
   { name: 'welcome-opening', surface: 'welcome', note: 'the press: spinner and Opening the grid…', view: welcomeView({ state: 'opening' }), local: { ticked: { agree: true } } },
-  { name: 'welcome-denied', surface: 'welcome', note: 'Deny in Chrome’s prompt', view: welcomeView({ state: 'denied', problem: WORDS.welcome.denied(HOST) }), local: { ticked: { agree: true } } },
+  { name: 'welcome-denied', surface: 'welcome', note: 'Deny in Chrome’s prompt', view: welcomeView({ state: 'denied', problem: WORDS.welcome.denied(PLACE) }), local: { ticked: { agree: true } } },
   { name: 'welcome-no-panel', surface: 'welcome', note: 'the panel did not open', view: welcomeView({ state: 'no-panel', problem: WORDS.welcome.panelNotOpened }), local: { ticked: { agree: true } } },
   { name: 'welcome-save-failed', surface: 'welcome', note: 'the record could not be saved', view: welcomeView({ state: 'save-failed', problem: WORDS.welcome.saveFailed }), local: { ticked: { agree: true } } },
   { name: 'welcome-other-portal', surface: 'welcome', note: 'Use another portal: the field slid open', view: welcomeView(), local: { portalOpen: true, portalInput: HOST } },
   { name: 'welcome-claude-address', surface: 'welcome', note: 'an Anthropic address refused before any prompt', view: welcomeView(), local: { portalOpen: true, portalInput: 'claude.ai', portalError: WORDS.welcome.anthropicRefused } },
   { name: 'welcome-two-grids', surface: 'welcome', note: '17.0.0: a build carrying two deployments: "Your grid" under the lede, the Wayne State profile first', view: welcomeView({ grids: TWO_GRIDS }) },
-  { name: 'welcome-handoff', surface: 'welcome', note: 'after the press: the panel carries on', view: welcomeView({ state: 'handoff', handoff: { text: WORDS.welcome.handoff, hero: { state: 'asked', orb: 'starting', word: WORDS.connect.hero, sub: WORDS.connect.gettingSignin, announce: WORDS.connect.hero } } }) },
+  { name: 'welcome-handoff-signin', surface: 'welcome', note: '19.0.0: after the press, the panel\u2019s sign-in sheet waits for the student: a step, no check mark', view: welcomeView({ state: 'handoff', handoff: { text: WORDS.welcome.handoffSignin, done: false } }) },
+  { name: 'welcome-handoff', surface: 'welcome', note: 'after the press: the panel carries on', view: welcomeView({ state: 'handoff', handoff: { text: WORDS.welcome.handoff, done: true, hero: { state: 'asked', orb: 'starting', word: WORDS.connect.hero, sub: WORDS.connect.gettingSignin, announce: WORDS.connect.hero } } }) },
 
   // the panel before the agreement, and while the welcome page carries moment 2
   { name: 'terms-needed', surface: 'panel', note: 'the panel before the agreement (D19)', view: { kind: 'terms-needed', body: WORDS.termsNeeded.body, button: ink(WORDS.termsNeeded.button, { kind: 'open-settings' }) } },
@@ -317,7 +373,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-welcome', surface: 'panel', note: 'the panel before the agreement, nothing pressed: finish on the welcome page', view: journey({ moment: 'welcome', state: 'finish', title: WORDS.welcomeMoment.finishTitle, body: WORDS.termsNeeded.body, button: ink(WORDS.termsNeeded.button, { kind: 'open-settings' }) }) },
   { name: 'j-welcome-waiting', surface: 'panel', note: 'the panel opened by the press, Chrome asking', view: journey({ moment: 'welcome', state: 'waiting', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.almostBody, status: WORDS.welcomeMoment.waiting }) },
   { name: 'j-welcome-denied', surface: 'panel', note: 'after Deny in Chrome\u2019s box', view: journey({ moment: 'welcome', state: 'denied', title: WORDS.welcomeMoment.almostTitle, body: WORDS.welcomeMoment.deniedBody }) },
-  { name: 'j-welcome-revoked', surface: 'panel', note: 'the portal\u2019s grant taken away after the first run', view: journey({ moment: 'welcome', state: 'revoked', title: WORDS.welcomeMoment.revokedTitle, body: WORDS.welcomeMoment.revokedBody(HOST), button: ink(WORDS.welcomeMoment.revokedButton, { kind: 'use-portal', origin: `https://${HOST}`, granted: false }), origin: `https://${HOST}` }) },
+  { name: 'j-welcome-revoked', surface: 'panel', note: 'the portal\u2019s grant taken away after the first run', view: journey({ moment: 'welcome', state: 'revoked', title: WORDS.welcomeMoment.revokedTitle, body: WORDS.welcomeMoment.revokedBody(PLACE), button: ink(WORDS.welcomeMoment.revokedButton, { kind: 'use-portal', origin: `https://${HOST}`, granted: false }), origin: `https://${HOST}` }) },
 
   // moment 4
   { name: 'j-gp-looking', surface: 'panel', note: 'GlobalProtect: looking for the grid', view: journey(gp('looking', WORDS.globalprotect.looking)) },
@@ -334,6 +390,20 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-grid-start-page', surface: 'panel', note: 'the tab landed on /public/start.html', view: journey(gridMoment({ problem: { body: WORDS.grid.startPage } })) },
   { name: 'j-grid-unreachable', surface: 'panel', note: 'the grid stops answering', view: journey(gridMoment({ problem: { body: WORDS.grid.unreachable(VPN_APP), button: ink(WORDS.grid.tryAgain, { kind: 'retry-grid' }) } })) },
   { name: 'j-grid-not-ood', surface: 'panel', note: 'a 200 with no "Logged in as"', view: journey(gridMoment({ problem: { body: WORDS.grid.notOod, button: ink(WORDS.grid.useAnother, { kind: 'open-settings' }) } })) },
+  // 19.0.0: Beethoven's own sign-in sheet
+  ...sheetFixtures(),
+  { name: 'j-grid-sheet-signed-in', surface: 'panel', note: '19.0.0: signed in from the sheet: the drawn check', view: journey(gridMoment({ body: WORDS.grid.sheetBody, signedIn: WORDS.grid.signedIn(ACCOUNT) })) },
+  { name: 'j-grid-sheet-ticked', surface: 'panel', note: '19.0.0: Remember ticked by the student', view: journey(sheetMoment()), local: { gridSupport: true, remember: true } },
+  { name: 'j-grid-sheet-shown', surface: 'panel', note: '19.0.0: the eye pressed: the password shown as text', view: journey(sheetMoment()), local: { gridSupport: true, passShown: true } },
+  { name: 'j-grid-sheet-bad-id', surface: 'panel', note: '19.0.0: Sign in with an AccessID that is not one', view: journey(sheetMoment({ username: undefined })), local: { gridSupport: true, gridUser: 'st 1234', gridUserBad: true } },
+  { name: 'j-grid-sheet-no-password', surface: 'panel', note: '19.0.0: Sign in with the password field empty', view: journey(sheetMoment()), local: { gridSupport: true, gridNote: WORDS.grid.noPassword } },
+  { name: 'j-grid-sheet-not-saved', surface: 'panel', note: '19.0.0: Remember ticked, the passkey step cancelled: used this once', view: journey(sheetMoment()), local: { gridSupport: true, remember: true, gridNote: WORDS.grid.notSaved } },
+  { name: 'j-grid-sheet-not-unlocked', surface: 'panel', note: '19.0.0: the unlock was cancelled', view: journey(sheetMoment({ phase: 'locked', saved: 'locked' }, true)), local: { gridSupport: true, gridNote: WORDS.grid.notUnlocked } },
+  { name: 'j-grid-sheet-type-instead', surface: 'panel', note: '19.0.0: Type it instead, on the locked phase', view: journey(sheetMoment({ phase: 'locked', saved: 'locked' }, true)), local: { gridSupport: true, typeInstead: true } },
+  { name: 'j-grid-sheet-unlocking', surface: 'panel', note: '19.0.0: Unlock pressed: the computer\u2019s own prompt is up', view: journey(sheetMoment({ phase: 'locked', saved: 'locked' })), local: { gridSupport: true, gridBusy: 'unlock' } },
+  { name: 'j-grid-sheet-unlocked-working', surface: 'panel', note: '19.0.0: unlocked: the sign-in it carries runs, and the sheet stays the locked one (no password field)', view: journey(sheetMoment({ phase: 'working', saved: 'ready' })), local: { gridSupport: true, gridBusy: 'unlock' } },
+  { name: 'j-grid-sheet-unreachable', surface: 'panel', note: '19.0.0: the sheet while the grid stops answering (its Try again stays quiet)', view: journey(sheetMoment({}, false, { problem: { body: WORDS.grid.unreachable(VPN_APP), button: ink(WORDS.grid.tryAgain, { kind: 'retry-grid' }) } })), local: { gridSupport: true } },
+  { name: 'j-grid-sheet-press-waits', surface: 'panel', note: '19.0.0: Connect pressed, the saved sign-in locked: Not now withdraws the press', view: journey(sheetMoment({ phase: 'locked', saved: 'locked', later: { label: WORDS.grid.notNow, tone: 'text', action: { kind: 'cancel' } } })), local: { gridSupport: true } },
 
   // moment 6
   { name: 'j-statement', surface: 'panel', note: 'Where your work goes: approval running underneath', view: journey(statementMoment()) },
@@ -429,6 +499,8 @@ export const FIXTURES: Fixture[] = [
   { name: 'h-stopped', surface: 'panel', note: 'Stopped', view: home({ hero: hero('stopped', 'stopped', WORDS.home.stoppedHero, WORDS.home.stoppedSub), primary: { kind: 'connect', button: ink(WORDS.home.connect, { kind: 'connect' }), reminder: WORDS.home.connectReminder }, rows: rows({ state: 'stopped', text: WORDS.home.workerStopped }, { claude: { state: 'unknown', text: WORDS.home.unknown } }) }) },
   { name: 'h-error', surface: 'panel', note: 'Couldn’t start', view: home({ hero: hero('error', 'error', WORDS.home.errorHero, WORDS.queue.couldntStart), primary: { kind: 'retry', button: ink(WORDS.home.tryAgain, { kind: 'retry' }) }, rows: rows({ state: 'error', text: WORDS.home.workerError }, { claude: { state: 'unknown', text: WORDS.home.unknown } }) }, { toolbar: { title: WORDS.toolbar.error, lit: false, badge: { text: '!', color: 'brick' } } }), log: SAMPLE_LOG.slice(0, 4) },
   { name: 'h-signed-out', surface: 'panel', note: 'after a browser restart: As of', view: onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'signed-out', text: WORDS.home.gridSignedOut, link: link(WORDS.home.gridSignIn, { kind: 'sign-in-grid' }) }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }, { asOf: WORDS.home.asOf('9:02 AM'), sub: WORDS.home.onlineSub(TITLE, 14 * 3600_000 + 3 * 60_000), timer: undefined }) },
+  { name: 'h-signed-out-locked', surface: 'panel', note: '19.0.0: after a browser restart with a saved sign-in: Unlock on the Grid row', view: lockedHome(onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'signed-out', text: WORDS.home.gridSignedOut, link: link(WORDS.home.unlock, { kind: 'unlock-grid' }) }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }, { asOf: WORDS.home.asOfLocked('9:02 AM', UNLOCK_WITH), sub: WORDS.home.onlineSub(TITLE, 14 * 3600_000 + 3 * 60_000), timer: undefined })) },
+  { name: 'h-stopped-locked', surface: 'panel', note: '19.0.0: Connect with a saved sign-in locked: the unlock starts in the same click', view: lockedHome(home({ hero: hero('stopped', 'stopped', WORDS.home.stoppedHero, WORDS.home.stoppedSub), primary: { kind: 'connect', button: ink(WORDS.home.connect, { kind: 'connect' }), reminder: WORDS.home.connectReminder }, rows: rows({ state: 'stopped', text: WORDS.home.workerStopped }, { grid: { state: 'signed-out', text: WORDS.home.gridSignedOut, link: link(WORDS.home.unlock, { kind: 'unlock-grid' }) }, claude: { state: 'unknown', text: WORDS.home.unknown } }) })) },
   { name: 'h-unreachable', surface: 'panel', note: 'Can’t reach the grid (worker last seen online)', view: onlineHome({ hero: hero('unreachable', 'stopped', WORDS.home.unreachableHero, WORDS.home.unreachableSub(VPN_APP)), rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'unreachable', text: WORDS.home.gridUnreachable }, claude: { state: 'unknown', text: WORDS.home.unknown } }), foot: FOOT_NONE }) },
   { name: 'h-checking', surface: 'panel', note: 'the first check of a browser session (D22)', view: onlineHome({ rows: rows({ state: 'as-of', text: WORDS.home.workerAsOf('9:02 AM', 'online') }, { grid: { state: 'checking', text: WORDS.home.checking }, claude: { state: 'unknown', text: WORDS.home.unknown } }) }) },
   { name: 'h-working-in-tab', surface: 'panel', note: 'tab mode: Working on the grid…', view: { ...queuedHome(WORDS.queue.hero, WORDS.queue.homeSub, 1), overlays: overlays({ workingInTab: true }) } as PanelView },
@@ -437,6 +509,12 @@ export const FIXTURES: Fixture[] = [
   { name: 'settings', surface: 'settings', note: 'Settings', view: settingsView() },
   { name: 'settings-system', surface: 'settings', note: 'Appearance: Match system', view: settingsView('system') },
   { name: 'settings-open', surface: 'settings', note: 'Change, terms and the lab lead fold open', view: settingsView(), local: { changeOpen: true, portalInput: HOST, termsOpen: true, labLeadOpen: true } },
+  { name: 'settings-signin-saved', surface: 'settings', note: '19.0.0: a saved grid sign-in and its Forget', view: { ...settingsView(), signin: SIGNIN_SAVED } },
+  { name: 'settings-signin-refused', surface: 'settings', note: '19.0.0: saved, but the grid turned it down last time', view: { ...settingsView(), signin: SIGNIN_REFUSED } },
+  { name: 'settings-signin-none', surface: 'settings', note: '19.0.0: nothing saved: no Forget', view: { ...settingsView(), signin: SIGNIN_NONE } },
+  { name: 'settings-signin-confirm', surface: 'settings', note: '19.0.0: Forget pressed: the confirm row', view: { ...settingsView(), signin: SIGNIN_SAVED }, local: { confirmForget: true } },
+  { name: 'settings-signin-forgotten', surface: 'settings', note: '19.0.0: after Forget: what stays and where the passkey may still be listed', view: { ...settingsView(), signin: SIGNIN_NONE }, local: { signinForgotten: SIGNIN_SAVED.forgotten } },
+  { name: 'settings-disconnect-confirm', surface: 'settings', note: '19.0.0: Disconnect pressed: Chrome stays signed in until it closes', view: { ...settingsView(), signin: SIGNIN_SAVED }, local: { confirmDisconnect: true } },
   { name: 'settings-old-key', surface: 'settings', note: "16.0.0: a key an earlier version put in the grid account: the note and its Forget", view: { ...settingsView(), oldKey: OLD_KEY } },
 ];
 
@@ -450,7 +528,7 @@ export function fixtureStrings(f: Fixture): string[] {
   const walk = (v: unknown, key = '') => {
     if (typeof v === 'string') {
       // addresses, times and the line the student pastes are not sentences
-      if (/^(https?:|\/|bash |exec )/.test(v) || /^\d{4}-\d{2}-\d{2}T/.test(v) || ['since', 'at', 'url', 'origin', 'line', 'link', 'licenseUrl', 'privacyUrl', 'script', 'style', 'portalInput', 'termsOpenedAt', 'moment', 'version', 'kind', 'id', 'phase', 'state', 'tone'].includes(key)) return;
+      if (/^(https?:|\/|bash |exec )/.test(v) || /^\d{4}-\d{2}-\d{2}T/.test(v) || ['since', 'at', 'url', 'origin', 'line', 'link', 'licenseUrl', 'privacyUrl', 'script', 'style', 'portalInput', 'termsOpenedAt', 'moment', 'version', 'kind', 'id', 'phase', 'state', 'tone', 'saved', 'cred'].includes(key)) return;
       out.push(v);
     } else if (Array.isArray(v)) v.forEach((x) => walk(x, key));
     else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) if (k !== 'details' && k !== 'labLead' && k !== 'action' && k !== 'dismiss' && k !== 'open') walk(x, k);

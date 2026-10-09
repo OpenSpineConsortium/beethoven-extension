@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 12, 2026-10-08. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 13, 2026-10-09. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -10,16 +10,19 @@ Beethoven. Questions and requests: the notice address on the support page at
 is not provided by or on behalf of any school, and Licensor is not acting for one.
 
 Beethoven is a browser extension that starts, watches and stops a job in your own cluster account
-through your university's Open OnDemand portal, in the browser session you have signed in to there,
-and a set of scripts (the framework) that runs in your cluster account. The job runs Claude Code,
-which you signed in to yourself. This statement says what stays in your browser, what an earlier
-version of Beethoven may have left on your computer and in your cluster account, what goes to your
-cluster account, what your portal sees, what happens when you sign in to Claude and when the
-portal's shell asks for your password, what Anthropic receives, what Licensor receives, and what is
-never collected. Beethoven 12.0.0 to 15.0.0 also reached your cluster over a secure shell (ssh)
+through your university's Open OnDemand portal, in a browser session signed in to there, by you or
+by the extension with the account name and password you give it, and a set of scripts (the
+framework) that runs in your cluster account. The job runs Claude Code, which you signed in to
+yourself. This statement says what stays in your browser, what an earlier version of Beethoven may
+have left on your computer and in your cluster account, what goes to your cluster account, what your
+portal sees, what happens when your portal asks you to sign in, when you sign in to Claude and when
+the portal's shell asks for your password, what Anthropic receives, what Licensor receives, and what
+is never collected. Beethoven 12.0.0 to 15.0.0 also reached your cluster over a secure shell (ssh)
 connection carried by a helper program on your computer, the Bridge, after a sign-in on a sheet of
-the extension's own; this version has none of that, reaches your cluster only through your portal,
-and never asks for your cluster password.
+the extension's own; this version has no Bridge and no ssh connection of its own and reaches your
+cluster only through your portal. It has a sign-in sheet again, for your portal only: it asks for
+your account name and cluster password when your portal asks for a sign-in, and saves the password,
+encrypted, only if you tick a box.
 
 ## What stays in your browser
 
@@ -29,6 +32,8 @@ and never asks for your cluster password.
 | Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched) and your appearance choice | `storage.local` | convenience | Settings |
 | The account name your portal's dashboard showed for the session you signed in to, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (your account is set up on another installation; this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
 | Only if an earlier version of Beethoven added a key for this computer to your grid account: a note of that, kept once from that version's record on the first run after the update: the account name it recorded, the key's fingerprint, when the key was added, and when the note was written (never the key itself, which is deleted unread) | `storage.local` | so Settings can tell you once that the key is there and that your lab lead can remove it | *Forget* beside that note in Settings (which removes the note and nothing on the grid); uninstalling |
+| Only if you tick *Remember it on this computer* on the grid sign-in sheet (it is never ticked for you): your saved grid sign-in: the account name you typed, your portal's address, your passkey's credential identifier (not secret), two random salts, a random value used once, and your password encrypted with AES-GCM under a 256-bit key derived (HKDF-SHA-256) from what your passkey releases, which is never written to disk; with when it was saved | the extension's own database in this browser profile on this computer (IndexedDB, `beethoven-signin`), which no website can read | so the extension can sign you in to your portal by itself once you have unlocked it with your passkey | *Forget* beside *Grid sign-in* in Settings; *Disconnect*; changing to another portal; uninstalling. Someone who can use this browser profile while it is unlocked, or who can unlock your passkey, could sign in to your portal with it, and so could the extension's own code |
+| Only while a saved grid sign-in exists, a note of it (never the password): the account name you typed, your portal's address, the passkey's credential identifier, when it was saved, when the extension last tried it, when it last worked and when your portal last turned it down, when its use was put on hold without it being turned down (a password you typed was turned down while it was saved, or the outcome of an earlier try could no longer be told: the browser closed before your portal replied, or one of your portal tabs asked for a sign-in or had a request answered meanwhile), when the extension last tried a password you typed while this one was saved, until that try's outcome comes, how many times in a row a password was turned down while it was saved, and the name your portal gives its sign-in (its realm); and, if your computer's passkey could not lock a password, when that happened and the name of your computer's operating system | `storage.local` | so the panel knows a sign-in is saved and which passkey opens it, never tries a password your portal turned down again, and stops offering *Remember it on this computer* where it cannot work | *Forget*; *Disconnect*; changing to another portal; uninstalling |
 | Your acceptance of the agreement: its version and date, the hashes of the agreement and of this statement as shown, the four-line summary and the sentence shown with the box, that you ticked it, the label of the button, whether you opened the full text and whether you scrolled it to its end, opened it in a tab, saved it or printed it, the time, the version of Beethoven, your browser and the installation identifier, and your account name with the time it was seen, added once your portal first shows it after you agree; an acceptance made with an earlier version of Beethoven is kept beside it, out of force | `storage.local`, with a copy you can save from Settings (*Save your acceptance record*, shown with the installation identifier) | to prove the agreement and its terms, for you and for Licensor | it is yours to read, copy and print; uninstalling removes it |
 | Your statement about a worker's workspace, made with the box you tick in the panel before your first worker starts: that you will keep FERPA, IRB, health and export-controlled data out of it, and that Remote Control is turned on for that worker; kept as the workspace name, the sentence and the lines shown with their version, the label of the button, the time, and the time the framework reported writing the marker below, one record per workspace | `storage.local` | so you are not asked to tick it again for the same workspace (a one-line reminder sits beside *Connect* each time) | making it again for a workspace in the panel; uninstalling. It is asked again when the text or the workspace changes |
 | A note of the check job submitted from *Details* (the time and the job number), so it is not submitted again while it runs | `storage.local` | so that step does not repeat itself | uninstalling |
@@ -39,34 +44,40 @@ and never asks for your cluster password.
 | How the extension reaches your portal (directly from its background, or through a tab it opens), and whether the portal's shell opened without asking for a password, with the time this was last tested | `storage.local` | so it uses the way that works without testing again before every action | uninstalling |
 | Small notes for the panel: how long your last five waits for a computer took, in minutes ("Last time: 6 min."); whether the tour was seen, and to its end; when your worker was first seen online in this browser (*Try asking* shows for three days from then), whether the tour began playing below your first wait, and which one-time tips you have seen or dismissed (pinning the toolbar button, *Try asking*, the tour card, the *New session* tip), with when | `storage.local` | so the panel can tell you what to expect and does not repeat itself | uninstalling |
 | Connection state during this browser session: the worker's name and its folder on the cluster, the job number, what the worker's files last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record, the grid's reason for the wait and its estimate, and when it was asked for, got a computer and came online), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it) and the last lines of its progress log; whether your portal answers and whether you are signed in to it, with the account name it showed and when this was checked; a press that waits until the grid can carry it; the tabs the extension opened itself (the grid sign-in tab, Anthropic's sign-in tab, your claude.ai tab, the portal's terminal tab for the one-time step, and, on a portal that does not share its sign-in, the portal tab it works through), so it can close them or bring them forward; that you pressed *Agree and continue* on the welcome page, for a few minutes, so the panel opening beside it can say what is happening; how far your computer's clock is from the grid's, so the panel's clocks agree with the grid's; and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
+| Only while a saved grid sign-in is unlocked: what your passkey released to open it, and the passkey's credential identifier | `storage.session`, in memory only, cleared when the browser closes or Beethoven updates or reloads | so you unlock it once each time you open the browser, not at every sign-in | closing the browser; *Forget*; *Disconnect*; changing to another portal |
+| A password you typed on the grid sign-in sheet without ticking *Remember it on this computer*, with the account name, your portal's address and when you typed it | `storage.session`, in memory only | for the one sign-in you asked for: it is removed once that sign-in has been tried, whether or not it worked, and at the latest two minutes after you typed it | it removes itself; *Forget*; *Disconnect*; changing to another portal; closing the browser |
+| The numbers your browser gave the requests the extension last answered with a password (at most 20); an answer still waiting for its outcome: when it was given, whether it was the saved or a typed password, which saved copy (by when it was saved) or when it was typed, and whether one of your portal tabs asked for a sign-in, or had a request answered by your portal without a refusal, meanwhile (never which tab or request); and the outcome of its last tries: when one was turned down, or when the outcome of one could no longer be told, whether it was a saved or a typed password, when it was given and which saved copy, how many were turned down in a row, and your portal's realm; nothing you typed | `storage.session`, cleared when the browser closes | so the extension answers each request at most once and stops after a refusal, even when it restarts | closing the browser; *Forget*; *Disconnect*; changing to another portal |
 | A plain-words list of what the extension did in this browser session, for *Show log* (for example, that you signed in to the grid and as which account, that you were approved, and the plan you signed in to Claude with), at most 200 lines | `storage.session`, cleared when the browser closes | so *Show log* can say what happened, beside your worker's own progress log | closing the browser; *Copy log* copies it only when you press it |
-| The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed is never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and under *Activity* in Settings (show, export, clear); it is never transmitted |
+| The audit log: one line per request the extension made to your portal (time, endpoint, method, job number, byte count, outcome). The sign-in sitting is one line with how many bytes were read and typed; what you typed is never in it. A sign-in the extension makes for you gets no line of its own (the request it answered is the line), and your password is never in it | the extension's own storage on your device | so you can see exactly what the extension did | the log under *Details* and under *Activity* in Settings (show, export, clear); it is never transmitted |
 
-There is no durable secret in the extension's storage: there is no key of Licensor's, and your own
-sign-in to your cluster identifies you. The one-time step below, for when the portal's shell asks
-for your password, makes a key in your cluster account, never in your browser. The extension never
-reads your portal's sign-in: your browser attaches the sign-in it holds (a cookie, or the sign-in it
-keeps after you type into its own box) to requests to that one website, the extension's own
-background requests included, until the browser closes. Before you agree to the terms, the extension
-sends nothing anywhere. After you agree, it asks your portal's address whether it answers, with
-requests that carry no sign-in or cookie and from which it learns only whether an answer came: once
-when you agree; every three seconds while a page of Beethoven's is open and the grid is out of
-reach, which is while it waits for you to turn on your VPN (GlobalProtect at Wayne State) on the
-first run, and later whenever a press of yours waits for the grid; once a minute while no page of
-Beethoven's is open and the grid was last out of reach, so that a press you made, and *Keep my
-worker running*, go ahead by themselves once the grid answers; and when you press *Try again*. The
-one thing it reads about you from the portal is the account name the portal's own dashboard page
-shows for your session. The extension never reads, stores, copies or relays a Claude credential:
-Claude Code keeps its own sign-in in your cluster account, and the framework reads only Claude
-Code's own report of whether it is signed in, with the account and plan that report names. The
-extension writes to your clipboard only when you press a *Copy* button and when you open the
-portal's terminal for the one-time step below, to put its one line there; it never reads your
-clipboard. The one QR code, your session's link for your phone, is drawn on your device, and the
-tour is drawn from files in the extension's package; nothing is fetched or sent to show them. The
-welcome page's links to your university's pages about its accounts and its VPN and to Anthropic's
-plans page, and the link to your university's VPN page on the screen that asks you to turn on your
-VPN, open those pages in a new tab only when you choose them, as a bookmark would: the extension
-learns nothing of your visit, and those websites see it as they see any visit.
+There is no key of Licensor's, and your own sign-in to your cluster identifies you. The one durable
+secret the extension may keep is your cluster password, and only if you tick *Remember it on this
+computer*: encrypted, as the table above and *When your portal asks you to sign in* say. The
+one-time step below, for when the portal's shell asks for your password, makes a key in your cluster
+account, never in your browser. The extension never reads your portal's sign-in: your browser
+attaches the sign-in it holds (a cookie, or the sign-in it keeps after you type into its own box or
+after the extension gives it your password) to requests to that one website, the extension's own
+background requests and your own portal tabs included, until the browser closes or you clear its
+browsing data with cookies. Before you agree to the terms, the extension sends nothing anywhere.
+After you agree, it asks your portal's address whether it answers, with requests that carry no
+sign-in or cookie and from which it learns only whether an answer came: once when you agree; every
+three seconds while a page of Beethoven's is open and the grid is out of reach, which is while it
+waits for you to turn on your VPN (GlobalProtect at Wayne State) on the first run, and later
+whenever a press of yours waits for the grid; once a minute while no page of Beethoven's is open and
+the grid was last out of reach, so that a press you made, and *Keep my worker running*, go ahead by
+themselves once the grid answers; and when you press *Try again*. The one thing it reads about you
+from the portal is the account name the portal's own dashboard page shows for your session. The
+extension never reads, stores, copies or relays a Claude credential: Claude Code keeps its own
+sign-in in your cluster account, and the framework reads only Claude Code's own report of whether it
+is signed in, with the account and plan that report names. The extension writes to your clipboard
+only when you press a *Copy* button and when you open the portal's terminal for the one-time step
+below, to put its one line there; it never reads your clipboard. The one QR code, your session's
+link for your phone, is drawn on your device, and the tour is drawn from files in the extension's
+package; nothing is fetched or sent to show them. The welcome page's links to your university's
+pages about its accounts and its VPN and to Anthropic's plans page, and the link to your
+university's VPN page on the screen that asks you to turn on your VPN, open those pages in a new tab
+only when you choose them, as a bookmark would: the extension learns nothing of your visit, and
+those websites see it as they see any visit.
 
 ## What an earlier version may have left
 
@@ -74,12 +85,13 @@ Beethoven 12.0.0 to 15.0.0 offered a direct way to your cluster: an ssh connecti
 Bridge, a helper program you installed on your computer; a sign-in on the extension's own sheet with
 your account name, cluster password and verification code; a key made in your browser, admitted to
 your cluster account by one restricted line; and, if you chose it, a passkey to protect that key.
-This version has none of it. On its first run after the update, the extension removes from your
-browser what that way kept there: the key and what protected it (deleted unread; the extension
-cannot use it and never sends it anywhere), the direct way's settings and one-time answers, and the
-*Connection* preference. If that version had recorded that it added a line for the key to your
-cluster account, the extension keeps one note of that first (the row in the table above), so that
-Settings can tell you.
+This version has none of it; the sign-in sheet and the passkey it has used since 19.0.0 are new and
+different (*When your portal asks you to sign in*). On its first run after the update, the extension
+removes from your browser what that way kept there: the key and what protected it (deleted unread;
+the extension cannot use it and never sends it anywhere), the direct way's settings and one-time
+answers, and the *Connection* preference; it never touches the grid sign-in this version saves. If
+that version had recorded that it added a line for the key to your cluster account, the extension
+keeps one note of that first (the row in the table above), so that Settings can tell you.
 
 Three things it cannot remove, because they are outside your browser:
 
@@ -101,9 +113,12 @@ Three things it cannot remove, because they are outside your browser:
   line, and the gate's small counts file in your account's state folder on the cluster stay, as
   ordinary files of yours. Settings say once, with the date, that such a line may be there, and
   offer *Forget*, which removes only that note from your browser.
-- **A passkey** you made to protect the key is kept by Windows Hello, your Mac's keychain or your
-  browser's password manager, not by the extension; you delete it there, in your system's or your
-  browser's list of passkeys.
+- **The old passkey**, one you made to protect the key, is kept by Windows Hello, your Mac's
+  keychain or your browser's password manager, not by the extension. It is named with your account
+  name alone, or "beethoven" ("Beethoven on this computer"); this version never uses it, and you
+  can delete it there, in your system's or your browser's list of passkeys. The passkey this
+  version makes for a saved grid sign-in is named with your account name followed by "(grid)" (for
+  example, "ab1234 (grid)"): delete that one only after *Forget*.
 
 ## What goes to your own cluster account
 
@@ -138,34 +153,142 @@ rules; Licensor has no access to it.
 ## What your portal sees
 
 The extension makes requests to your university's Open OnDemand portal, and only to it, using the
-sign-in your browser already holds, from the extension's own background, with no portal tab where
-your browser allows it: waking the portal's own web server up if it is asleep; reading the dashboard
-(when the panel opens, on each press that needs the grid, and about once a minute while the panel is
-open; every two seconds while you sign in); listing and reading your worker's files through the
-portal's Files app (every five seconds while a worker starts and the panel is open, every thirty
-seconds while it starts and the panel is closed, and about once a minute otherwise), and reading the
-version number of your lab's shared copy of the framework; and opening the shell for one command at
-a time (setting your account up to use the lab's copy; connect, which starts your worker and, when
-needed, holds the sign-in sitting described below; status, about once a minute while your worker
-waits for a computer and the panel is open; stop; and mark restricted), once after your first
-sign-in to test how the portal's shell can be reached (opened and closed with nothing typed but
-`exit`), during the one-time step below to test whether the shell still asks for a password, and,
-from *Details*, for the checks and the check job you start there. The extension types into the shell
-only once the shell has shown it is ready (its prompt), never at a password prompt. A shell
-connection from the extension's background arrives with the extension's own origin
+sign-in your browser holds for it (one you made in its own box, or one the extension made with the
+password you gave it, as the next section says), from the extension's own background, with no portal
+tab where your browser allows it: waking the portal's own web server up if it is asleep; reading the
+dashboard (when the panel opens, on each press that needs the grid, and about once a minute while
+the panel is open; every two seconds while you sign in with Chrome's own box; and, while no page of
+Beethoven's is open, a saved sign-in is unlocked and your portal has signed you out, once at each of
+the extension's checks of your worker, every thirty seconds to a minute); listing and reading your
+worker's files through the portal's Files app (every five seconds while a worker starts and the
+panel is open, every thirty seconds while it starts and the panel is closed, and about once a minute
+otherwise), and reading the version number of your lab's shared copy of the framework; and opening
+the shell for one command at a time (setting your account up to use the lab's copy; connect, which
+starts your worker and, when needed, holds the sign-in sitting described below; status, about once a
+minute while your worker waits for a computer and the panel is open; stop; and mark restricted),
+once after your first sign-in to test how the portal's shell can be reached (opened and closed with
+nothing typed but `exit`), during the one-time step below to test whether the shell still asks for a
+password, and, from *Details*, for the checks and the check job you start there. The extension types
+into the shell only once the shell has shown it is ready (its prompt), never at a password prompt. A
+shell connection from the extension's background arrives with the extension's own origin
 (`chrome-extension://...`) in the portal's logs. Your institution's logs record those requests as
 they record any use of the portal; the shell's page token appears in the portal's access log, as it
-does when you open the shell yourself. The extension opens the portal in a tab only for you to sign
-in there (in your browser's own sign-in box, or on the portal's own sign-in page), never sees what
+does when you open the shell yourself. The extension opens the portal in a tab for you to sign in
+there (in your browser's own sign-in box, or on the portal's own sign-in page) only when you choose
+*Use Chrome's sign-in box instead*, or in a browser where it cannot sign in for you, never sees what
 you type there, and closes that tab; where your portal does not share its sign-in with the
 extension, it opens a background tab for one action and closes it. It also opens the portal's own
 terminal page in a tab for the one-time step below, and your worker's folder in the portal's Files
-app when you press *Your files*. The extension never signs in for you and never touches a
-multi-factor step. It reads no other website and makes no request to claude.ai. When it opens a
-claude.ai page (your session's link when a worker you started is ready, *Open my session* and *New
-session*, or the connectors page from the optional step) or Anthropic's sign-in page, it opens it in
-a new browser tab, as a bookmark would, and runs nothing there; it closes Anthropic's sign-in tab
-once you are signed in, and *Open my session* may bring forward the claude.ai tab it opened itself.
+app when you press *Your files*. The extension signs in for you only as the next section says, with
+the account name and password you typed on its sheet, and never touches a multi-factor step. A
+password it gives your portal arrives there as one typed into Chrome's own box would, and one your
+portal turns down is recorded in your institution's logs as a failed sign-in. It reads no other
+website and makes no request to claude.ai. When it opens a claude.ai page (your session's link when
+a worker you started is ready, *Open my session* and *New session*, or the connectors page from the
+optional step) or Anthropic's sign-in page, it opens it in a new browser tab, as a bookmark would,
+and runs nothing there; it closes Anthropic's sign-in tab once you are signed in, and *Open my
+session* may bring forward the claude.ai tab it opened itself.
+
+## When your portal asks you to sign in
+
+Your university's portal may ask for your account name and cluster password (at Wayne State, your
+AccessID and its password) before it answers. In Chrome, the panel then shows Beethoven's own
+sign-in sheet: your account name, your password, the box *Remember it on this computer* (never
+ticked for you), *Sign in*, *Use Chrome's sign-in box instead* and, when you can leave it for later,
+*Not now*. Typing them there and pressing *Sign in* asks the extension to sign in to your portal for
+you.
+
+**How it signs in.** The extension holds two permissions for this, `webRequest` and
+`webRequestAuthProvider`, which let it answer a request for a sign-in on a website you granted it;
+your one portal is the only such website. It answers only the sign-in request that its own
+background reading of your portal's dashboard page receives, at most once each time it checks
+whether you are signed in, and only when that request comes from your portal itself, not from a
+proxy, asks for the portal's plain ("Basic") sign-in and, once a password the extension gave has
+worked, in this browser session or, for the saved password, at any time since it was saved, names
+the same sign-in realm as that one; a sign-in in Chrome's own box records no realm, and *Forget*,
+*Disconnect* and changing to another portal remove the one on record. It never answers a sign-in
+request from one of your own browser tabs (Chrome shows its own box there), from a proxy, from
+another website or for another realm, and never one of the checks that ask whether your portal
+answers, which carry no sign-in. The same permissions tell it of your own portal tabs' sign-in
+requests and of when requests to your portal end. It leaves your tabs' requests to Chrome and keeps
+one mark of them only, and only while an answer it gave still waits for its outcome: that one of
+your portal tabs asked for a sign-in, or had a request answered by your portal without a refusal,
+meanwhile (*One wrong password at most* says why); never which tab, which request or which page. The
+account name you type is used only to sign in; the approval check still sends the account name your
+portal's dashboard shows. The extension never fills in a sign-in web page or your university's
+identity provider, never touches a multi-factor step, and never types a password into the portal's
+shell.
+
+**One wrong password at most.** The extension sends a password your portal turns down at most once.
+The first refusal stops every sign-in the extension makes by itself, with a saved or a typed
+password, until you type the password again; the sheet asks you to check it first, and a saved
+password that was turned down is not tried again after Beethoven or the browser restarts. When the
+extension cannot tell whether a password it gave worked, because the browser closed, or Beethoven
+updated or reloaded, before the grid replied, or because one of your portal tabs asked for a sign-in
+or had a request answered while that answer waited (you may have signed in in Chrome's own box, and
+Chrome may have used that password for Beethoven's request as well), it counts the try as neither a
+success nor a refusal and puts a saved password on hold: it is not sent again until a password you
+type on the sheet works, or you save one again. Chrome keeps its own copy of a password it is given
+and sends it again by itself: when your portal turns that password down, Chrome re-sends its cached
+copy once for each request already started with it before the first refusal comes back; Beethoven
+then sends at most one; when the answered request is abandoned before the grid replies, Chrome may
+re-send that copy once. How many of these the grid counts is not yet measured. Your university may
+disable your account after a few wrong passwords, and getting it back may take days; a password you
+have just changed may not work everywhere yet.
+
+**If you do not tick the box**, the extension keeps the password in `storage.session`, in memory
+only, for the one sign-in you asked for, and removes it once that sign-in has been tried, whether or
+not it worked, and at the latest two minutes after you typed it.
+
+**If you tick it**, the extension asks your computer to make a passkey for your grid sign-in,
+unlocked with Windows Hello, Touch ID or your screen lock, with your account name followed by
+"(grid)" as its user name (for example, "ab1234 (grid)"). It encrypts the password with AES-GCM
+under a 256-bit key derived (HKDF-SHA-256) from a secret the passkey releases, which is never
+written to disk, and keeps only that encrypted copy, in the extension's own database in this browser
+profile. When the extension next needs your portal after you open the browser, the panel asks you to
+unlock it, once; what the passkey released then stays in `storage.session`, in memory, until the
+browser closes or Beethoven updates or reloads, and the extension signs in with it when your portal
+asks, also while no page of Beethoven's is open, so that a press you made, or *Keep my worker
+running*, can go ahead. The passkey is kept by Windows Hello, your Mac's Passwords app (iCloud
+Keychain) or Chrome's password manager, not by the extension; that store may keep it in your Google
+account or in iCloud and offer it on your other devices, but the saved password itself stays only in
+this browser profile. Someone who can use this browser profile while the saved password is unlocked,
+or who can unlock your passkey, could sign in to your portal with it, and so could the extension's
+own code; no website and no other extension can read it. Where your computer's passkey cannot lock a
+password, the extension says so, signs you in that once with the password you typed, and notes it so
+that the sheet stops offering the box. Saving is your choice, and your university's rules apply to
+it (the agreement, section 4(a)): where your university says to type your password each time you
+need it, as Wayne State's password standard does, leave the box unticked.
+
+**Forget.** *Forget*, beside *Grid sign-in* in Settings, deletes the saved password, its note, the
+note that a passkey could not lock a password, the unlocked secret, a typed password not yet used
+and the outcomes of the last tries. *Disconnect* does the same, and so does changing to another
+portal; uninstalling removes them with the rest of the extension's data. Forget may ask your list of
+passkeys to remove the passkey, but some lists keep it: yours may still show it, and you can delete
+it there, after Forget. It is not the old passkey of Beethoven 12.0.0 to 15.0.0, which is named with
+your account name alone, or "beethoven", and can go (*What an earlier version may have left*). If a
+password you typed works while your saved one is turned down or on hold, the extension forgets the
+saved one by itself, unless it can tell that the saved one is the same password, which it then keeps
+and uses again.
+
+**Chrome stays signed in.** Once your portal has accepted a password the extension gave it, Chrome
+keeps it in memory, as it keeps one you type into its own box, and uses it for your own portal tabs
+too, until Chrome closes or you clear its browsing data with cookies; *Forget* and *Disconnect* do
+not end that.
+
+**Chrome's own box.** *Use Chrome's sign-in box instead* opens your portal in a tab, where you sign
+in with Chrome's own box or on the portal's own sign-in page, as Beethoven 18.0.0 did; the extension
+never sees what you type there and closes that tab once you are signed in. Where the extension
+cannot answer your portal's request for a sign-in, this is the only way. That includes a portal that
+sends you to your university's own sign-in page instead of asking the browser for a password: in
+Chrome the sheet still appears there, but the extension sends no password typed on it. Chrome may
+offer to save what you type in that tab; that offer is Chrome's own, and your university's rules
+apply to it as well.
+
+Nothing of this reaches Licensor: not your password, not the account name you type, not the outcomes
+of the tries. This sign-in came with Beethoven 19.0.0 and has been tried only in Licensor's own
+tests, against its mock portal and a stand-in for a passkey, not yet against a real cluster or with
+a real Windows Hello or Touch ID.
 
 ## What happens when you sign in to Claude
 
@@ -194,29 +317,30 @@ the latest); if it ends without a sign-in, nothing is kept and you can start it 
 ## When the portal's shell asks for your password
 
 An account with no key on the cluster may find that the portal's shell asks for a password when the
-extension opens it. The extension never types a password: it stops before typing anything and, when
-you next press a button that needs the grid, asks you, once, to open the portal's own terminal page.
-When you press *Open the grid terminal*, it opens that page (the portal's Shell app) in a tab beside
-the panel and puts one line on your clipboard. You type your password there yourself, into your
-institution's own page; the extension never sees it. On that page the extension's page script
-watches only the page's title, to tell when your shell is up: it listens to no keys, reads nothing
-the terminal shows and stores nothing from the page. When you press *I'm in*, or the title shows
-that your shell is up, it types the one line into the terminal for you; where it cannot, you paste
-it. The line runs `hpcworker login-setup` from your lab's shared copy, in your own account: it makes
-a key there, lets that key into your account only from the computer the terminal came from, which at
-your institution is its Open OnDemand server, and has ssh offer it when the portal's shell connects
-you (see *What goes to your own cluster account*). It never reads, changes or prints a key you
-already have, and never prints a private key. The key never leaves your cluster account: the
-extension does not see it, keeps nothing about it in your browser and sends nothing about it to
-anyone; it keeps only which tab it opened, until the browser closes, and whether the shell still
-asks for a password (see the table above). It then checks whether the shell opens without a
-password, every two seconds for ten seconds and then every ten seconds for up to five minutes; each
-check opens the portal's shell once and closes it, which the login node records as a sign-in that
-stopped at the password prompt. It closes the terminal tab it opened once the shell opens without a
-password, and carries on with what you pressed. If the computer the terminal comes from changes, the
-shell asks again and the step is offered again. `hpcworker login-setup --remove`, run in a terminal
-on the cluster, removes the key and both entries. This step came with Beethoven 11.0.0 and has been
-tried only against the lab's mock portal, not yet on a real cluster by an account without a key.
+extension opens it. The extension never types a password, not even one you gave it to sign in to
+your portal: it stops before typing anything and, when you next press a button that needs the grid,
+asks you, once, to open the portal's own terminal page. When you press *Open the grid terminal*, it
+opens that page (the portal's Shell app) in a tab beside the panel and puts one line on your
+clipboard. You type your password there yourself, into your institution's own page; the extension
+never sees it. On that page the extension's page script watches only the page's title, to tell when
+your shell is up: it listens to no keys, reads nothing the terminal shows and stores nothing from
+the page. When you press *I'm in*, or the title shows that your shell is up, it types the one line
+into the terminal for you; where it cannot, you paste it. The line runs `hpcworker login-setup` from
+your lab's shared copy, in your own account: it makes a key there, lets that key into your account
+only from the computer the terminal came from, which at your institution is its Open OnDemand
+server, and has ssh offer it when the portal's shell connects you (see *What goes to your own
+cluster account*). It never reads, changes or prints a key you already have, and never prints a
+private key. The key never leaves your cluster account: the extension does not see it, keeps nothing
+about it in your browser and sends nothing about it to anyone; it keeps only which tab it opened,
+until the browser closes, and whether the shell still asks for a password (see the table above). It
+then checks whether the shell opens without a password, every two seconds for ten seconds and then
+every ten seconds for up to five minutes; each check opens the portal's shell once and closes it,
+which the login node records as a sign-in that stopped at the password prompt. It closes the
+terminal tab it opened once the shell opens without a password, and carries on with what you
+pressed. If the computer the terminal comes from changes, the shell asks again and the step is
+offered again. `hpcworker login-setup --remove`, run in a terminal on the cluster, removes the key
+and both entries. This step came with Beethoven 11.0.0 and has been tried only against the lab's
+mock portal, not yet on a real cluster by an account without a key.
 
 ## What Anthropic receives
 
@@ -251,20 +375,22 @@ Licensor before you have accepted the agreement. After that:
   one from the lab's private listing). The extension keeps a yes for up to a day, and for up to
   seven days when the service cannot be reached, so an outage on Licensor's side does not stop your
   work; it keeps a no for ten minutes, and while the answer is no it starts no worker and, unless
-  the reason is one of those three, offers you a button to ask for access. - **Two files, once a
-  day.** `https://openspineconsortium.com/beethoven/services.json` (the address of the access
-  service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed list of
-  withdrawn extension versions). Both requests are sent without cookies and carry nothing about you
-  beyond what any web request carries (your network address, which the web host's ordinary server
-  logs may record for a short time); the files hold addresses and the list only.
+  the reason is one of those three, offers you a button to ask for access.
+- **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
+  of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
+  list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
+  about you beyond what any web request carries (your network address, which the web host's ordinary
+  server logs may record for a short time); the files hold addresses and the list only.
 
 Those are the only requests the extension ever makes to Licensor. In particular:
 
 - there is no key of Licensor's and no activation step; your institution's own sign-in identifies
-  you; the extension never reads your portal's sign-in, cookie or password; - the extension sends no
-  error reports, no crash reports and no usage data; it has no code for them and no address to send
-  them to; - your acceptance record, your statements, your audit log, your activity list, your
-  settings and what the extension remembers about your worker stay in your browser.
+  you; the extension never reads your portal's sign-in or cookie, and never sends Licensor your
+  cluster password, not even one you gave it to sign in to your portal;
+- the extension sends no error reports, no crash reports and no usage data; it has no code for them
+  and no address to send them to;
+- your acceptance record, your statements, your audit log, your activity list, your settings, a grid
+  sign-in you chose to save and what the extension remembers about your worker stay in your browser.
 
 **What Licensor records from the checks.** One record for each account and product: the account
 name, the product, and the portal hostname and the version of the latest check; when the account was
@@ -321,20 +447,26 @@ record.
 ## What is never collected
 
 Stated in the negative because reviewers read for what is absent: the extension does not collect
-command text, file paths, prompt content, job output, portal cookies or tokens, your portal
-password, your cluster password or verification code (you type them only into your browser's own
-sign-in box, your portal's own pages and the portal's own terminal page, never into the extension),
+command text, file paths, prompt content, job output, portal cookies or tokens, a verification code,
 the code you paste to sign in to Claude, anything the portal's terminal page shows, the key the
-one-time step makes, browsing activity, or anything from claude.ai or any Anthropic page. It reads
-no hardware address, serial number or other identifier from your device and derives none from it:
-the one identifier of the installation is the random number described above. It sends Licensor no
-error or crash reports, no usage data and no activation request; the approval check above is the
-only thing it sends about you. It has no site permission on claude.ai, claude.com or anthropic.com
-and never asks for one, requests no `activeTab`, `cookies`, `tabs`, `webRequest`, `debugger`,
-`identity`, `clipboardRead` or `nativeMessaging` permission (so no program on your computer is
-started for it), is granted no website when it is installed (it asks for your portal's one website
-when you press *Agree and continue*, *Use this portal* or *Change* under Settings), and runs no code
-fetched from anywhere.
+one-time step makes, browsing activity (of your own portal tabs it learns only of their sign-in
+requests and of when their requests end, and keeps of them only the one mark *When your portal asks
+you to sign in* describes, while an answer of its own waits for its outcome), or anything from
+claude.ai or any Anthropic page. Your portal or cluster password reaches the extension only if you
+type it into its own sign-in sheet; it then goes only to your portal, never to Licensor, and is kept
+only as *When your portal asks you to sign in* says. A password or code you type into your browser's
+own sign-in box, your portal's own pages or the portal's own terminal page the extension never sees.
+It reads no hardware address, serial number or other identifier from your device and derives none
+from it: the one identifier of the installation is the random number described above. It sends
+Licensor no error or crash reports, no usage data and no activation request; the approval check
+above is the only thing it sends about you. It has no site permission on claude.ai, claude.com or
+anthropic.com and never asks for one, requests no `activeTab`, `cookies`, `tabs`,
+`webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`, `clipboardRead` or
+`nativeMessaging` permission (so no program on your computer is started for it), requests
+`webRequest` and `webRequestAuthProvider` only to answer your portal's request for a sign-in, and to
+learn whether its answer worked, as *When your portal asks you to sign in* says, is granted no
+website when it is installed (it asks for your portal's one website when you press *Agree and
+continue*, *Use this portal* or *Change* under Settings), and runs no code fetched from anywhere.
 
 ## How Licensor uses and keeps it
 
@@ -346,9 +478,9 @@ accounting and disputes. Nothing is sold or used for advertising. The web host t
 daily files sees the requests any web server sees and nothing more. Processors acting for Licensor
 (hosting; the access service; the e-mail service that carries its notices) see only what they need
 to run the service. Your cluster password and verification code reach neither Licensor nor any
-processor of Licensor's: the extension never sees them; you type them only into your browser's own
-sign-in box or your institution's own pages. Licensor's use of data complies with the Chrome Web
-Store's Limited Use requirements.
+processor of Licensor's: a password you give the extension goes only to your portal, and a password
+or code you type into your browser's own sign-in box or your institution's own pages the extension
+never sees. Licensor's use of data complies with the Chrome Web Store's Limited Use requirements.
 
 ## Security and breaches
 
@@ -358,17 +490,20 @@ by Licensor.
 
 ## Your choices and rights
 
-Remove the site permission or uninstall the extension at any time; press *Forget* on the note in
-Settings about a key an earlier version added; have the line an earlier version added to your
-cluster account removed (ask your lab lead, or run `hpcworker browser-key remove` in a terminal on
-the cluster); remove a Bridge an earlier version had you install (on Windows from Settings, Apps; on
-a Mac or on Linux, and for a Bridge installed from a zip file with Beethoven 14.0.0 or earlier, with
-its uninstaller); remove the key of the one-time step from your cluster account with `hpcworker
-login-setup --remove`; ask Licensor to move your approval to another installation, or for a copy or
-deletion of your access records (deletion of your access record ends your approval and with it the
-license). Michigan residents and residents of other states may have further rights under their
-state's laws; Licensor honours requests it is obliged to honour and answers others where it
-reasonably can. Beethoven is offered in the United States.
+Remove the site permission or uninstall the extension at any time; leave *Remember it on this
+computer* unticked, or press *Forget* beside *Grid sign-in* in Settings to delete a saved grid
+sign-in (and then delete its passkey, named with your account name followed by "(grid)", in your
+list of passkeys if it is still there); press *Forget* on the note in Settings about a key an
+earlier version added; have the line an earlier version added to your cluster account removed (ask
+your lab lead, or run `hpcworker browser-key remove` in a terminal on the cluster); remove a Bridge
+an earlier version had you install (on Windows from Settings, Apps; on a Mac or on Linux, and for a
+Bridge installed from a zip file with Beethoven 14.0.0 or earlier, with its uninstaller); remove the
+key of the one-time step from your cluster account with `hpcworker login-setup --remove`; ask
+Licensor to move your approval to another installation, or for a copy or deletion of your access
+records (deletion of your access record ends your approval and with it the license). Michigan
+residents and residents of other states may have further rights under their state's laws; Licensor
+honours requests it is obliged to honour and answers others where it reasonably can. Beethoven is
+offered in the United States.
 
 ## Children
 
@@ -378,6 +513,27 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 13 (2026-10-09, Beethoven 19.0.0): Beethoven signs in to your portal for you. In Chrome,
+when your portal asks for a sign-in, the panel shows Beethoven's own sign-in sheet for your account
+name and cluster password, and the extension answers your portal's request for a sign-in from its
+background, with no tab, under the `webRequest` and `webRequestAuthProvider` permissions, which it
+now requests: only for its own reading of your portal's dashboard, at most once per check, and never
+for a tab, a proxy, another website or another realm. It sends a password your portal turns down at
+most once, and that refusal stops every sign-in it makes by itself until you type the password
+again. Saving the password is optional and off unless you tick *Remember it on this computer*; a
+saved password is kept only encrypted, in the extension's database in this browser profile, under a
+key derived from what a passkey releases (Windows Hello, Touch ID or your screen lock, named with
+your account name followed by "(grid)"); what the passkey releases stays in memory only, from when
+you unlock it until the browser closes or Beethoven updates or reloads; a password not saved is kept
+in memory for one sign-in and at most two minutes. New in your browser: the saved sign-in, its note,
+the note that a passkey could not lock a password, the unlocked secret, the typed password for one
+sign-in and the outcomes of the last tries (the table). *Forget* beside *Grid sign-in* in Settings,
+*Disconnect* and changing to another portal delete them. Chrome keeps a password that worked in
+memory until it closes and uses it for your portal tabs too. *Use Chrome's sign-in box instead*
+keeps the way of 18.0.0, which is also the only way where the extension cannot answer a request for
+a sign-in. The statement now tells the old passkey of 12.0.0 to 15.0.0 apart from the new one.
+Nothing new reaches Licensor.
 
 Version 12 (2026-10-08, Beethoven 16.0.0): the direct way of versions 12.0.0 to 15.0.0 is removed
 whole. The extension no longer reaches your cluster over ssh, has no Bridge, no sign-in sheet, no

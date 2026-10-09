@@ -15,11 +15,19 @@
 // 16.0.0 removed that way and the permission with it (greg, 2026-10-08: the one way is the university's
 // VPN and the portal), so the manifest is 11.0.0's again.
 //
+// 19.0.0 (greg, 2026-10-09: Beethoven signs in): webRequest and webRequestAuthProvider on the Chromium
+// builds, for one webRequest.onAuthRequired listener (asyncBlocking, which needs the second one; never
+// webRequestBlocking). It answers only the HTTP Basic challenge of Beethoven's own background request
+// for the dashboard on the one granted origin, once per armed check, with what the student typed into
+// Beethoven's sheet; its two companions, onCompleted and onErrorOccurred, say whether the grid took it.
+// The events reach only the origin the student granted; a tab's challenge is left to Chrome's own box.
+// The Firefox build gets neither and keeps the box (the 18.0.0 way).
+//
 // What is deliberately absent, and must stay absent: any host_permissions at install time (Decision 2),
-// the cookies, tabs, notifications, webRequest, offscreen, tabGroups, debugger and identity
-// permissions, and any origin on claude.ai, anthropic.com or claude.com. The only other
-// addresses it fetches are the maintainer's (the approval check, the services file and the
-// withdrawn-versions list), with plain cross-origin fetches and no host permission.
+// the cookies, tabs, notifications, webRequestBlocking, declarativeNetRequest, offscreen, tabGroups,
+// debugger, identity and nativeMessaging permissions, and any origin on claude.ai, anthropic.com or
+// claude.com. The only other addresses it fetches are the maintainer's (the approval check, the
+// services file and the withdrawn-versions list), with plain cross-origin fetches and no host permission.
 import { defineConfig } from 'wxt';
 
 // the manifest description: at most 132 characters in Chrome's manifest documentation; this is 128
@@ -58,8 +66,9 @@ export default defineConfig({
       description: SINGLE_PURPOSE,
       author: 'OpenSpineConsortium',
       homepage_url: 'https://openspineconsortium.com/beethoven/',
-      // sidePanel on the Chromium builds only: Firefox's sidebar is declared below
-      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['sidePanel'] : [])],
+      // sidePanel on the Chromium builds only: Firefox's sidebar is declared below; webRequest and
+      // webRequestAuthProvider (19.0.0) there only too: Firefox MV2 would need webRequestBlocking, never asked for
+      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['sidePanel', 'webRequest', 'webRequestAuthProvider'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
       // no default_popup: the toolbar button toggles the window-wide panel (the background sets
       // openPanelOnActionClick); its badge, tooltip and lit icon report while the panel is closed.

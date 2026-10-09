@@ -25,8 +25,8 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 11;
-export const TERMS_DATE = '2026-10-08';
+export const TERMS_VERSION = 12;
+export const TERMS_DATE = '2026-10-09';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Agree and continue';
@@ -51,7 +51,7 @@ export const TWO_TICKS = false;
 export const SUMMARY: readonly string[] = [
   "Free while you're approved. Licensed to you, not sold.",
   'To check your approval, it sends the lab your AccessID and an ID for this browser.',
-  'The grid, Anthropic or the browser store can stop it working at any time. You accept that risk.',
+  'The grid, Anthropic or the browser store can stop it working at any time, and wrong passwords can get your grid account disabled. You accept these risks.',
   'Disputes: written notice first, then one person at a time in Michigan courts, with no jury.',
 ];
 
@@ -248,6 +248,8 @@ export function bindAccount(r: TermsRecord, account: string, at = new Date().toI
  * a version 9 acceptance is kept in the history the same way and is out of force.
  * 16.0.0 (LICENSE version 11, PRIVACY version 12: the direct way removed): a version 10 acceptance is
  * kept in the history the same way and is out of force.
+ * 19.0.0 (LICENSE version 12, PRIVACY version 13: Beethoven signs in to the grid): a version 11 acceptance
+ * is kept in the history the same way and is out of force.
  */
 export function recordInForce(r: unknown): r is TermsRecord {
   const x = r as TermsRecord | undefined;

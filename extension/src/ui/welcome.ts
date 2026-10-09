@@ -9,10 +9,17 @@
 // The press is one gesture: inside the click and before any await, the page calls sidePanel.open with the
 // window id it read when it loaded and permissions.request for the portal's one origin; then it writes the
 // acceptance record (core/terms.ts buildTermsRecord, TermsRecord v2) and sends "agree" with what Chrome
-// answered. The background turns this same tab into the grid's sign-in. Below 960 px the tick and the
-// button sit in a sticky bar so the action is always in view.
+// answered. On the box path (18.0.0) the background turns this same tab into the grid's sign-in; where the
+// browser can answer the grid's sign-in itself (19.0.0) no tab opens and the panel carries on with
+// Beethoven's own sheet. Below 960 px the tick and the button sit in a sticky bar so the action is always
+// in view.
+//
+// 19.0.0: a sentence names the place, never the portal's host where a profile names the grid (core/model.ts
+// placeOf): "Chrome will ask to let Beethoven reach the Wayne State University HPC grid, which Chrome names by
+// its web address."; the host only for a portal typed under "Use another portal", which no carried profile
+// declares.
 import { TERMS_HISTORY_KEY, TERMS_KEY, TERMS_VERSION, buildTermsRecord, endReached, withHistory, type TermsRecord } from '../core/terms';
-import { WORDS, type HeroView, type WelcomeView } from '../core/model';
+import { WORDS, placeOf, type HeroView, type WelcomeView } from '../core/model';
 import { add, clear, downloadText, el, morph } from './dom';
 import { drawnCheck, icon, spinner, type IconName } from './icons';
 import { foldToggle, hero, tickBox } from './parts';
@@ -59,6 +66,12 @@ export interface Gestures {
   load?: (key: string) => Promise<unknown>;
   /** inside the click, before the panel opens: a session note that the press is under way, so the panel opening beside the page says "Almost there." (never awaited) */
   notePress?: () => void;
+  /**
+   * 19.0.0, Settings' Forget: tell the passkey list a passkey Beethoven made is no longer used (best-effort,
+   * never awaited). Default: the browser's own signal, ext/gridSignin.ts signalUnknownPasskey; the gallery
+   * passes a stand-in.
+   */
+  unknownPasskey?: (cred: string) => void;
   tabId?: number;
   windowId?: number;
 }
@@ -86,11 +99,22 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
   /** the portal the press asks Chrome for: the one chosen under "Use another portal", else the view's (the site profile's) */
   const portalOf = (v: WelcomeView) => local.portalChosen ?? { origin: v.portal.origin, hostname: v.portal.hostname };
 
+  /**
+   * The place a sentence names for that portal: the picked grid's name when it is the picked grid's own
+   * portal, else the host. A deployment whose profile gives no display name is listed by its id
+   * (background.ts), which is no place name, so that one keeps the host too.
+   */
+  const placeFor = (v: WelcomeView, p: { origin: string; hostname: string }) => {
+    const picked = v.grids.options.find((o) => o.site === v.grids.selected);
+    return placeOf(p.origin === v.portal.origin && picked && picked.name !== picked.site ? picked.name : undefined, p.hostname);
+  };
+
   /** the one gesture: panel and permission first, synchronously, then the record and "agree" */
   const press = () => {
     const v = view;
     if (!v || !allTicked(v) || local.pressing) return;
     const { origin, hostname } = portalOf(v);
+    const place = placeFor(v, { origin, hostname });
     g.notePress?.();
     const opening = g.hasPanel ? g.openPanel() : Promise.resolve(false);
     const granting = g.request(origin);
@@ -125,7 +149,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
       }
       const answer = await opts.act({ kind: 'agree', origin, granted, panelOpened, ...(g.tabId !== undefined ? { tabId: g.tabId } : {}), ...(g.windowId !== undefined ? { windowId: g.windowId } : {}) });
       opts.onAccepted?.();
-      if (!granted) set({ pressing: false, localState: 'denied', localProblem: WORDS.welcome.denied(hostname) });
+      if (!granted) set({ pressing: false, localState: 'denied', localProblem: WORDS.welcome.denied(place) });
       else if (g.hasPanel && !panelOpened) set({ pressing: !answer, localState: 'no-panel', localProblem: WORDS.welcome.panelNotOpened });
       else if (!answer) set({ pressing: false });
     })();
@@ -210,8 +234,9 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     return m ? el('h1', { class: 'w-h1' }, m[1]!, ' ', el('em', { text: m[2]! })) : el('h1', { class: 'w-h1', text });
   }
 
-  function handoff(text: string, h?: HeroView): HTMLElement {
-    return el('section', { class: 'handoff', role: 'status' }, el('p', { class: 'handoff-head' }, drawnCheck(28), el('span', { text })), h ? hero(h) : null);
+  /** done: the drawn check and the panel's hero; not done (the sheet waits in the panel): the words alone */
+  function handoff(text: string, done: boolean, h?: HeroView): HTMLElement {
+    return el('section', { class: 'handoff', role: 'status' }, el('p', { class: 'handoff-head' }, done ? drawnCheck(28) : null, el('span', { text })), done && h ? hero(h) : null);
   }
 
   function agreement(v: WelcomeView): HTMLElement {
@@ -222,7 +247,8 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
     const label = opening ? v.agree.busyLabel : retry ? WORDS.welcome.tryAgain : v.agree.label;
     const ready = allTicked(v);
     const chosen = portalOf(v);
-    const allowNote = local.portalChosen ? WORDS.welcome.allowNote(chosen.hostname) : v.allowNote;
+    // the core's sentence for the view's own portal; one typed under "Use another portal" names its host
+    const allowNote = local.portalChosen && local.portalChosen.origin !== v.portal.origin ? WORDS.welcome.allowNote(placeFor(v, chosen)) : v.allowNote;
     return el(
       'div',
       { class: 'w-right' },
@@ -311,7 +337,7 @@ export function mountWelcome(root: HTMLElement, opts: { act: Act; gestures: Gest
         grids(v),
         needs(v),
       ),
-      v.state === 'handoff' ? el('div', { class: 'w-right' }, handoff(v.handoff?.text ?? WORDS.welcome.handoff, v.handoff?.hero)) : agreement(v),
+      v.state === 'handoff' ? el('div', { class: 'w-right' }, handoff(v.handoff?.text ?? WORDS.welcome.handoff, v.handoff?.done ?? true, v.handoff?.hero)) : agreement(v),
       v.state === 'handoff' ? null : footer(v),
     );
     if (page && page.isConnected) morph(page, next);

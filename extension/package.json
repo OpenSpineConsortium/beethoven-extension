@@ -2,7 +2,7 @@
   "name": "beethoven",
   "displayName": "Beethoven",
   "description": "Starts, watches and stops a Claude Code worker on your university's Open OnDemand cluster and hands you its Remote Control link.",
-  "version": "18.0.0",
+  "version": "19.0.0",
   "private": true,
   "type": "module",
   "license": "SEE LICENSE IN public/LICENSE.txt",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/node": "22.20.4",
+    "linkedom": "0.18.13",
     "typescript": "5.9.3",
     "vite": "8.3.1",
     "vitest": "5.0.2",

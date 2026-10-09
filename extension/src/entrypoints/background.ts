@@ -26,12 +26,22 @@
 //   this browser is removed once on the first run after the update (cleanupDirectWay). Out of reach,
 //   a press now waits on the GlobalProtect moment and goes ahead by itself once the grid answers; the
 //   alarm asks once a minute whether it does, so "Keep my worker running" works with the panel closed.
+//   19.0.0 (greg, 2026-10-09): Beethoven signs in. Where the browser has webRequest.onAuthRequired, the
+//   grid moment is Beethoven's own sheet in the panel, and one listener answers the portal's HTTP Basic
+//   challenge to this background's own dashboard GET, inside checkGrid's armed window and once per window,
+//   with the AccessID and password the student typed there (for one attempt) or saved (sealed under the
+//   passkey, opened per answer). A tab's challenge, a proxy's, another origin's or realm's get nothing and
+//   keep Chrome's own box; the grid turning the password down stops every automatic sign-in until the
+//   student types it again. The 18.0.0 sign-in tab stays as "Use Chrome's sign-in box instead", and is
+//   the only way where the browser has no such listener (the Firefox build).
 //
 // It never runs anything on, and holds no site permission for, claude.ai, claude.com or anthropic.com
 // (it opens Anthropic's sign-in page and the claude.ai link in tabs, as a bookmark would); it never
-// reads, stores or relays a Claude credential or the university password; nothing goes to the lab
-// before the agreement is accepted, and the approval check's fields are unchanged.
-import { browser } from 'wxt/browser';
+// reads, stores or relays a Claude credential. The university password the student gives the sheet
+// goes only to the grid, as that one answer: never into a message, a view, a log, storage.local or
+// argv, and never to the lab. Nothing goes to the lab before the agreement is accepted, and the
+// approval check's fields are unchanged (the account name the dashboard shows, never the typed AccessID).
+import { browser, type Browser } from 'wxt/browser';
 import { defineBackground } from 'wxt/utils/define-background';
 import { Audit, AUDIT_KEY, clearRecordsKeepingClocks } from '../core/audit';
 import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/channel';
@@ -43,6 +53,7 @@ import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnosti
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
 import { bundledDeployments, bundledProfile, deploymentOfPortal, portalOf, PRESELECTED_SITE, type Deployment } from '../core/deployments';
+import { ACCESS_ID, authVerdict, onceExpired, unlockWord, type AuthContext, type AuthDetails } from '../core/gridsignin';
 import { noSharedForSite, usesSharedCopy } from '../core/install';
 import {
   ACCESS_KEY,
@@ -69,7 +80,11 @@ import {
   REVOKED_KEY,
   RUN_KEY,
   SERVICES_KEY,
+  SIGNIN_NOTE_KEY,
+  SIGNIN_ONCE_KEY,
+  SIGNIN_STATE_KEY,
   SIGNIN_TAB_KEY,
+  SIGNIN_UNLOCK_KEY,
   STATEMENTS_KEY,
   TERMINAL_TAB_KEY,
   TOUR_SEEN_KEY,
@@ -89,26 +104,31 @@ import {
   type PortalSettings,
   type Prefs,
   type ProbeNote,
+  type SigninNote,
+  type SigninOnce,
+  type SigninState,
+  type SigninUnlock,
   type TourSeen,
   type WaitHistory,
 } from '../core/keys';
 import { CodeGate, ConnectWatcher } from '../core/login';
 import { LoginSetupFlow } from '../core/loginSetup';
 import { CONNECT_PORT, fail, succeed, unwrap, VIEW_PORT, type Answer, type ConnectOut, type Request, type TerminalTyped, type ViewIn, type ViewOut } from '../core/messages';
-import { BADGE_COLORS, LOG_WORDS, WORDS, type Action, type ActionResults, type ConnectFailure, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
+import { BADGE_COLORS, LOG_WORDS, placeOf, WORDS, type Action, type ActionResults, type ConnectFailure, type Surface, type SurfaceView, type WelcomeView } from '../core/model';
 import type { WsConstructor } from '../core/net';
 import { reach, REACH_LOOKING_TIMEOUT_MS, REACH_TIMEOUT_MS } from '../core/net';
 import { DASHBOARD, PORTAL_OPS, PortalClient, type PortalApi, type SessionInfo } from '../core/portal';
 import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell';
 import { detailsView, settingsView } from '../core/sheets';
-import { firstRunDone, heroOf, home, lastKnownOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
+import { firstRunDone, heroOf, home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type OwnSigninFacts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
 import { connectLine, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
 import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, requestUrl, type AccessRecord, type AccessTrigger, type StoredServices } from '../licensing/access';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
-import { connectApi, disconnectPortal, dropAnthropicLeftovers, savePortal } from '../ext/connectApi';
+import { indexedDbRecords, openPassword, unbase64 } from '../core/vault';
+import { connectApi, disconnectPortal, dropAnthropicLeftovers, forgetGridSignin, savePortal } from '../ext/connectApi';
 import { hasPanel } from '../ext/gesture';
 import { assetUrl, installId, local, prefs as loadPrefs, session, version } from '../ext/storage';
 import { activeTabIn, closeUnderGuards, focusTab, openTab, tabHost, tabNow } from '../ext/tabs';
@@ -117,6 +137,8 @@ export type { RunState } from '../core/facts';
 
 const POLL_ALARM = 'bridge.poll';
 const SIGNIN_ALARM = 'bridge.signin';
+/** 19.0.0: a one-shot (a password typed without Remember) is removed two minutes after it was written, at the latest */
+const SIGNIN_ONCE_ALARM = 'bridge.signinOnce';
 const KILLLIST_ALARM = 'bridge.killlist';
 const ACCESS_ALARM = 'bridge.access';
 /** the daily alarm leaves the kill-list alone when it was fetched this recently */
@@ -180,6 +202,42 @@ interface Sitting {
 
 const freshConnect = (): ConnectFacts => ({ inFlight: false, queued: false, signin: 'none' });
 
+/** 19.0.0: where an answer's password came from: a one-shot typed without Remember, or the saved sign-in */
+type AuthSource = 'once' | 'saved';
+/** what the grid made of an answer: took it, turned it down, or not known (the request ended before it replied) */
+type AuthOutcome = 'proven' | 'refused' | 'unsettled';
+type GridWord = 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown';
+/** 19.0.0: what one check's armed window did, read by the grid-signin that ran it */
+interface WindowFacts {
+  armed?: AuthSource;
+  answered?: string;
+  outcome?: AuthOutcome;
+  /** an answer from an earlier window whose outcome this check's reading settled */
+  earlier?: 'proven' | 'refused' | 'unconfirmed';
+}
+
+/**
+ * 19.0.0: what the onAuthRequired listener decides from, in memory, since it must decide in its first
+ * synchronous turn. Never a password: `once` is a one-shot's meta, `unlockCred` the unlock's credential id;
+ * the secrets are read from storage.session per answer and dropped after it.
+ */
+interface GridAuth {
+  /** the state, the note and the unlock's credential id read at start (main) */
+  loaded: Promise<void>;
+  state: SigninState;
+  note?: SigninNote;
+  once?: { origin: string; username: string; at: string };
+  unlockCred?: string;
+  /** a grid-signin action is under way (the sheet's working phase) */
+  working: boolean;
+  /** the student asked for the sheet (the Grid row's Sign in): the grid moment shows it for ten minutes at most */
+  asked?: number;
+  /** the latest answer's outcome, settled once by Chrome's own signals (or the next check's reading) */
+  outcome?: { requestId: string; settle(o: AuthOutcome): void; done: Promise<AuthOutcome> };
+}
+
+const freshAuthState = (): SigninState => ({ sent: [], refusals: 0 });
+
 const mem = {
   ports: new Map<ViewPort, { surface: Surface; windowId?: number; last?: string }>(),
   panelWindowId: undefined as number | undefined,
@@ -224,6 +282,21 @@ const mem = {
   startId: 0,
   /** student presses being carried out now (Connect, Stop, Sign in to Claude…): the tick carries nothing meanwhile */
   pressDepth: 0,
+  /** 19.0.0: checkGrid's armed window (the one dashboard GET that may get the password) and the request that got it */
+  grid: {
+    armed: undefined as { url: string; answered?: string; source: AuthSource } | undefined,
+    /** the last check's own window, for the grid-signin that ran it: armed or not, the request it answered and that answer's outcome, and an earlier answer its reading settled */
+    lastWindow: undefined as WindowFacts | undefined,
+  },
+  /** 19.0.0: the grid check in flight, claimed before its first await, so a grid-signin waits for it and then runs its own */
+  gridCheck: undefined as Promise<GridWord> | undefined,
+  gridAuth: { loaded: Promise.resolve(), state: freshAuthState(), working: false } as GridAuth,
+  /** the stored portal's origin as last read (settingsNow), for the listener's first synchronous turn */
+  portalOrigin: undefined as string | undefined,
+  /** "Windows Hello", "Touch ID" or "your screen lock", once read */
+  unlockWith: undefined as string | undefined,
+  /** 19.0.0: the press a carryPress last took up, so the shell's 401 runs its sign-in check once per press */
+  carried: undefined as PendingPress | undefined,
 };
 
 // ---- 14.0.0: the debug log ------------------------------------------------------------------------------
@@ -384,6 +457,27 @@ export default defineBackground({
       if (area === 'local' && (changes[PREFS_KEY] || changes[PORTAL_KEY] || changes[TERMS_KEY] || changes[STATEMENTS_KEY])) schedulePush();
       // the welcome page's press, written inside its click: the panel opening beside it says "Almost there."
       if (area === 'session' && changes[WELCOME_PRESS_KEY]) schedulePush();
+      // 19.0.0: what a page wrote for the grid sign-in, kept current for the listener; never a secret value
+      // (the note holds none; of the unlock, only its credential id; of a one-shot, nothing but its alarm)
+      if (area === 'local' && changes[SIGNIN_NOTE_KEY]) {
+        authSeq.note++;
+        mem.gridAuth.note = noteOf(changes[SIGNIN_NOTE_KEY]?.newValue);
+        schedulePush();
+      }
+      if (area === 'session' && changes[SIGNIN_UNLOCK_KEY]) {
+        authSeq.unlock++;
+        mem.gridAuth.unlockCred = credOf(changes[SIGNIN_UNLOCK_KEY]?.newValue);
+        schedulePush();
+      }
+      if (area === 'session' && changes[SIGNIN_ONCE_KEY]?.newValue !== undefined) void browser.alarms.create(SIGNIN_ONCE_ALARM, { delayInMinutes: 2 });
+    });
+    // 19.0.0: the listener first, synchronously (an event raised while the worker starts is not lost), and
+    // again whenever Chrome grants an origin: an onAuthRequired registered while no host is granted is
+    // refused silently, and each addListener is its own registration, so the old one goes first
+    mem.gridAuth.loaded = loadGridAuth();
+    listenForGridAuth();
+    browser.permissions.onAdded.addListener(() => {
+      if (!gridAuthLive) listenForGridAuth();
     });
     browser.runtime.onInstalled.addListener(async (details) => {
       // the options page shows the welcome until the agreement is accepted
@@ -412,6 +506,7 @@ export default defineBackground({
     browser.alarms.onAlarm.addListener(async (alarm) => {
       if (alarm.name === POLL_ALARM) await backgroundPoll();
       else if (alarm.name === SIGNIN_ALARM) await signinAlarm();
+      else if (alarm.name === SIGNIN_ONCE_ALARM) await signinOnceAlarm();
       else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow({ skipIfFetchedWithinMs: KILLLIST_ALARM_SKIP_MS });
       else if (alarm.name === ACCESS_ALARM) await checkAccessNow('alarm');
     });
@@ -509,7 +604,9 @@ async function setPollEvery(minutes: number): Promise<void> {
 }
 
 async function settingsNow(): Promise<PortalSettings | undefined> {
-  return acceptedSettings(await local.get<PortalSettings>(PORTAL_KEY));
+  const s = acceptedSettings(await local.get<PortalSettings>(PORTAL_KEY));
+  mem.portalOrigin = s?.origin;
+  return s;
 }
 
 async function termsInForce(): Promise<boolean> {
@@ -548,6 +645,8 @@ function siteWords(profile: SiteProfile | undefined, workerName: string): SiteWo
     ...(profile?.vpn_portal ? { vpnPortal: profile.vpn_portal } : {}),
     ...(profile?.vpn_required === false ? { vpnRequired: false } : {}),
     ...(profile?.session_title ? { grid: profile.session_title } : {}),
+    // 19.0.0: the place the sentences name in place of the host (core/model.ts placeOf)
+    ...(profile?.display_name ? { name: profile.display_name } : {}),
     title: sessionTitleFor(profile?.session_title, workerName),
     hours: Number(profile?.worker_defaults?.hours) || 8,
     ...(profile?.grid_account_help_url ? { gridAccountHelpUrl: profile.grid_account_help_url } : {}),
@@ -687,6 +786,11 @@ async function buildFacts(): Promise<Facts> {
   const connect: ConnectFacts = { ...connectRest, ...(notSubscription && !rf.claude?.loggedIn && rf.phase !== 'online' ? { notSubscription } : {}), ...(interrupted ? { interrupted } : {}) };
   const press = S[WELCOME_PRESS_KEY] as { at?: string } | undefined;
   const pressAt = press?.at ? Date.parse(press.at) : NaN;
+  // 19.0.0: the sheet the student asked for stands ten minutes at most; Not now is a waiting press's Cancel, else "later"
+  if (mem.gridAuth.asked !== undefined && now - mem.gridAuth.asked >= ASKED_MS) mem.gridAuth.asked = undefined;
+  const asked = mem.gridAuth.asked;
+  const own = await ownSigninFacts(settings?.origin, account, S[PRESS_KEY] && grid.session !== 'signed-in' ? 'press' : asked !== undefined ? 'asked' : undefined);
+  const signin: SigninFacts = { ...mem.signin, ...(asked !== undefined ? { asked } : {}), ...(own ? { own } : {}) };
   return {
     now,
     terms: recordInForce(L[TERMS_KEY]),
@@ -694,7 +798,7 @@ async function buildFacts(): Promise<Facts> {
     granted,
     site: words,
     grid: { reach: grid.reach, session: grid.session, ...(account ? { account } : {}), ...(mem.lookingSince !== undefined ? { lookingSince: mem.lookingSince } : {}), ...(mem.answeredAt !== undefined ? { answeredAt: mem.answeredAt } : {}) },
-    signin: mem.signin,
+    signin,
     ...(channel && settings && channel.origin === settings.origin ? { channel } : {}),
     access,
     setup: mem.setup,
@@ -733,7 +837,11 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       const portal = settings ? { origin: settings.origin, hostname: settings.hostname } : (def ?? { origin: '', hostname: '' });
       const grids = { options: deployments.map((d) => ({ site: d.site, name: d.profile.display_name || d.site })), selected: picked };
       const state: WelcomeView['state'] = f.terms && mem.welcome.state === 'idle' && settings ? 'handoff' : mem.welcome.state;
-      return { surface: 'welcome', view: welcomeView({ portal, grids, site: f.site, state, ...(mem.welcome.problem ? { problem: mem.welcome.problem } : {}), ...(state === 'handoff' && firstRunDone(f) ? { hero: home(f).hero } : state === 'handoff' ? { hero: (({ live: _l, ...h }) => h)(heroOf(f)) } : {}), licenseUrl: browser.runtime.getURL('/LICENSE.txt' as never), privacyUrl: browser.runtime.getURL('/PRIVACY.md' as never) }) };
+      // chosen at each push, never latched at the press: while the panel's sheet waits for the student the
+      // hand-off asks for that step; once signed in (or past it) it says the student is set
+      const grid = state === 'handoff' && !firstRunDone(f) && momentOf(f) === 'grid' ? journey(f, 'grid') : undefined;
+      const signinNext = grid?.moment === 'grid' && !grid.signedIn && !!grid.sheet;
+      return { surface: 'welcome', view: welcomeView({ portal, grids, site: f.site, state, signinNext, ...(mem.welcome.problem ? { problem: mem.welcome.problem } : {}), ...(state === 'handoff' && firstRunDone(f) ? { hero: home(f).hero } : state === 'handoff' ? { hero: (({ live: _l, ...h }) => h)(heroOf(f)) } : {}), licenseUrl: browser.runtime.getURL('/LICENSE.txt' as never), privacyUrl: browser.runtime.getURL('/PRIVACY.md' as never) }) };
     }
     case 'details': {
       const settings = await settingsNow();
@@ -760,7 +868,12 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       // Change field must refill from the bundled profile, not come back empty (hy9698, 2026-10-03)
       const settingsDef = settings ? undefined : portalOf(await siteProfile(await welcomeSite()));
       const oldKey = await local.get<OldKeyNote>(OLD_KEY_KEY);
-      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}) });
+      // 19.0.0: the saved sign-in's row, only where Beethoven answers the grid's sign-in itself
+      const own = await ownSigninFacts(settings?.origin, undefined, undefined);
+      const note = own && own.saved !== 'none' ? mem.gridAuth.note : undefined;
+      // "didn't work last time" only for the saved password itself (a typed one turned down says so on the sheet)
+      const signin = own ? { ...(note ? { note } : {}), unlockWith: own.unlockWith, refused: mem.gridAuth.state.refused?.source === 'saved' } : undefined;
+      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}), ...(signin ? { signin } : {}) });
       return { surface: 'settings', view: sv };
     }
   }
@@ -909,8 +1022,18 @@ async function backgroundPoll(): Promise<void> {
     schedulePush();
     return;
   }
+  // 19.0.0: signed out with no page open, and a saved sign-in unlocked and not turned down: one check signs in
+  // again (Chrome's sign-in cache went with a browser restart), at most once per alarm
+  if (grid?.session === 'signed-out' && mem.ports.size === 0 && savedSigninReady()) await checkGrid('alarm');
   if (grid?.session === 'signed-in' || mem.ports.size === 0) await pollRun();
   schedulePush();
+}
+
+/** a saved sign-in for this portal, unlocked, and neither turned down nor on hold */
+function savedSigninReady(): boolean {
+  const ga = mem.gridAuth;
+  const n = ga.note;
+  return ownSigninAvailable() && !!n && n.origin === mem.portalOrigin && ga.unlockCred === n.cred && !n.refused_at && !n.stopped_at && !ga.state.refused && !heldOver(ga.state.held, n);
 }
 
 async function signinAlarm(): Promise<void> {
@@ -1030,8 +1153,30 @@ async function actInner(a: Action): Promise<unknown> {
     case 'pick-grid':
       return onPickGrid(a.site);
     case 'sign-in-grid':
-      if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
+    // the Grid row's Unlock is the page's own (it runs the passkey); one that reaches here asks for the sheet
+    case 'unlock-grid':
+      if (a.kind === 'sign-in-grid' && a.windowId !== undefined) mem.panelWindowId = a.windowId;
+      // 19.0.0: the grid moment shows Beethoven's sheet; no tab
+      if (ownSigninAvailable()) {
+        mem.gridAuth.asked = Date.now();
+        schedulePush();
+        return { opened: false } satisfies ActionResults['sign-in-grid'];
+      }
       return { opened: await openSigninTab('press') } satisfies ActionResults['sign-in-grid'];
+    case 'sign-in-grid-box':
+      // "Use Chrome's sign-in box instead": the 18.0.0 tab, unchanged
+      if (a.windowId !== undefined) mem.panelWindowId = a.windowId;
+      return { opened: await openSigninTab('press') } satisfies ActionResults['sign-in-grid-box'];
+    case 'grid-signin':
+      return gridSignin(a.how);
+    case 'grid-signin-later':
+      mem.gridAuth.asked = undefined;
+      schedulePush();
+      return { recorded: true } satisfies ActionResults['grid-signin-later'];
+    case 'forget-grid-signin':
+      await forgetSignin();
+      await activity(LOG_WORDS.signinForgotten);
+      return { forgotten: true } satisfies ActionResults['forget-grid-signin'];
     case 'retry-grid': {
       const r = await recheckReach();
       const s = r === 'answers' ? await checkGrid('retry') : 'unreachable';
@@ -1153,7 +1298,10 @@ async function actInner(a: Action): Promise<unknown> {
     }
     case 'disconnect':
       await cancelPress();
+      // the saved grid sign-in goes with the portal (disconnectPortal removes its stores)
       await disconnectPortal();
+      clearGridAuthMemory();
+      mem.gridAuth.asked = undefined;
       mem.client = undefined;
       mem.sharedDir = undefined;
       mem.setup = { state: 'unknown' };
@@ -1167,6 +1315,7 @@ async function actInner(a: Action): Promise<unknown> {
       mem.welcome = { state: 'idle', problem: undefined };
       mem.setup = { state: 'unknown' };
       mem.signin = { waiting: false } as SigninFacts;
+      mem.gridAuth.asked = undefined;
       await local.remove(ONCE_KEY);
       schedulePush();
       return { restarted: true } satisfies ActionResults['start-over'];
@@ -1223,8 +1372,9 @@ async function onAgree(a: Extract<Action, { kind: 'agree' }>): Promise<ActionRes
   const noPanel = !a.panelOpened && hasPanel();
   mem.welcome = { state: noPanel ? 'no-panel' : 'opening', problem: undefined };
   schedulePush();
-  // the panel carries GlobalProtect's moment; the welcome page hands over to it, and this same tab
-  // becomes the sign-in once the grid answers (afterReach)
+  // the panel carries GlobalProtect's moment and the grid's sign-in; the welcome page hands over to it (and,
+  // in the build where the browser cannot answer the grid's sign-in itself, this same tab becomes Chrome's
+  // sign-in box once the grid answers: afterReach)
   const handoff = () => {
     if (!noPanel) mem.welcome = { state: 'handoff', problem: undefined };
   };
@@ -1239,6 +1389,11 @@ async function onAgree(a: Extract<Action, { kind: 'agree' }>): Promise<ActionRes
     return { navigated: false, signedInAlready: true };
   }
   if (s === 'unreachable') {
+    handoff();
+    return no;
+  }
+  // 19.0.0: the grid moment in the panel is Beethoven's sheet; the welcome tab stays the welcome page
+  if (ownSigninAvailable()) {
     handoff();
     return no;
   }
@@ -1276,7 +1431,11 @@ async function rememberPortal(origin: string): Promise<PortalSettings> {
     mem.sharedDir = undefined;
     mem.setup = { state: 'unknown' };
     mem.signin = { waiting: false };
+    // another origin: the saved grid sign-in was the old portal's (savePortal removed its stores)
+    clearGridAuthMemory();
+    mem.gridAuth.asked = undefined;
   }
+  mem.portalOrigin = s.origin;
   return s;
 }
 
@@ -1289,7 +1448,9 @@ async function onUsePortal(raw: string, granted: boolean, settingsPage: boolean)
     return { origin: '' };
   }
   if (!granted) {
-    mem.welcome = { state: 'denied', problem: WORDS.welcome.denied(new URL(origin).hostname) };
+    // the place the portal's own deployment names, else its host (core/model.ts placeOf)
+    const d = deploymentOfPortal(origin, await deploymentsNow(), await welcomeSite());
+    mem.welcome = { state: 'denied', problem: WORDS.welcome.denied(placeOf(d?.profile.display_name, new URL(origin).hostname)) };
     return { origin };
   }
   await rememberPortal(origin);
@@ -1348,8 +1509,9 @@ async function recheckReach(o: { fromAlarm?: boolean } = {}): Promise<'answers' 
  * and open the sign-in box if it is needed for the first run or a waiting press; never from the alarm with no page open
  */
 async function afterReach(o: { fromAlarm?: boolean } = {}): Promise<void> {
+  // 19.0.0: the check itself signs in when Beethoven may; otherwise the sheet asks, and no tab opens
   const s = await checkGrid('reach');
-  if (s !== 'signed-out' || (o.fromAlarm && mem.ports.size === 0)) return;
+  if (s !== 'signed-out' || (o.fromAlarm && mem.ports.size === 0) || ownSigninAvailable()) return;
   const press = await session.get<PendingPress>(PRESS_KEY);
   const f = await buildFacts();
   if (!press && firstRunDone(f)) return;
@@ -1368,33 +1530,955 @@ async function rememberIdentity(s: SessionInfo): Promise<void> {
   if (recordInForce(t) && !t.bound_account) await local.set(TERMS_KEY, bindAccount(t, s.username));
 }
 
-/** one dashboard GET from this background: signed in, signed out, unreachable (never "Failed to fetch") */
-async function checkGrid(reason: string): Promise<'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown'> {
-  if (!(await termsInForce())) return 'unknown';
-  const c = await directClient();
-  if (!c) return 'unknown';
-  if (mem.busy.grid) return ((await session.get<GridNote>(GRID_KEY))?.session as 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | undefined) ?? 'unknown';
+/**
+ * One dashboard GET from this background: signed in, signed out, unreachable (never "Failed to fetch").
+ * 19.0.0: claimed before its first await (as startConnect), so two callers in the same moment make one
+ * request and a grid-signin can wait for the one in flight and then run its own; armed, when Beethoven
+ * holds a sign-in for this portal, so that request's challenge (and no other) may get the password.
+ */
+function checkGrid(reason: string): Promise<GridWord> {
+  if (mem.busy.grid) return lastGridWord();
   mem.busy.grid = true;
+  const run: Promise<GridWord> = checkGridClaimed(reason).finally(() => {
+    mem.busy.grid = false;
+    if (mem.gridCheck === run) mem.gridCheck = undefined;
+  });
+  mem.gridCheck = run;
+  return run;
+}
+
+async function lastGridWord(): Promise<GridWord> {
+  return ((await session.get<GridNote>(GRID_KEY))?.session as GridWord | undefined) ?? 'unknown';
+}
+
+/** how long a check waits for the outcome of the answer its own request got (Chrome's onCompleted can trail the response) */
+const OUTCOME_WAIT_MS = 6_000;
+
+async function checkGridClaimed(reason: string): Promise<GridWord> {
   mem.last.grid = Date.now();
+  mem.grid.lastWindow = undefined;
+  let armed: typeof mem.grid.armed;
   try {
+    await mem.gridAuth.loaded;
+    if (!(await termsInForce())) return 'unknown';
+    const c = await directClient();
+    const origin = mem.portalOrigin;
+    if (!c || !origin) return 'unknown';
     const before = (await session.get<GridNote>(GRID_KEY))?.session;
-    const s = await c.session();
-    dbg('grid', `portal (${reason}): ${s.state}${s.username ? ` as ${s.username}` : ''} (HTTP ${s.status})${s.detail ? `: ${s.detail}` : ''}`);
+    const source = armSource(origin);
+    if (source) mem.grid.armed = armed = { url: `${origin}${DASHBOARD}`, source };
+    let s = await c.session();
+    // the window's own answer: its outcome comes from Chrome's signals for that request; a proven answer read
+    // as anything but signed in (the cold per-user server) is read once more, through Chrome's sign-in cache
+    const answered = armed?.answered;
+    const out = mem.gridAuth.outcome;
+    let outcome: AuthOutcome | undefined;
+    if (answered && out?.requestId === answered) {
+      outcome = await within(out.done, OUTCOME_WAIT_MS);
+      if (outcome === 'proven' && s.state !== 'signed-in') s = await c.session();
+    }
+    const earlier = settleEarlier(s.state, answered);
+    mem.grid.lastWindow = { ...(armed ? { armed: armed.source } : {}), ...(answered ? { answered } : {}), ...(outcome ? { outcome } : {}), ...(earlier ? { earlier } : {}) };
+    dbg('grid', `portal (${reason}): ${s.state}${s.username ? ` as ${s.username}` : ''} (HTTP ${s.status})${s.detail ? `: ${s.detail}` : ''}${armed ? `; armed (${armed.source === 'once' ? 'typed' : 'saved'})${armed.answered ? ', answered' : ', not answered'}` : ''}`);
     // a cold per-user server is signed in; the next check reads it
     const word = s.state === 'cold' ? before ?? 'unknown' : s.state;
     await writeGrid({ session: word as GridNote['session'], ...(s.state === 'unreachable' ? {} : { reach: 'answers' }), ...(s.username ? { account: s.username } : {}) });
     if (s.signedIn) await rememberIdentity(s);
+    if (s.state === 'signed-in') mem.gridAuth.asked = undefined;
     if (s.state === 'signed-in' && before !== 'signed-in') void onSignedIn(reason);
     else if (s.state === 'signed-in' && mem.signin.waiting) void onSignedIn(reason);
     if (s.state === 'unreachable') mem.lookingSince ??= Date.now();
     schedulePush();
-    return word as 'signed-in' | 'signed-out' | 'unreachable' | 'not-ood' | 'unknown';
+    return word as GridWord;
   } catch {
     return 'unknown';
   } finally {
-    mem.busy.grid = false;
+    if (armed && mem.grid.armed === armed) mem.grid.armed = undefined;
   }
 }
+
+// ---- 19.0.0: Beethoven signs in ---------------------------------------------------------------------------
+//
+// One webRequest.onAuthRequired listener (asyncBlocking: webRequest and webRequestAuthProvider) answers the
+// portal's HTTP Basic challenge to checkGrid's own request, with what the student gave the sheet: a one-shot
+// typed without Remember (storage.session, for one attempt, removed after it), or the saved sign-in, its
+// record opened per answer with the passkey's output the page left in storage.session. core/gridsignin.ts
+// decides, from memory, in the event's first synchronous turn. What the grid made of it comes from Chrome's
+// own signals for that request: the challenge again for it (the grid turned the password down: cancelled,
+// and every automatic sign-in stops until the student types it again), onCompleted with any other status
+// (proven), onErrorOccurred (not known yet: the next check's reading settles it). Chrome then keeps the
+// password in its own sign-in cache until it closes, and sends it for the student's portal tabs too; that
+// is Chrome's, not Beethoven's, and the texts say so. I1: Chrome re-sends its cached copy once for each
+// request already started with it before the first refusal comes back; Beethoven then sends at most one;
+// when the answered request is abandoned before the grid replies, Chrome may re-send that copy once. How
+// many of these the grid counts is not yet measured.
+
+/** the sign-in keys a page wrote, counted, so a load that read them before a change does not undo it */
+const authSeq = { note: 0, unlock: 0 };
+
+/** the answer's realm, kept until its outcome: a proven sign-in records it */
+let answeredRealm: { requestId: string; realm?: string } | undefined;
+
+/** the browser can answer the grid's sign-in itself (Chrome; not the Firefox build) */
+function ownSigninAvailable(): boolean {
+  return !!(browser as unknown as { webRequest?: { onAuthRequired?: unknown } }).webRequest?.onAuthRequired;
+}
+
+/**
+ * An event reached these listeners, so Chrome took their registration: nothing to register again on a
+ * grant. Removing a live listener would make Chrome let go of a request it holds for an answer, with no
+ * answer (CleanUpForListener; measured in Chromium 141 in the review: the fetch gets the 401 at once), and
+ * the answer under way would then read as a refusal of a password the grid never saw. A new worker starts
+ * with this false and registers at its top level again.
+ */
+let gridAuthLive = false;
+
+/** every https origin, as optional_host_permissions: Chrome raises the events only for the one the student granted */
+const AUTH_URLS = ['https://*/*', ...(import.meta.env.MODE === 'development' ? ['http://localhost/*', 'http://127.0.0.1/*'] : [])];
+
+function listenForGridAuth(): void {
+  const wr = (browser as unknown as { webRequest?: typeof browser.webRequest }).webRequest;
+  if (!wr?.onAuthRequired) return;
+  const filter = { urls: AUTH_URLS };
+  try {
+    wr.onAuthRequired.removeListener(onGridAuth);
+    wr.onCompleted.removeListener(onGridDone);
+    wr.onErrorOccurred.removeListener(onGridError);
+    wr.onAuthRequired.addListener(onGridAuth, filter, ['asyncBlocking']);
+    wr.onCompleted.addListener(onGridDone, filter);
+    wr.onErrorOccurred.addListener(onGridError, filter);
+  } catch (e) {
+    dbg('signin', `the sign-in listener could not be registered: ${(e as Error).message}`);
+  }
+}
+
+const noteOf = (v: unknown): SigninNote | undefined => {
+  const n = v as Partial<SigninNote> | undefined;
+  return n && typeof n === 'object' && typeof n.origin === 'string' && typeof n.username === 'string' && typeof n.cred === 'string' && typeof n.saved_at === 'string' ? (n as SigninNote) : undefined;
+};
+const credOf = (v: unknown): string | undefined => {
+  const c = (v as Partial<SigninUnlock> | undefined)?.cred;
+  return typeof c === 'string' ? c : undefined;
+};
+const stateOf = (v: unknown): SigninState | undefined => {
+  const st = v as Partial<SigninState> | undefined;
+  if (!st || typeof st !== 'object' || !Array.isArray(st.sent)) return undefined;
+  return { ...st, sent: st.sent.filter((x): x is string => typeof x === 'string').slice(-20), refusals: Number(st.refusals) || 0 } as SigninState;
+};
+/** a is later than b (b absent: yes) */
+const laterThan = (a: string | undefined, b: string | undefined): boolean => !!a && (!b || Date.parse(a) > Date.parse(b));
+
+/** the session's hold covers this saved sign-in: the seal the held answer gave, or for a typed one any seal made before it was given */
+const heldOver = (h: SigninState['held'], n: SigninNote | undefined): boolean => !!h && !!n && (h.seal ? n.saved_at === h.seal : !laterThan(n.saved_at, h.given));
+
+/**
+ * loadGridAuth has put the attempt state back. A tab's challenge, or the end of a request an earlier worker
+ * answered, can be the very event that wakes this one, before the state those events are about is read
+ * (Chrome hands a woken worker its events as soon as it starts); they wait for it, never decide on an empty one.
+ */
+let gridAuthReady = false;
+function afterLoad(fn: () => void): void {
+  if (gridAuthReady) fn();
+  else void mem.gridAuth.loaded.then(fn).catch(() => undefined);
+}
+
+/** at start: the attempt state, the note and the unlock's credential id; an expired one-shot goes */
+async function loadGridAuth(): Promise<void> {
+  try {
+    await loadGridAuthNow();
+  } finally {
+    gridAuthReady = true;
+  }
+}
+
+async function loadGridAuthNow(): Promise<void> {
+  const seen = { ...authSeq };
+  try {
+    await settingsNow();
+    const S = await session.many([SIGNIN_STATE_KEY, SIGNIN_UNLOCK_KEY, SIGNIN_ONCE_KEY]);
+    const note = noteOf(await local.get(SIGNIN_NOTE_KEY));
+    const ga = mem.gridAuth;
+    // a leftover pending answer stays: the next check's reading settles it (settleEarlier)
+    const state = stateOf(S[SIGNIN_STATE_KEY]);
+    if (state) ga.state = state;
+    if (authSeq.note === seen.note) ga.note = note;
+    if (authSeq.unlock === seen.unlock) ga.unlockCred = credOf(S[SIGNIN_UNLOCK_KEY]);
+    const once = S[SIGNIN_ONCE_KEY] as Partial<SigninOnce> | undefined;
+    if (once && onceExpired(String(once.at), Date.now())) await session.remove(SIGNIN_ONCE_KEY);
+    // no state at all is a browser restart: a try whose outcome never came (the saved password's own, not
+    // settled since, or a typed one given while it was saved) puts the saved one on hold, so the one-wrong-try
+    // rule holds across it; a hold, not a refusal: nothing says the grid turned it down, and none is counted
+    const n = ga.note;
+    const lostSaved = !!n?.attempt_at && laterThan(n.attempt_at, n.proven_at) && laterThan(n.attempt_at, n.refused_at) && laterThan(n.attempt_at, n.stopped_at);
+    if (!state && n && (lostSaved || n.typed_attempt_at)) {
+      dbg('signin', 'the last try while a sign-in was saved has no outcome on record (the browser closed): the saved one is not tried again until you type one');
+      await updateNote(ofSeal(n), () => ({ stopped_at: nowIso(), typed_attempt_at: undefined }));
+    }
+    // and the refusals in a row go on counting from the note's, so a second one after the restart says so
+    const n2 = ga.note;
+    const held = n2 && (laterThan(n2.stopped_at, n2.refused_at) ? n2.stopped_at : n2.refused_at);
+    if (!state && n2 && held && laterThan(held, n2.proven_at)) ga.state = { ...ga.state, refusals: Math.max(ga.state.refusals, n2.refusals ?? 0) };
+  } catch (e) {
+    dbg('signin', `the grid sign-in's state could not be read: ${(e as Error).message}`);
+  }
+}
+
+let noteChain: Promise<unknown> = Promise.resolve();
+let stateChain: Promise<unknown> = Promise.resolve();
+
+/** the fields of the note the background may change (a field patched to undefined goes) */
+type NotePatch = Partial<Pick<SigninNote, 'attempt_at' | 'typed_attempt_at' | 'proven_at' | 'refused_at' | 'stopped_at' | 'refusals' | 'realm'>>;
+
+/** the note of that seal, and no other (a page's re-seal meanwhile is the student's new password) */
+const ofSeal = (s: { cred: string; saved_at: string }) => (n: SigninNote) => n.cred === s.cred && n.saved_at === s.saved_at;
+
+/**
+ * The background's part of the note: the outcome fields, read-modify-write, one write at a time, and only on
+ * the note `match` names (a page's new seal is never written over). True when it wrote. Never throws.
+ */
+function updateNote(match: (n: SigninNote) => boolean, patch: (n: SigninNote) => NotePatch): Promise<boolean> {
+  const next = noteChain.then(async () => {
+    const cur = noteOf(await local.get(SIGNIN_NOTE_KEY));
+    if (!cur || !match(cur)) return false;
+    const n = { ...cur, ...patch(cur) } as SigninNote & Record<string, unknown>;
+    for (const k of Object.keys(n)) if (n[k] === undefined) delete n[k];
+    await local.set(SIGNIN_NOTE_KEY, n);
+    authSeq.note++;
+    mem.gridAuth.note = n;
+    return true;
+  });
+  noteChain = next.catch(() => undefined);
+  return next.catch((e) => {
+    dbg('signin', `the sign-in note could not be written: ${(e as Error).message}`);
+    return false;
+  });
+}
+
+/**
+ * The record is a newer seal than the note (the page puts the record, then writes the note whole, and a
+ * write of the background's may have landed between them): the note is made again from the record, with
+ * none of the last seal's marks, so the two agree and the next check can answer. Never a forgotten note
+ * brought back, never a newer note written over.
+ */
+function healNote(rec: { origin: string; username: string; saved_at: string; cred: string }): Promise<void> {
+  const next = noteChain.then(async () => {
+    const cur = noteOf(await local.get(SIGNIN_NOTE_KEY));
+    if (!cur || cur.cred !== rec.cred || cur.origin !== rec.origin || !laterThan(rec.saved_at, cur.saved_at)) return;
+    const n: SigninNote = { origin: rec.origin, username: rec.username, saved_at: rec.saved_at, cred: rec.cred };
+    await local.set(SIGNIN_NOTE_KEY, n);
+    authSeq.note++;
+    mem.gridAuth.note = n;
+    dbg('signin', 'the sign-in note was behind the saved record: made again from it');
+  });
+  noteChain = next.catch(() => undefined);
+  return next.catch((e) => dbg('signin', `the sign-in note could not be written: ${(e as Error).message}`));
+}
+
+/** the attempt state as memory holds it when the write runs, one write at a time; false when it could not be written. Never throws */
+function persistAuthState(): Promise<boolean> {
+  const next = stateChain.then(() => session.set(SIGNIN_STATE_KEY, { ...mem.gridAuth.state, sent: [...mem.gridAuth.state.sent] }));
+  stateChain = next.catch(() => undefined);
+  return next.then(
+    () => true,
+    (e) => {
+      dbg('signin', `the sign-in state could not be written: ${(e as Error).message}`);
+      return false;
+    },
+  );
+}
+
+/** what this window may answer with: a fresh one-shot for this portal, else the saved sign-in when it is unlocked */
+function armSource(origin: string): AuthSource | undefined {
+  if (!ownSigninAvailable()) return undefined;
+  const ga = mem.gridAuth;
+  if (ga.once && ga.once.origin === origin && !onceExpired(ga.once.at, Date.now())) return 'once';
+  if (ga.note && ga.note.origin === origin && ga.unlockCred !== undefined && ga.unlockCred === ga.note.cred) return 'saved';
+  return undefined;
+}
+
+function authContext(): AuthContext {
+  const ga = mem.gridAuth;
+  const armed = mem.grid.armed;
+  let portalOrigin = mem.portalOrigin;
+  if (!portalOrigin && armed) {
+    try {
+      portalOrigin = new URL(armed.url).origin;
+    } catch {
+      portalOrigin = undefined;
+    }
+  }
+  const realm = ga.state.realm ?? (ga.note && portalOrigin && ga.note.origin === portalOrigin ? ga.note.realm : undefined);
+  return {
+    // from the id, never through URL: an extension address's origin is 'null' there
+    extOrigin: `chrome-extension://${browser.runtime.id}`,
+    ...(portalOrigin ? { portalOrigin } : {}),
+    ...(armed ? { armed } : {}),
+    sent: new Set(ga.state.sent),
+    ...(ga.state.pending ? { pending: ga.state.pending.requestId } : {}),
+    refusedOnce: !!ga.state.refused,
+    // a hold in memory counts before its note is written, and if it never is (I1)
+    refusedSaved: !!ga.state.refused || !!ga.note?.refused_at || !!ga.note?.stopped_at || heldOver(ga.state.held, ga.note),
+    // the realm a sign-in last worked in: this session's, else the note's, which outlives a browser restart (I2)
+    ...(realm ? { realm } : {}),
+  };
+}
+
+/**
+ * The listener: synchronous, and every path calls the callback exactly once (Chrome holds the request until
+ * it is called; a returned value is ignored). Everything it decides on is in memory, so two challenges in
+ * the same task cannot both find the armed window unanswered.
+ */
+function onGridAuth(details: Browser.webRequest.OnAuthRequiredDetails, callback?: (r: Browser.webRequest.BlockingResponse) => void): undefined {
+  gridAuthLive = true;
+  if (!callback) return undefined;
+  let called = false;
+  const answer = (r: Browser.webRequest.BlockingResponse): void => {
+    if (called) return;
+    called = true;
+    try {
+      callback(r);
+    } catch {
+      /* the request is gone */
+    }
+  };
+  try {
+    const d: AuthDetails = {
+      requestId: String(details.requestId),
+      url: details.url,
+      tabId: details.tabId,
+      ...(details.initiator !== undefined ? { initiator: details.initiator } : {}),
+      isProxy: !!details.isProxy,
+      ...(details.scheme !== undefined ? { scheme: details.scheme } : {}),
+      ...(details.realm !== undefined ? { realm: details.realm } : {}),
+      ...(details.challenger ? { challenger: details.challenger } : {}),
+    };
+    const v = authVerdict(d, authContext());
+    // the debug log: the verdict and the request's type; an address only for the dashboard request
+    // Beethoven answers or cancels; never the user name or the password; and of a tab's challenge nothing
+    // at all (the texts: of your own tabs' sign-in requests it keeps nothing)
+    const where = `${details.type}, ${details.tabId === -1 ? 'not a tab' : 'a tab'}`;
+    if (v.act === 'pass') {
+      if (v.why === 'tab') boxMaySignIn(d.url);
+      else dbg('signin', `a sign-in challenge left to Chrome (${v.why}; ${where})`);
+      answer({});
+    } else if (v.act === 'cancel') {
+      dbg('signin', `the grid turned the password down; cancelled (${where}, ${hostPath(d.url)})`);
+      const p = mem.gridAuth.state.pending;
+      if (p && p.requestId === d.requestId) refusedNow(p);
+      answer({ cancel: true });
+    } else {
+      // claimed in this same turn: a second challenge for the window passes ('armed-once')
+      mem.grid.armed!.answered = d.requestId;
+      dbg('signin', `a sign-in challenge answered with the ${v.source === 'once' ? 'typed' : 'saved'} password (${where}, ${hostPath(d.url)})`);
+      void answerWith(v.source, d, answer);
+    }
+  } catch (e) {
+    dbg('signin', `a sign-in challenge left to Chrome (${(e as Error).message})`);
+    answer({});
+  }
+  return undefined;
+}
+
+/** the password for an answer, read now and dropped after it; none, or one that fails to open, is no answer */
+async function answerWith(source: AuthSource, d: AuthDetails, answer: (r: Browser.webRequest.BlockingResponse) => void): Promise<void> {
+  try {
+    let origin = mem.portalOrigin;
+    if (!origin) origin = new URL(d.url).origin;
+    let secret = source === 'once' ? await onceSecret(origin) : await savedSecret(origin);
+    if (!secret) {
+      dbg('signin', 'nothing to answer with (no password in reach, or it did not open); left to Chrome');
+      answer({});
+      return;
+    }
+    const ga = mem.gridAuth;
+    const at = nowIso();
+    // which password this is: the saved one's seal, or the one-shot's time of typing; every outcome is marked on that one only
+    const pending: NonNullable<SigninState['pending']> = { requestId: d.requestId, at, source, ...(secret.seal ? { seal: secret.seal } : {}), ...(secret.onceAt ? { onceAt: secret.onceAt } : {}) };
+    ga.state = { ...ga.state, sent: [...ga.state.sent.filter((x) => x !== d.requestId), d.requestId].slice(-20), pending };
+    answeredRealm = { requestId: d.requestId, ...(d.realm !== undefined ? { realm: d.realm } : {}) };
+    let settle: (o: AuthOutcome) => void = () => undefined;
+    const done = new Promise<AuthOutcome>((resolve) => (settle = resolve));
+    ga.outcome = { requestId: d.requestId, settle: (o) => settle(o), done };
+    /** nothing is given after all: memory and the record forget this answer, and the request goes on without one */
+    const withdraw = async (): Promise<void> => {
+      if (ga.state.pending?.requestId === d.requestId) {
+        const { pending: _p, ...rest } = ga.state;
+        ga.state = { ...rest, sent: rest.sent.filter((x) => x !== d.requestId) };
+        await persistAuthState();
+      }
+      settle('unsettled');
+      answer({});
+    };
+    // on record before the answer, so a worker stopped meanwhile still knows this request had the password;
+    // not on record, no answer (and nothing in memory says there was one)
+    if (!(await persistAuthState())) {
+      await withdraw();
+      return;
+    }
+    // a typed password given while one is saved: on that note too, until its outcome comes, since the record
+    // may hold this very password and a browser closed before the grid replies takes the session's record with it
+    if (source === 'once' && !(await markTyped(at, origin))) {
+      dbg('signin', 'the typed attempt could not be put on the saved sign-in\'s note: nothing answered this time');
+      secret = undefined;
+      await withdraw();
+      return;
+    }
+    if (source === 'saved' && secret.seal) {
+      // the try is marked on the note of the very seal that was read, and that seal must still be the
+      // record's when it goes: a re-seal landing meanwhile (the page puts the record, then the note) would
+      // otherwise get this password's attempt and outcome, or this one none at all
+      const cred = secret.cred;
+      const seal = secret.seal;
+      let before: string | undefined;
+      const marked = await updateNote(
+        (n) => n.cred === cred && n.saved_at === seal,
+        (n) => {
+          before = n.attempt_at;
+          return { attempt_at: at };
+        },
+      );
+      const rec = await indexedDbRecords().get().catch(() => undefined);
+      if (!marked || !rec || rec.cred !== cred || rec.saved_at !== seal) {
+        dbg('signin', 'the saved sign-in changed while it was read (saved again just now): nothing answered this time');
+        if (marked) await updateNote((n) => n.attempt_at === at, () => ({ attempt_at: before }));
+        if (rec) await healNote(rec);
+        secret = undefined;
+        await withdraw();
+        return;
+      }
+    }
+    answer({ authCredentials: { username: secret.username, password: secret.password } });
+    secret = undefined;
+  } catch (e) {
+    dbg('signin', `nothing answered: ${(e as Error).message}`);
+    answer({});
+  }
+}
+
+/** a one-shot: fresh, for this portal, an AccessID's shape; an expired one goes */
+async function onceSecret(origin: string): Promise<{ username: string; password: string; onceAt: string; cred?: undefined; seal?: undefined } | undefined> {
+  const o = await session.get<Partial<SigninOnce>>(SIGNIN_ONCE_KEY);
+  if (!o || typeof o.at !== 'string' || typeof o.username !== 'string' || typeof o.password !== 'string') return undefined;
+  if (onceExpired(o.at, Date.now())) {
+    await session.remove(SIGNIN_ONCE_KEY).catch(() => undefined);
+    return undefined;
+  }
+  if (o.origin !== origin || !ACCESS_ID.test(o.username) || !o.password) return undefined;
+  return { username: o.username, password: o.password, onceAt: o.at };
+}
+
+/** the saved sign-in, opened with the unlock the page left (its credential the record's own), for this portal only */
+async function savedSecret(origin: string): Promise<{ username: string; password: string; cred: string; seal: string; onceAt?: undefined } | undefined> {
+  const u = await session.get<Partial<SigninUnlock>>(SIGNIN_UNLOCK_KEY);
+  const rec = await indexedDbRecords().get();
+  if (!u || !rec || typeof u.prf !== 'string' || u.cred !== rec.cred) return undefined;
+  const prf = unbase64(u.prf);
+  try {
+    const r = await openPassword(prf, rec, { origin });
+    return { username: r.username, password: r.password, cred: rec.cred, seal: rec.saved_at };
+  } finally {
+    prf.fill(0);
+  }
+}
+
+/**
+ * What an outcome writes (the attempt state, the note, a record that went stale) runs one at a time, and a
+ * grid-signin waits for it before the action returns and before it removes the one-shot, which the
+ * comparison of a typed password that worked with the saved one reads.
+ */
+let outcomeWork: Promise<void> = Promise.resolve();
+function afterOutcome(work: () => Promise<void>): void {
+  outcomeWork = outcomeWork.then(work).catch((e) => dbg('signin', `an outcome could not be written: ${(e as Error).message}`));
+}
+
+function settleOutcome(requestId: string, o: AuthOutcome): void {
+  const out = mem.gridAuth.outcome;
+  if (out && out.requestId === requestId) out.settle(o);
+}
+
+/** the note of the seal an answer gave (an answer of an earlier version's state names no seal: its time alone) */
+const answeredNote = (p: NonNullable<SigninState['pending']>) => (n: SigninNote) => n.attempt_at === p.at && (!p.seal || n.saved_at === p.seal);
+
+/** the saved sign-in a typed answer given at `at` may have held the password of: this portal's, sealed at or before it */
+const savedBefore = (at: string, origin: string | undefined) => (n: SigninNote) => (!origin || n.origin === origin) && !laterThan(n.saved_at, at);
+
+/** a typed answer's mark on the note goes with its outcome, whatever the outcome */
+const typedDone = (p: NonNullable<SigninState['pending']>, n: SigninNote): NotePatch => (n.typed_attempt_at === p.at ? { typed_attempt_at: undefined } : {});
+
+/** a typed answer given at `at` on the note of a sign-in saved before it; true when there is none to mark or the mark is on record */
+async function markTyped(at: string, origin: string): Promise<boolean> {
+  const over = savedBefore(at, origin);
+  if (await updateNote(over, () => ({ typed_attempt_at: at }))) return true;
+  try {
+    const cur = noteOf(await local.get(SIGNIN_NOTE_KEY));
+    return !cur || !over(cur);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The grid turned the answer down: no automatic sign-in from either source until the student types the
+ * password again. On the note too, so a browser restart keeps it (I1): the saved password's own refusal,
+ * or, for a typed one, a hold on the saved sign-in made before that password was given, since the record
+ * may hold the very password the grid just turned down.
+ */
+function refusedNow(p: NonNullable<SigninState['pending']>): void {
+  const ga = mem.gridAuth;
+  const at = nowIso();
+  const { pending: _p, ...rest } = ga.state;
+  ga.state = { ...rest, refused: { at, source: p.source, given: p.at, ...(p.seal ? { seal: p.seal } : {}) }, refusals: rest.refusals + 1 };
+  settleOutcome(p.requestId, 'refused');
+  const origin = mem.portalOrigin;
+  afterOutcome(async () => {
+    await persistAuthState();
+    if (p.source === 'saved') await updateNote(answeredNote(p), (n) => ({ refused_at: at, refusals: (n.refusals ?? 0) + 1 }));
+    else await updateNote(savedBefore(p.at, origin), (n) => ({ stopped_at: at, refusals: (n.refusals ?? 0) + 1, ...typedDone(p, n) }));
+    await activity(LOG_WORDS.signinRefused).catch(() => undefined);
+    schedulePush();
+  });
+}
+
+/** the grid took the answer: the refusal (if any) is over; a typed password that worked where the saved one was turned down replaces it */
+function provenNow(p: NonNullable<SigninState['pending']>): void {
+  const ga = mem.gridAuth;
+  const realm = answeredRealm?.requestId === p.requestId ? answeredRealm.realm : ga.state.realm;
+  // the session's hold stays until the comparison below lifts it: the note may not carry it
+  const hold = ga.state.held;
+  const { pending: _p, refused: _r, realm: _realm, ...rest } = ga.state;
+  ga.state = { ...rest, refusals: 0, ...(realm !== undefined ? { realm } : {}) };
+  settleOutcome(p.requestId, 'proven');
+  afterOutcome(async () => {
+    await persistAuthState();
+    if (p.source === 'saved') await updateNote(answeredNote(p), () => ({ proven_at: nowIso(), refusals: 0, ...(realm !== undefined ? { realm } : {}) }));
+    else {
+      await updateNote((n) => n.typed_attempt_at === p.at, () => ({ typed_attempt_at: undefined }));
+      const held = noteOf(await local.get(SIGNIN_NOTE_KEY).catch(() => undefined));
+      if (held && (held.refused_at || held.stopped_at || heldOver(hold, held))) await typedWorkedOverSaved(held, p, hold);
+    }
+    schedulePush();
+  });
+}
+
+/**
+ * A typed password worked while the saved one was turned down or on hold. The record holding that same
+ * password (opened now, while it is unlocked and the one-shot that worked is still there) stays, its
+ * hold lifted; one holding another, or one that cannot be opened to tell, goes, so a password the grid
+ * turned down is never sent from it again (I1).
+ */
+async function typedWorkedOverSaved(held: SigninNote, p: NonNullable<SigninState['pending']>, hold?: SigninState['held']): Promise<void> {
+  if (await sameAsSaved(held, p)) {
+    // taken by the grid as typed, so taken as saved: an earlier try of it whose outcome never came no longer
+    // reads, after a browser restart, as one lost on the way (loadGridAuth's restart rule)
+    await updateNote((n) => n.cred === held.cred && n.saved_at === held.saved_at, () => ({ refused_at: undefined, stopped_at: undefined, refusals: 0, proven_at: nowIso() }));
+    // the session's hold too, the one this outcome found (one put on since is another answer's)
+    const ga = mem.gridAuth;
+    if (hold && ga.state.held === hold) {
+      const { held: _h, ...rest } = ga.state;
+      ga.state = rest;
+      await persistAuthState();
+    }
+    dbg('signin', 'the password typed is the saved one, and it worked: the saved sign-in is used again');
+    return;
+  }
+  // the session's hold may go with the record: it covers only seals made before it, never the next one saved
+  await forgetReplaced(held, held.refused_at ? LOG_WORDS.signinReplaced : LOG_WORDS.signinSetAside, hold);
+}
+
+/** the one-shot that was answered and the saved record hold the same account and password; false when either cannot be read */
+async function sameAsSaved(held: SigninNote, p: NonNullable<SigninState['pending']>): Promise<boolean> {
+  return !!p.onceAt && (await typedMatchesSeal(p.onceAt, held.origin, held)) === true;
+}
+
+/**
+ * The one-shot typed at `onceAt` and the saved record of that seal hold the same account and password: read
+ * now, in memory, compared and dropped; undefined when either cannot be read (the one-shot gone, the record
+ * locked or sealed again).
+ */
+async function typedMatchesSeal(onceAt: string, origin: string, seal: { saved_at: string; cred?: string }): Promise<boolean | undefined> {
+  let typed: Partial<SigninOnce> | undefined;
+  let saved: { username: string; password: string } | undefined;
+  try {
+    typed = await session.get<Partial<SigninOnce>>(SIGNIN_ONCE_KEY);
+    if (!typed || typed.at !== onceAt || typed.origin !== origin || typeof typed.username !== 'string' || typeof typed.password !== 'string') return undefined;
+    const s = await savedSecret(origin);
+    if (!s || s.seal !== seal.saved_at || (seal.cred !== undefined && s.cred !== seal.cred)) return undefined;
+    saved = { username: s.username, password: s.password };
+    // both compared whole (never an early exit on a password)
+    return [sameText(saved.username, typed.username), sameText(saved.password, typed.password)].every(Boolean);
+  } catch {
+    return undefined;
+  } finally {
+    typed = undefined;
+    saved = undefined;
+  }
+}
+
+/** a and b equal, every character looked at whatever the first difference */
+function sameText(a: string, b: string): boolean {
+  let d = a.length ^ b.length;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) d |= (a.charCodeAt(i) | 0) ^ (b.charCodeAt(i) | 0);
+  return d === 0;
+}
+
+/**
+ * onCompleted. The answered request's end: 401 or 403 is the grid turning it down; anything else (200, 3xx,
+ * the cold 5xx) took it, unless a sign-in in Chrome's box may have finished it meanwhile (boxMaySignIn), and
+ * then it cannot be told which password the grid took. A portal tab's request let in is such a sign, and
+ * nothing else of it is kept.
+ */
+function onGridDone(d: { requestId: string; statusCode: number; tabId?: number; url?: string; fromCache?: boolean }): void {
+  gridAuthLive = true;
+  try {
+    if (d.tabId !== undefined && d.tabId !== -1) {
+      if (d.statusCode !== 401 && d.statusCode !== 403 && !d.fromCache && d.url) boxMaySignIn(d.url);
+      return;
+    }
+    const requestId = String(d.requestId);
+    const status = d.statusCode;
+    afterLoad(() => {
+      const p = mem.gridAuth.state.pending;
+      if (!p || p.requestId !== requestId) return;
+      dbg('signin', `the answered request ended: HTTP ${status}`);
+      if (status === 401 || status === 403) refusedNow(p);
+      else if (p.tainted) unconfirmedNow(p);
+      else provenNow(p);
+    });
+  } catch {
+    /* an event about someone else's request, or one this background cannot read */
+  }
+}
+
+/** onErrorOccurred: the answered request ended before the grid replied; not known yet (the answer stays pending, and the listener answers nothing else meanwhile) */
+function onGridError(d: { requestId: string; error?: string; tabId?: number }): void {
+  gridAuthLive = true;
+  try {
+    if (d.tabId !== undefined && d.tabId !== -1) return;
+    const requestId = String(d.requestId);
+    const error = d.error;
+    afterLoad(() => {
+      const p = mem.gridAuth.state.pending;
+      if (!p || p.requestId !== requestId) return;
+      dbg('signin', `the answered request ended before the grid replied (${error ?? 'no reason given'}); its outcome is not known yet`);
+      settleOutcome(p.requestId, 'unsettled');
+    });
+  } catch {
+    /* as above */
+  }
+}
+
+/**
+ * An answer from an earlier window whose outcome never came (the request was abandoned, or the worker
+ * stopped): this window's reading settles it. Signed in (or the cold server, or a page that is not the
+ * dashboard's) means Chrome's cache carried the answered copy; signed out means it was turned down; out of
+ * reach says nothing. Unless a sign-in in Chrome's box may have been made meanwhile (boxMaySignIn): then the
+ * cache may hold the box's password, or have lost the answered one with the box's, and the reading says
+ * nothing of this answer either way (unconfirmedNow).
+ */
+function settleEarlier(state: SessionInfo['state'], thisWindow: string | undefined): WindowFacts['earlier'] {
+  const p = mem.gridAuth.state.pending;
+  if (!p || p.requestId === thisWindow) return undefined;
+  if (state === 'signed-in' || state === 'cold' || state === 'not-ood') {
+    if (p.tainted) {
+      unconfirmedNow(p);
+      return 'unconfirmed';
+    }
+    dbg('signin', 'an earlier answer settled: the grid took it');
+    provenNow(p);
+    return 'proven';
+  }
+  if (state === 'signed-out') {
+    if (p.tainted) {
+      unconfirmedNow(p);
+      return 'unconfirmed';
+    }
+    dbg('signin', 'an earlier answer settled: the grid turned it down');
+    refusedNow(p);
+    return 'refused';
+  }
+  return undefined;
+}
+
+/**
+ * A sign that a sign-in may be, or was, made in Chrome's own box on the portal: a portal tab asked to sign in,
+ * or a portal tab's request let in. What the box is given goes into the sign-in cache Beethoven's answer went
+ * into, and Chrome takes it for any request of the realm, Beethoven's own included: after the grid turns
+ * Beethoven's password down, Chrome finishes Beethoven's request with the box's and raises no event
+ * (http_auth_controller.cc: ResetAuth, InvalidateRejectedAuthFromCache, SelectNextAuthIdentityToTry). So
+ * while an answer waits for its outcome, in flight or unsettled, its request's end and every later reading
+ * stop saying which password the grid took or dropped: the answer is marked, and a marked answer is never
+ * counted as taken, nor as turned down (unconfirmedNow; I1: when in doubt, the saved password waits for the
+ * student). A box submitted before Beethoven answers is no such sign: the answer replaces the box's password
+ * in the cache, so its outcome stays its own. Of the tab only its origin is looked at, until the state is
+ * read (afterLoad), and nothing is kept, not even a line in the debug log: only this mark on the answer.
+ */
+function boxMaySignIn(url: string): void {
+  let origin: string;
+  try {
+    origin = new URL(url).origin;
+  } catch {
+    return;
+  }
+  afterLoad(() => {
+    const ga = mem.gridAuth;
+    const p = ga.state.pending;
+    if (!p || p.tainted || !mem.portalOrigin || origin !== mem.portalOrigin) return;
+    ga.state = { ...ga.state, pending: { ...p, tainted: true } };
+    void persistAuthState();
+  });
+}
+
+/**
+ * An answer whose outcome can no longer be told: never counted as taken, nor as turned down (no refusal is
+ * counted). The saved sign-in is put on hold (stopped_at, not refused_at: nothing says it was turned down)
+ * until the student types one that works or saves one again: the answered seal for a saved answer, and for
+ * a typed one any seal made before it, as when a typed one is turned down, since the record may hold the
+ * very password given. In memory in this same turn (`held`), as a refusal is: the note is written later,
+ * maybe not at all, and the next window may come first.
+ */
+function unconfirmedNow(p: NonNullable<SigninState['pending']>): void {
+  const ga = mem.gridAuth;
+  const at = nowIso();
+  const { pending: _p, ...rest } = ga.state;
+  ga.state = { ...rest, held: { at, source: p.source, given: p.at, ...(p.source === 'saved' && p.seal ? { seal: p.seal } : {}) } };
+  settleOutcome(p.requestId, 'unsettled');
+  const origin = mem.portalOrigin;
+  dbg('signin', "an answer's outcome cannot be told (a sign-in was asked for or made in Chrome's box meanwhile): not counted as taken, and the saved password is not tried again until you type one");
+  afterOutcome(async () => {
+    await persistAuthState();
+    if (p.source === 'saved') await updateNote(answeredNote(p), () => ({ stopped_at: at }));
+    else await updateNote(savedBefore(p.at, origin), (n) => ({ stopped_at: at, ...typedDone(p, n) }));
+    schedulePush();
+  });
+}
+
+/** p, or undefined once `ms` have passed */
+function within<T>(p: Promise<T>, ms: number): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(undefined), ms);
+    void p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    });
+  });
+}
+
+/** the alarm two minutes after a one-shot was written: it goes, used or not */
+async function signinOnceAlarm(): Promise<void> {
+  const o = await session.get<Partial<SigninOnce>>(SIGNIN_ONCE_KEY).catch(() => undefined);
+  if (o && typeof o.at === 'string' && !onceExpired(o.at, Date.now())) {
+    // a newer one-shot: its own two minutes
+    await browser.alarms.create(SIGNIN_ONCE_ALARM, { delayInMinutes: Math.max(0.5, (Date.parse(o.at) + 120_000 - Date.now()) / 60_000) });
+    return;
+  }
+  await session.remove(SIGNIN_ONCE_KEY).catch(() => undefined);
+  mem.gridAuth.once = undefined;
+}
+
+/** memory's part of Forget: nothing of the saved sign-in or of the attempts is left to answer with */
+function clearGridAuthMemory(): void {
+  const ga = mem.gridAuth;
+  authSeq.note++;
+  authSeq.unlock++;
+  ga.state = freshAuthState();
+  ga.note = undefined;
+  ga.once = undefined;
+  ga.unlockCred = undefined;
+  answeredRealm = undefined;
+}
+
+/** Forget, Disconnect, another portal: every store of the sign-in (ext/connectApi.ts forgetGridSignin) and memory */
+async function forgetSignin(): Promise<void> {
+  await forgetGridSignin();
+  clearGridAuthMemory();
+  schedulePush();
+}
+
+/**
+ * A typed password worked where the saved one had been turned down or put on hold, and it is another: the
+ * saved one is stale (the grid's password changed), so its record, its note and the unlock that opens it go. The attempt state stays (it
+ * records this sign-in), and so does the no-PRF mark, which is about the computer, not the password.
+ */
+async function forgetReplaced(stale: SigninNote, words: string = LOG_WORDS.signinReplaced, hold?: SigninState['held']): Promise<void> {
+  try {
+    // that seal only: one the page made meanwhile (the same passkey, a new password) is the student's new one
+    const sameSeal = (x: { cred: string; saved_at: string }) => x.cred === stale.cred && x.saved_at === stale.saved_at;
+    const store = indexedDbRecords();
+    const rec = await store.get();
+    if (rec && sameSeal(rec)) await store.delete();
+    const cur = noteOf(await local.get(SIGNIN_NOTE_KEY));
+    if (cur && sameSeal(cur) && (cur.refused_at || cur.stopped_at || heldOver(hold, cur))) {
+      await local.remove(SIGNIN_NOTE_KEY);
+      authSeq.note++;
+      mem.gridAuth.note = undefined;
+    }
+    const left = await store.get();
+    const u = await session.get<Partial<SigninUnlock>>(SIGNIN_UNLOCK_KEY);
+    if (u?.cred === stale.cred && left?.cred !== stale.cred) {
+      await session.remove(SIGNIN_UNLOCK_KEY);
+      authSeq.unlock++;
+      mem.gridAuth.unlockCred = undefined;
+    }
+    await activity(words);
+  } catch (e) {
+    dbg('signin', `the stale saved sign-in could not be removed: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Whether a password the student gives now ends the refusal on record (I1: until the student types the
+ * password again), decided by which answer was turned down, never by whose clock came first. A typed one
+ * ends a refusal when it was typed after the refused password was given (a press of Sign in made after that
+ * one, not a second press made before its refusal was known); typed before a saved one was given, only when
+ * it is not that password (`typedDiffers`, the comparison with the record of the refused seal: the student
+ * may have typed the very password saved, stale with it). A seal ends the refusal of another seal, and a
+ * typed one's when it was made after that password was given. An unlock ends nothing: it gives no new password.
+ */
+function refusalEndsFor(how: 'typed' | 'saved' | 'unlocked', once: GridAuth['once'], typedDiffers?: boolean): boolean {
+  const ga = mem.gridAuth;
+  const r = ga.state.refused;
+  if (!r) return false;
+  const given = r.given ?? r.at;
+  if (how === 'typed') return !!once && (laterThan(once.at, given) || (r.source === 'saved' && typedDiffers === true));
+  if (how === 'saved' && ga.note) return r.source === 'saved' && r.seal ? r.seal !== ga.note.saved_at : laterThan(ga.note.saved_at, given);
+  return false;
+}
+
+/**
+ * A one-shot typed before the saved password on record as turned down was given: is it another password?
+ * Compared with the record of that seal (unlocked, since it was just answered from); undefined when either
+ * cannot be read, which keeps the refusal (the student types it again, after it).
+ */
+async function typedDiffersFromRefused(once: GridAuth['once']): Promise<boolean | undefined> {
+  const r = mem.gridAuth.state.refused;
+  if (!once || r?.source !== 'saved' || !r.seal || laterThan(once.at, r.given ?? r.at)) return undefined;
+  const same = await typedMatchesSeal(once.at, once.origin, { saved_at: r.seal });
+  return same === undefined ? undefined : !same;
+}
+
+/**
+ * The sheet's Sign in (typed), a seal (saved) or an unlock (unlocked): this call's own attempt, after any
+ * check in flight. The page wrote the password to storage.session or sealed it; this action carries none.
+ */
+async function gridSignin(how: 'typed' | 'saved' | 'unlocked'): Promise<ActionResults['grid-signin']> {
+  const ga = mem.gridAuth;
+  ga.working = true;
+  schedulePush();
+  try {
+    await ga.loaded;
+    let once: GridAuth['once'];
+    if (how === 'typed') {
+      const o = await session.get<Partial<SigninOnce>>(SIGNIN_ONCE_KEY).catch(() => undefined);
+      if (o && typeof o.at === 'string' && typeof o.origin === 'string' && typeof o.username === 'string' && !onceExpired(o.at, Date.now())) once = { origin: o.origin, username: o.username, at: o.at };
+    } else {
+      // the page's writes may reach this background's storage.onChanged after its message: read them now
+      if (how === 'saved') {
+        const n = noteOf(await local.get(SIGNIN_NOTE_KEY));
+        authSeq.note++;
+        ga.note = n;
+        if (n) await activity(LOG_WORDS.signinSaved).catch(() => undefined);
+      }
+      const u = await session.get(SIGNIN_UNLOCK_KEY).catch(() => undefined);
+      authSeq.unlock++;
+      ga.unlockCred = credOf(u);
+    }
+    while (mem.gridCheck) await mem.gridCheck;
+    // an earlier answer still waiting for its outcome keeps every window from answering ('unsettled'): one
+    // check without this attempt's password settles it first (a reading signed in or out), so the password
+    // the student gives now is the one tried, and the sheet speaks of it and not of the earlier one
+    let word: GridWord = 'unknown';
+    if (ga.state.pending) {
+      word = await checkGrid('signin-settle');
+      while (mem.gridCheck) await mem.gridCheck;
+    }
+    let w: WindowFacts | undefined;
+    if (word !== 'signed-in') {
+      for (let round = 0; round < 2; round++) {
+        // a typed password and a saved one turned down after it was typed: the same password or not, read
+        // first (the comparison waits), then the check in flight meanwhile, and only for that same refusal
+        const r = ga.state.refused;
+        let differs = how === 'typed' ? await typedDiffersFromRefused(once) : undefined;
+        while (mem.gridCheck) await mem.gridCheck;
+        if (ga.state.refused !== r) differs = undefined;
+        // this same synchronous turn: the refusal ends for a password the student gave after it (the
+        // background never clears a note's refused_at on a page's word; only a new seal, a new note, does),
+        // and the check below is claimed before any tick could arm a window with this attempt's password
+        if (refusalEndsFor(how, once, differs)) {
+          const { refused: _r, ...rest } = ga.state;
+          ga.state = rest;
+          void persistAuthState();
+        }
+        if (once) ga.once = once;
+        word = await checkGrid('signin-sheet');
+        w = mem.grid.lastWindow;
+        // the window passed because an earlier answer was still unsettled, and its own reading settled that
+        // one (turned down, or its outcome no longer to be told): this attempt's password was never tried, so
+        // it is tried once now
+        if (word === 'signed-in' || !w?.armed || w.answered || (w.earlier !== 'refused' && w.earlier !== 'unconfirmed')) break;
+        while (mem.gridCheck) await mem.gridCheck;
+      }
+    }
+    const signedIn = word === 'signed-in';
+    // this call's own attempt: its window's answer turned down, or nothing given because a refusal this
+    // password does not end still stands (for the saved sign-in, also its note's refusal or hold); never an
+    // earlier answer's refusal that this attempt went past
+    const ownRefused = !!w?.answered && w.outcome === 'refused';
+    const standing = !!ga.state.refused || (how !== 'typed' && (!!ga.note?.refused_at || !!ga.note?.stopped_at || heldOver(ga.state.held, ga.note)));
+    const refused = !signedIn && (ownRefused || (!w?.answered && standing));
+    return { signedIn, refused };
+  } finally {
+    await within(outcomeWork, OUTCOME_WAIT_MS);
+    await session.remove(SIGNIN_ONCE_KEY).catch(() => undefined);
+    ga.once = undefined;
+    ga.working = false;
+    schedulePush();
+  }
+}
+
+/** 5.8: what the sheet, the overlays, the Grid row and Settings say of Beethoven's own sign-in; none where the browser cannot answer the grid's sign-in */
+async function ownSigninFacts(origin: string | undefined, account: string | undefined, later: OwnSigninFacts['later']): Promise<OwnSigninFacts | undefined> {
+  if (!ownSigninAvailable() || !origin) return undefined;
+  await mem.gridAuth.loaded;
+  const ga = mem.gridAuth;
+  const note = ga.note && ga.note.origin === origin ? ga.note : undefined;
+  const saved: OwnSigninFacts['saved'] = !note ? 'none' : ga.unlockCred !== undefined && ga.unlockCred === note.cred ? 'ready' : 'locked';
+  // this session's hold counts before its note is written (and if it never is)
+  const heldNow = saved !== 'none' && heldOver(ga.state.held, note);
+  const refused = !!ga.state.refused || (saved !== 'none' && (!!note?.refused_at || !!note?.stopped_at)) || heldNow;
+  // stopped with nothing turned down this session and a hold the last mark: no one can say whether the saved
+  // password works (its try's outcome could not be told, or a typed one was turned down in an earlier
+  // session), so the words must not say it didn't
+  const holdAt = heldNow && laterThan(ga.state.held?.at, note?.stopped_at) ? ga.state.held?.at : note?.stopped_at;
+  const held = refused && !ga.state.refused && laterThan(holdAt, note?.refused_at);
+  // in a row; after a browser restart the session's count is gone and the saved one's stands
+  const refusals = ga.state.refusals > 0 ? ga.state.refusals : saved !== 'none' ? note?.refusals ?? 0 : 0;
+  const username = note?.username ?? account;
+  return {
+    saved,
+    refused,
+    held,
+    refusals,
+    working: ga.working,
+    ...(username ? { username } : {}),
+    unlockWith: await unlockWithNow(),
+    origin,
+    later,
+  };
+}
+
+async function unlockWithNow(): Promise<string> {
+  if (mem.unlockWith === undefined) {
+    const os = await browser.runtime
+      .getPlatformInfo()
+      .then((p) => p.os as string)
+      .catch(() => '');
+    mem.unlockWith = unlockWord(os);
+  }
+  return mem.unlockWith;
+}
+
+/** the student's "Sign in" asked for the sheet: the grid moment shows it for this long at most */
+const ASKED_MS = 10 * 60_000;
 
 /**
  * Open the grid's sign-in: the welcome tab itself (first run), or one tab in front in the panel's
@@ -1460,12 +2544,14 @@ async function onSignedIn(reason: string): Promise<void> {
   try {
     const grid = await session.get<GridNote>(GRID_KEY);
     const wasWaiting = mem.signin.waiting;
-    mem.signin = { waiting: false, signedInAt: Date.now() };
+    // 19.0.0: box, when this sign-in was made in Chrome's box (its tab watched, or on record below), for the drawn check's words
+    mem.signin = { waiting: false, signedInAt: Date.now(), ...(wasWaiting ? { box: true } : {}) };
     if (grid?.account) await activity(LOG_WORDS.gridSignedIn(grid.account));
     let ch = await channelNow();
     if (!ch) ch = await runChannelTest();
     const rec = await session.get<OpenedTab>(SIGNIN_TAB_KEY);
     if (rec) {
+      if (!mem.signin.box && mem.signin.signedInAt !== undefined) mem.signin = { ...mem.signin, box: true };
       if (ch?.mode === 'tab') {
         // tab mode: the sign-in tab carries the shell's lines; it is kept out of the way and closed when the work ends
         mem.keptTabId = rec.tabId;
@@ -1479,7 +2565,6 @@ async function onSignedIn(reason: string): Promise<void> {
     await browser.alarms.clear(SIGNIN_ALARM);
     schedulePush();
     void reason;
-    void wasWaiting;
     await checkAccessNow('signin');
     await ensureSetup();
     await carryPress();
@@ -1798,7 +2883,8 @@ async function readyForPressInner(kind: PendingPress['kind']): Promise<{ go: boo
   // answers (the tick and the alarm ask; afterReach, onSignedIn, carryPress). 15.0.0 dropped it here.
   if (g === 'unreachable') return { go: false, waiting: 'grid' };
   if (g !== 'signed-in') {
-    await openSigninTab('press');
+    // 19.0.0: the press waits on the sheet (or the unlock), and goes ahead once the grid-signin signs in
+    if (!ownSigninAvailable()) await openSigninTab('press');
     return { go: false, waiting: 'grid' };
   }
   if (kind === 'open-files') return { go: true };
@@ -1851,6 +2937,7 @@ async function carryPress(): Promise<void> {
     }
     if (!r.go) return;
     await session.remove(PRESS_KEY);
+    mem.carried = p;
     if (p.kind === 'connect') await startConnect('auto');
     else if (p.kind === 'sign-in-claude') await startConnect('always');
     else if (p.kind === 'stop') await doStop();
@@ -1873,6 +2960,8 @@ async function pressConnect(statement?: { tick: string; lines: string[]; buttonL
   // one connect at a time: a start or a sitting under way is this press's own
   if (mem.sitting || mem.startId) return { started: true };
   mem.connect = { ...freshConnect() };
+  // a press of the student's own: the shell's 401 may run its one sign-in check for it again
+  mem.carried = undefined;
   // 16.0.0: the student's own Connect starts "Keep my worker running"'s count of starts in a row afresh
   await mutateRun((cur) => (cur && cur.kept_running ? { ...cur, kept_running: 0 } : undefined));
   await session.set(PRESS_KEY, { kind: 'connect', at: nowIso() } satisfies PendingPress);
@@ -1901,6 +2990,7 @@ async function pressSignInClaude(): Promise<ActionResults['sign-in-claude']> {
     mem.sitting = undefined;
   }
   mem.connect = { ...freshConnect() };
+  mem.carried = undefined;
   await session.set(PRESS_KEY, { kind: 'sign-in-claude', at: nowIso() } satisfies PendingPress);
   const r = await readyForPress('sign-in-claude');
   if (r.drop) {
@@ -2036,7 +3126,17 @@ async function startDirectSitting(id: number, line: string, login: ConnectLogin)
       // the grid sign-in lapsed: the press waits for it, as any press does (the sign-in tab, then on by itself)
       mem.connect = { ...freshConnect() };
       await writeGrid({ session: 'signed-out' });
-      await session.set(PRESS_KEY, { kind: login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude', at: nowIso() } satisfies PendingPress);
+      const kind = login === 'auto' || login === 'never' ? 'connect' : 'sign-in-claude';
+      if (ownSigninAvailable()) {
+        // 19.0.0: Chrome's sign-in cache lost (the browser restarted): one check signs in again when Beethoven
+        // may, once per press (the flag goes with the press it carries), and never a tab
+        const again = mem.carried?.kind === kind && !!mem.carried.shell401;
+        await session.set(PRESS_KEY, { kind, at: nowIso(), shell401: true } satisfies PendingPress);
+        if (!again) void checkGrid('shell-401');
+        schedulePush();
+        return false;
+      }
+      await session.set(PRESS_KEY, { kind, at: nowIso() } satisfies PendingPress);
       await openSigninTab('press');
       schedulePush();
       return false;

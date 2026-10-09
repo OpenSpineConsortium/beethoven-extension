@@ -2,10 +2,17 @@
 // step), each one column: the title, the body, the moment's one control, then a spacer that keeps the
 // primary 32 px from the bottom. Every word comes from the view (core/model.ts JourneyView). The
 // four-node track is drawn above the moments by the panel (panel.ts), so it stays put while they slide.
-import { WORDS, formatTimer, type ProblemView, type ClaudeMoment, type ConnectMoment, type GlobalProtectMoment, type GridMoment, type JourneyView, type LoginSetupMoment, type OnlineMoment, type QueueMoment, type StartingMoment, type StatementMoment, type WelcomeMoment } from '../core/model';
+//
+// 19.0.0: the grid moment carries Beethoven's own sign-in sheet where the browser can answer the grid's
+// sign-in (GridSheet): the AccessID and the password typed here, the unticked Remember, and the locked
+// phase that opens a saved sign-in with the computer's own unlock. The password field is the page's alone:
+// drawn once with no value, left exactly as it is by the morph (data-keep), read and emptied by the panel
+// inside the press. Every other value comes from the view or the panel's page-local state (GridSheetCtx).
+import { WORDS, formatTimer, type ButtonView, type ProblemView, type ClaudeMoment, type ConnectMoment, type GlobalProtectMoment, type GridMoment, type GridSheet, type JourneyView, type LoginSetupMoment, type OnlineMoment, type QueueMoment, type StartingMoment, type StatementMoment, type WelcomeMoment } from '../core/model';
 import { el, svg } from './dom';
 import { codeBox, type CodeBoxState } from './codebox';
 import { drawnCheck, icon, spinner, type IconName } from './icons';
+import { LABELS } from './labels';
 import { logFold, type LogWords } from './log';
 import { button, checklist, fold, foldToggle, glyph, liveSub, orb, problem, tickBox, type OnAct } from './parts';
 import type { LogLine } from '../core/model';
@@ -32,6 +39,37 @@ export interface JourneyCtx {
   working?: string;
   /** "Allow again" (the portal's grant taken away): Chrome is asked for the origin inside the click, then use-portal is sent */
   allowAgain?: (origin: string) => void;
+  /** 19.0.0: the sign-in sheet's page-local half; without it the grid moment is drawn as 18.0.0 drew it */
+  grid?: GridSheetCtx;
+}
+
+/**
+ * 19.0.0: what the sign-in sheet keeps on the page alone, reset when the moment changes (panel.ts), and the
+ * presses it hands back. The password is not here: only the live field holds it, until Sign in reads it.
+ */
+export interface GridSheetCtx {
+  /** the AccessID as typed; else the view's */
+  user?: string;
+  /** the Remember tick, never pre-ticked */
+  remember: boolean;
+  /** "Type it instead": the locked phase drawn as the type phase */
+  typeInstead: boolean;
+  /** the page's own sentence under the password (noPassword, notUnlocked, notSaved); over the core's note */
+  note?: string;
+  /** the AccessID did not look like one */
+  userBad: boolean;
+  /** the page's probe: true offers the tick, false says why not (noRemember), undefined while it runs */
+  support?: boolean;
+  /** a press of this page's in flight: Sign in, or the unlock */
+  busy?: 'signin' | 'unlock';
+  /** the eye: the password shown as text */
+  passShown: boolean;
+  onUser: (value: string) => void;
+  setRemember: (on: boolean) => void;
+  setTypeInstead: () => void;
+  togglePass: () => void;
+  submit: (s: GridSheet) => void;
+  unlock: () => void;
 }
 
 const STATEMENT_ICONS: IconName[] = ['eye', 'clock', 'shield', 'gauge'];
@@ -172,6 +210,7 @@ function signInArt(): SVGElement {
 }
 
 function grid(m: GridMoment, ctx: JourneyCtx): HTMLElement {
+  if (m.sheet && ctx.grid && !m.signedIn) return gridSheet(m, m.sheet, ctx, ctx.grid);
   return wait(
     'grid',
     [
@@ -184,6 +223,220 @@ function grid(m: GridMoment, ctx: JourneyCtx): HTMLElement {
     ],
     [workingLine(ctx.working)],
   );
+}
+
+/** the phase the sheet is drawn in: the view's, with the page's "Type it instead" and its own press over it */
+export function sheetPhase(s: GridSheet, g: Pick<GridSheetCtx, 'typeInstead' | 'busy'>): GridSheet['phase'] {
+  // this page's unlock and the sign-in it carries: still the locked sheet, its Unlock busy
+  if (g.busy === 'unlock' && (s.phase === 'locked' || s.phase === 'working')) return 'locked';
+  if (s.phase === 'working' || g.busy === 'signin') return 'working';
+  return s.phase === 'locked' && !g.typeInstead ? 'locked' : 'type';
+}
+
+/** the sheet's heading as drawn in its phase, which the panel also announces as the moment's headline */
+export function sheetTitle(m: GridMoment, s: GridSheet, g: Pick<GridSheetCtx, 'typeInstead' | 'busy'>): string {
+  return sheetPhase(s, g) === 'locked' ? WORDS.grid.lockedTitle : (m.problem?.title ?? m.title);
+}
+
+/**
+ * The sentence under the password, and whether it says the password is wrong or missing (aria-invalid on
+ * the live field): the page's own first, else the core's (the refusal, or the hold, which says no password
+ * was wrong), which steps aside while a new attempt runs so the last one's refusal is not read as this one's.
+ */
+export function passState(s: GridSheet, g: Pick<GridSheetCtx, 'note' | 'typeInstead' | 'busy'>): { note: string; invalid: boolean } {
+  const core = sheetPhase(s, g) === 'working' ? undefined : s.note;
+  return { note: g.note ?? core ?? '', invalid: g.note === WORDS.grid.noPassword || (g.note === undefined && !!core && core !== WORDS.grid.held) };
+}
+
+/** a quiet way out under the moment's one ink button */
+function soft(b: ButtonView | undefined, ctx: JourneyCtx): HTMLElement | null {
+  return b ? button({ ...b, tone: 'text' }, ctx.onAct, { pending: ctx.pending, block: false, cls: 'm-alt' }) : null;
+}
+
+/** Enter in a sheet field: the next field, or the field's own press */
+function onEnter(then: () => void): (e: Event) => void {
+  return (e: Event) => {
+    const k = e as KeyboardEvent;
+    if (k.key !== 'Enter' || k.isComposing) return;
+    k.preventDefault();
+    then();
+  };
+}
+
+/** the live password field (never one inside a screen that is leaving) */
+function livePass(): HTMLInputElement | undefined {
+  return Array.from(document.querySelectorAll<HTMLInputElement>('#grid-pass')).find((f) => !f.closest('.leaving'));
+}
+
+/**
+ * 19.0.0: Beethoven's own sign-in, in three phases. type: the AccessID, the password with its eye, the tick
+ * where this computer can lock a saved password, one ink Sign in. locked: one ink "Unlock with Windows
+ * Hello". working: the type phase with Sign in busy and "Signing in…" (after this page's unlock, the locked
+ * phase with Unlock busy and the same words). The fields carry data-key, so the morph pairs them however
+ * many lines come and go above them; the section carries the focus key the panel moves the caret by within
+ * one moment (a refusal: the password).
+ */
+function gridSheet(m: GridMoment, s: GridSheet, ctx: JourneyCtx, g: GridSheetCtx): HTMLElement {
+  const G = WORDS.grid;
+  const phase = sheetPhase(s, g);
+  // with the sheet the problem's button is never a second ink one: Sign in (or Unlock) is the moment's
+  const prob = m.problem ? el('div', { class: 'm-problem', key: 'grid-problem' }, problem(m.problem.button ? { ...m.problem, button: { ...m.problem.button, tone: 'outline' } } : m.problem, ctx.onAct, { pending: ctx.pending })) : null;
+  const alts = (...b: Array<HTMLElement | null>) => el('div', { class: 'm-alts', key: 'grid-alts' }, ...b);
+  if (phase === 'locked') {
+    const busy = g.busy === 'unlock';
+    const sec = wait(
+      'grid',
+      [
+        glyph('fingerprint'),
+        title(sheetTitle(m, s, g)),
+        body(G.lockedBody(s.unlockWith)),
+        prob,
+        el('p', { class: 'field-error gs-note', id: 'grid-unlock-note', key: 'grid-unlock-note', role: 'alert', text: g.note ?? '' }),
+      ],
+      [
+        el(
+          'div',
+          { class: 'm-foot' },
+          el(
+            'button',
+            {
+              type: 'button',
+              id: 'grid-unlock',
+              key: 'grid-unlock',
+              class: `btn btn-ink btn-block${busy ? ' busy' : ''}`,
+              'aria-busy': busy ? 'true' : undefined,
+              'aria-describedby': 'grid-unlock-note',
+              'data-autofocus': true,
+              onClick: () => {
+                if (!busy) g.unlock();
+              },
+            },
+            busy ? spinner(18) : icon('fingerprint', 16),
+            el('span', { class: 'btn-label', text: G.unlock(s.unlockWith) }),
+          ),
+          // once the unlock has opened it, the sign-in it carries is under way
+          el('p', { class: 'status gs-status', key: 'grid-working', role: 'status', text: busy && s.phase === 'working' ? G.signingIn : '' }),
+          alts(el('button', { type: 'button', class: 'btn btn-text m-alt', key: 'grid-type-instead', onClick: () => g.setTypeInstead() }, el('span', { class: 'btn-label', text: G.typeInstead })), soft(s.box, ctx), soft(s.later, ctx)),
+        ),
+        workingLine(ctx.working),
+      ],
+    );
+    sec.setAttribute('data-focus-key', `locked:${s.note ?? ''}`);
+    sec.setAttribute('data-focus-id', 'grid-unlock');
+    return sec;
+  }
+  const working = phase === 'working';
+  const user = g.user ?? s.username ?? '';
+  const said = passState(s, g);
+  const userField = el(
+    'div',
+    { class: 'gs-q', key: 'grid-user-q' },
+    el('label', { class: 'gs-label', for: 'grid-user', text: G.accessId }),
+    el('input', {
+      id: 'grid-user',
+      key: 'grid-user',
+      class: `field gs-field${g.userBad ? ' bad' : ''}`,
+      type: 'text',
+      value: user,
+      autocomplete: 'username',
+      autocapitalize: 'off',
+      autocorrect: 'off',
+      spellcheck: 'false',
+      'aria-invalid': g.userBad ? 'true' : undefined,
+      'aria-describedby': 'grid-user-note',
+      'data-autofocus': !working && !user ? true : undefined,
+      onInput: (e: Event) => g.onUser((e.target as HTMLInputElement).value),
+      onKeydown: onEnter(() => livePass()?.focus()),
+    }),
+    el('p', { class: 'field-error gs-note', id: 'grid-user-note', key: 'grid-user-note', role: 'alert', text: g.userBad ? G.badAccessId : '' }),
+  );
+  // never a value and never a name: the field is drawn once, and the morph leaves it exactly as it is
+  // (data-keep), so what is typed is never copied, cleared or moved; its type and aria-invalid are set on
+  // the live field itself (the eye, panel.ts)
+  const pass = el('input', {
+    id: 'grid-pass',
+    key: 'grid-pass',
+    class: 'field gs-field',
+    type: g.passShown ? 'text' : 'password',
+    autocomplete: 'off',
+    autocapitalize: 'off',
+    autocorrect: 'off',
+    spellcheck: 'false',
+    'aria-describedby': 'grid-pass-note',
+    'aria-invalid': said.invalid ? 'true' : undefined,
+    'data-keep': 'grid-pass',
+    'data-autofocus': !working && user ? true : undefined,
+    onKeydown: onEnter(() => g.submit(s)),
+  });
+  const eye = el(
+    'button',
+    {
+      type: 'button',
+      class: 'btn btn-icon bare field-eye',
+      key: 'grid-eye',
+      // a toggle keeps one name and says its state by aria-pressed alone: "Show password, pressed" while shown
+      'aria-label': LABELS.showPassword,
+      'aria-pressed': g.passShown ? 'true' : 'false',
+      'aria-controls': 'grid-pass',
+      onClick: () => g.togglePass(),
+    },
+    icon(g.passShown ? 'eyeOff' : 'eye', 18),
+  );
+  const passField = el(
+    'div',
+    { class: 'gs-q', key: 'grid-pass-q' },
+    el('label', { class: 'gs-label', for: 'grid-pass', text: G.password }),
+    el('div', { class: 'field-wrap has-eye', key: 'grid-pass-wrap' }, pass, eye),
+    // always here, so the field's aria-describedby never points at nothing; only its words change
+    el('p', { class: 'field-error gs-note', id: 'grid-pass-note', key: 'grid-pass-note', role: 'alert', text: said.note }),
+  );
+  const remember =
+    g.support === true
+      ? el(
+          'div',
+          { class: 'gs-remember', key: 'grid-remember' },
+          tickBox('grid-remember', s.saved !== 'none' ? G.replaceSaved(s.unlockWith) : G.remember(s.unlockWith), undefined, g.remember, g.setRemember, { card: true, plain: true, describedBy: 'grid-remember-note' }),
+          el('p', { class: 'gs-fine', id: 'grid-remember-note', text: G.rememberNote }),
+        )
+      : g.support === false
+        ? el('p', { class: 'gs-fine gs-remember', key: 'grid-no-remember', text: G.noRemember(s.unlockWith) })
+        : null;
+  const sec = wait(
+    'grid',
+    [glyph('key'), title(sheetTitle(m, s, g)), body(m.body), prob, el('div', { class: 'gs-form', key: 'grid-form' }, userField, passField, remember)],
+    [
+      el(
+        'div',
+        { class: 'm-foot' },
+        el('p', { class: 'gs-privacy', key: 'grid-privacy' }, icon('lock', 15), el('span', { text: G.privacy })),
+        // busy as the welcome page's Agree: a spinner, aria-busy, and a press that does nothing meanwhile
+        el(
+          'button',
+          {
+            type: 'button',
+            id: 'grid-signin',
+            key: 'grid-signin',
+            class: `btn btn-ink btn-block${working ? ' busy' : ''}`,
+            'aria-busy': working ? 'true' : undefined,
+            onClick: () => {
+              if (!working) g.submit(s);
+            },
+          },
+          working ? spinner(18) : null,
+          el('span', { class: 'btn-label', text: G.signIn }),
+        ),
+        // always here so the words are announced when they come; the button carries the spinner
+        el('p', { class: 'status gs-status', key: 'grid-working', role: 'status', text: working ? G.signingIn : '' }),
+        alts(soft(s.box, ctx), soft(s.later, ctx)),
+      ),
+      workingLine(ctx.working),
+    ],
+  );
+  // within one moment the caret moves when the phase or the core's note changes: after a refusal, to the
+  // password; a field the student is typing in is never taken from them by a tick or a toggle
+  sec.setAttribute('data-focus-key', working ? 'working' : `type:${s.note ?? ''}`);
+  sec.setAttribute('data-focus-id', working ? '' : s.note || user ? 'grid-pass' : 'grid-user');
+  return sec;
 }
 
 function statement(m: StatementMoment, ctx: JourneyCtx): HTMLElement {

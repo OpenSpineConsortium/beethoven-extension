@@ -5,6 +5,14 @@
 // that signs in with the browser's own HTTP box (Wayne State, AM1: the dashboard answers 401 with
 // WWW-Authenticate: Basic), and for a cookie with SameSite=None.
 //
+// 19.0.0 (Beethoven signs in): where the browser has webRequest.onAuthRequired, that sign-in may be
+// Beethoven's own: the background's GET of the dashboard inside checkGrid's armed window, and only that
+// request, once per check, gets the portal's HTTP Basic challenge answered with the AccessID and password
+// the student typed into the sheet (for one attempt) or saved (sealed under the passkey), and Chrome's
+// sign-in cache then carries it to every later request, the WebSocket included, until Chrome closes.
+// Elsewhere (the Firefox build, or "Use Chrome's sign-in box instead") it is the sign-in the student made
+// in Chrome's own box. Nothing here reads, stores or relays a Claude credential.
+//
 // "tab": the background's GETs carry the sign-in but its WebSocket does not (a cookie with SameSite=Lax
 // or Strict travels on an extension's fetch, never on its WebSocket: channel/cookietest). Reads still
 // go from the background; each shell line runs in a page script on the portal, in a tab Beethoven

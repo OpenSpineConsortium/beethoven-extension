@@ -44,6 +44,11 @@ afterEach(() => {
 });
 
 describe('18.0.0: the grid sign-in in front', () => {
+  // 19.0.0: the sign-in tab is the path of a browser without webRequest (the Firefox build), and of "Use Chrome's
+  // sign-in box instead"; where the browser can answer the grid's sign-in, the panel's sheet comes first (background19)
+  beforeEach(() => {
+    world = install({ webRequest: false });
+  });
   it('the welcome tab becomes the sign-in in front, with its window, when the student had another tab up', async () => {
     await boot(world, { ready: false });
     world.opts.reach = false;
@@ -119,6 +124,11 @@ describe('18.0.0: the GlobalProtect wait', () => {
 });
 
 describe('18.0.0: Chrome keeps its offer to save the grid password', () => {
+  // 19.0.0: the sign-in tab is the path of a browser without webRequest (the Firefox build), and of "Use Chrome's
+  // sign-in box instead"; where the browser can answer the grid's sign-in, the panel's sheet comes first (background19)
+  beforeEach(() => {
+    world = install({ webRequest: false });
+  });
   async function signInThroughPress(o: { leaveInFront: boolean }) {
     await boot(world, { ready: true });
     world.opts.signedIn = false;

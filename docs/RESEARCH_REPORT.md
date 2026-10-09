@@ -1,5 +1,30 @@
 # Remote Control replaces the claude.ai interception
 
+> **Note of 2026-10-09 (Beethoven 19.0.0).** A later decision of the maintainer's (his decision card,
+> option B "Beethoven signs in", tapped 2026-10-09 03:01:45Z) supersedes five passages of this report
+> for the extension; the report is otherwise unchanged and still governs. (1) The session paragraph's
+> "a 302 to an identity provider or a 401 means "sign in to your portal in a tab", never an automated
+> login" and check 17's "on the first 302/401, "sign in again in a tab"": on a portal that signs in
+> with HTTP Basic, the extension's background now answers the 401 of its own dashboard request, on the
+> one granted origin and realm, once per check, with the AccessID and password the student typed into
+> the extension's own sign-in sheet; a tab's challenge still gets the browser's own box, a 302 to an
+> identity provider still means a tab, and no HTML sign-in page or identity provider is ever filled
+> in. One refusal stops every automatic sign-in until the student types the password again; Chrome
+> re-sends its cached copy once for each request already started with it before the first refusal
+> comes back; Beethoven then sends at most one; when the answered request is abandoned before the grid
+> replies, Chrome may re-send that copy once. How many of these the grid counts is not yet measured.
+> (2) The store paragraph's "`webRequest` buys nothing since MV3 cannot block": in MV3,
+> `webRequest.onAuthRequired` with `asyncBlocking` can answer a sign-in with the `webRequest` and
+> `webRequestAuthProvider` permissions, without `webRequestBlocking`, and the Chrome build asks for
+> those two (neither shows an install warning); `webRequestBlocking` stays never requested. (3) The
+> manifest table's "Never requested" row loses `webRequest`. (4) "No durable secret is kept at all"
+> (the store paragraph and the background paragraph): the grid password is kept if, and only if, the
+> student ticks *Remember it on this computer*, and then only as AES-GCM ciphertext in the extension's
+> IndexedDB under a key derived from a passkey's PRF output. (5) The security-controls paragraph's
+> "never stores a credential" now reads "never stores a Claude credential"; the grid password is the
+> exception in (4). `docs/ARCHITECTURE.md` (its 19.0.0 paragraph), `SECURITY.md`, `LICENSE.txt`
+> version 12 and `PRIVACY.md` version 13 describe the software as built.
+
 The interception design in `arch.txt` and `protocols.txt` does not survive: a MAIN-world `window.fetch` patch on claude.ai that aborts Anthropic's request, forges its SSE grammar and harvests the multimodal payload is, on the plain text of the Consumer Terms, access "through automated or non-human means" plus reverse engineering plus interference, with suspension "at any time without notice" as the remedy, and it is also technically wrong in three places (the background worker is not "continuous", SSE is a documented kill condition for a Chrome service worker, and the cookie claim is documented only for Chrome) and functionally self-defeating (the forged conversation never reaches Anthropic's servers, so a reload, the phone app and search all lose it). What replaces it is already shipped and permitted on the Pro and Max plans students hold: **Claude Code Remote Control**, which makes a `claude` process running inside the student's own Slurm job visible and steerable at claude.ai/code and in the iOS and Android apps, with attachments, transcript sync and push notifications, over outbound HTTPS only ([Remote Control docs](https://code.claude.com/docs/en/remote-control)). That inversion shrinks the browser extension to a lightweight launcher and diagnostics panel that talks to exactly one origin, the student's Open OnDemand portal, and never touches claude.ai or any credential; it uses three OOD surfaces that exist on every 3.x and 4.x site without admin help (the Shell WebSocket, whose frame format has been byte-identical from 2.0 to 4.2.5, the Files JSON routes, and Active Jobs JSON) and an optional `/rnode/` fast path where an administrator has enabled it ([OOD shell app.js](https://github.com/OSC/ondemand/blob/master/apps/shell/app.js); [ood_portal.yml reference](https://osc.github.io/ood-documentation/latest/reference/files/ood-portal-yml.html)). The cluster side becomes a university-agnostic framework of a static site profile, a six-call scheduler/runtime/egress adapter and one job template, which covers all twelve US university clusters sampled (eleven Slurm, one LSF) and reuses Ashley's existing sbatch wrapper, Apptainer sandbox recipe, CephFS state directory and signed-key licence gate. The design that passes the Chrome, Edge, Firefox and Apple stores and reads well on a HECVAT is the one with no `cookies` permission, no install-time host permission, no claude.ai scripts, an on-device audit log and an Ed25519-signed kill-list fetched as data; the Safari edition must be free or sold by in-app purchase because Apple forbids licence keys. What is not known and only a real cluster can settle is whether `claude remote-control` stays registered from inside an `sbatch` job under `tmux` with its two one-time prompts pre-accepted, whether the compute nodes can reach Anthropic's unnamed feature-flag host, and whether `ondemand.grid.wayne.edu` has the reverse proxy switched on. The build specification at the end of this report is written so that those three tests are the first thing the team runs.
 
 ## The interception design fails three independent tests

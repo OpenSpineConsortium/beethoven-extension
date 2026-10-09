@@ -168,6 +168,9 @@ describe('the background, run whole', () => {
   }, 30_000);
 
   it('a welcome tab the student has since used for something else is never navigated or closed', async () => {
+    // 19.0.0: the sign-in tab is the path of a browser without webRequest (the Firefox build); where the browser
+    // can answer the grid's sign-in, no tab opens at all (background19.test.ts)
+    world = install({ webRequest: false });
     await boot(world, { terms: false, ready: false, firstRun: true });
     world.opts.reach = false;
     world.opts.signedIn = false;

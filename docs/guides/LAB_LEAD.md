@@ -1,9 +1,9 @@
-# Beethoven 16.0.0 for the lab lead
+# Beethoven 19.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it then stood in the
 working tree; rewritten 2026-10-08 for 16.0.0, which removed the direct way of 12.0.0 to 15.0.0
-whole. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
+whole, and brought up to date 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
 lab's folders on the grid, was added 2026-10-02 with `tools/grid_access.sh` and revised that evening
 after its review.
 
@@ -28,6 +28,20 @@ decision; section 1). What an earlier version may have left in a student's accou
 computer, and how it goes, is section 5. The agreement is now version 11 and the privacy statement
 version 12, both of 2026-10-08, so every student accepts once more.
 
+**19.0.0 (2026-10-09).** Beethoven signs in to the grid (Greg's decision card, tapped 2026-10-09
+03:01Z). When the portal asks for its HTTP Basic sign-in, the panel's sheet **Sign in to the grid**
+takes the student's AccessID and password, and Beethoven's background answers the portal's challenge
+for its own request to the portal's dashboard, on the one granted origin, once per check; a tab's
+challenge still gets Chrome's own box, and **Use Chrome's sign-in box instead** keeps 18.0.0's way.
+The first refusal stops every automatic sign-in until the student types the password again. Saving
+the password is off unless the student ticks **Remember it on this computer**: then it is encrypted
+on that computer under a key a passkey named "<AccessID> (grid)" releases with Windows Hello, Touch
+ID or the screen lock, until **Forget**. Wayne State's Strong Password Standard says never to save
+passwords in web browsers or computer programs, so tell Wayne State students to leave it off (section
+3). Nothing changes on the grid: no framework change, no new line typed, and the VPN is still needed.
+The manifest gains `webRequest` and `webRequestAuthProvider` (no install warning). The agreement is
+version 12 and the privacy statement version 13, of 2026-10-09, so every student accepts once more.
+
 ## 1. What changes for you
 
 - **One way to the grid again: GlobalProtect and the Open OnDemand portal**, inside the student's
@@ -37,16 +51,28 @@ version 12, both of 2026-10-08, so every student accepts once more.
   this computer**, the phone route, the relay and the pilot app) is gone whole: it could not work
   without a program outside the browser, and a student with the VPN has the portal. The manifest is
   11.0.0's again: `storage`, `alarms`, `scripting`, `sidePanel` and the optional `https://*/*` host
-  the student grants at click time; no `nativeMessaging`. Beethoven works offline on the last good
-  lists as before.
-- **Beethoven never asks for a grid password or a code.** The student signs in to the portal on the
-  university's own pages, in the box Chrome shows; Beethoven never fills them in. 11.0.0's one-time
-  grid key step stays: when the portal's shell asks for a password while a press waits, the student
-  types it into the university's own terminal page, and Beethoven's page script watches that tab's
-  title only and types one login-setup line after **I'm in**. The terminal may ask for the Google
-  Authenticator code too; the panel's one warning there, "Don't run 2FA Setup if you have one: it
-  replaces it.", is about that terminal. That step is not yet measured on the grid by a student
-  without a key.
+  the student grants at click time; no `nativeMessaging`. Since 19.0.0 it also asks for `webRequest`
+  and `webRequestAuthProvider`, for one listener that answers the portal's HTTP sign-in (never
+  `webRequestBlocking`). Beethoven works offline on the last good lists as before. 19.0.0's sign-in
+  sheet is not the direct way: no ssh, no helper, no code, and the VPN is still needed.
+- **Beethoven signs in to the portal with the password the student gives it (19.0.0), and never asks
+  for a code.** The student types the AccessID and password into Beethoven's sheet, or chooses
+  Chrome's own box. From the sheet the password goes only to the portal, as the answer to the HTTP
+  Basic challenge of Beethoven's own background request, on the granted origin (and, once a password
+  Beethoven gave has worked, that sign-in's realm), once per check; never to a tab's, a proxy's or
+  another site's challenge, never to the vendor, never into a log, the audit log or the debug log.
+  Beethoven itself sends a password the grid turns down at most once. Chrome re-sends its cached
+  copy once for each request already started with it before the first refusal comes back; Beethoven
+  then sends at most one; when the answered request is abandoned before the grid replies, Chrome may
+  re-send that copy once. How many of these the grid counts is not yet measured. Beethoven never
+  fills in the university's sign-in pages or an identity provider, never touches Microsoft
+  Authenticator or a code, and never types a password into a shell. The approval check still names
+  the account the portal's dashboard shows, never the typed AccessID. 11.0.0's one-time grid key
+  step stays: when the portal's shell asks for a password while a press waits, the student types it
+  into the university's own terminal page, and Beethoven's page script watches that tab's title only
+  and types one login-setup line after **I'm in**. The terminal may ask for the Google Authenticator
+  code too; the panel's one warning there, "Don't run 2FA Setup if you have one: it replaces it.",
+  is about that terminal. That step is not yet measured on the grid by a student without a key.
 - **A press made while the grid is out of reach is kept.** The panel shows **Turn on
   GlobalProtect.** with **How to set it up** (the site profile's `vpn_help_url`: Wayne State's KB
   20314) and "Beethoven carries on by itself as soon as the grid answers."; reach is re-checked
@@ -102,7 +128,16 @@ rule on the folders above the copy, no test sign-in of your own and no note to C
 
 Nothing new for 16.0.0. Students reach the grid through the VPN and the portal, as Wayne State's own
 pages describe, and nothing of Beethoven's is installed on the grid but the lab's own scripts in the
-group folder. The draft 12.0.0 kept here, about students' browsers signing in to `grid.wayne.edu`
+group folder.
+
+19.0.0 raises two questions only C&IT can answer, worth asking before students update: whether a
+wrong password sent as an HTTP Basic answer to `ondemand.grid.wayne.edu` counts toward the five wrong
+passwords after which an AccessID is disabled (reactivation can take up to three business days); and
+whether the Strong Password Standard ("Never save passwords in web browsers or computer programs;
+instead, type them in each time you need them.") allows a password kept encrypted behind a Windows
+Hello or Touch ID passkey. Until they answer, tell students to leave **Remember it on this computer**
+off; the sheet already says "Your university may ask you to type your password each time; if it
+does, leave this off." Neither answer is recorded yet. The draft 12.0.0 kept here, about students' browsers signing in to `grid.wayne.edu`
 directly with restricted keys, is withdrawn with the direct way; whether it was ever sent is not
 recorded in these texts. If it was, tell C&IT that no such key is added any more and that the lines
 already in students' `~/.ssh/authorized_keys` are being removed (section 5).
@@ -126,15 +161,15 @@ calls the copy outdated.
 
 ## 5. What an earlier version may have left
 
-16.0.0 never adds a key, never types a command about one, and deletes nothing on the grid or under a
-student's home, ever. What 12.0.0 to 15.0.0 left stays until a person removes it:
+16.0.0 and later never add a key, never type a command about one, and delete nothing on the grid or
+under a student's home, ever. What 12.0.0 to 15.0.0 left stays until a person removes it:
 
 | What | Where | How it goes |
 |---|---|---|
 | **A line in the student's `~/.ssh/authorized_keys`** on the cluster, beginning `restrict,command="<the lab's shared copy>/bin/hpcworker gate"` and ending with the tag `beethoven-browser` and a date. Beside it, `~/.ssh/authorized_keys.beethoven-prev` is that version's copy of the file from before the line was added; it never holds a Beethoven line. | The student's home on the grid | The student, in a terminal on the cluster (OnDemand's shell, on the VPN): `bash /rs/rs_grp_oschome/shared/beethoven/hpcworker/current/bin/hpcworker browser-key remove` (the framework's shared copy still has the command; it answers `HPCW-KEY removed`, or `HPCW-KEY none`; refused under Claude Code, another agent or a batch job). Or by hand: delete the line. You cannot edit another account's file: ask the student, or C&IT. Withdrawing the approval does **not** remove it. 16.0.0 cannot use the line: the key it belonged to was dropped from the browser, unread, on the first run after the update. |
 | **The Settings note** | The student's Beethoven | **Settings** shows once **A key from an earlier version**: "An earlier version of Beethoven added a key for this computer to your grid account (<date>). Beethoven no longer uses it. Your lab lead can remove it for you." **Forget** hides the note and nothing more. |
 | **The helper** (the bridge) | The student's computer | Windows: **Settings**, **Apps**, **Beethoven bridge**, **Uninstall**. macOS: `uninstall.command` in `~/Library/Application Support/Beethoven/bridge`. Linux: `bash ~/.local/share/beethoven/bridge/uninstall.sh`. A zip install of 14.0.0 or earlier: its own `uninstall.cmd` or `uninstall.command` (`INSTALL.md`). 16.0.0 holds no permission to start it. |
-| **A passkey named Beethoven** (Windows Hello or Touch ID protection) | The browser's or the system's passkey store | The student deletes it in that store's own list (`INSTALL.md`, "Remove Beethoven completely"). |
+| **The old passkey** (12.0.0 to 15.0.0's Windows Hello or Touch ID protection of the key) | The browser's or the system's passkey store | It is named with the student's AccessID alone, or "beethoven" ("Beethoven on this computer"), and can go: the student deletes it in that store's own list (`INSTALL.md`, "Remove Beethoven completely"). Not the passkey 19.0.0 uses for the grid sign-in, named "<AccessID> (grid)", which the student deletes only after **Forget**. |
 
 A lost laptop with 12.0.0 to 15.0.0 still on it holds a key whose line, while the shared copy still
 answers `gate`, lets it start, watch and stop that student's worker until the line is removed: have
@@ -179,6 +214,26 @@ The 60-second floor on scheduler questions is this product's own etiquette, not 
   Setup (Wayne State's KB 20242): running it with one destroys the existing code, and the panel says
   so there. Not yet measured on the grid: ask what the terminal showed and keep it.
 - **"Settings says A key from an earlier version."** Section 5. **Forget** hides the note only.
+- **"It says That password didn't work, and Beethoven stopped."** The portal turned the password
+  down once and Beethoven sent nothing more; it will not try again until the student types it again.
+  Have them check it first (a password changed in the last half hour may not work yet). After two
+  refusals in a row the panel says to wait or ask the help desk. If the AccessID is disabled, only
+  C&IT turns it back on. Beethoven also stops, without counting a wrong try, when it could not tell
+  whether a password it sent worked, the saved one or one typed while one was saved (Chrome closed
+  before the grid replied, or a portal tab asked for a sign-in or loaded a page while the answer
+  waited, which Chrome's own box may have signed in); the debug log's `signin` lines tell the two
+  apart ("the grid turned the password down" or "an answer's outcome cannot be told", and after a
+  browser restart "the last try while a sign-in was saved has no outcome on record"), and so does the
+  panel: a hold says "Beethoven couldn't tell whether your saved password worked, so it won't use it
+  again by itself. Type your password to sign in." Either way nothing is sent until the student types
+  the password.
+- **"It asks me to unlock my grid sign-in."** They ticked **Remember it on this computer**. Each
+  time Chrome opens, one Windows Hello or Touch ID prompt unlocks it; **Type it instead** works too.
+  At Wayne State, suggest **Forget** (**Settings**, **Your grid**, **Grid sign-in**) and typing the
+  password each time (section 3).
+- **"Which passkey do I delete?"** One named with their AccessID alone, or "beethoven", is the old one
+  (12.0.0 to 15.0.0) and can go. The one named "<AccessID> (grid)" is 19.0.0's: delete it only after
+  **Forget**.
 - **"I lost my laptop."** Section 5, if 12.0.0 to 15.0.0 was on it; otherwise nothing of
   Beethoven's on it reaches the grid without the student's own VPN and portal sign-in.
 - **"This Claude account has no Pro or Max plan."** The Claude account they signed in with has no
@@ -371,11 +426,19 @@ On the grid, only the entry for hy9698 that you set by hand on 2026-10-02 has be
 
 ## 10. Not yet measured
 
-Of the one way, on the real grid: the one-time grid key step by a student without a key (section
-1); a press kept on the GlobalProtect step going ahead by itself when the grid answers; and **Keep
-my worker running** starting an ended worker again from a closed panel. The framework's own open
-questions are hpcworker's `docs/OPEN_QUESTIONS.md`. Nothing of the direct way remains to measure:
-`V12_STATUS.md`'s tests G1 to G3 are moot.
+Of the one way, on the real grid: the one-time grid key step by a student without a key (section 1);
+a press kept on the GlobalProtect step going ahead by itself when the grid answers; and **Keep my
+worker running** starting an ended worker again from a closed panel. Of 19.0.0's sign-in
+(`docs/OPEN_QUESTIONS.md`): Beethoven's background answering the live portal's HTTP sign-in; a
+Windows Hello or Touch ID prompt from the side panel on real computers (Chromium reports the panel
+closing); real Windows Hello and Touch ID giving what the saved sign-in needs; whether a wrong
+answer counts toward the AccessID's five; what passkey lists show for "<AccessID> (grid)"; and how
+many stale tries Chrome sends after a password change; whether, when a student signs in in Chrome's
+box while Beethoven's own answer is on its way, the tab's request can end after Beethoven's (the
+answer is then counted as worked although the box's password may have been the one the grid took);
+and how often a portal tab in use while an answer waits puts a right saved password on hold. The
+framework's own open questions are hpcworker's `docs/OPEN_QUESTIONS.md`. Nothing of the direct way
+remains to measure: `V12_STATUS.md`'s tests G1 to G3 are moot.
 
 ## 11. A resumed session's link (14.0.0, framework 14)
 
@@ -415,6 +478,7 @@ Each line is `<UTC time> <tag> <what happened>`. The tags:
 | `sw` | the background started (Chrome starts it again after it has been idle) |
 | `cleanup` | 16.0.0's one-time removal of what the direct way left in this browser: removed, none, or why not |
 | `grid` | each check of the grid sign-in through the portal, and what it found (signed in or not, as whom, the HTTP status) |
+| `signin` | 19.0.0's own sign-in: each challenge of Beethoven's own request, with what the listener did and why (answered with the typed or the saved password, cancelled as a refusal, or left to Chrome) and the request's type, an address only for the dashboard request it answered or cancelled; how the answered request ended; an answer whose outcome cannot be told, and the hold it puts on the saved password. Never the AccessID or a password, and of a portal tab's challenge nothing at all |
 | `read` | each read of the run's files: `status.json`'s job, state and `updated_at`, the phase Beethoven made of it, stale or not, seen alive or not, and whether a link is there and of which form |
 | `status` | each `worker status --json` the panel asked while a worker was in line or renewing |
 | `press`, `action`, `ready` | each button by its kind only, the press's result, and what a press waited for (the grid, the approval, the setup) |

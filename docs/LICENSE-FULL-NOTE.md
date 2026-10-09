@@ -10,7 +10,8 @@ Wayne-State-specific access wording replaced with "the institution's Open OnDema
 computing systems" while keeping the approved-list model; the three Known Risks specific to this
 form factor (Anthropic changing or enforcing Remote Control eligibility, the university disabling or
 reconfiguring Open OnDemand's shell, files or reverse proxy, a browser store removing or disabling
-the extension) added to section 8; and the disclosure sentences of section 5(e) carried over word
+the extension) added to section 8 (the Trial Edition's version 12 adds a fourth, the institution
+disabling the account after wrong passwords, which a Full Edition text would carry too); and the disclosure sentences of section 5(e) carried over word
 for word. Its refund, term and outage-extension clauses come from that Full Edition text unchanged.
 One thing differs by store: Apple's App Review Guideline 3.1.1 forbids an app from using its own
 mechanism, such as a license key, to unlock functionality, so the Safari edition is free or is sold

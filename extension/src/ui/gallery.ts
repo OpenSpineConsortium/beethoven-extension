@@ -7,6 +7,7 @@
 import './gallery.css';
 import { applyAppearance, el } from './dom';
 import type { Action } from '../core/model';
+import type { GridSignin } from '../ext/gridSignin';
 import { FIXTURES, SAMPLE_LOG, fixture } from './fixtures';
 import { mountPanel } from './panel';
 import { manifestVersion, packaged, type Act } from './rpc';
@@ -42,6 +43,25 @@ const stubGestures: Gestures = {
   host: () => 'Chrome',
   installId: () => Promise.resolve('gallery'),
   save: () => Promise.resolve(),
+  unknownPasskey: (cred) => console.info('[gallery] unknown passkey', cred),
+};
+
+/**
+ * 19.0.0: the sign-in sheet's page side, stood in: no passkey and no storage. Each press is logged by what
+ * it would do, never by what was typed, and answers after a moment the way the real one would.
+ */
+const later = <T>(value: T): Promise<T> => new Promise((done) => setTimeout(() => done(value), 900));
+const stubSignin: GridSignin = {
+  supportNow: () => Promise.resolve(true),
+  submitSheet: (o) => {
+    console.info('[gallery] sign in', JSON.stringify({ origin: o.origin, username: o.username, remember: o.remember }));
+    return later(o.remember ? { saved: true } : { saved: false });
+  },
+  unlockNow: () => {
+    console.info('[gallery] unlock');
+    return later('cancelled' as const);
+  },
+  forgetNow: () => Promise.resolve(true),
 };
 
 export function mountGallery(root: HTMLElement, page: 'panel' | 'options', q: URLSearchParams): void {
@@ -54,7 +74,7 @@ export function mountGallery(root: HTMLElement, page: 'panel' | 'options', q: UR
     if (!first || first.surface !== 'panel') return;
     document.body.classList.remove('page');
     document.body.classList.add('panel');
-    const p = mountPanel(root, { act: stubAct, fixture: { view: first.view, local: first.local, details: first.details, log: first.log } });
+    const p = mountPanel(root, { act: stubAct, signin: stubSignin, fixture: { view: first.view, local: first.local, details: first.details, log: first.log } });
     p.show(first.view);
     names.slice(1).forEach((n, i) => {
       const f = fixture(n);
@@ -89,7 +109,7 @@ export function mountGallery(root: HTMLElement, page: 'panel' | 'options', q: UR
   if (f.surface === 'panel') {
     document.body.classList.remove('page');
     document.body.classList.add('panel');
-    const p = mountPanel(root, { act: stubAct, fixture: { view: f.view, local: f.local, details: f.details, log: f.log } });
+    const p = mountPanel(root, { act: stubAct, signin: stubSignin, fixture: { view: f.view, local: f.local, details: f.details, log: f.log } });
     p.show(f.view);
     return;
   }

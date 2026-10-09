@@ -40,6 +40,10 @@ export interface MockPortalOptions {
   auth?: 'cookie' | 'basic';
   /** the Basic password; default MOCK_PASSWORD, else "mockpass" */
   password?: string;
+  /** 19.0.0: the realm every Basic challenge names (the CLI's --realm, MOCK_REALM); default "private", the live portal's */
+  realm?: string;
+  /** 19.0.0: wrong Basic answers after which the account is locked: even the right password gets 401 until POST /_mock/reset (the CLI's --lockout N, MOCK_LOCKOUT); default 0, never */
+  lockoutAfter?: number;
   /** the session cookie's SameSite in cookie mode; default "lax" (10.0.0's mock); "none" adds Secure */
   sameSite?: 'lax' | 'none' | 'strict' | string;
   /** AM2: every shell asks for the password until login-setup has authorised the OnDemand server's address */
@@ -136,8 +140,12 @@ export interface MockPortal {
   sharedInstall?: string;
   /** the directory on disk behind it */
   sharedDir?: string;
-  /** the Authorization header of a signed-in request in auth basic */
-  basicAuth: string;
+  /** the Authorization header of a signed-in request in auth basic, with the password the grid accepts now */
+  readonly basicAuth: string;
+  /** 19.0.0: the password the grid accepts from now on, as a password changed on the grid (Basic and the keyless shell's prompt); never echoed or logged */
+  setPassword(password: string): void;
+  /** the realm every Basic challenge names */
+  realm: string;
   auth: 'cookie' | 'basic';
   /** Wayne State's state folder (/rs/rs_grp_oschome/<user>) and where it is on disk */
   rsRoot: { virtual: string; dir: string };
@@ -164,6 +172,17 @@ export interface MockPortal {
     passwordPrompts: number;
     passwordFailures: number;
     typedAtPasswordPrompt: number;
+    /** 19.0.0: what the grid accepts now (setPassword, POST /_mock/password); never in /_mock/state, /_mock/log or a log line */
+    password: string;
+    /** times the password was changed while running */
+    passwordChanges: number;
+    /** Basic answers the portal checked: the right pair let in, and any other pair (POST /_mock/reset starts them again) */
+    basicGood: number;
+    basicBad: number;
+    /** right answers turned down because the account was locked */
+    basicLocked: number;
+    /** lockoutAfter wrong answers were reached: every answer gets 401 until POST /_mock/reset */
+    lockedOut: boolean;
     requests: MockRequestRecord[];
     shellLog: MockShellRecord[];
     simulator: string[];

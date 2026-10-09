@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import WebSocket from 'ws';
 import { claudeState, setClaudeState } from '../mock-ood/lib/common.mjs';
-import { createMockPortal } from '../mock-ood/server.mjs';
+import { cliOptions, createMockPortal } from '../mock-ood/server.mjs';
 
 register('./lib/ts-hooks.mjs', import.meta.url);
 const C = await import('../src/core/contract.ts');
@@ -196,6 +196,82 @@ if (section('basic')) {
   ok.close();
   const reqs = (await (await fetch(`${m.origin}/_mock/log`)).json()).requests;
   check('/_mock/log records each request with the sign-in it carried and the answer', reqs.some((r) => r.path === '/pun/sys/dashboard/' && r.auth === 'none' && r.status === 401) && reqs.some((r) => r.path === '/pun/sys/dashboard/' && r.auth === 'good' && r.status === 200) && reqs.some((r) => r.kind === 'ws' && r.status === 101 && r.path.includes('csrf=[redacted]')));
+
+  // 19.0.0 (Beethoven signs in): the password changes on the grid, every Basic answer is counted, the account locks
+  console.log('\n# HTTP Basic: a password changed on the grid, the counters, the lockout, the realm (19.0.0)');
+  const pair = (u, pw) => ({ Authorization: `Basic ${Buffer.from(`${u}:${pw}`).toString('base64')}` });
+  const dashboard = (mm, headers = {}) => fetch(`${mm.origin}/pun/sys/dashboard/`, { redirect: 'manual', headers });
+  const stateOf = async (mm) => (await fetch(`${mm.origin}/_mock/state`)).json();
+  const [P1, P2, P3, P4] = ['Old-Pass-7f3a', 'New-Pass-91c2', 'Third-Pass-5e0d', 'Json-Pass-24b8'];
+  const said = [];
+  const pm = await mock({ auth: 'basic', password: P1, log: (s) => said.push(s) });
+  await dashboard(pm);
+  let st = await stateOf(pm);
+  check('a request with no credentials is no answer: neither counter moves', st.basicGood === 0 && st.basicBad === 0, JSON.stringify({ good: st.basicGood, bad: st.basicBad }));
+  const right1 = await dashboard(pm, pair('st1234', P1));
+  const wrong1 = await dashboard(pm, pair('st1234', 'not-it'));
+  st = await stateOf(pm);
+  check('the right pair: 200 and basicGood 1; a wrong one: 401 and basicBad 1', right1.status === 200 && wrong1.status === 401 && st.basicGood === 1 && st.basicBad === 1, JSON.stringify({ right: right1.status, wrong: wrong1.status, good: st.basicGood, bad: st.basicBad }));
+  const changed = await fetch(`${pm.origin}/_mock/password`, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: P2 });
+  const changedText = await changed.text();
+  check('POST /_mock/password takes the new password as its body and does not answer it back', changed.status === 200 && JSON.parse(changedText).ok === true && !changedText.includes(P2), changedText);
+  const old2 = await dashboard(pm, pair('st1234', P1));
+  const new2 = await dashboard(pm, pair('st1234', P2));
+  check('after the change the old password gets 401 and the new one 200, and basicAuth follows it', old2.status === 401 && new2.status === 200 && pm.basicAuth === pair('st1234', P2).Authorization, `${old2.status} ${new2.status}`);
+  pm.setPassword(P3);
+  check('setPassword() on the mock changes it the same way', (await dashboard(pm, pair('st1234', P2))).status === 401 && (await dashboard(pm, pair('st1234', P3))).status === 200);
+  const viaJson = await fetch(`${pm.origin}/_mock/password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: P4 }) });
+  check('POST /_mock/password also takes JSON {"password"}', viaJson.status === 200 && (await dashboard(pm, pair('st1234', P4))).status === 200);
+  const empty = await fetch(`${pm.origin}/_mock/password`, { method: 'POST', body: '' });
+  const asGet = await fetch(`${pm.origin}/_mock/password?password=${P1}`);
+  check('an empty body is refused (400), and the password is never taken from the address (GET: 405)', empty.status === 400 && asGet.status === 405 && (await dashboard(pm, pair('st1234', P4))).status === 200, `${empty.status} ${asGet.status}`);
+  const wsWrong = await new Promise((resolve) => {
+    const w = new WebSocket(`${pm.origin.replace(/^http/, 'ws')}/pun/sys/shell/ssh/default`, { headers: pair('st1234', P1) });
+    w.on('unexpected-response', (_q, res) => resolve(res.statusCode));
+    w.on('open', () => resolve(101));
+    w.on('error', () => resolve(0));
+  });
+  st = await stateOf(pm);
+  check('a wrong pair on the shell handshake is a counted answer too (401)', wsWrong === 401 && st.basicBad === 4, JSON.stringify({ ws: wsWrong, bad: st.basicBad }));
+  check('the counters in /_mock/state: right and wrong answers and the changes, no lockout by default', st.basicGood === 5 && st.passwordChanges === 3 && st.lockoutAfter === 0 && st.lockedOut === false, JSON.stringify({ good: st.basicGood, changes: st.passwordChanges }));
+  const seen = JSON.stringify(st) + JSON.stringify(await (await fetch(`${pm.origin}/_mock/log`)).json()) + said.join('\n');
+  check('no password, old or new, is in /_mock/state, /_mock/log or a line the mock logged', [P1, P2, P3, P4].every((p) => !seen.includes(p)));
+
+  const lm = await mock({ auth: 'basic', password: P1, lockoutAfter: 3 });
+  for (let i = 0; i < 2; i++) await dashboard(lm, pair('st1234', `wrong-${i}`));
+  const beforeLock = await dashboard(lm, pair('st1234', P1));
+  for (let i = 2; i < 4; i++) await dashboard(lm, pair('st1234', `wrong-${i}`));
+  const locked = await dashboard(lm, pair('st1234', P1));
+  st = await stateOf(lm);
+  check('--lockout 3: the right password still works after two wrong answers', beforeLock.status === 200);
+  check('--lockout 3: from the third wrong answer on, even the right password gets 401', locked.status === 401 && st.lockedOut === true && st.basicBad === 4 && st.basicLocked === 1, JSON.stringify({ status: locked.status, lockedOut: st.lockedOut, bad: st.basicBad, locked: st.basicLocked }));
+  const reset = await fetch(`${lm.origin}/_mock/reset`, { method: 'POST' });
+  const afterReset = await dashboard(lm, pair('st1234', P1));
+  st = await stateOf(lm);
+  check('POST /_mock/reset lifts the lockout and starts the counters again', reset.status === 200 && afterReset.status === 200 && st.lockedOut === false && st.basicBad === 0 && st.basicGood === 1, JSON.stringify({ status: afterReset.status, bad: st.basicBad, good: st.basicGood }));
+
+  const rm = await mock({ auth: 'basic', realm: 'grid-realm' });
+  const realmPage = await dashboard(rm);
+  const realmWs = await new Promise((resolve) => {
+    const w = new WebSocket(`${rm.origin.replace(/^http/, 'ws')}/pun/sys/shell/ssh/default`);
+    w.on('unexpected-response', (_q, res) => resolve(res.headers['www-authenticate']));
+    w.on('open', () => resolve('opened'));
+    w.on('error', () => resolve('error'));
+  });
+  check('realm: the page and the handshake challenge name it', realmPage.headers.get('www-authenticate') === 'Basic realm="grid-realm"' && realmWs === 'Basic realm="grid-realm"' && (await stateOf(rm)).realm === 'grid-realm', `${realmPage.headers.get('www-authenticate')} ${realmWs}`);
+  await fetch(`${rm.origin}/_mock/password`, { method: 'POST', body: `${P2}\n` });
+  check('a text body that ends in a line break (as a shell sends it) sets the password without it', (await dashboard(rm, pair('st1234', P2))).status === 200);
+
+  const cm = await mock({ auth: 'basic', password: P1, coldPun: 60_000 });
+  const coldNone = await dashboard(cm);
+  const coldBefore = (await stateOf(cm)).basicGood;
+  const coldFirst = await dashboard(cm, pair('st1234', P1));
+  const coldThen = await dashboard(cm, pair('st1234', P1));
+  check('--cold-pun after an accepted Basic answer: 401 without credentials leaves the PUN cold, then 500 once, then 200', coldNone.status === 401 && coldBefore === 0 && coldFirst.status === 500 && coldThen.status === 200 && cm.state.coldHits === 1, `${coldNone.status} ${coldFirst.status} ${coldThen.status}`);
+
+  const co = cliOptions(['--realm', 'other', '--lockout', '5'], {});
+  const ce = cliOptions([], { MOCK_LOCKOUT: '4', MOCK_REALM: 'env-realm' });
+  check('the CLI: --realm and --lockout, or MOCK_REALM and MOCK_LOCKOUT; neither by default', co.realm === 'other' && co.lockoutAfter === 5 && ce.realm === 'env-realm' && ce.lockoutAfter === 4 && cliOptions([], {}).lockoutAfter === 0 && cliOptions([], {}).realm === 'private');
 }
 
 // ---- cookie: 10.0.0's mode and its SameSite switch -----------------------------------------------------

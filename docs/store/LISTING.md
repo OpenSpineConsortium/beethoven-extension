@@ -1,14 +1,15 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 16.0.0, and the answers
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 19.0.0, and the answers
 to its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 to 10.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven; a **Private** item whose
 trusted testers are the Google Group of approved students; one installation per approved account;
 the site's theme; an Anthropic address refused before any permission request), rewritten on
 2026-10-02 for 12.0.0, brought up to date on 2026-10-04 for 15.0.0 (13.0.0 and 14.0.0 left these
-texts as they were), and rewritten again on 2026-10-08 for 16.0.0, which removed the direct way of
-12.0.0 to 15.0.0 whole. 11.0.0 (2026-10-01) was built but never submitted, and its store documents
+texts as they were), rewritten again on 2026-10-08 for 16.0.0, which removed the direct way of
+12.0.0 to 15.0.0 whole, and brought up to date on 2026-10-09 for 19.0.0, in which Beethoven signs in
+to the grid itself (17.0.0 and 18.0.0 left these texts as they were). 11.0.0 (2026-10-01) was built but never submitted, and its store documents
 were never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
 - **11.0.0**: a welcome page with one tick and "Agree and continue" replaces the setup page with its
@@ -49,6 +50,23 @@ reach is kept, the panel shows the GlobalProtect screen with a link to the unive
 and the press goes ahead by itself once the grid answers; Settings notes once a key an earlier
 version added to the grid account. Agreement version 11, privacy statement version 12.
 
+**19.0.0** (2026-10-09): Beethoven signs in to the grid (the maintainer's decision of 2026-10-09).
+The panel's sheet *Sign in to the grid* takes the AccessID and password and, on a portal that signs
+in with HTTP Basic, as Wayne State's does, the extension's background answers the portal's sign-in
+for its own request to the portal's dashboard, on the one granted portal origin, once per check,
+never a tab's (the tab gets Chrome's own box), a proxy's or another site's. One refusal stops it
+until the student types the password again. Saving the password is optional and off unless the
+student ticks *Remember it on this computer*; a saved password is AES-GCM ciphertext in the
+extension's IndexedDB under a key that a platform passkey named "<AccessID> (grid)" releases with
+Windows Hello, Touch ID or the screen lock; Settings' *Forget* deletes it. *Use Chrome's sign-in box
+instead* keeps 18.0.0's way (the portal in a tab, Chrome's own box). New permissions: `webRequest`
+and `webRequestAuthProvider` (Chrome build only; neither shows an install warning;
+`webRequestBlocking` is still never requested). New data type: Authentication information, ticked
+again. This is not the direct way of 12.0.0 to 15.0.0: no ssh, no helper, no one-time code, and the
+VPN is still needed. The old passkey of 12.0.0 to 15.0.0 is named with the AccessID alone or
+"beethoven" and can go; the one 19.0.0 uses for the grid sign-in is named "<AccessID> (grid)" and is
+deleted only after *Forget*. Agreement version 12, privacy statement version 13.
+
 There is no other store, no download and no signed file: the package is the extension alone, and
 nothing of it is ever on the website. (12.0.0 to 15.0.0 offered the helper's installers from inside
 the package, the two for Windows and macOS signed; 16.0.0 offers none.)
@@ -61,9 +79,11 @@ anything is pasted, read the built extension (`extension/.output/chrome-mv3`) on
 `../STORE_LISTING.md` is an older, longer compliance document (8.0.0 to 10.0.0 wording).
 
 Facts every text below rests on (settled against the working tree on 2026-10-02 by fixer B, after the
-build streams and the four reviews, and again on 2026-10-08 for 16.0.0 against
+build streams and the four reviews, again on 2026-10-08 for 16.0.0 against
 `extension/src/core/model.ts`, `extension/wxt.config.ts` and
-`extension/src/entrypoints/background.ts`):
+`extension/src/entrypoints/background.ts`, and on 2026-10-09 for 19.0.0 against the 19.0.0 build
+specification, while the background and the pages were being built beside these texts; read the
+built extension once more for the sign-in before pasting):
 
 - The extension reaches the user's cluster in one way, 11.0.0's: requests to the student's own Open
   OnDemand portal, from the extension's background with the sign-in the browser keeps, and the
@@ -84,11 +104,28 @@ build streams and the four reviews, and again on 2026-10-08 for 16.0.0 against
   hexadecimal characters made when the agreement is accepted), answered yes or no; made only after
   the agreement is accepted and the portal has shown the account. And the daily GETs of
   `services.json` and `killlist.json`, without cookies, carrying no data about the person.
-- The user types their cluster password (and a verification code, if the grid asks for one) only
-  into the browser's own sign-in box or the portal's own pages, which the extension never reads; it
-  has no sign-in sheet of its own. In the one-time key step, when the portal's shell asks for a
-  password, the student types it into the university's own terminal page, and Beethoven's page
-  script reads only that page's title and types one setup line after "I'm in".
+- The user types their AccessID and cluster password into Beethoven's own sheet, *Sign in to the
+  grid* in the panel, or, by choice ("Use Chrome's sign-in box instead"), into the browser's own
+  sign-in box in a portal tab, which the extension never reads. From the sheet the password goes
+  only to the portal: the background's one `webRequest.onAuthRequired` listener answers the HTTP
+  Basic challenge of the extension's own request to the portal's dashboard (no tab, the extension as
+  initiator), on the granted origin and, once one is recorded, realm, once per check, and never a
+  tab's, a proxy's or another origin's. The first refusal stops every automatic sign-in until the
+  student types the password again; Beethoven itself sends a password the grid turns down at most
+  once. Chrome re-sends its cached copy once for each request already started with it before the
+  first refusal comes back; Beethoven then sends at most one; when the answered request is abandoned
+  before the grid replies, Chrome may re-send that copy once. How many of these the grid counts is
+  not yet measured. The password is saved only when the student ticks *Remember it on this computer*
+  (never pre-ticked): AES-GCM ciphertext in IndexedDB under a key derived from the PRF output of a
+  platform passkey named "<AccessID> (grid)", unlocked with Windows Hello, Touch ID or the screen
+  lock once per browser session; unticked, it is held in `storage.session` for one attempt and at
+  most two minutes. It never appears in a message, a log, the audit log, `storage.local` or argv,
+  and never reaches the maintainer. No HTML sign-in page or identity provider is filled in and no
+  multi-factor step is touched; on a portal that redirects to an identity provider the sheet can
+  answer nothing, and only "Use Chrome's sign-in box instead" signs the user in. In the one-time key
+  step, when the portal's shell asks for a password, the student types it into the university's own
+  terminal page, and Beethoven's page script reads only that page's title and types one setup line
+  after "I'm in"; Beethoven never types a password into a shell.
 - Nothing of the direct way stays. On the first run after the update the extension removes what
   12.0.0 to 15.0.0 left in the browser, the key unread. A key one of them added to the cluster
   account is noted once in Settings ("A key from an earlier version", with its date; "Forget"
@@ -113,8 +150,8 @@ build streams and the four reviews, and again on 2026-10-08 for 16.0.0 against
   `https://openspineconsortium.com/beethoven/support.html`, request page
   `https://openspineconsortium.com/beethoven/request.html`. None of them links the listing or offers
   a download.
-- The package is `release/16.0.0/beethoven-16.0.0-chrome.zip`, a copy of
-  `extension/.output/beethoven-16.0.0-chrome.zip` (`npm run zip` in `extension/`, after `npm ci`,
+- The package is `release/19.0.0/beethoven-19.0.0-chrome.zip`, a copy of
+  `extension/.output/beethoven-19.0.0-chrome.zip` (`npm run zip` in `extension/`, after `npm ci`,
   `npm run typecheck`, `npm test` and `npm run build`; the Firefox zip the same command writes is
   not submitted anywhere; `SUBMISSION.md`, section 0, item 1). Besides the fonts of 9.0.0, the icons
   and the tour it holds the site profiles as data and the two agreement texts, and nothing of the
@@ -141,17 +178,19 @@ Starts, watches and stops a Claude Code worker on your university's Open OnDeman
 ```
 
 Unchanged since 8.0.0 (`extension/wxt.config.ts` and `extension/package.json`;
-`extension/test/hygiene.test.ts` fails above 132). It stays true of 16.0.0: the cluster is an Open
+`extension/test/hygiene.test.ts` fails above 132). It stays true of 19.0.0: the cluster is an Open
 OnDemand cluster, reached through its portal.
 
-## Detailed description (the one to paste; plain text; 1,466 characters; under Chrome's limit of 16,000)
+## Detailed description (the one to paste; plain text; 1,570 characters; under Chrome's limit of 16,000)
 
 Rewritten 2026-10-02 for 12.0.0 in the voice of 9.0.0's text, for a student who reads it in twenty
-seconds, and on 2026-10-08 for 16.0.0 (step 2, the paragraph under the steps, the needs and the data
-paragraph). Counted with Python as Unicode characters without a trailing newline: 1,466 (1,487 if
-the dashboard counts each of its 21 line breaks as two characters). ASCII only. Every sentence rests
-on the facts above: the data paragraph names what the approval check carries about the person and
-says that the password never reaches Beethoven.
+seconds, on 2026-10-08 for 16.0.0 (step 2, the paragraph under the steps, the needs and the data
+paragraph), and on 2026-10-09 for 19.0.0 (step 2 and the data paragraph). Counted with Python as
+Unicode characters without a trailing newline: 1,570 (1,591 if the dashboard counts each of its 21
+line breaks as two characters). ASCII only. Every sentence rests on the facts above: the data
+paragraph names what the approval check carries about the person and says that the password goes
+only to the grid and is kept only if the student asks. It does not advertise the *Remember* tick:
+Wayne State's own standard tells its people to type a password each time (`docs/guides/USE.md`).
 
 ```
 Your grid. From claude.ai.
@@ -160,7 +199,7 @@ Beethoven starts a Claude Code worker in your own account on the Wayne State gri
 
 HOW IT WORKS
 1. Accept the agreement on Beethoven's welcome page.
-2. Turn on GlobalProtect, then sign in to the grid's website in the box Chrome shows: your AccessID and password. Beethoven never sees them.
+2. Turn on GlobalProtect, then type your AccessID and password into Beethoven's sign-in sheet. Beethoven signs in to the grid for you, in the background.
 3. Sign in to Claude once, on Anthropic's own page.
 4. Click Open my session. Your worker runs until you press Stop.
 
@@ -173,17 +212,18 @@ By approval only: ask at https://openspineconsortium.com/
 One approval covers one installation: one Chrome profile on one computer.
 
 YOUR DATA
-To check your approval, Beethoven sends our access service the account name the grid's website shows and a random installation identifier, with your portal's address and the version. It sends nothing else about you, and it never reads your password. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
+To check your approval, Beethoven sends our access service the account name the grid's website shows and a random installation identifier, with your portal's address and the version. It sends nothing else about you. Your password goes only to the grid, never to us, and Beethoven keeps it, encrypted on this computer, only if you ask it to. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.
 ```
 
-## Reviewed description (reviewer-facing; plain text; 5,285 characters; not pasted into the dashboard)
+## Reviewed description (reviewer-facing; plain text; 6,318 characters; not pasted into the dashboard)
 
 Rewritten 2026-10-02 for 12.0.0 from 10.0.0's reviewed text, sentence by sentence against the facts
-above, on 2026-10-04 for 15.0.0 in one place (the helper's sentence in step 2), and on 2026-10-08
+above, on 2026-10-04 for 15.0.0 in one place (the helper's sentence in step 2), on 2026-10-08
 for 16.0.0, which took the direct way out of every section (the needs, steps 2 and 3, three negative
-statements and what it keeps). If a reviewer asks what the extension does, never does or keeps,
+statements and what it keeps), and on 2026-10-09 for 19.0.0 (step 2, the password statement and
+what it keeps). If a reviewer asks what the extension does, never does or keeps,
 reply with it (with the reviewer recipe below and `SUBMISSION.md`, section 4). The detailed
 description above is condensed from it and narrowed to Wayne State (the only site profile with a
 shared copy), and makes no claim this one does not support.
@@ -199,7 +239,7 @@ WHAT YOU NEED
 
 HOW IT WORKS
 1. Accept the agreement on the welcome page that opens on install: one tick and "Agree and continue". The full text is one click away, and can be saved and printed. The welcome page names the three things you need, each with a link to your university's or Anthropic's own page.
-2. Turn on your university's VPN (at Wayne State, GlobalProtect) and sign in to your Open OnDemand portal in the browser's own box, which Beethoven never reads. While the grid is out of reach, the panel says "Turn on GlobalProtect." with a link to your university's own page about it, and carries on by itself as soon as the grid answers; a Connect pressed in the meantime is kept, not dropped. Nothing is installed outside the browser.
+2. Turn on your university's VPN (at Wayne State, GlobalProtect) and type your AccessID and password into Beethoven's sign-in sheet; Beethoven signs in to your Open OnDemand portal for you, in the background. You can choose the browser's own sign-in box in a portal tab instead, which Beethoven never reads. While the grid is out of reach, the panel says "Turn on GlobalProtect." with a link to your university's own page about it, and carries on by itself as soon as the grid answers; a Connect pressed in the meantime is kept, not dropped. Nothing is installed outside the browser.
 3. Where your work goes: read the four lines, tick, Connect. Sign in to Claude once, when the panel asks: it opens Anthropic's sign-in page in a new tab; you sign in with your own account and paste the code the page shows into the panel's one box. The code is typed once into your own job's terminal and is not kept.
 
 When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off), and the panel's "Open my session" opens it again. The worker stays on by itself until you press Stop.
@@ -207,7 +247,7 @@ When your worker connects, your session's claude.ai page opens in a new tab (you
 WHAT IT NEVER DOES
 - It has no site permission on claude.ai or any Anthropic page and never asks for one: it runs no code there, reads nothing there and changes nothing there. It only opens those pages in a new tab, as a bookmark would; an address on claude.ai, claude.com or anthropic.com is refused as a portal before any permission request.
 - It never sees your Claude sign-in. The one-time code you paste is passed once to your own cluster shell and is not stored, not logged and not sent anywhere else.
-- It never sees your cluster password or code. You type them into your browser's own sign-in box or your portal's own pages, which Beethoven never reads; it has no sign-in sheet of its own and never offers to remember anything.
+- It sends your cluster password only to your portal: only to the HTTP sign-in your portal asks of Beethoven's own background request, on the one portal site you allowed, once per check, never to a sign-in a tab, a proxy or another site asks for. When the portal turns the password down, it stops and does not send it again until you type it again; Chrome re-sends its cached copy once for each request already started with it before the first refusal comes back; Beethoven then sends at most one; when the answered request is abandoned before the grid replies, Chrome may re-send that copy once. How many of these the grid counts is not yet measured. It never fills in a sign-in page or an identity provider's page, never touches a multi-factor step, and never sends the password to the maintainer or writes it to a log.
 - Its only other requests go to the maintainer: the approval check (the account name your portal shows, your portal's address, the product name and its version, and the random identifier of this installation), sent only after your portal has shown your account; and a daily download of the service's address and the signed list of withdrawn versions, which carries nothing about you.
 - It reads nothing from your computer's hardware. The installation identifier is a random number it makes for itself.
 - It runs no code it did not ship with. Its once-a-day update check downloads a signed list, not a program, and the package holds no program besides the extension itself.
@@ -215,7 +255,7 @@ WHAT IT NEVER DOES
 - It never deletes your files. It removes only its own state files, and cancels only the job it started.
 
 WHAT IT KEEPS
-On your device only: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed and the last approval answer, the random identifier of this installation, your statement about each workspace, and an audit log of every request it made to your portal, which you can read, export and clear. If an earlier version of Beethoven added a key to your cluster account, Settings says so once, with its date, and your lab lead can remove it; Beethoven no longer uses or touches it. Privacy statement: https://openspineconsortium.com/beethoven/privacy.html
+On your device only: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed and the last approval answer, the random identifier of this installation, your statement about each workspace, an audit log of every request it made to your portal, which you can read, export and clear, and your grid sign-in, only if you tick "Remember it on this computer" (never ticked for you): encrypted, under a key your passkey releases with Windows Hello, Touch ID or your screen lock, until you press Forget. Unticked, the password is held in memory for one sign-in and at most two minutes. If an earlier version of Beethoven added a key to your cluster account, Settings says so once, with its date, and your lab lead can remove it; Beethoven no longer uses or touches it. Privacy statement: https://openspineconsortium.com/beethoven/privacy.html
 
 ACCESS AND TERMS
 Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved, on one installation. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
@@ -233,17 +273,22 @@ Start, monitor and stop a Claude Code worker on your university's Open OnDemand 
 
 ## Permission justifications (one sentence or two each, as the dashboard asks for them)
 
-16.0.0's Chrome manifest asks, as 11.0.0's did, for `storage`, `alarms`, `scripting` and `sidePanel`
-(all required; `extension/wxt.config.ts`), and the one optional host permission `https://*/*`;
-`activeTab` left with 11.0.0, and `nativeMessaging`, which 12.0.0 to 15.0.0 asked for, left with
-16.0.0. The Firefox build, which is not submitted anywhere, has no `sidePanel`.
+19.0.0's Chrome manifest asks for `storage`, `alarms`, `scripting`, `sidePanel`, `webRequest` and
+`webRequestAuthProvider` (all required; `extension/wxt.config.ts`), and the one optional host
+permission `https://*/*`; `activeTab` left with 11.0.0, and `nativeMessaging`, which 12.0.0 to
+15.0.0 asked for, left with 16.0.0. `webRequest` and `webRequestAuthProvider` are new in 19.0.0 and
+show no line in Chrome's install dialog, so an installed copy updates without being disabled; a
+`webRequest` permission invites a closer review. The Firefox build, which is not submitted anywhere,
+has neither of them and no `sidePanel`.
 
 | Permission | Justification |
 |---|---|
-| `storage` | Remembers, on your device: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed with the last approval answer, this installation's random identifier, your statement about each worker's workspace, the audit log of requests made to your portal and, until you dismiss it, a note that an earlier version added a key to your cluster account (its date and fingerprint, never the key). |
+| `storage` | Remembers, on your device: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed with the last approval answer, this installation's random identifier, your statement about each worker's workspace, the audit log of requests made to your portal, your grid sign-in, encrypted, if you chose to save it, and, until you dismiss it, a note that an earlier version added a key to your cluster account (its date and fingerprint, never the key). |
 | `alarms` | Reads your running worker's status no more than once a minute, renews the approval check and fetches the signed withdrawn-versions list once a day, and keeps doing so after the browser suspends the extension. |
 | `scripting` | Loads the extension's page script only into a tab the extension opened itself on the one portal site you allowed: where your portal does not share its sign-in with the extension's own requests, and on the portal's terminal page for its one-time key step, where it reads only the page's title and types one line. No page script is registered or loaded anywhere else. |
 | `sidePanel` | Opens the extension's panel at the side of the window when you click the toolbar button; there is no popup. |
+| `webRequest` | Lets the extension learn, on the one portal site you allowed, of sign-in requests and of when requests end, your tabs' included, so it knows whether the grid accepted the password it gave its own background request and stops at the first refusal. It acts on no request but that one and reads no page; a tab's sign-in goes straight back to Chrome's own box. Of your tabs' requests it keeps one mark only, and only while its own answer awaits its outcome: that a portal tab asked for a sign-in or had a request answered without a refusal meanwhile (you may have signed in in Chrome's box), after which it holds a saved password until you type one. |
+| `webRequestAuthProvider` | Lets the extension answer that one sign-in request, once per check, with the AccessID and password you typed into its own sign-in sheet (or saved behind your passkey), so the grid signs you in without a separate tab. If the portal asks again after that answer, the extension declines instead of sending the password twice. It never answers a sign-in that a tab, a proxy or another site asks for, redirects or rewrites no request, and after the first refusal it sends nothing until you type the password again. |
 | Optional host permission `https://*/*` (requested at runtime for one origin) | Your university's Open OnDemand portal has an address the extension cannot know in advance, so no site is granted at install. The extension asks the browser for one origin at a time, and only inside a click: "Agree and continue" on its welcome page (your university's portal, filled in from the site profile, or the address you typed under "Use another portal"), "Allow again" in its panel if the grant was removed, or "Change" in its Settings. It refuses to work through a portal until that one site is granted. An address on claude.ai, claude.com or anthropic.com, or on any of their subdomains, is refused before any request, so the extension never requests an Anthropic origin. |
 
 `nativeMessaging` was asked for by 12.0.0 to 15.0.0, for the helper, and was a required permission,
@@ -257,9 +302,10 @@ continue", the panel's "Allow again" or Settings' "Change", never from the toolb
 opens the panel) and never from a setup page (gone). The welcome page asks for the portal at "Agree
 and continue" (`extension/src/ui/welcome.ts`); it is the one way's first step.
 
-Never requested: `activeTab`, `cookies`, `tabs`, `webRequest`, `webRequestBlocking`,
-`declarativeNetRequest`, `debugger`, `identity`, `clipboardRead`, `nativeMessaging` (12.0.0 to
-15.0.0 only); any install-time host permission.
+Never requested: `activeTab`, `cookies`, `tabs`, `webRequestBlocking`, `declarativeNetRequest`,
+`debugger`, `identity`, `clipboardRead`, `nativeMessaging` (12.0.0 to 15.0.0 only); any install-time
+host permission. `webRequest` was on this list until 18.0.0; 19.0.0 asks for it with
+`webRequestAuthProvider` for the one listener above, and still never for `webRequestBlocking`.
 
 ## Remote code
 
@@ -273,19 +319,26 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 
 | Question | Answer |
 |---|---|
-| Does the extension collect or transmit user data? | Yes, one kind. **Personally identifiable information**: the institutional account name the user's portal shows and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: No. The cluster password (and a verification code, if the cluster asks for one) is typed only into the browser's own sign-in box or the portal's own pages, which the extension never reads; it has no sign-in sheet (12.0.0 to 15.0.0 had one, for the direct way, and answered Yes). Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 12 names the approval check, what the developer records from it, what your portal sees, what stays on the device, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
+| Does the extension collect or transmit user data? | Yes, two kinds. **Personally identifiable information**: the institutional account name the user's portal shows and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: Yes. The user's AccessID and cluster password, typed into the extension's own sign-in sheet, are sent only to the user's own university portal, as the answer to its HTTP sign-in, and never to the developer; the password is kept only if the user ticks "Remember it on this computer", and then only encrypted on the device, under a key the user's passkey releases (12.0.0 to 15.0.0 answered Yes for the direct way's sign-in sheet; 16.0.0 to 18.0.0 answered No). Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 13 names the approval check, what the developer records from it, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
 | Limited Use statement (on the landing page and the reviewers page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
 ## The negative statements (word for word as on the public reviewers page, `/beethoven/reviewers.html`)
 
+Final for 19.0.0 (2026-10-09): the website's reviewers page takes this block word for word. It keeps
+16.0.0's statements about Anthropic's pages, the Claude sign-in, what the extension installs, remote
+code and what it sends; the cluster-password statement is replaced by two (where the password goes,
+and when it is kept).
+
 ```
 - Beethoven has no site permission on claude.ai or any Anthropic page and never asks for one. It does not run on those sites, does not read them and does not change them. It opens an Anthropic page in a new tab only as a bookmark would (the sign-in page Claude Code printed during a sitting you started, your session's claude.ai/code link, the connectors settings page for the optional Google Drive step, the plans page); nothing of the extension runs there.
 - Beethoven never sees your Claude sign-in. You sign in to Claude Code yourself, on Anthropic's own page; the one-time code you paste into the extension's box is typed once into your own job's terminal on your cluster and is not stored, not logged and not sent anywhere else.
-- Beethoven never sees your cluster password or verification code. You type them into your browser's own sign-in box or your portal's own pages, which it never reads; it has no sign-in sheet of its own.
+- Beethoven sends your cluster password nowhere but your university's portal. When you type your AccessID and password into Beethoven's own sign-in sheet, it answers only the HTTP sign-in your portal asks of Beethoven's own background request, on the one portal site you allowed, once per check; it never answers a sign-in that a tab, a proxy or another site asks for (a tab gets your browser's own box). When the portal turns the password down, Beethoven stops and does not send it again until you type it again: Beethoven itself sends a password the portal turns down at most once. Chrome re-sends its cached copy once for each request already started with it before the first refusal comes back; Beethoven then sends at most one; when the answered request is abandoned before the grid replies, Chrome may re-send that copy once. How many of these the grid counts is not yet measured. Beethoven never fills in a sign-in page or an identity provider's page, never touches a multi-factor step, never types a password into a shell, never writes the password to a log or its audit log, and never sends it to the maintainer.
+- Beethoven keeps your cluster password only if you tick "Remember it on this computer", which is never ticked for you, and then only encrypted (AES-GCM) in the extension's own storage on this computer, under a key that only your passkey releases, opened with Windows Hello, Touch ID or your screen lock (the passkey stays with your computer or your password manager, which may sync it as it syncs any passkey). Unticked, the password is held in the browser's memory for one sign-in and at most two minutes. "Forget" in Settings deletes the saved copy. Chrome itself keeps the sign-in it was given until it closes.
+- Beethoven installs nothing outside the browser: no helper, no native program, no installer. Versions 12.0.0 to 15.0.0 had a direct way over ssh through such a helper; 16.0.0 removed it whole, with its permission. The sign-in sheet of 19.0.0 is not that way: no ssh, no helper, and the university's VPN is still needed.
 - Beethoven runs no code it did not ship with. Its daily update check fetches a signed list, not a program.
-- Beethoven asks for a website only from a click, one at a time: your university's Open OnDemand portal. It refuses an address on claude.ai, claude.com or anthropic.com before asking the browser for anything. Its only other requests go to the maintainer: the approval check (the account name your portal shows, your portal's address, the product name and its version, and the installation identifier, a random number made when its agreement is accepted, not derived from the device), sent only after your portal has shown your account; and a daily fetch of the service's address and the signed list of withdrawn versions, which carries nothing about you.
+- Beethoven asks for a website only from a click, one at a time: your university's Open OnDemand portal. It refuses an address on claude.ai, claude.com or anthropic.com before asking the browser for anything. To learn whether the portal is reachable, it sends the portal's address a request that carries no sign-in or cookie and learns only whether an answer came (every three seconds at most while it waits for the VPN with one of its pages open). Its only other requests go to the maintainer: the approval check (the account name your portal's dashboard showed, never the one you typed to sign in; your portal's address; the product name and its version; and the installation identifier, a random number made when its agreement is accepted, not derived from the device), sent only after the portal accepted your sign-in; and a daily fetch of the service's address and the signed list of withdrawn versions, which carries nothing about you.
 - Beethoven sends its maintainer no usage data, no error reports and no activation request; the approval check is the only thing it sends about you. Its audit log never contains what you typed to sign in and is never transmitted.
 ```
 
@@ -301,18 +354,21 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
-15.0.0 or 16.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 11
-and `PRIVACY.md` version 12 before submission (`docs/PUBLISHING_SITE.md`).
+15.0.0, 16.0.0 or 19.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 12
+and `PRIVACY.md` version 13 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 13.
 
 ## Images and the promo video
 
 **Out of date, not redone in this pass.** The five screenshots, the tiles and the promo video were
 captured from 9.0.0 (`extension/store-assets/`): the setup page, the toolbar-button start, the old
 panel. None shows 11.0.0's welcome page, journey, home or tour, or 16.0.0's GlobalProtect screen
-with its link; 12.0.0's helper, sign-in sheet and Settings' Connection section are screens 16.0.0
-does not have, so none may appear either. A screenshot of 9.0.0's setup page is a screen 16.0.0 does
-not have; redo at least the screenshots from the 16.0.0 release build before submitting (not yet
-captured), to the rules below.
+with its link; 12.0.0's helper, its sign-in sheet (with the code field) and Settings' Connection
+section are screens 19.0.0 does not have, so none may appear either. A screenshot of 9.0.0's setup page is a screen 16.0.0 does
+not have; redo at least the screenshots from the 19.0.0 release build before submitting (not yet
+captured), to the rules below. 19.0.0's sign-in sheet, unlock screen and Settings' *Your grid* card are
+new screens; a capture of the sheet shows the mock account `st1234` and an empty or dotted password
+field, never a real one.
 
 The rules (from 9.0.0): the store icon is the package icon flattened on the site's cream; every
 product screen is a real capture of the release build, framed, never a drawn screen; a diagram may
@@ -332,16 +388,17 @@ Additional instructions (500 characters).
 
 If the review asks for test access, answer with the letter in `SUBMISSION.md`, section 4, followed
 by the fuller text from `PASTE.md`'s Test instructions section, and attach
-`release/16.0.0/reviewer/beethoven-mock-portal.zip` (made by hand with the release, as 12.0.0's
-was). The recipe below is the same mock flow with more explanation, for a follow-up question.
+`release/19.0.0/reviewer/beethoven-mock-portal.zip` (made by hand with the release, as 12.0.0's
+was; its `server.mjs` must be 19.0.0's, which has `--auth basic`). The recipe below is the same mock flow with more explanation, for a follow-up question.
 
 ## Reviewer recipe (for a reply to the review)
 
 For a reviewer who has the item installed from the store and the mock-portal-only zip
-(`release/16.0.0/reviewer/beethoven-mock-portal.zip`): no build and no extension source. The mock
-carries the whole of 16.0.0's one way, as it carried 11.0.0's: the panel looks for the grid (on
-localhost it answers at once), reads the sign-in the browser holds and goes on by itself. There is
-no download, no helper and nothing to skip.
+(`release/19.0.0/reviewer/beethoven-mock-portal.zip`): no build and no extension source. The mock
+runs in `--auth basic`, the HTTP Basic sign-in Wayne State's portal answers with, so the reviewer
+sees 19.0.0's sign-in sheet do what it does on the grid: the panel looks for the grid (on localhost
+it answers at once), asks for the AccessID and password, signs in from its background and goes on by
+itself. There is no download, no helper and nothing to skip.
 
 ```
 Beethoven starts, watches and stops a Claude Code job in the user's own account on their university's cluster and shows the user the link Claude Code prints when it registers with Anthropic's Remote Control feature. It reaches the cluster through the university's Open OnDemand web portal, in the user's own browser session, behind the university's VPN.
@@ -353,23 +410,25 @@ What you can do instead, with the item installed from the store: run our mock po
   1. Unzip beethoven-mock-portal.zip and open bash in the beethoven-mock-portal folder it makes.
   2. Make a localhost certificate there (in Git Bash, put MSYS_NO_PATHCONV=1 in front of the command):
      openssl req -x509 -newkey rsa:2048 -nodes -keyout key.pem -out cert.pem -subj /CN=localhost -days 30 -addext subjectAltName=DNS:localhost
-  3. Start the mock as the reviewer account st1234:
-     MOCK_LOGGED_IN=false node server.mjs --port 8443 --host localhost --user st1234 --cert cert.pem --key key.pem
-  4. In Chrome, open https://localhost:8443/login , choose Advanced, "Proceed to localhost (unsafe)" (the certificate is the one you just made), and click "Sign in as st1234". There is no password.
+  3. Start the mock as the reviewer account st1234, with the HTTP Basic sign-in the university's portal uses (the mock's password is mockpass, a made-up one):
+     MOCK_LOGGED_IN=false node server.mjs --port 8443 --host localhost --user st1234 --auth basic --cert cert.pem --key key.pem
+  4. In Chrome, open https://localhost:8443/ , choose Advanced, "Proceed to localhost (unsafe)" (the certificate is the one you just made). The mock's public start page appears; leave it there and do not press its LOGIN link (that would sign Chrome in through its own box, and the extension would find the grid already signed in).
   5. On the extension's welcome page (it opens on install), press "Another university? Use another portal", type https://localhost:8443 and press "Use this portal". Tick the box and press "Agree and continue". Chrome asks to allow https://localhost:8443; allow it.
-  6. The panel then works by itself: it looks for the grid (localhost answers at once), reads the account name the mock's dashboard shows (st1234), asks our access service whether that account is approved (it is: st1234 is approved for exactly this recipe, from any installation, when the portal is localhost), shows the data statement (tick it, press Connect), opens the sign-in step (the mock prints a real-looking claude.ai authorize link with a mock client id, which Anthropic's page declines: close that tab, type any six letters or digits into the panel's box, press Continue), waits in line, and says "You're online." with "Open my session" (a made-up claude.ai/code link; no real session). Under the menu (the "More" button), "Details for your lab lead", "Run the checks" runs the extension's checks against the mock.
+  6. The panel shows "Sign in to the grid". Type st1234 as the AccessID and mockpass as the password and press "Sign in": the extension signs in from its background, with no tab. Leave "Remember it on this computer" unticked; if you tick it, Chrome asks to make a passkey named "st1234 (grid)" with Windows Hello, Touch ID or your screen lock, and Settings, "Your grid", "Forget" deletes the saved sign-in again. A wrong password shows "That password didn't work, and Beethoven stopped." and is not sent again until you type one again. "Use Chrome's sign-in box instead" opens the mock in a tab with Chrome's own box, the other way.
+  7. The panel then works by itself: it looks for the grid (localhost answers at once), reads the account name the mock's dashboard shows (st1234), asks our access service whether that account is approved (it is: st1234 is approved for exactly this recipe, from any installation, when the portal is localhost), shows the data statement (tick it, press Connect), opens the sign-in step (the mock prints a real-looking claude.ai authorize link with a mock client id, which Anthropic's page declines: close that tab, type any six letters or digits into the panel's box, press Continue), waits in line, and says "You're online." with "Open my session" (a made-up claude.ai/code link; no real session). Under the menu (the "More" button), "Details for your lab lead", "Run the checks" runs the extension's checks against the mock.
 
 Please start the mock with --user st1234 and no other name: the extension sends the name the mock shows to our access service, which refuses any other and records the check. For a refused account the panel's one button is "Ask for access", which opens our request page with that name filled in.
 
-What the extension never does: no code, host permission or content script on claude.ai, anthropic.com or claude.com (it opens those pages in a new tab only, and refuses an address on them before any permission request); no reading of any Claude credential; no reading of the cluster password or code (they are typed into the browser's own sign-in box or the portal's own pages, which the extension never reads); no remote code; no cookies, tabs, webRequest, nativeMessaging, debugger or identity permission; nothing installed outside the browser; no install-time host permission. What it sends us: the approval check only (the account name the portal shows, the portal hostname, the product, the version and a random identifier the extension made for this installation, answered yes or no), and daily GETs of https://openspineconsortium.com/beethoven/services.json and https://openspineconsortium.com/beethoven/killlist.json without cookies; the approval check goes to https://beethoven-access.openspineconsortium.workers.dev/access_check, and its product field reads "bridge", the extension's name on the wire since its first version.
+What the extension never does: no code, host permission or content script on claude.ai, anthropic.com or claude.com (it opens those pages in a new tab only, and refuses an address on them before any permission request); no reading of any Claude credential; the cluster password typed into its own sign-in sheet goes only to the portal, as the answer to the HTTP sign-in the portal asks of the extension's own background request, once per check, never to a tab's, a proxy's or another site's, and nothing more after the first refusal (Chrome re-sends its cached copy once for each request already started with it before the first refusal comes back; Beethoven then sends at most one; when the answered request is abandoned before the grid replies, Chrome may re-send that copy once. How many of these the grid counts is not yet measured); it is kept only if the user ticks "Remember it on this computer", encrypted under a key the user's passkey releases, and is never sent to us or written to a log; no sign-in page or identity provider is ever filled in; no remote code; no cookies, tabs, webRequestBlocking, declarativeNetRequest, nativeMessaging, debugger or identity permission (webRequest and webRequestAuthProvider serve only that one sign-in); nothing installed outside the browser; no install-time host permission. What it sends us: the approval check only (the account name the portal shows, the portal hostname, the product, the version and a random identifier the extension made for this installation, answered yes or no), and daily GETs of https://openspineconsortium.com/beethoven/services.json and https://openspineconsortium.com/beethoven/killlist.json without cookies; the approval check goes to https://beethoven-access.openspineconsortium.workers.dev/access_check, and its product field reads "bridge", the extension's name on the wire since its first version.
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. It is not provided by or on behalf of any university, Anthropic or the Open OnDemand project.
 ```
 
-The recipe's steps 5 and 6 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal", 13
-presses, `docs/V11_STATUS.md`). They have not been walked on a 16.0.0 build (nor were they on a
-12.0.0 or 15.0.0 build, whose harness ran the direct way against a local grid stand-in instead,
-`docs/V12_STATUS.md`). Walk them once on the release build and correct any word.
+The recipe's steps 5 and 7 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal", 13
+presses, `docs/V11_STATUS.md`); steps 3, 4 and 6 are 19.0.0's (`--auth basic` and the sign-in sheet,
+from the 19.0.0 build specification). None of them has been walked on a 19.0.0 build (nor on a 16.0.0
+build; nor on a 12.0.0 or 15.0.0 build, whose harness ran the direct way against a local grid
+stand-in instead, `docs/V12_STATUS.md`). Walk them once on the release build and correct any word.
 
 ## No other store
 

@@ -67,8 +67,11 @@ its claude.ai link) to shared storage. The browser **extension** (`extension/`, 
 Open OnDemand portal, over surfaces that exist on every Open OnDemand 3.x and 4.x site without
 administrator help: the Shell WebSocket (to run one `sbatch`, and to hold one sign-in sitting open),
 the Files JSON routes (to read the job's status files), and Active Jobs JSON (to reconcile). It rides
-the portal session the student already has in the browser; it never reads the cookie and never
-automates a login.
+the portal session the browser holds; it never reads the cookie. Since 19.0.0 it can make that
+session itself on a portal that signs in with HTTP Basic, as Wayne State's does: the student types
+their AccessID and password into Beethoven's own sheet, and the background answers the portal's
+sign-in request to its own dashboard request, once, under the narrow rule in *What it never does*.
+It never fills in a sign-in page or an identity provider.
 
 The product is small on purpose. On twelve sampled US university clusters the things that break a
 worker, egress from compute nodes, the container runtime, node-local temp, login-node rules, proxy
@@ -104,7 +107,11 @@ installation per approved account; if it is not approved, the panel's one button
 access*):
 
 1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
-   university requires it) and keep the tab open.
+   university requires it) and keep the tab open. (The flow of 2026-09-29. Since 11.0.0 the welcome
+   page asks for the portal at "Agree and continue" and no portal tab is needed; since 19.0.0
+   Beethoven's panel asks for the AccessID and password and, on a portal that signs in with HTTP
+   Basic, signs in by itself, while "Use Chrome's sign-in box instead" keeps the browser's own box;
+   `docs/guides/USE.md` has the student's steps as built.)
 2. **Click the Beethoven icon.** The first click asks the browser once for access to that one
    site. Then the extension does the rest by itself, in order, and says in one line what it is doing:
    wakes the portal up, checks it is signed in, confirms your account is approved, sets the
@@ -164,12 +171,30 @@ From the report's "deliberately absent" list and its security controls:
   standard input. `SECURITY.md` records the incident of 2026-09-28 behind this rule.
 - No install-time host permission. Access to the one portal origin is requested from the click on
   the icon (or the *Connect* button on the setup page).
-- No `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`,
-  `identity`, `clipboardRead` or `nativeMessaging` permission (`nativeMessaging` was requested from
-  12.0.0 to 15.0.0, for Beethoven's own bundled bridge, and is not since 16.0.0). The portal cookie
-  is carried by the browser's network stack and never read.
-- No automated login of the portal: a redirect to the identity provider means "sign in to your
-  portal in a tab", and the university's sign-in pages are never filled in.
+- No `cookies`, `tabs`, `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`,
+  `clipboardRead` or `nativeMessaging` permission (`nativeMessaging` was requested from 12.0.0 to
+  15.0.0, for Beethoven's own bundled bridge, and is not since 16.0.0). The portal cookie is carried
+  by the browser's network stack and never read. Since 19.0.0 the Chrome build asks for `webRequest`
+  and `webRequestAuthProvider`, for one listener that answers the portal's HTTP sign-in request.
+- No sign-in it was not asked for, and none outside a narrow rule (greg's decision of 2026-10-09,
+  19.0.0). Beethoven answers only the HTTP Basic challenge of its own background request to the
+  portal's dashboard, on the one granted portal origin (and, once a password it gave has worked,
+  that sign-in's realm), once per check, with the AccessID and password the student typed into its
+  sheet. It never answers a tab's challenge (the tab gets the browser's own box), a proxy's, another
+  origin's or another realm's, and one refusal stops every automatic sign-in until the student types
+  the password again: Beethoven itself sends a password the grid turns down at most once. Chrome
+  re-sends its cached copy once for each request already started with it before the first refusal
+  comes back; Beethoven then sends at most one; when the answered request is abandoned before the
+  grid replies, Chrome may re-send that copy once. How many of these the grid counts is not yet
+  measured. A try whose outcome cannot be told (the browser closed before the grid replied, or a
+  portal tab asked for a sign-in or had a request answered while the answer waited, which Chrome's
+  own box may have signed in) puts a saved password on hold the same way, without counting a
+  refusal. The sheet comes whenever the portal wants a sign-in; on a portal that redirects to an
+  identity provider instead, it can answer nothing, and only "Use Chrome's sign-in box instead" (a
+  tab) signs the student in. No HTML sign-in page or identity provider is ever filled in, no
+  multi-factor step is touched, and no password is typed into a shell. The approval check still uses
+  the account name the dashboard shows, never the typed AccessID. "Use Chrome's sign-in box instead"
+  keeps 18.0.0's tab path.
 - No remote code: no `eval`, no fetched scripts. The kill-list is JSON, verified with WebCrypto against
   a public key compiled into the bundle, and the extension works offline on the last good list.
 - Nothing persistent on the login node: one `sbatch --parsable` through the shell, then the shell is
@@ -178,8 +203,15 @@ From the report's "deliberately absent" list and its security controls:
   the panel closes the connection after fifteen minutes whatever happened), and no longer.
   Scheduler-facing calls never faster than once a minute; the job writes `status.json` and clients
   read the file.
-- No durable secret in extension storage. Connection state lives in `storage.session`; the audit log
-  of every portal request stays on the device and is never transmitted.
+- No durable secret unless the student chooses one. The grid password is saved only if the student
+  ticks *Remember it on this computer* (never ticked for them), and then only in the extension's
+  IndexedDB as AES-GCM ciphertext under a key derived from a passkey's PRF output, which is never
+  written to disk; unticked, it is kept in memory for one attempt and at most two minutes. It never
+  appears in a message, a log, the audit log, `storage.local` or argv, and never reaches the vendor.
+  The passkey that unlocks it is named "<AccessID> (grid)"; the old passkey of 12.0.0 to 15.0.0 is named
+  with the AccessID alone or "beethoven" and can go, and the new one is deleted only after *Forget*.
+  Connection state lives in `storage.session`; the audit log of every portal request stays on the
+  device and is never transmitted.
 - No transmission of command text, file paths, prompts, job output, portal cookies or tokens to the
   vendor. The only thing sent to the vendor about the student is the approval check (the account
   name the portal's dashboard shows, the portal hostname, the product, the version and the random
@@ -211,7 +243,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 18.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 19.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -226,11 +258,13 @@ removes that way whole and keeps the one way, the university's VPN and the porta
 waits for the VPN and goes ahead by itself; 17.0.0 reads the site profile through beethoven-base's
 reader and offers "Your grid" when a build carries two or more; 18.0.0 brings the grid's sign-in box
 to the front, keeps the sign-in tab long enough for Chrome's offer to save the password, and waits on
-GlobalProtect at once when the grid is known to be out of reach; `release/<version>/README.md` lists a version's changes,
-up to 14.0.0); the framework is the server repository's, `OpenSpineConsortium/hpcworker`, and the
+GlobalProtect at once when the grid is known to be out of reach; 19.0.0 signs in to the grid itself
+with the AccessID and password typed into its own sheet, saves the password behind a passkey only
+when the student ticks *Remember it on this computer*, and keeps Chrome's sign-in box as the other
+way; `release/<version>/README.md` lists a version's changes, up to 14.0.0); the framework is the server repository's, `OpenSpineConsortium/hpcworker`, and the
 lab's shared copy at Wayne State is the version its `tools/deploy_shared.sh` last published (the
-panel shows it under *Details*); the agreement `LICENSE.txt` is version 11 and the extension's
-`TERMS_VERSION` (`extension/src/core/terms.ts`) is 11 to match; `PRIVACY.md` is version 12. All
+panel shows it under *Details*); the agreement `LICENSE.txt` is version 12 and the extension's
+`TERMS_VERSION` (`extension/src/core/terms.ts`) is 12 to match; `PRIVACY.md` is version 13. All
 integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
@@ -368,8 +402,8 @@ that sends no installation identifier (before 8.0.0) is refused once the service
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 11; the extension's
-  `TERMS_VERSION` is 11) and the privacy statement (version 12).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 12; the extension's
+  `TERMS_VERSION` is 12) and the privacy statement (version 13).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

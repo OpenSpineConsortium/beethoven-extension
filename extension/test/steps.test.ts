@@ -7,7 +7,7 @@
 // student must never read.
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS, type LastKnown } from '../src/core/keys';
-import { formatClock, type HomeView, type JourneyView, type PanelView } from '../src/core/model';
+import { formatClock, WORDS, type HomeView, type JourneyView, type PanelView } from '../src/core/model';
 import { SHORT_STATEMENT, STATEMENT_TICK, PLAN_CLASS_DISCLOSURE } from '../src/core/disclosure';
 import { home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
 import { TERMS_REFUSAL } from '../src/core/terms';
@@ -116,6 +116,48 @@ describe('journey: the first run, moment by moment', () => {
     expect(momentOf(done)).toBe('grid');
     expect(J(done, 'grid').signedIn).toBe('Signed in as st1234.');
     expect(momentOf(facts({ ...firstRun, signin: { waiting: false, signedInAt: NOW - 2_000 } }))).toBe('statement');
+  });
+
+  // 19.0.0: the drawn check keeps the words of the way the student signed in: after Beethoven's sheet the
+  // box's "Beethoven never sees them" would be false; after Chrome's box (the 18.0.0 tab) it stays
+  it('the drawn check after a sign-in keeps the sheet\'s words, or the box\'s when the box was the way', () => {
+    const own = { saved: 'none', refused: false, held: false, refusals: 0, working: false, unlockWith: 'Windows Hello', origin: ORIGIN, later: undefined } as const;
+    const sheet = J(facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own } }), 'grid');
+    expect(sheet.sheet?.phase).toBe('type');
+    expect(sheet.body).toBe('Type your AccessID and password. Beethoven signs in to the grid for you, in the background.');
+    const bySheet = facts({ ...firstRun, signin: { waiting: false, signedInAt: NOW - 500, own } });
+    expect(momentOf(bySheet)).toBe('grid');
+    expect(J(bySheet, 'grid')).toMatchObject({ signedIn: 'Signed in as st1234.', body: 'Type your AccessID and password. Beethoven signs in to the grid for you, in the background.' });
+    expect(J(bySheet, 'grid').sheet).toBeUndefined();
+    const byBox = facts({ ...firstRun, signin: { waiting: false, signedInAt: NOW - 500, box: true, own } });
+    expect(J(byBox, 'grid')).toMatchObject({ signedIn: 'Signed in as st1234.', body: 'Use your AccessID and password in the box Chrome shows. Beethoven never sees them. Chrome can save them for next time.' });
+  });
+
+  // a saved sign-in the grid turned down asks for the password typed, never for Windows Hello to unlock it
+  it('a refused saved sign-in that is locked shows the type phase with the refused note; one not refused shows the locked phase', () => {
+    const own = { saved: 'locked', refused: true, held: false, refusals: 1, working: false, unlockWith: 'Windows Hello', origin: ORIGIN, later: undefined } as const;
+    expect(J(facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own } }), 'grid').sheet).toMatchObject({ phase: 'type', saved: 'locked', note: WORDS.grid.refused });
+    const notRefused = { ...own, refused: false, refusals: 0 };
+    expect(J(facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own: notRefused } }), 'grid').sheet?.phase).toBe('locked');
+  });
+
+  // a hold is no refusal: whether the saved password works could not be told, so the sheet asks for it typed
+  // and never says it didn't work or warns of a lockout; two refusals in a row before it still say so
+  it('a saved sign-in on hold shows the type phase with the hold\'s words, never the refusal\'s, and no Unlock', () => {
+    const own = { saved: 'ready', refused: true, held: true, refusals: 0, working: false, unlockWith: 'Windows Hello', origin: ORIGIN, later: 'asked' } as const;
+    const out = facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own } });
+    const sheet = J(out, 'grid').sheet;
+    expect(sheet).toMatchObject({ phase: 'type', saved: 'ready', note: WORDS.grid.held });
+    expect(WORDS.grid.held).not.toMatch(/didn't work|lock your AccessID|wrong/);
+    expect(J(facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own: { ...own, saved: 'locked' } } }), 'grid').sheet).toMatchObject({ phase: 'type', note: WORDS.grid.held });
+    const overlays = (o: { refused?: boolean; held?: boolean }) => {
+      const v = panelView(facts({ grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own: { ...own, later: undefined, ...o, saved: 'locked' } } }));
+      return v.kind === 'terms-needed' ? undefined : v.overlays;
+    };
+    expect(overlays({ refused: false, held: false })?.unlock).toEqual({ unlockWith: 'Windows Hello' });
+    expect(overlays({})).toBeDefined();
+    expect(overlays({})?.unlock).toBeUndefined();
+    expect(J(facts({ ...firstRun, grid: { session: 'signed-out', account: undefined }, signin: { waiting: false, own: { ...own, refusals: 2 } } }), 'grid').sheet?.note).toBe(WORDS.grid.refusedTwice);
   });
 
   it('the grid sign-in when it goes wrong, never "Failed to fetch"', () => {
