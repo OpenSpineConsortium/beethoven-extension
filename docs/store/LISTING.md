@@ -1,6 +1,6 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 19.0.0, and the answers
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 20.0.0, and the answers
 to its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 to 10.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven; a **Private** item whose
@@ -9,7 +9,10 @@ the site's theme; an Anthropic address refused before any permission request), r
 2026-10-02 for 12.0.0, brought up to date on 2026-10-04 for 15.0.0 (13.0.0 and 14.0.0 left these
 texts as they were), rewritten again on 2026-10-08 for 16.0.0, which removed the direct way of
 12.0.0 to 15.0.0 whole, and brought up to date on 2026-10-09 for 19.0.0, in which Beethoven signs in
-to the grid itself (17.0.0 and 18.0.0 left these texts as they were). 11.0.0 (2026-10-01) was built but never submitted, and its store documents
+to the grid itself (17.0.0 and 18.0.0 left these texts as they were), and on 2026-10-11 for 20.0.0,
+in which one approval covers every installation of the student's own (the description's approval
+line and its access link, the reviewed text's needs, and the privacy answer).
+11.0.0 (2026-10-01) was built but never submitted, and its store documents
 were never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
 - **11.0.0**: a welcome page with one tick and "Agree and continue" replaces the setup page with its
@@ -192,12 +195,12 @@ Unchanged since 8.0.0 (`extension/wxt.config.ts` and `extension/package.json`;
 `extension/test/hygiene.test.ts` fails above 132). It stays true of 19.0.0: the cluster is an Open
 OnDemand cluster, reached through its portal.
 
-## Detailed description (the one to paste; plain text; 1,570 characters; under Chrome's limit of 16,000)
+## Detailed description (the one to paste; plain text; 1,599 characters; under Chrome's limit of 16,000)
 
 Rewritten 2026-10-02 for 12.0.0 in the voice of 9.0.0's text, for a student who reads it in twenty
 seconds, on 2026-10-08 for 16.0.0 (step 2, the paragraph under the steps, the needs and the data
 paragraph), and on 2026-10-09 for 19.0.0 (step 2 and the data paragraph). Counted with Python as
-Unicode characters without a trailing newline: 1,570 (1,591 if the dashboard counts each of its 21
+Unicode characters without a trailing newline: 1,599 (1,620 if the dashboard counts each of its 21
 line breaks as two characters). ASCII only. Every sentence rests on the facts above: the data
 paragraph names what the approval check carries about the person and says that the password goes
 only to the grid and is kept only if the student asks. It does not advertise the *Remember* tick:
@@ -219,7 +222,7 @@ If the grid is out of reach, Beethoven waits and carries on by itself as soon as
 YOU NEED
 A Wayne State AccessID with a grid account, GlobalProtect, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
 
-By approval only: ask at https://openspineconsortium.com/
+By approval only: ask at https://openspineconsortium.com/beethoven/
 One approval covers every installation of your own: your computers and your Chrome profiles.
 
 YOUR DATA
@@ -228,7 +231,7 @@ To check your approval, Beethoven sends our access service the account name the 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.
 ```
 
-## Reviewed description (reviewer-facing; plain text; 6,318 characters; not pasted into the dashboard)
+## Reviewed description (reviewer-facing; plain text; 6,420 characters; not pasted into the dashboard)
 
 Rewritten 2026-10-02 for 12.0.0 from 10.0.0's reviewed text, sentence by sentence against the facts
 above, on 2026-10-04 for 15.0.0 in one place (the helper's sentence in step 2), on 2026-10-08
@@ -361,7 +364,7 @@ and when it is kept).
 | Homepage URL | `https://openspineconsortium.com/beethoven/` (the manifest's `homepage_url`) |
 | Support URL | `https://openspineconsortium.com/beethoven/support.html` |
 | Privacy policy | `https://openspineconsortium.com/beethoven/privacy.html` |
-| Ask for access (in the description) | `https://openspineconsortium.com/` (the form is on the home page; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
+| Ask for access (in the description) | `https://openspineconsortium.com/beethoven/` (the form is on Beethoven's page, which was the site's home page until 2026-10-11, when the home page became the lab's; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
@@ -376,7 +379,7 @@ captured from 9.0.0 (`extension/store-assets/`): the setup page, the toolbar-but
 panel. None shows 11.0.0's welcome page, journey, home or tour, or 16.0.0's GlobalProtect screen
 with its link; 12.0.0's helper, its sign-in sheet (with the code field) and Settings' Connection
 section are screens 19.0.0 does not have, so none may appear either. A screenshot of 9.0.0's setup page is a screen 16.0.0 does
-not have; redo at least the screenshots from the 19.0.0 release build before submitting (not yet
+not have; redo at least the screenshots from the 20.0.0 release build before submitting (not yet
 captured), to the rules below. 19.0.0's sign-in sheet, unlock screen and Settings' *Your grid* card are
 new screens; a capture of the sheet shows the mock account `st1234` and an empty or dotted password
 field, never a real one.
@@ -437,9 +440,10 @@ Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude
 
 The recipe's steps 5 and 7 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal", 13
 presses, `docs/V11_STATUS.md`); steps 3, 4 and 6 are 19.0.0's (`--auth basic` and the sign-in sheet,
-from the 19.0.0 build specification). None of them has been walked on a 19.0.0 build (nor on a 16.0.0
-build; nor on a 12.0.0 or 15.0.0 build, whose harness ran the direct way against a local grid
-stand-in instead, `docs/V12_STATUS.md`). Walk them once on the release build and correct any word.
+from the 19.0.0 build specification). None of them has been walked on a 19.0.0 or 20.0.0 build (nor
+on a 16.0.0 build; nor on a 12.0.0 or 15.0.0 build, whose harness ran the direct way against a local
+grid stand-in instead, `docs/V12_STATUS.md`). Walk them once on the release build and correct any
+word.
 
 ## No other store
 

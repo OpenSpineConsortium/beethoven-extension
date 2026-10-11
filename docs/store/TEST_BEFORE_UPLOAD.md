@@ -186,8 +186,9 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
 18. **A second installation.** New in 20.0.0: a second Chrome profile with the unpacked build is
     approved at its first check and reaches the strip's next step (10.0.0 to 19.0.0 stopped it at
     "<AccessID> is set up on another computer. Your lab lead can move it here."); the maintainer's
-    mailbox gets one notice ("Beethoven: <AccessID> is using a new installation") with a *Withdraw
-    approval* link and no Move link, and no second notice for a third profile the same day.
+    mailbox gets one notice ("Beethoven: <name> (<AccessID>) is using a new installation", the bare
+    AccessID only when no name is on record) with a *Withdraw approval* link and no Move link, and
+    no second notice for a third profile the same day.
 19. **Anthropic addresses are refused before any prompt** (10.0.0's step 15, on the welcome page's
     **Use another portal** field): `claude.ai`, `anthropic.com`, `www.claude.com` each answer
     "That's a Claude address, not your grid." and Chrome shows no prompt; `chrome://extensions`,
@@ -213,7 +214,7 @@ allowed the portal, and then only that site.
   (`SUBMISSION.md`, section 0, item 5).
 - The screenshots are new captures of 19.0.0 (`PASTE.md`, field 7; none exists yet), and none shows
   a real AccessID or password.
-- The description in `PASTE.md` is 1,570 characters; paste it whole.
+- The description in `PASTE.md` is 1,599 characters; paste it whole.
 - Before pasting the Test instructions in `PASTE.md`, see each of their steps on this build in a
   fresh profile with no portal granted and GlobalProtect off: the welcome page, **Agree and
   continue** and what Chrome asks; the panel's **Turn on GlobalProtect.** with **Looking for the

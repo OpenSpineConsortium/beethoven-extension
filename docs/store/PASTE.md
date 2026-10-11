@@ -72,7 +72,7 @@ python -X utf8 -c "from PIL import Image; import glob; [print(f, Image.open(f).s
 
 ### 1. Description (up to 16,000 characters)
 
-1,570 characters (counted with Python, without a trailing newline). Plain text: the line breaks are
+1,599 characters (counted with Python, without a trailing newline). Plain text: the line breaks are
 kept, nothing else is formatted. The same text as `LISTING.md`'s detailed description.
 
 ```
@@ -91,7 +91,7 @@ If the grid is out of reach, Beethoven waits and carries on by itself as soon as
 YOU NEED
 A Wayne State AccessID with a grid account, GlobalProtect, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
 
-By approval only: ask at https://openspineconsortium.com/
+By approval only: ask at https://openspineconsortium.com/beethoven/
 One approval covers every installation of your own: your computers and your Chrome profiles.
 
 YOUR DATA

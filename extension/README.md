@@ -389,10 +389,12 @@ account. Ask your lab lead to move it to yours." with no button; and a check wit
 gets `"reason":"update_required"`, said as "Install the current Beethoven from the lab's private listing.".
 `"reason":"other_installation"`, which the service sent from 8.0.0 to 19.0.0 for an account bound to another
 installation, is never sent any more and is still read, said as "This account is already set up on another computer. Ask
-your lab lead to move it here." with no button. The reason is said ahead of a withdrawal: an installation that hears a
-reason hears it, not "Access withdrawn". `v` stays 1, because the service before 8.0.0 refuses any
-other `v` and ignores fields it does not know. This is a check in the client, not a proof: a modified copy could skip
-it, which the agreement forbids (section 6(d)); it keeps an approval from being passed around, and no text claims more.
+your lab lead to move it here." with no button. A reason is said ahead of a withdrawal: an installation that was
+approved and is later refused with `other_account` (its account's installations were cleared, or it fell out of the ten
+kept, and another account asked from it first) shows that sentence, not "Access withdrawn". `v` stays 1, because the
+service before 8.0.0 refuses any other `v` and ignores fields it does not know. This is a check in the client, not a
+proof: a modified copy could skip it, which the agreement forbids (section 6(d)); it keeps an approval from being passed
+around, and no text claims more.
 
 ## The signed kill-list
 

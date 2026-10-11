@@ -55,7 +55,9 @@ screenshot-04-seventeen-checks.png  (1280x800)
     the right edge, which cuts the end of the longer rows. The headline says what the tags say (it read
     "All green." until 2026-09-30; at listing size the pale tags do not read as green).
 screenshot-05-by-approval-only.png  (1280x800)
-    "By approval only." / "Ask for access. One approval, one installation." Below it the setup page's
+    "By approval only." / "Ask for access. One approval, every computer of yours." (the source since
+    2026-10-11; the PNG here was rendered before and still reads "One approval, one installation.", and
+    its card is 9.0.0's, so both are made again from the 20.0.0 build before upload). Below it the setup page's
     Access card: what the approval check sends, one installation per approval, "Access approved for st1234 at
     localhost (checked 2026-10-01 01:32 UTC)", "Check my access now". From raw-9/07-setup-access-card.png,
     the whole card.

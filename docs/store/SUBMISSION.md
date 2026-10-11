@@ -157,7 +157,7 @@ The item (about thirty minutes):
    public. Nothing in the package depends on it: 19.0.0 carries no installer bound to the item
    (15.0.0's were built for its ID, which is why the ID then had to come before the package).
    Submitting comes last, at item 9, once every tab below is filled.
-5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,570 characters);
+5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,599 characters);
    Category Developer Tools; Language English (United States); the store icon; the promo video field
    empty; the small promo tile; the five screenshots captured from 19.0.0, in the order given; the
    marquee; Official URL (empty until the site is verified); Homepage URL
@@ -178,7 +178,7 @@ The item (about thirty minutes):
 8. **Test instructions** tab (under **Access** in the left menu), from `PASTE.md`: the username
    sentence, the password sentence (the mock's made-up password, never a real one), and the
    Additional instructions (494 characters, within the box's 500). Save changes. Before pasting,
-   walk the instructions on the 19.0.0 build
+   walk the instructions on the 20.0.0 build
    (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"). The fuller text below them in `PASTE.md` is
    not pasted: it goes into a reply if a reviewer asks (section 4).
 9. **Submit for review** (top right). A Private item is reviewed like a public one.
@@ -226,7 +226,7 @@ never calls the shared copy outdated.)
   the item's link (`https://chromewebstore.google.com/detail/<item-id>`) with one line: open it in
   Chrome, signed in with that Google account, on the computer you will use; *Add to Chrome*; then
   follow `docs/guides/INSTALL.md` (send it, or the support page).
-- **"Beethoven: <name> (<AccessID>) is using a new installation."** A notice, since 20.0.0: the
+- **The notice "Beethoven: <name> (<AccessID>) is using a new installation".** Since 20.0.0: the
   student's second computer, another Chrome profile or a reinstallation was approved at its first
   check, and the e-mail says so, at most once a day per account, with one link, *Withdraw approval*,
   for the case where the student knows of no such installation (ask them first). There is no Move
