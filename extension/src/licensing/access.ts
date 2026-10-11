@@ -13,28 +13,35 @@
 //             200 {"approved":false,...,"reason":"other_installation"|"other_account"|"update_required"}
 //             400 a malformed body; 429 the service's rate limit. Anything else, or nothing, is "no answer".
 //
-// One approved account, one installation (8.0.0). install_id is the random identifier
-// ext/storage.ts installId() makes the first time it is needed in this installation, from the
-// browser's random generator and nothing about the device; uninstalling removes it and a reinstall
-// makes a new one. The service binds an approved account to the first installation that asks and
-// refuses any other with reason "other_installation" until the maintainer moves the approval; an
-// installation bound to one approved account is refused for any other with "other_account"; a
-// build that sends no identifier (before 8.0.0) is refused with "update_required". v stays 1: the
-// service before 8.0.0 refuses any other v and ignores a field it does not know, so this request
-// works against the service before and after it learned about installations. This is a check in
-// the client, not a proof: it keeps an approval from being passed around, and the texts claim no
-// more than that.
+// One person's approval, every installation of their own (2026-10-11, 20.0.0; from 8.0.0 to 19.0.0
+// one installation per account). install_id is the random identifier ext/storage.ts installId()
+// makes the first time it is needed in this installation, from the browser's random generator and
+// nothing about the device; uninstalling removes it and a reinstall makes a new one. The service
+// approves an approved account from every installation that asks about it, records each one
+// against the account (identifier, product, version, first and last seen; the ten most recently
+// seen kept) and e-mails the maintainer, at most once a day per account, when a new one asks, with
+// one link that withdraws the approval and none that moves it: a notice, nothing refused. One
+// installation still serves one account: an installation bound to one approved account is refused
+// for any other with "other_account", until the maintainer releases it; a build that sends no
+// identifier (before 8.0.0) is refused with "update_required". The reason "other_installation" (an
+// approved account bound to another installation, 8.0.0 to 19.0.0) is never sent any more; it is
+// still read here, as a reason an older service may send, with its sentence unchanged. v stays 1:
+// the service before 8.0.0 refuses any other v and ignores a field it does not know, so this
+// request works against the service before and after it learned about installations. This is a
+// check in the client, not a proof: it keeps an approval from being passed around, and the texts
+// claim no more than that.
 //
-// Caches and grace: an approval is good for 24 hours without asking again, and is kept up to
-// 7 days when the service does not answer; a refusal is kept 10 minutes (opening the panel asks
-// again at once, so an approval just given is seen: LICENSE 3(a), 11.0.0); an attempt that got no
-// answer is not repeated for 15 minutes. There is no periodic re-check while the panel is open: the
-// triggers are the acceptance, the first grid sign-in, opening the panel, a page's "Try again", and
-// the daily alarm (accessForced says which of them ask past a refusal). Withdrawal (the service answering approved:false for an account
-// it approved before) stops every start at the next check and is said as such; an approval moved
-// to another installation reaches this one the same way. A reason the service gives is said in its
-// own sentence, ahead of the withdrawal. The service's answers are data: the only URL taken from
-// them is a page on Licensor's own site.
+// Caches and grace: an approval is good for 24 hours without asking again, and is kept up to 7 days
+// when the service does not answer; a refusal is kept 10 minutes (opening the panel asks again at
+// once, so an approval just given is seen: LICENSE 3(a), 11.0.0); an attempt that got no answer is
+// not repeated for 15 minutes. There is no periodic re-check while the panel is open: the triggers
+// are the acceptance, the first grid sign-in, opening the panel, a page's "Try again", and the
+// daily alarm (accessForced says which of them ask past a refusal). Withdrawal (the service
+// answering approved:false for an account it approved before) stops every start at the next check
+// and is said as such; a withdrawal made from the notice e-mail's link reaches every installation
+// of the account's the same way. A reason the service gives is said in its own sentence, ahead of
+// the withdrawal. The service's answers are data: the only URL taken from them is a page on
+// Licensor's own site.
 //
 // Nothing here touches the browser: storage, fetch and the clock are handed in, so the whole
 // thing runs in Node against a fake service.
@@ -84,11 +91,11 @@ export function normalizeAccount(name: unknown): string | undefined {
   return ACCOUNT_RE.test(s) ? s : undefined;
 }
 
-/** why the service refused, when it said: the account is set up on another installation, this installation is set up for another account, or the request carried no installation identifier */
+/** why the service refused, when it said: this installation is set up for another account, the request carried no installation identifier, or (an older service, before 2026-10-11) the account is set up on another installation */
 export type AccessReason = 'other_installation' | 'other_account' | 'update_required';
 const REASONS: ReadonlySet<string> = new Set<AccessReason>(['other_installation', 'other_account', 'update_required']);
 
-/** the strip's sentence when the account is set up on another installation; there is nothing for the student to press */
+/** the strip's sentence when an older service says the account is set up on another installation (not sent since 2026-10-11, still read); there is nothing for the student to press */
 export const OTHER_INSTALLATION = 'This account is already set up on another computer. Ask your lab lead to move it here.';
 /** the strip's sentence when this installation is set up for another approved account; only the lab lead can release it */
 export const OTHER_ACCOUNT = `This installation of ${PRODUCT_NAME} is already set up for another account. Ask your lab lead to move it to yours.`;
@@ -178,7 +185,7 @@ export type AccessState =
   | 'denied'
   /** approved before, refused now */
   | 'withdrawn'
-  /** the account is approved and set up on another installation; the maintainer moves it */
+  /** an older service's answer: the account is approved and set up on another installation (not sent since 2026-10-11, still read) */
   | 'other-installation'
   /** this installation is set up for another approved account; the maintainer releases it */
   | 'other-account'

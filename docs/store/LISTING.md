@@ -1,6 +1,6 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 19.0.0, and the answers
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 20.0.0, and the answers
 to its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 to 10.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven; a **Private** item whose
@@ -9,7 +9,10 @@ the site's theme; an Anthropic address refused before any permission request), r
 2026-10-02 for 12.0.0, brought up to date on 2026-10-04 for 15.0.0 (13.0.0 and 14.0.0 left these
 texts as they were), rewritten again on 2026-10-08 for 16.0.0, which removed the direct way of
 12.0.0 to 15.0.0 whole, and brought up to date on 2026-10-09 for 19.0.0, in which Beethoven signs in
-to the grid itself (17.0.0 and 18.0.0 left these texts as they were). 11.0.0 (2026-10-01) was built but never submitted, and its store documents
+to the grid itself (17.0.0 and 18.0.0 left these texts as they were), and on 2026-10-11 for 20.0.0,
+in which one approval covers every installation of the student's own (the description's approval
+line and its access link, the reviewed text's needs, and the privacy answer).
+11.0.0 (2026-10-01) was built but never submitted, and its store documents
 were never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
 - **11.0.0**: a welcome page with one tick and "Agree and continue" replaces the setup page with its
@@ -66,6 +69,17 @@ again. This is not the direct way of 12.0.0 to 15.0.0: no ssh, no helper, no one
 VPN is still needed. The old passkey of 12.0.0 to 15.0.0 is named with the AccessID alone or
 "beethoven" and can go; the one 19.0.0 uses for the grid sign-in is named "<AccessID> (grid)" and is
 deleted only after *Forget*. Agreement version 12, privacy statement version 13.
+
+**20.0.0** (2026-10-11): one person's approval, every installation of their own (the maintainer's
+decision of 2026-10-11). An approved account is approved from every installation that asks about it:
+a second computer, another Chrome profile or a reinstallation works at its first check, where 8.0.0
+to 19.0.0 refused it until the maintainer moved the approval. The access service records each
+installation the account asks from (its random identifier, the product, the version, first and last
+seen), keeps the ten most recent, and e-mails the maintainer, at most once a day per account, when a
+new one asks, with one link that withdraws the approval and none that moves it. An installation
+still serves one account. Nothing new is sent or read: the check carries what it carried, and the
+identifier is still random and says nothing about the device. Agreement version 13, privacy
+statement version 14.
 
 There is no other store, no download and no signed file: the package is the extension alone, and
 nothing of it is ever on the website. (12.0.0 to 15.0.0 offered the helper's installers from inside
@@ -181,12 +195,12 @@ Unchanged since 8.0.0 (`extension/wxt.config.ts` and `extension/package.json`;
 `extension/test/hygiene.test.ts` fails above 132). It stays true of 19.0.0: the cluster is an Open
 OnDemand cluster, reached through its portal.
 
-## Detailed description (the one to paste; plain text; 1,570 characters; under Chrome's limit of 16,000)
+## Detailed description (the one to paste; plain text; 1,599 characters; under Chrome's limit of 16,000)
 
 Rewritten 2026-10-02 for 12.0.0 in the voice of 9.0.0's text, for a student who reads it in twenty
 seconds, on 2026-10-08 for 16.0.0 (step 2, the paragraph under the steps, the needs and the data
 paragraph), and on 2026-10-09 for 19.0.0 (step 2 and the data paragraph). Counted with Python as
-Unicode characters without a trailing newline: 1,570 (1,591 if the dashboard counts each of its 21
+Unicode characters without a trailing newline: 1,599 (1,620 if the dashboard counts each of its 21
 line breaks as two characters). ASCII only. Every sentence rests on the facts above: the data
 paragraph names what the approval check carries about the person and says that the password goes
 only to the grid and is kept only if the student asks. It does not advertise the *Remember* tick:
@@ -208,8 +222,8 @@ If the grid is out of reach, Beethoven waits and carries on by itself as soon as
 YOU NEED
 A Wayne State AccessID with a grid account, GlobalProtect, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
 
-By approval only: ask at https://openspineconsortium.com/
-One approval covers one installation: one Chrome profile on one computer.
+By approval only: ask at https://openspineconsortium.com/beethoven/
+One approval covers every installation of your own: your computers and your Chrome profiles.
 
 YOUR DATA
 To check your approval, Beethoven sends our access service the account name the grid's website shows and a random installation identifier, with your portal's address and the version. It sends nothing else about you. Your password goes only to the grid, never to us, and Beethoven keeps it, encrypted on this computer, only if you ask it to. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
@@ -217,7 +231,7 @@ To check your approval, Beethoven sends our access service the account name the 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks.
 ```
 
-## Reviewed description (reviewer-facing; plain text; 6,318 characters; not pasted into the dashboard)
+## Reviewed description (reviewer-facing; plain text; 6,420 characters; not pasted into the dashboard)
 
 Rewritten 2026-10-02 for 12.0.0 from 10.0.0's reviewed text, sentence by sentence against the facts
 above, on 2026-10-04 for 15.0.0 in one place (the helper's sentence in step 2), on 2026-10-08
@@ -235,7 +249,7 @@ WHAT YOU NEED
 - An account on a cluster where your lab keeps the shared copy of Beethoven's cluster-side scripts, and whatever your university needs to reach its Open OnDemand portal. At Wayne State: a grid account and the GlobalProtect VPN.
 - Your own Claude account on a plan that includes Claude Code Remote Control (Pro or Max).
 - Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/beethoven/request.html with your account name and the Google account at which you want the invitation to this listing, which is private. There is no licence key.
-- One computer. An approval covers one installation; another computer, another browser profile or a reinstallation is refused until the maintainer moves the approval to it.
+- Your own computers. An approval covers every installation you use yourself; a second computer, another browser profile or a reinstallation works at its first check, and the maintainer is told that a new installation asked. One installation serves one account.
 
 HOW IT WORKS
 1. Accept the agreement on the welcome page that opens on install: one tick and "Agree and continue". The full text is one click away, and can be saved and printed. The welcome page names the three things you need, each with a link to your university's or Anthropic's own page.
@@ -258,7 +272,7 @@ WHAT IT KEEPS
 On your device only: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed and the last approval answer, the random identifier of this installation, your statement about each workspace, an audit log of every request it made to your portal, which you can read, export and clear, and your grid sign-in, only if you tick "Remember it on this computer" (never ticked for you): encrypted, under a key your passkey releases with Windows Hello, Touch ID or your screen lock, until you press Forget. Unticked, the password is held in memory for one sign-in and at most two minutes. If an earlier version of Beethoven added a key to your cluster account, Settings says so once, with its date, and your lab lead can remove it; Beethoven no longer uses or touches it. Privacy statement: https://openspineconsortium.com/beethoven/privacy.html
 
 ACCESS AND TERMS
-Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved, on one installation. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
+Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved, on the installations of your own. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. Beethoven is not provided by or on behalf of any university. It is a research and teaching tool, not a medical device. Offered in the United States.
 ```
@@ -320,7 +334,7 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Question | Answer |
 |---|---|
 | Does the extension collect or transmit user data? | Yes, two kinds. **Personally identifiable information**: the institutional account name the user's portal shows and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: Yes. The user's AccessID and cluster password, typed into the extension's own sign-in sheet, are sent only to the user's own university portal, as the answer to its HTTP sign-in, and never to the developer; the password is kept only if the user ticks "Remember it on this computer", and then only encrypted on the device, under a key the user's passkey releases (12.0.0 to 15.0.0 answered Yes for the direct way's sign-in sheet; 16.0.0 to 18.0.0 answered No). Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 13 names the approval check, what the developer records from it, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 14 names the approval check, what the developer records from it, the installations it keeps per approved account, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
 | Limited Use statement (on the landing page and the reviewers page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
@@ -350,13 +364,13 @@ and when it is kept).
 | Homepage URL | `https://openspineconsortium.com/beethoven/` (the manifest's `homepage_url`) |
 | Support URL | `https://openspineconsortium.com/beethoven/support.html` |
 | Privacy policy | `https://openspineconsortium.com/beethoven/privacy.html` |
-| Ask for access (in the description) | `https://openspineconsortium.com/` (the form is on the home page; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
+| Ask for access (in the description) | `https://openspineconsortium.com/beethoven/` (the form is on Beethoven's page, which was the site's home page until 2026-10-11, when the home page became the lab's; `.../beethoven/request.html` is the same form and is what the panel's *Ask for access* button opens) |
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
-15.0.0, 16.0.0 or 19.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 12
-and `PRIVACY.md` version 13 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 13.
+15.0.0, 16.0.0, 19.0.0 or 20.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 13
+and `PRIVACY.md` version 14 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 14.
 
 ## Images and the promo video
 
@@ -365,7 +379,7 @@ captured from 9.0.0 (`extension/store-assets/`): the setup page, the toolbar-but
 panel. None shows 11.0.0's welcome page, journey, home or tour, or 16.0.0's GlobalProtect screen
 with its link; 12.0.0's helper, its sign-in sheet (with the code field) and Settings' Connection
 section are screens 19.0.0 does not have, so none may appear either. A screenshot of 9.0.0's setup page is a screen 16.0.0 does
-not have; redo at least the screenshots from the 19.0.0 release build before submitting (not yet
+not have; redo at least the screenshots from the 20.0.0 release build before submitting (not yet
 captured), to the rules below. 19.0.0's sign-in sheet, unlock screen and Settings' *Your grid* card are
 new screens; a capture of the sheet shows the mock account `st1234` and an empty or dotted password
 field, never a real one.
@@ -426,9 +440,10 @@ Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude
 
 The recipe's steps 5 and 7 follow 11.0.0's harness (scenario 1 on the mock: "Use another portal", 13
 presses, `docs/V11_STATUS.md`); steps 3, 4 and 6 are 19.0.0's (`--auth basic` and the sign-in sheet,
-from the 19.0.0 build specification). None of them has been walked on a 19.0.0 build (nor on a 16.0.0
-build; nor on a 12.0.0 or 15.0.0 build, whose harness ran the direct way against a local grid
-stand-in instead, `docs/V12_STATUS.md`). Walk them once on the release build and correct any word.
+from the 19.0.0 build specification). None of them has been walked on a 19.0.0 or 20.0.0 build (nor
+on a 16.0.0 build; nor on a 12.0.0 or 15.0.0 build, whose harness ran the direct way against a local
+grid stand-in instead, `docs/V12_STATUS.md`). Walk them once on the release build and correct any
+word.
 
 ## No other store
 

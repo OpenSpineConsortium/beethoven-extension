@@ -1,4 +1,4 @@
-# Paste sheet: Beethoven 19.0.0 on the Chrome Web Store
+# Paste sheet: Beethoven 20.0.0 on the Chrome Web Store
 
 Every field of the dashboard, in the order it asks for them, with the text to paste (in a block:
 copy all of it) or the file to upload. Paths are from the repository root of the checkout that made
@@ -7,7 +7,7 @@ the reasons behind them are in `LISTING.md`; registration, the testers' group an
 `SUBMISSION.md`. Written 2026-09-30 for 9.0.0, brought up to date for 10.0.0 on 2026-10-01,
 rewritten on 2026-10-02 for 12.0.0 (11.0.0 was built and never submitted; its changes are carried
 here too: the welcome page, no `activeTab`, the window-wide panel), brought up to date on 2026-10-04
-for 15.0.0, on 2026-10-08 for 16.0.0, and on 2026-10-09 for 19.0.0. 12.0.0 added the `nativeMessaging` permission, the
+for 15.0.0, on 2026-10-08 for 16.0.0, on 2026-10-09 for 19.0.0, and on 2026-10-11 for 20.0.0. 12.0.0 added the `nativeMessaging` permission, the
 helper's installers inside the package, and the Authentication information data type; 15.0.0 added
 the signed installers of the helper for Windows and macOS. 16.0.0 removes all of it with the direct
 way: no `nativeMessaging`, no helper, no installer, and Authentication information unticked again,
@@ -16,13 +16,13 @@ into its own sheet, adds the `webRequest` and `webRequestAuthProvider` permissio
 justification fields) and ticks Authentication information again; it adds no helper and no
 installer.
 
-**Everything in one folder.** `release/19.0.0/store-kit/` (also zipped, as
-`release/19.0.0/store-kit-19.0.0.zip`) holds a copy of every file this sheet names, with the number
+**Everything in one folder.** `release/20.0.0/store-kit/` (also zipped, as
+`release/20.0.0/store-kit-20.0.0.zip`) holds a copy of every file this sheet names, with the number
 of its field below in front of the name, so the folder lists in the order of this sheet. Fields 2, 3
 and 9 to 11 are typed, so they have no file, and so are the Privacy practices and Distribution tabs;
 the package is `00`, and the Test instructions tab (`12`, after Distribution) has one file per box
 and one for the fuller reply text. The kit was assembled for 12.0.0 on 2026-10-02 with that release
-(`release/12.0.0/README.md`); for 19.0.0 it is to be assembled again, with the 19.0.0 package as
+(`release/12.0.0/README.md`); for 20.0.0 it is to be assembled again, with the 20.0.0 package as
 `00` and the texts of this sheet as they are now. Its screenshots are still 9.0.0's until field 7's
 captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which). The `00` zip, and
 the kit's own zip that holds it, stay out of the repository (`.gitignore`), like the record's zip,
@@ -31,14 +31,14 @@ carries no installer, so nothing in the kit is bound to the item.
 
 | File in the kit | Field | Copy of |
 |---|---|---|
-| `00-beethoven-19.0.0-chrome.zip` | Package | `release/19.0.0/beethoven-19.0.0-chrome.zip` (built as `extension/.output/beethoven-19.0.0-chrome.zip`) |
+| `00-beethoven-20.0.0-chrome.zip` | Package | `release/20.0.0/beethoven-20.0.0-chrome.zip` (built as `extension/.output/beethoven-20.0.0-chrome.zip`) |
 | `01-description.txt` | 1. Description | the block under field 1 (no newline at the end) |
 | `04-store-icon-128.png` | 4. Store icon | `extension/store-assets/store-icon-128.png` |
 | `05-promo-video-1280x720.mp4` | 5. Global promo video (to YouTube first) | `extension/store-assets/promo/beethoven-promo.mp4` (9.0.0's; see field 5) |
 | `05-promo-video-thumbnail.png` | 5. the video's YouTube thumbnail | `extension/store-assets/promo/beethoven-promo-poster.png` |
 | `06-promo-tile-440x280.png` | 6. Small promo tile | `extension/store-assets/promo-tile-440x280.png` |
-| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | **to be captured from the 19.0.0 build** (field 7) |
-| `07-SCREENSHOTS-OUT-OF-DATE.txt` | 7. not a field | which of the kit's 9.0.0 images and video no longer match 19.0.0's screens |
+| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | **to be captured from the 20.0.0 build** (field 7) |
+| `07-SCREENSHOTS-OUT-OF-DATE.txt` | 7. not a field | which of the kit's 9.0.0 images and video no longer match 20.0.0's screens |
 | `08-marquee-1400x560.png` | 8. Marquee promo tile | `extension/store-assets/marquee-1400x560.png` |
 | `12-test-username.txt` | 12. Test instructions: Username | the block under **Username** (no newline at the end) |
 | `12-test-password.txt` | 12. Test instructions: Password | the block under **Password** (no newline at the end) |
@@ -46,8 +46,8 @@ carries no installer, so nothing in the kit is bound to the item.
 | `12-test-instructions-long-reply.txt` | 12. not a box: the fuller text for a reply to a reviewer | the block under **The fuller text** (no newline at the end) |
 | `PASTE.md` | | this sheet |
 
-**Package first.** Upload `release/19.0.0/beethoven-19.0.0-chrome.zip` (the same bytes as the kit's
-`00-beethoven-19.0.0-chrome.zip`; check it against `release/19.0.0/SHA256SUMS.txt`, because a later
+**Package first.** Upload `release/20.0.0/beethoven-20.0.0-chrome.zip` (the same bytes as the kit's
+`00-beethoven-20.0.0-chrome.zip`; check it against `release/20.0.0/SHA256SUMS.txt`, because a later
 `npm run build` rewrites the copy in `extension/.output/`): under the draft's **Package** tab, once
 the item exists (`SUBMISSION.md`, section 1, item 4), or with the maintainer's own upload tool,
 `node extension/scripts/publish-store.mjs upload --publisher <id> --item <id> --zip <the zip>`,
@@ -72,7 +72,7 @@ python -X utf8 -c "from PIL import Image; import glob; [print(f, Image.open(f).s
 
 ### 1. Description (up to 16,000 characters)
 
-1,570 characters (counted with Python, without a trailing newline). Plain text: the line breaks are
+1,599 characters (counted with Python, without a trailing newline). Plain text: the line breaks are
 kept, nothing else is formatted. The same text as `LISTING.md`'s detailed description.
 
 ```
@@ -91,8 +91,8 @@ If the grid is out of reach, Beethoven waits and carries on by itself as soon as
 YOU NEED
 A Wayne State AccessID with a grid account, GlobalProtect, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
 
-By approval only: ask at https://openspineconsortium.com/
-One approval covers one installation: one Chrome profile on one computer.
+By approval only: ask at https://openspineconsortium.com/beethoven/
+One approval covers every installation of your own: your computers and your Chrome profiles.
 
 YOUR DATA
 To check your approval, Beethoven sends our access service the account name the grid's website shows and a random installation identifier, with your portal's address and the version. It sends nothing else about you. Your password goes only to the grid, never to us, and Beethoven keeps it, encrypted on this computer, only if you ask it to. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
@@ -121,7 +121,7 @@ English (United States)
 
 The field takes a YouTube address, not a file. The file, `extension/store-assets/promo/beethoven-promo.mp4`
 (28 seconds, 1280x720), was made from 9.0.0 and shows its toolbar-button start; **leave this field
-empty** until a video of 19.0.0 is made. To add one later: YouTube Studio, **Create**, **Upload
+empty** until a video of 20.0.0 is made. To add one later: YouTube Studio, **Create**, **Upload
 videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; paste the
 `https://youtu.be/...` link here.
 
@@ -131,7 +131,7 @@ videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; p
 
 ### 7. Screenshots (up to 5, 1280x800), in this order
 
-**To be captured from the 19.0.0 release build before submission** (`LISTING.md`, "Images and the
+**To be captured from the 20.0.0 release build before submission** (`LISTING.md`, "Images and the
 promo video"): 9.0.0's five show its setup page and old panel, and none has been captured yet.
 Suggested order, each a real capture on the mock account `st1234` (the GlobalProtect screen needs
 the real portal out of reach: the Wayne State portal chosen on the welcome page and GlobalProtect
@@ -274,9 +274,9 @@ creditworthiness or for lending.
 https://openspineconsortium.com/beethoven/privacy.html
 ```
 
-It must show version 13 (2026-10-09) before the submission: the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 13 (and `terms.html` version
-12). Then **Save draft**.
+It must show version 14 (2026-10-11) before the submission: the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 14 (and `terms.html` version
+13). Then **Save draft**.
 
 ## Distribution tab
 
@@ -298,13 +298,13 @@ without a trailing newline, ASCII only (but for the panel's own ellipsis charact
 fuller text, which is not pasted into the form); the second number is the count if the form counts
 each line break as two characters.
 
-**Not yet walked on a 19.0.0 build.** The quoted words below were in 16.0.0's sources
+**Not yet walked on a 19.0.0 or 20.0.0 build.** The quoted words below were in 16.0.0's sources
 (`extension/src/core/model.ts`, checked 2026-10-08); the sign-in sheet's words ("Sign in to the
 grid", "Remember it on this computer", "Sign in", "Use Chrome's sign-in box instead", "That password
 didn't work, and Beethoven stopped.") are the 19.0.0 build specification's, written while
 `model.ts` was being built beside this sheet, and are to be checked against it. The browser
 harness's scenarios 1 to 12 are the mock flow of 11.0.0 (`docs/V11_STATUS.md`), and whether they pass
-on 19.0.0, in `--auth basic` or not, is not yet measured.
+on 19.0.0 or 20.0.0, in `--auth basic` or not, is not yet measured.
 Nobody has walked the text by hand, as a reviewer would, in a fresh profile: do that before pasting
 (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"), and correct the text and its count here if a
 word differs. Nothing in it reaches the real grid: without the university's VPN the panel waits on
@@ -337,10 +337,10 @@ Then **Save changes**.
 **The fuller text, for a reply to a reviewer** (not for this form; 6,011 characters, 6,037 if each
 of its 26 line breaks counts as two). If a reviewer asks for test access or for the mock portal,
 reply with the letter in `SUBMISSION.md`, section 4, and this text under it, and attach
-`release/19.0.0/reviewer/beethoven-mock-portal.zip` (the mock portal, its stand-in scheduler and
-cluster tool and its one dependency, `ws`; no extension code; its `server.mjs` must be 19.0.0's,
+`release/20.0.0/reviewer/beethoven-mock-portal.zip` (the mock portal, its stand-in scheduler and
+cluster tool and its one dependency, `ws`; no extension code; its `server.mjs` must be 20.0.0's,
 with `--auth basic`). The mock was run end to end only on Windows, with Git for Windows, and not yet
-in `--auth basic` against a 19.0.0 build.
+in `--auth basic` against a 19.0.0 or 20.0.0 build.
 
 ```
 WHAT IT IS

@@ -1,6 +1,12 @@
 # Install Beethoven
 
-For Beethoven 19.0.0. Written 2026-10-02, updated 2026-10-09.
+For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-11.
+
+**Updating from 19.0.0.** Chrome updates Beethoven by itself and asks you nothing. Beethoven asks
+you to accept its terms once more, because they now say that your approval covers every
+installation of your own: Beethoven on a second computer of yours, or in another Chrome profile,
+works from its first check, where 19.0.0 stopped it with "set up on another computer". Nothing else
+changes, on your computer or on the grid.
 
 **Updating from 16.0.0, 17.0.0 or 18.0.0.** Chrome updates Beethoven by itself from its page in the
 Chrome Web Store, and asks you nothing: 19.0.0 needs nothing Chrome shows in its list. Beethoven

@@ -98,15 +98,20 @@ name and identifier carry no university name.
   model); a confirmed approval is kept 24 h (7 days when the service is unreachable), a refusal 10
   minutes. The sibling Beethoven for VS Code (Ashley for VS Code until 3.0.0) keeps its own key flow
   and the same approved list serves both.
-- **One approved account, one installation (decided 2026-09-30, 8.0.0).** The approval check also
-  sends `install_id`, the random identifier `ext/storage.ts` `installId()` makes once per
-  installation (16 random bytes, nothing about the device; a reinstall makes a new one). The service
-  binds an approved account to the first installation that asks; another gets
-  `"reason":"other_installation"` and the strip says "This account is already set up on another
-  computer. Ask your lab lead to move it here." with no button; an installation already bound to
-  another approved account gets `"reason":"other_account"` and "This installation of Beethoven is
-  already set up for another account. Ask your lab lead to move it to yours.", also with no button;
-  a request with no identifier gets `"update_required"`. The wire stays `v:1` (the service before
+- **One person's approval, every installation of their own (decided 2026-10-11, 20.0.0; one
+  installation per account from 8.0.0 to 19.0.0).** The approval check also sends `install_id`, the
+  random identifier `ext/storage.ts` `installId()` makes once per installation (16 random bytes,
+  nothing about the device; a reinstall makes a new one). An approved account is approved from every
+  installation that asks about it: the service records each one against the account (identifier,
+  product, version, first and last seen), keeps the ten most recently seen, and e-mails the
+  maintainer, at most once a day per account, when a new one asks, with one link, Withdraw approval,
+  and none to move it (a notice, nothing refused). One installation still serves one account: an
+  installation bound to one approved account gets `"reason":"other_account"` for any other, and the
+  strip says "This installation of Beethoven is already set up for another account. Ask your lab
+  lead to move it to yours." with no button; a request with no identifier gets `"update_required"`.
+  The reason `"other_installation"` is never sent any more; the extension still reads it, as a reason
+  an older service may send, and says it as before ("This account is already set up on another
+  computer. Ask your lab lead to move it here.", no button). The wire stays `v:1` (the service before
   8.0.0 refuses any other `v` and ignores unknown fields). Never a hardware address, serial or other
   device identifier, no fingerprinting, no obfuscation (Chrome forbids it; Vite's minification
   only): everything the check sends and the service keeps is written in `LICENSE.txt` section 3(e)
@@ -174,12 +179,14 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-09 and extension 19.0.0 `LICENSE.txt` is version 12 and `PRIVACY.md`
-  version 13, which describe Beethoven's own grid sign-in (the sheet, the answer to the portal's
-  HTTP sign-in under the narrow rule above, one wrong try and then stop, the Remember tick and the
-  passkey that unlocks the saved password, the one-shot password kept at most two minutes, Forget,
-  Chrome's box as the fallback, Chrome keeping the sign-in until it closes) on top of version 11 and
-  12 (16.0.0: the one way (the university's VPN and the portal; no bridge, no sign-in
+  Edition; since 2026-10-11 and extension 20.0.0 `LICENSE.txt` is version 13 and `PRIVACY.md`
+  version 14, which describe the relaxed installation rule (sections 3(e) and 10: one person's
+  approval on every installation of their own, the ten most recent installations kept per account,
+  a notice e-mail with a Withdraw link and none to move) on top of version 12 and 13 (19.0.0:
+  Beethoven's own grid sign-in: the sheet, the answer to the portal's HTTP sign-in under the narrow
+  rule above, one wrong try and then stop, the Remember tick and the passkey that unlocks the saved
+  password, the one-shot password kept at most two minutes, Forget, Chrome's box as the fallback,
+  Chrome keeping the sign-in until it closes) on top of version 11 and 12 (16.0.0: the one way (the university's VPN and the portal; no bridge, no sign-in
   sheet, no key in the browser), what an earlier version may have left (the bridge on the computer,
   the gate line in the grid account, a passkey; `hpcworker browser-key remove` or the lab lead
   removes the line) and 16.0.0's waiting press, keep-running and old-key note);
@@ -196,7 +203,7 @@ name and identifier carry no university name.
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 12 to match, with `TERMS_DATE` 2026-10-09; the framework's
+  `extension/src/core/terms.ts` is 13 to match, with `TERMS_DATE` 2026-10-11; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and
@@ -229,7 +236,9 @@ name and identifier carry no university name.
   holds the manifest exactly as the report's permission table specifies it; `src/core/` (audit
   chokepoint, net, redact, shell driver), `src/licensing/` (kill-list verification; no licence keys
   since 4.0.0), `src/entrypoints/` (onboarding, popup, sidepanel), `mock-ood/` (the reviewer's mock
-  portal, with a stand-in for the access service that binds one installation per approved account),
+  portal, with a stand-in for the access service that still binds one installation per approved
+  account, 8.0.0 to 19.0.0's rule, so the `other_installation` answer the extension still reads is
+  played),
   `scripts/sync-profiles.mjs` (copies `../framework/profiles/*.json` as data, and the two agreement
   texts, into `public/` before every build and zip; since 8.0.0 no framework code enters the
   package).

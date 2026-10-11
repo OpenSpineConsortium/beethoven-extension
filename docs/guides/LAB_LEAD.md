@@ -1,9 +1,9 @@
-# Beethoven 19.0.0 for the lab lead
+# Beethoven 20.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it then stood in the
 working tree; rewritten 2026-10-08 for 16.0.0, which removed the direct way of 12.0.0 to 15.0.0
-whole, and brought up to date 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
+whole, brought up to date 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid, and on 2026-10-11 for 20.0.0, which approves a student from every installation of their own. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
 lab's folders on the grid, was added 2026-10-02 with `tools/grid_access.sh` and revised that evening
 after its review.
 
@@ -41,6 +41,19 @@ passwords in web browsers or computer programs, so tell Wayne State students to 
 3). Nothing changes on the grid: no framework change, no new line typed, and the VPN is still needed.
 The manifest gains `webRequest` and `webRequestAuthProvider` (no install warning). The agreement is
 version 12 and the privacy statement version 13, of 2026-10-09, so every student accepts once more.
+
+**20.0.0 (2026-10-11).** One person's approval, every installation of their own (Greg's decision of
+2026-10-11). A student's second computer, another Chrome profile or a reinstallation is approved at
+its first check, where 8.0.0 to 19.0.0 refused it until you moved the approval. The access service
+records each installation an account asks from (its random identifier, the product, the version,
+first and last seen), keeps the ten most recent, and e-mails you, at most once a day per account,
+when a new one asks: a notice, with one link, **Withdraw approval**, which you press only when the
+installation cannot be the student's; there is no Move link and nothing to move. `admin.mjs seat
+<AccessID>` still shows an account's installations and `reset-seat` still forgets them, and one
+installation still serves one account: a browser first used with another student's AccessID is
+refused for this one until you release it (`reset-seat` or `remove` on the account that holds it).
+The agreement is version 13 and the privacy statement version 14, of 2026-10-11, so every student
+accepts once more.
 
 ## 1. What changes for you
 
@@ -92,10 +105,11 @@ version 12 and the privacy statement version 13, of 2026-10-09, so every student
   that may enter the lab's volume, kept on the grid by `tools/grid_access.sh`, every fifteen minutes
   from your PC (section 9). An approval for the lab only (`approve-lab`) does not put anyone on it,
   and neither does the store reviewers' mock account. Until a newly approved student is on it, their
-  setup ends in `Permission denied`. Otherwise approvals are as before: one approved account, one
-  installation. Moving a student to a new computer is still `admin.mjs` (or the e-mail's link).
-  Withdrawing an approval takes their AccessID off the list at the next run (section 9); a line an
-  earlier version added to their `~/.ssh/authorized_keys` is not touched by it (section 5).
+  setup ends in `Permission denied`. Otherwise approvals are as before, except that since 20.0.0 an
+  approval covers every installation of the student's own: a new computer needs nothing from you,
+  and the e-mail about it is a notice whose one link withdraws. Withdrawing an approval takes their
+  AccessID off the list at the next run (section 9); a line an earlier version added to their
+  `~/.ssh/authorized_keys` is not touched by it (section 5).
 
 ## 2. Before the first student
 

@@ -46,8 +46,10 @@ export async function prefs(): Promise<Prefs> {
 /**
  * This installation's random identifier, made once from the browser's random generator and from
  * nothing about the device. It names the acceptance record and the consent marker, and the approval
- * check sends it so that one approved account is used from one installation (licensing/access.ts).
- * Uninstalling removes it and a reinstall makes a new one; nothing here ever clears it.
+ * check sends it so that Licensor's service sees which installations ask about an account (every
+ * one of the person's own is approved; 8.0.0 to 19.0.0 bound an account to one) and binds each
+ * installation to the one account it serves (licensing/access.ts). Uninstalling removes it and a
+ * reinstall makes a new one; nothing here ever clears it.
  */
 export async function installId(): Promise<string> {
   let id = await local.get<string>(INSTALL_ID_KEY);

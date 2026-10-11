@@ -913,18 +913,22 @@ From the report's "Security controls", in the order a reviewer will look for the
   by the automatic start, and the one button is *Ask for access*. The name asked about is only the
   one the dashboard page shows (`SessionInfo.username`), never a typed one (the AccessID typed into
   the 19.0.0 sign-in sheet is only the HTTP sign-in's user name) and never the home-directory fallback. Nothing is read from a cookie.
-- **One approved account, one installation (8.0.0).** The check also carries `install_id`, the
-  random identifier `installId()` in `ext/storage.ts` makes once per installation (nothing about the
-  device; a reinstall makes a new one). The service binds an approved account to the first
-  installation that asks and refuses any other with `"reason":"other_installation"`, which the strip
-  says as "This account is already set up on another computer. Ask your lab lead to move it here."
-  with no button, until the maintainer moves the approval; an installation already bound to another
-  approved account gets `"reason":"other_account"`, said as "This installation of Beethoven is
-  already set up for another account. Ask your lab lead to move it to yours.", also with no button;
-  a check without an identifier gets `"update_required"`. The wire stays `v:1`. The binding is
-  enforced by the extension against the service's answer, so it keeps an approval from being shared
-  casually and proves nothing against a modified copy; a move or a withdrawal reaches an
-  installation holding a fresh yes within a day (7 days offline).
+- **One person's approval, every installation of their own (20.0.0; one installation per account
+  from 8.0.0 to 19.0.0).** The check also carries `install_id`, the random identifier `installId()`
+  in `ext/storage.ts` makes once per installation (nothing about the device; a reinstall makes a new
+  one). The service approves an approved account from every installation that asks about it, records
+  each one against the account (identifier, product, version, first and last seen; the ten most
+  recently seen kept) and e-mails the maintainer, at most once a day per account, when a new one
+  asks, with a link that withdraws the approval and none that moves it; an installation already
+  bound to another approved account gets `"reason":"other_account"`, said as "This installation of
+  Beethoven is already set up for another account. Ask your lab lead to move it to yours." with no
+  button; a check without an identifier gets `"update_required"`. `"reason":"other_installation"`,
+  with which 8.0.0 to 19.0.0's service refused an account bound to another installation, is never
+  sent any more and still read, said as "This account is already set up on another computer. Ask
+  your lab lead to move it here." with no button. The wire stays `v:1`. The binding is enforced by
+  the extension against the service's answer, so it keeps an approval from being shared casually and
+  proves nothing against a modified copy; a withdrawal reaches an installation holding a fresh yes
+  within a day (7 days offline).
 - **Two gates between a request and a working installation: the group and the approval.** The
   listing on the Chrome Web Store is private, so Chrome installs Beethoven only for the Google
   accounts in the lab's Google Group `Beethoven-users`; the approval check then decides whether an

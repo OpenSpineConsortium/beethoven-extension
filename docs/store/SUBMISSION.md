@@ -5,7 +5,7 @@ dashboard's order, with the text to paste or the file to upload. `LISTING.md` ho
 the reasons behind them; this file says what to do around the paste, in what order. Written
 2026-09-29 for 4.0.0, rewritten on 2026-09-30 for 8.0.0, brought up to date for 9.0.0 and 10.0.0,
 brought up to date for 12.0.0 on 2026-10-02, for 15.0.0 on 2026-10-04, for 16.0.0 on
-2026-10-08, and for 19.0.0 on 2026-10-09. Neither 9.0.0, 10.0.0 nor 11.0.0 was submitted for review; 12.0.0 carried 11.0.0's
+2026-10-08, for 19.0.0 on 2026-10-09, and for 20.0.0 on 2026-10-11. Neither 9.0.0, 10.0.0 nor 11.0.0 was submitted for review; 12.0.0 carried 11.0.0's
 changes (the welcome page with one tick, the window-wide panel, no `activeTab`) and its own (the
 direct way over ssh through the helper inside the package, the `nativeMessaging` permission, the
 Authentication information data type, agreement version 9 and privacy statement version 10), and
@@ -18,7 +18,10 @@ into its own sheet (saved behind a passkey only if the student ticks *Remember i
 computer*), and keeps Chrome's sign-in box as the other way: the Chrome manifest adds `webRequest`
 and `webRequestAuthProvider` (never `webRequestBlocking`), Authentication information is Yes again,
 and the agreement is version 12 and the privacy statement version 13. 17.0.0 and 18.0.0 were not
-submitted with texts of their own. Beethoven is offered in one place only: a **Private** item on the Chrome Web Store,
+submitted with texts of their own. 20.0.0 (2026-10-11) changes no permission and no data type: an
+approved account now works from every installation of its own, the service keeping the ten most
+recent and e-mailing the maintainer of a new one with a link to withdraw and none to move, and the
+agreement is version 13 and the privacy statement version 14. Beethoven is offered in one place only: a **Private** item on the Chrome Web Store,
 visible to the trusted testers the maintainer names, a Google Group he keeps with his personal
 Google account and to which he adds each student he approves for Beethoven. No other store, no
 download from the website and no signed file: the website shows no install link at all, the package
@@ -28,10 +31,12 @@ writing, and the texts are what matter.
 
 What one private listing does and does not do, so nobody is told more than is true: only the Google
 accounts in the group can open the listing and install from it, and the extension then works only
-for an approved AccessID on the one installation that approval is bound to. It does not make a copy
-impossible to pass around (an installed extension's files sit in the browser profile), and the
-binding is checked by the extension itself against the access service; it keeps an approval from
-being shared casually, and the agreement makes sharing a breach.
+for an approved AccessID, from the installations of that person's own (since 20.0.0; 8.0.0 to 19.0.0
+bound an approval to one installation). It does not make a copy impossible to pass around (an
+installed extension's files sit in the browser profile), and the check is made by the extension
+itself against the access service, which records every installation an account asks from and tells
+the maintainer of a new one; it keeps an approval from being shared casually, and the agreement
+makes sharing a breach.
 
 ## 0. Before the first submission
 
@@ -39,24 +44,24 @@ Have these in hand, and check each once:
 
 1. The package, made on the maintainer's own computer once the version is raised, committed on
    `main` and pushed: in `extension/`, `npm ci`, `npm run typecheck`, `npm test`, `npm run build`
-   and `npm run zip`, which writes `extension/.output/beethoven-19.0.0-chrome.zip`. Copy it to
-   `release/19.0.0/beethoven-19.0.0-chrome.zip` and record the folder as 14.0.0's was
+   and `npm run zip`, which writes `extension/.output/beethoven-20.0.0-chrome.zip`. Copy it to
+   `release/20.0.0/beethoven-20.0.0-chrome.zip` and record the folder as 14.0.0's was
    (`release/14.0.0/README.md`: a `README.md`, `guides/` and `SHA256SUMS.txt`); the zip itself stays
    out of the repository (`.gitignore`) and the committed checksums pin it, so a later build, which
    rewrites `.output/`, cannot be mistaken for it. The hand test (`TEST_BEFORE_UPLOAD.md`) comes
    between the build and the upload. The upload is the maintainer's own tool, `node
    extension/scripts/publish-store.mjs upload --publisher <id> --item <id> --zip
-   release/19.0.0/beethoven-19.0.0-chrome.zip`, with `--publish` to submit it for review in the same
+   release/20.0.0/beethoven-20.0.0-chrome.zip`, with `--publish` to submit it for review in the same
    run (item 7; its header says how it signs in; the first submission goes by hand, section 1, item
    4), or by hand under the item's **Package** tab. Nothing is signed and nothing is built outside
-   `extension/`: 19.0.0, like 16.0.0, has no helper, no installer and no signing step. `npm run
+   `extension/`: 20.0.0, like 16.0.0, has no helper, no installer and no signing step. `npm run
    zip` also writes a Firefox zip and a sources zip; neither is uploaded or sent to anyone. A
-   reviewer who asks for the mock portal gets `release/19.0.0/reviewer/beethoven-mock-portal.zip`,
-   which holds the mock (19.0.0's, with `--auth basic`) and no extension code (section 4); make it
+   reviewer who asks for the mock portal gets `release/20.0.0/reviewer/beethoven-mock-portal.zip`,
+   which holds the mock (20.0.0's, with `--auth basic`) and no extension code (section 4); make it
    by hand after the record, as 12.0.0's was
    (`release/12.0.0/README.md`, "The reviewers' mock portal"). Confirm it is a release build: `unzip
-   -p release/19.0.0/beethoven-19.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
-   `"version":"19.0.0"`, the 128-character `description` in `LISTING.md`,
+   -p release/20.0.0/beethoven-20.0.0-chrome.zip manifest.json` must show `"name":"Beethoven"`,
+   `"version":"20.0.0"`, the 128-character `description` in `LISTING.md`,
    `"homepage_url":"https://openspineconsortium.com/beethoven/"`,
    `"optional_host_permissions":["https://*/*"]` and no `localhost`, the six permissions `storage`,
    `alarms`, `scripting`, `sidePanel`, `webRequest` and `webRequestAuthProvider`, all under
@@ -67,40 +72,46 @@ Have these in hand, and check each once:
    extension may show the product's old name (`grep -ril` over the unpacked zip; the kill-list's
    format tag inside the bundle is the one allowed exception).
 2. The images named in `PASTE.md` (all under `extension/store-assets/`; its `manifest.txt` says how
-   each was made). **The five screenshots must be captured again from the 19.0.0 build**
+   each was made). **The five screenshots must be captured again from the 20.0.0 build**
    (`LISTING.md`, "Images and the promo video"; none exists yet); the promo video field stays empty
-   until a 19.0.0 video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a
+   until a 20.0.0 video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a
    one-line check). Look at each one before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
-   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 13), `.../beethoven/terms.html`
-   (the text of `LICENSE.txt` version 12), `.../beethoven/support.html` and
+   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 14), `.../beethoven/terms.html`
+   (the text of `LICENSE.txt` version 13), `.../beethoven/support.html` and
    `.../beethoven/request.html` (which must fill its AccessID field from `?access_id=<account>`,
    since the panel's *Ask for access* button opens it that way, and which asks for the Google
    account the invitation goes to). The pages show one install card, "Private listing, by
    invitation", and no download and no other browser. Reviewers open the privacy URL; a 404 there is
    a rejection. `docs/PUBLISHING_SITE.md` builds and checks them. **The upload waits until
-   https://openspineconsortium.com/beethoven/privacy.html shows version 13**: 19.0.0's Authentication
-   information answer and its two new permissions rest on that text, and the reviewers page
+   https://openspineconsortium.com/beethoven/privacy.html shows version 14**: 19.0.0's Authentication
+   information answer and its two permissions rest on that text, and 20.0.0's installation rule too, and the reviewers page
    (`/beethoven/reviewers.html`) must carry `LISTING.md`'s negative-statement block word for word.
 4. `https://openspineconsortium.com/beethoven/killlist.json`, the signed list of withdrawn
    versions the extension fetches once a day, published with `Access-Control-Allow-Origin: *`.
-5. The access service, with the one-installation rule, exactly as for 10.0.0:
+5. The access service, with the installation rule of 20.0.0 (an approved account from every
+   installation of its own; an installation serves one account):
    `https://openspineconsortium.com/beethoven/services.json` must carry the `access_check` address
    `https://beethoven-access.openspineconsortium.workers.dev/access_check`, and the mock's username
    `st1234` must answer yes **from any installation**, at portal `localhost` only. From WSL (Windows
-   sockets flake), two checks with two different installation identifiers:
-   `curl -s -X POST -H 'content-type: text/plain;charset=UTF-8' --data '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"19.0.0","install_id":"00000000000000000000000000000001"}' https://beethoven-access.openspineconsortium.workers.dev/access_check`
-   and the same with `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
+   sockets flake), two checks with two different installation identifiers: `curl -s -X POST -H
+   'content-type: text/plain;charset=UTF-8' --data
+   '{"v":1,"access_id":"st1234","portal":"localhost","product":"bridge","version":"20.0.0","install_id":"00000000000000000000000000000001"}'
+   https://beethoven-access.openspineconsortium.workers.dev/access_check` and the same with
+   `...0002`. Both must answer `{"approved":true,"access_id":"st1234",...}` with
    `access-control-allow-origin: *`. If the second answers `"reason":"other_installation"`, the
-   exemption is missing: `admin.mjs seat-rule st1234 any` in the access service's own repository,
-   `OpenSpineConsortium/beethoven-access` (`tools/intake/` of Beethoven for VS Code until
-   2026-10-07; token from the vendor folder, never on the command line). Never run this check with a
-   real student's AccessID: the first identifier that asks binds that account. The access service of
-   2026-10-01 (st1234 only at `localhost`, a public `GET /allowlist` that names nobody) must be
-   deployed under both names first, in the order the 10.0.0 text of this file gave (git history of
-   this file, section 0, item 5). 12.0.0, 15.0.0, 16.0.0 and 19.0.0 change nothing in the check: no
-   new field, and it is sent only after the portal has shown the account name. In 19.0.0 that name is
-   still the one the portal's dashboard shows, never the AccessID typed into the sign-in sheet.
+   service is still the one of 8.0.0 to 19.0.0, which bound an account to one installation, and the
+   mock account's exemption is missing: deploy the service of 2026-10-11, or `admin.mjs seat-rule
+   st1234 any` in the access service's own repository, `OpenSpineConsortium/beethoven-access`
+   (`tools/intake/` of Beethoven for VS Code until 2026-10-07; token from the vendor folder, never
+   on the command line). Never run this check with a real student's AccessID: the identifier is
+   recorded against that account as one of its installations, bound to it, and the maintainer is
+   e-mailed about a new installation. The access service of 2026-10-01 (st1234 only at `localhost`,
+   a public `GET /allowlist` that names nobody) must be deployed under both names first, in the
+   order the 10.0.0 text of this file gave (git history of this file, section 0, item 5). 12.0.0,
+   15.0.0, 16.0.0 and 19.0.0 change nothing in the check: no new field, and it is sent only after
+   the portal has shown the account name. In 19.0.0 that name is still the one the portal's
+   dashboard shows, never the AccessID typed into the sign-in sheet.
 6. The Google Group of testers, made once at `https://groups.google.com` with the personal Google
    account that owns the developer account: the name "Beethoven-users"; who can search for the group:
    only members; who can join: only invited users; who can view members and who can post: group
@@ -146,7 +157,7 @@ The item (about thirty minutes):
    public. Nothing in the package depends on it: 19.0.0 carries no installer bound to the item
    (15.0.0's were built for its ID, which is why the ID then had to come before the package).
    Submitting comes last, at item 9, once every tab below is filled.
-5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,570 characters);
+5. **Store listing** tab, from `PASTE.md`, top to bottom: the description (1,599 characters);
    Category Developer Tools; Language English (United States); the store icon; the promo video field
    empty; the small promo tile; the five screenshots captured from 19.0.0, in the order given; the
    marquee; Official URL (empty until the site is verified); Homepage URL
@@ -158,7 +169,7 @@ The item (about thirty minutes):
    using remote code?" No; Data usage: tick "Personally identifiable information" and
    "Authentication information", each with its sentence from `PASTE.md`, and leave every other
    category unticked; tick the three certifications; Privacy policy URL
-   `https://openspineconsortium.com/beethoven/privacy.html` (version 13 live). Save draft.
+   `https://openspineconsortium.com/beethoven/privacy.html` (version 14 live). Save draft.
 7. **Distribution** tab: Payments Free; Visibility **Private**, and add the address of the
    Beethoven-users group from section 0, item 6. Regions: United States only. Save draft. Chrome's
    documentation (`https://developer.chrome.com/docs/webstore/cws-dashboard-distribution`, read
@@ -167,7 +178,7 @@ The item (about thirty minutes):
 8. **Test instructions** tab (under **Access** in the left menu), from `PASTE.md`: the username
    sentence, the password sentence (the mock's made-up password, never a real one), and the
    Additional instructions (494 characters, within the box's 500). Save changes. Before pasting,
-   walk the instructions on the 19.0.0 build
+   walk the instructions on the 20.0.0 build
    (`TEST_BEFORE_UPLOAD.md`, "Just before uploading"). The fuller text below them in `PASTE.md` is
    not pasted: it goes into a reply if a reviewer asks (section 4).
 9. **Submit for review** (top right). A Private item is reviewed like a public one.
@@ -189,8 +200,9 @@ updated from one of them loses the `nativeMessaging` permission without a prompt
 direct way left in the browser on its first run, and notes once in Settings a key an earlier version
 added to the grid account). An update to 19.0.0 adds `webRequest` and `webRequestAuthProvider`,
 neither of which shows a line in Chrome's install dialog, so Chrome does not disable the installed
-copy or ask the student anything; the changed agreement (version 12) is shown again on the first
-run and accepted again before Beethoven does anything.
+copy or ask the student anything; an update to 20.0.0 changes no permission at all. The changed
+agreement (version 13) is shown again on the first run and accepted again before Beethoven does
+anything.
 
 ## 2. The deploy order with the access service
 
@@ -214,10 +226,13 @@ never calls the shared copy outdated.)
   the item's link (`https://chromewebstore.google.com/detail/<item-id>`) with one line: open it in
   Chrome, signed in with that Google account, on the computer you will use; *Add to Chrome*; then
   follow `docs/guides/INSTALL.md` (send it, or the support page).
-- **"... asked from a second installation; it was refused."** As before: *Move the approval to the
-  new installation* when the student changed computers, Chrome profiles or reinstalled; withdraw and
-  ask if they do not know of one. The access service's `admin.mjs seat <AccessID>` shows the
-  binding; `reset-seat <AccessID>` clears it.
+- **The notice "Beethoven: <name> (<AccessID>) is using a new installation".** Since 20.0.0: the
+  student's second computer, another Chrome profile or a reinstallation was approved at its first
+  check, and the e-mail says so, at most once a day per account, with one link, *Withdraw approval*,
+  for the case where the student knows of no such installation (ask them first). There is no Move
+  link and nothing to move; the service of 8.0.0 to 19.0.0 refused the second installation and
+  offered a move instead. The access service's `admin.mjs seat <AccessID>` shows the account's
+  installations; `reset-seat <AccessID>` forgets them.
 - **"This installation of Beethoven is already set up for another account."** One installation serves
   one account; two approved students who share a computer each need a Chrome profile of their own.
 - **Withdrawing.** Withdraw in the admin console (or the e-mail link), and remove the Google account

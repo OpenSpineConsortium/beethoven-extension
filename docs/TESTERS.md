@@ -12,7 +12,8 @@ Written 2026-09-29 for 4.0.0 and brought up to date for 6.0.0, for 7.0.0, the fi
 Beethoven, and for 8.0.0, the first build offered only through a private listing on the Chrome Web
 Store, with one installation per approved account; on 2026-09-30 also for the steps between the
 request and the installation (the mailbox confirmation and the invitation to the lab's Google
-Group). If you tested an earlier build under another name or loaded one by hand, remove it from your
+Group), and on 2026-10-11 for 20.0.0, which approves your account from every installation of your
+own. If you tested an earlier build under another name or loaded one by hand, remove it from your
 browser before you install this one; your approval carries over, and you accept the agreement once
 more.
 
@@ -28,7 +29,7 @@ more.
   form. Beethoven is offered in no other browser and no other store, and there is no download.
 - Your Wayne State mailbox (`<AccessID>@wayne.edu`), in case the service asks you to confirm your
   request from it (step 1).
-- The one computer and the one Chrome profile you will use it from (see step 2).
+- The computers and Chrome profiles you will use it from (see step 2).
 
 ## 1. Ask for access
 
@@ -73,17 +74,17 @@ Chrome's own prompt. Updates come by themselves through Chrome. If the listing d
 either Chrome is signed in with another Google account or yours is not in the group yet: check the
 first, then ask Greg.
 
-One approved account, one installation. The first installation that checks your account is bound to
-it (Greg's list then shows you as installed). Another computer, another Chrome profile or a
-reinstallation is a new installation, and it is refused: its panel says "This account is already set
-up on another computer. Ask your lab lead to move it here." If you change computers or reinstall, ask
-Greg to move your approval; the new installation works at its next check, and the old one stops at
-its own next check, within a day while it is online (it keeps a yes up to seven days when it cannot
-reach the service). The identifier behind this is a random number the extension makes for itself; it
-is not taken from your computer, and Chrome does not sync it. So if Chrome Sync installs Beethoven on
+Your approval, every installation of your own. Each installation that checks your account is
+recorded against it (Greg's list then shows it), and it works at its first check: another computer,
+another Chrome profile or a reinstallation is a new installation, and it is approved like the first;
+Greg is told by e-mail that a new one asked, as a notice, and the e-mail's one link withdraws the
+approval, which he presses only if the installation is not yours. One installation serves one
+account: the first account it checks is bound to it, and a check from it for any other account is
+refused. The identifier behind this is a random number the extension makes for itself; it is not
+taken from your computer, and Chrome does not sync it. So if Chrome Sync installs Beethoven on
 another computer where Chrome is signed in to the same Google account, that copy is a new
-installation and is refused: remove it there, or turn off syncing of extensions in Chrome's settings
-on the computers you do not use for Beethoven.
+installation of yours, and it works there too; remove it if you do not use that computer for
+Beethoven, or turn off syncing of extensions in Chrome's settings there.
 
 The extension's welcome page opens by itself. Read *You'll need* (a grid account, your university's
 VPN, Claude Pro or Max), tick the one box (*Show terms* opens the agreement) and choose *Agree and
@@ -129,26 +130,25 @@ access*, wait ten minutes and click again (the extension keeps a "no" for ten mi
 service's storage can take a minute to catch up). If it still says so after that, send Greg the
 account name the panel shows under *Details* (check 4, "signed in as").
 
-## If the panel says "This account is already set up on another computer"
+## If the panel says "This installation of Beethoven is already set up for another account"
 
-Your approval is bound to another installation: another computer, another Chrome profile, or this
-one before a reinstallation. There is no button; ask Greg to move the approval here, then click the
-icon again. If it says "Install the current Beethoven from the lab's private listing.", your copy is
-older than the service accepts: update it from the private listing's page.
-
-If it says "This installation of Beethoven is already set up for another account.", this browser's
-Beethoven was first used with someone else's account, and one installation serves one account. Use
-your own installation, or ask Greg to release this one for you.
+This browser's Beethoven was first used with someone else's account, and one installation serves one
+account. There is no button; use your own installation, or ask Greg to release this one for you, then
+click the icon again. If it says "Install the current Beethoven from the lab's private listing.", your
+copy is older than the service accepts: update it from the private listing's page. "This account is
+already set up on another computer" is an answer the service gave before 20.0.0 and gives no more:
+every installation of your own is approved; if you still see it, Greg's service is out of date, and he
+knows what to do.
 
 ## What the extension sends the maintainer, so you know
 
 Only the approval check: the account name your portal shows for you, your portal's hostname, the
 product name, the extension's version and the random identifier of this installation, answered yes
 or no; the service records those with the time, a salted hash of your network address and the
-answer, and keeps which installation your approval is bound to. Once a day it also downloads,
-without cookies, two small files from the maintainer's website (the service address and the signed
-list of withdrawn versions), which carry nothing about you. No usage data, no error reports, no
-activation. The full statement is `PRIVACY.md` (version 12), also at
+answer, and keeps the ten most recent installations your account has asked from. Once a day it also
+downloads, without cookies, two small files from the maintainer's website (the service address and
+the signed list of withdrawn versions), which carry nothing about you. No usage data, no error
+reports, no activation. The full statement is `PRIVACY.md` (version 14), also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
 ## What to send when something does not work

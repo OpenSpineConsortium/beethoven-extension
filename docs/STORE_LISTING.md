@@ -57,8 +57,8 @@ access*, opens the vendor's own request page in a new tab when the account the p
 yet approved, with that account name in the page's address so the form is filled in; it is a link
 the person clicks, and nothing of the extension runs there. There is no licence key anywhere in the
 product: the person's own sign-in to their portal identifies them, and the extension confirms with
-the vendor's access service that the account is approved and that this installation is the one the
-approval is bound to (one approved account, one installation).
+the vendor's access service that the account is approved (since 20.0.0 from every installation of
+the person's own; one installation serves one account).
 
 ## Per-permission justifications (one sentence each; the texts entered in the dashboard are in `store/PASTE.md`)
 
@@ -111,22 +111,21 @@ submission): (1) the approval check, a `POST` without cookies to the `access_che
 portal's dashboard shows for the signed-in session (never a typed one), the portal's hostname, the
 product (`bridge`), the version and the installation identifier (32 random hexadecimal characters
 the extension makes for itself when the agreement is accepted, from the browser's random number
-generator and nothing about the device), answered yes or no, a no with a reason when the account is
-bound to another installation, the installation to another account, or the build is too old; made
-only after acceptance and once the portal is connected, on each icon click and once a day (a yes is
-kept 24 h, up to 7 days when the service is unreachable; a no 10 minutes); the vendor records the
-check with the time, a salted hash of the network address and the answer, and keeps, per approved
-account, the installation it is bound to with its first and last check, and a count of refused
-checks from other installations or for other accounts. (2) One request a day each for
-`services.json` (the service address) and the signed withdrawn-versions list at
-`https://openspineconsortium.com/beethoven/killlist.json` (`src/licensing/killlist.ts`), sent with
-`credentials: 'omit'`; they carry nothing about the person beyond the network address any web
-request carries. There is no licence key and no activation request. There are no error or crash
-reports and no usage data: the code has none and no address to send them to. Every other request
-goes to the one portal origin the person granted, from the page script on that origin, with the
-browser carrying the portal cookie (never read). The extension opens, in a new tab and with no code
-of its own on them, the portal's own pages, Anthropic's sign-in page (only an https address on
-claude.ai or claude.com, printed by the sitting), the session's
+generator and nothing about the device), answered yes or no, a no with a reason when the
+installation is bound to another account or the build is too old; made only after acceptance and
+once the portal is connected, on each icon click and once a day (a yes is kept 24 h, up to 7 days
+when the service is unreachable; a no 10 minutes); the vendor records the check with the time, a
+salted hash of the network address and the answer, and keeps, per approved account, the ten most
+recent installations it has asked from with their first and last check, and a count of refused
+checks for other accounts. (2) One request a day each for `services.json` (the service address) and
+the signed withdrawn-versions list at `https://openspineconsortium.com/beethoven/killlist.json`
+(`src/licensing/killlist.ts`), sent with `credentials: 'omit'`; they carry nothing about the person
+beyond the network address any web request carries. There is no licence key and no activation
+request. There are no error or crash reports and no usage data: the code has none and no address to
+send them to. Every other request goes to the one portal origin the person granted, from the page
+script on that origin, with the browser carrying the portal cookie (never read). The extension
+opens, in a new tab and with no code of its own on them, the portal's own pages, Anthropic's sign-in
+page (only an https address on claude.ai or claude.com, printed by the sitting), the session's
 `https://claude.ai/code?environment=...` link, `https://claude.ai/settings/connectors`, and, from
 the *Ask for access* button, the vendor's request page with the account name in its address. What
 stays on the device: portal hostname and granted origin, preferences, the acceptance record, the
