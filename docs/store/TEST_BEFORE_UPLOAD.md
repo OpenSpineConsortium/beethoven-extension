@@ -1,4 +1,4 @@
-# Testing Beethoven 19.0.0 by hand before the store upload
+# Testing Beethoven 20.0.0 by hand before the store upload
 
 One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in (a private
 listing on the Chrome Web Store; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up to date
@@ -9,13 +9,14 @@ Hello / Touch ID, Forget this computer), brought up to date on 2026-10-04 for 15
 signed installers), and rewritten on 2026-10-08 for 16.0.0, which removed the direct way whole: one
 way to the grid, GlobalProtect and the portal, as in 11.0.0, with a press that waits for
 GlobalProtect and a note in Settings about a key an earlier version left. Brought up to date on
-2026-10-09 for 19.0.0, in which Beethoven signs in to the grid itself: the AccessID and password typed
-into its own sheet, saved behind a passkey only when *Remember it on this computer* is ticked, and
-Chrome's own box (18.0.0's way) as the other way. The agreement is version 12 and the privacy
-statement version 13. The build is in `extension/.output/chrome-mv3/`; the zip
-beside it is what the store gets. To build it: Node 22, then `npm ci`, `npm run typecheck`, `npm
-test`, `npm run build` and `npm run zip` in `extension/` (`SUBMISSION.md`, section 0, item 1).
-Nothing is signed, and nothing is installed outside the browser.
+2026-10-09 for 19.0.0, in which Beethoven signs in to the grid itself: the AccessID and password
+typed into its own sheet, saved behind a passkey only when *Remember it on this computer* is ticked,
+and Chrome's own box (18.0.0's way) as the other way; and on 2026-10-11 for 20.0.0, which approves
+an account from every installation of its own. The agreement is version 13 and the privacy statement
+version 14. The build is in `extension/.output/chrome-mv3/`; the zip beside it is what the store
+gets. To build it: Node 22, then `npm ci`, `npm run typecheck`, `npm test`, `npm run build` and `npm
+run zip` in `extension/` (`SUBMISSION.md`, section 0, item 1). Nothing is signed, and nothing is
+installed outside the browser.
 
 This is the pass only you can make: it signs in to the real grid with your own account, through the
 real portal with GlobalProtect on. Nothing in it was run by the stream that wrote it: every screen
@@ -29,9 +30,12 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
 
 - Your AccessID is approved for Beethoven (`admin.mjs list` in the access service's own repository,
   `OpenSpineConsortium/beethoven-access`, shows it).
-- One approved account, one installation. The unpacked build is an installation: clear your seat
-  first (the access service's `admin.mjs reset-seat <your AccessID>`), and again after the test,
-  before you install from the private listing.
+- Your approval covers every installation of your own (20.0.0). The unpacked build is an
+  installation like any other: the service records it against your AccessID at its first check,
+  approves it, and e-mails the maintainer once that a new installation asked (a notice; its one link
+  withdraws, so do not press it). After the test, `admin.mjs reset-seat <your AccessID>` in the
+  access service's own repository forgets the installations, if you want the list clean before you
+  install from the private listing.
 - The lab's shared copy of the cluster-side tool is published (`docs/guides/LAB_LEAD.md`), and
   your account can read it.
 - You know your grid password. Wayne State disables an AccessID after the fifth wrong password, and
@@ -60,7 +64,7 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
    to protect.wayne.edu.", **How to set it up**) and **Claude Pro or Max** ("The account you use at
    claude.ai.", **See plans**). Each link opens the university's or Anthropic's own page in a new tab
    only when pressed; no QR code is drawn and no code-setup step is offered. **Show terms** opens
-   version 12 and the privacy statement version 13. Tick the box and press **Agree and continue**.
+   version 13 and the privacy statement version 14. Tick the box and press **Agree and continue**.
    Chrome asks to let Beethoven reach `ondemand.grid.wayne.edu`, that one site only: choose
    **Allow** (as in 11.0.0).
 3. **Pin the icon**: puzzle-piece icon, pin *Beethoven*.
@@ -179,8 +183,11 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
     ciphertext, and nothing after **Forget**. **Show log** says "Signed in to the grid as st1234"
     and never shows the password. On the grid, read the exported audit log by eye: no password, no
     code.
-18. **A second installation.** As in 10.0.0: a second Chrome profile with the unpacked build stops
-    at "<AccessID> is set up on another computer. Your lab lead can move it here."
+18. **A second installation.** New in 20.0.0: a second Chrome profile with the unpacked build is
+    approved at its first check and reaches the strip's next step (10.0.0 to 19.0.0 stopped it at
+    "<AccessID> is set up on another computer. Your lab lead can move it here."); the maintainer's
+    mailbox gets one notice ("Beethoven: <AccessID> is using a new installation") with a *Withdraw
+    approval* link and no Move link, and no second notice for a third profile the same day.
 19. **Anthropic addresses are refused before any prompt** (10.0.0's step 15, on the welcome page's
     **Use another portal** field): `claude.ai`, `anthropic.com`, `www.claude.com` each answer
     "That's a Claude address, not your grid." and Chrome shows no prompt; `chrome://extensions`,
@@ -192,14 +199,14 @@ allowed the portal, and then only that site.
 
 ## Just before uploading
 
-- `unzip -p release/19.0.0/beethoven-19.0.0-chrome.zip manifest.json` (the file you upload; its
-  SHA-256 matches `release/19.0.0/SHA256SUMS.txt`) shows version 19.0.0, the name Beethoven, the
+- `unzip -p release/20.0.0/beethoven-20.0.0-chrome.zip manifest.json` (the file you upload; its
+  SHA-256 matches `release/20.0.0/SHA256SUMS.txt`) shows version 20.0.0, the name Beethoven, the
   128-character `description` in `LISTING.md`, the permissions `storage`, `alarms`, `scripting`,
   `sidePanel`, `webRequest` and `webRequestAuthProvider`, optional host `https://*/*`, nothing else
   (no `nativeMessaging`, no `webRequestBlocking`), and no `"key"`.
   `unzip -l` lists `fonts/` and no `bridge/`: no `.msi`, no `.pkg`, no script zip.
-- The five public pages open; `privacy.html` says version 13 and `terms.html` version 12 (the upload
-  waits for version 13 there); the reviewers page carries `LISTING.md`'s negative statements; none
+- The five public pages open; `privacy.html` says version 14 and `terms.html` version 13 (the upload
+  waits for version 14 there); the reviewers page carries `LISTING.md`'s negative statements; none
   offers a download or names another browser; `services.json` carries `access_check` and no
   `allowlist`; `killlist.json` answers 200 and verifies.
 - The access service answers `st1234` yes from two installation identifiers at portal `localhost`

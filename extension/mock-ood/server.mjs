@@ -68,7 +68,10 @@
 //   GET  /beethoven/services.json              {"access_check": "<origin>/beethoven/access_check", ...}, CORS open
 //   POST /beethoven/access_check               text/plain JSON {v, access_id, portal, product, version, install_id} ->
 //                                              --access list (default): for the ids in --approve (default st1234),
-//                                              one installation each: the first install_id asking binds the account
+//                                              one installation each (8.0.0 to 19.0.0's rule, kept so the extension's
+//                                              reading of "other_installation", which an older service may still send,
+//                                              is played; the live service since 20.0.0 approves every installation of
+//                                              the account's own): the first install_id asking binds the account
 //                                              (--seat id=install binds one beforehand), and it gets 200
 //                                              {"approved":true,...}; another gets reason "other_installation"; an
 //                                              installation bound to another approved account gets "other_account";
@@ -478,8 +481,11 @@ export async function createMockPortal(opts = {}) {
         break;
     }
     if (!o.approved.includes(id)) return no();
-    // one approved account, one installation: the first to ask is bound; another is refused and counted, the seat unchanged;
-    // and one installation, one account: an installation another account's seat names is refused for this one
+    // one approved account, one installation, as the service answered from 8.0.0 to 19.0.0: the first to ask is bound;
+    // another is refused and counted, the seat unchanged. Kept so the "other_installation" case the extension still
+    // reads (an older service's answer; the live service since 20.0.0 approves every installation of the account's own)
+    // is played. And one installation, one account, which still holds: an installation another account's seat names is
+    // refused for this one
     const install = typeof j.install_id === 'string' ? j.install_id.toLowerCase() : '';
     if (install) {
       if (!state.seats[id]) {

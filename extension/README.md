@@ -130,9 +130,10 @@ For developers and the maintainer's hand test only; students install from the pr
 
 - Chrome: `chrome://extensions`, Developer mode, "Load unpacked", pick `.output/chrome-mv3`.
 
-An unpacked copy is an installation like any other: the first one that checks an approved account
-binds it, and the access service refuses the account from every other installation until the
-maintainer moves the approval (`../docs/store/TEST_BEFORE_UPLOAD.md`).
+An unpacked copy is an installation like any other: the access service approves an approved account
+from every installation of its own, records the unpacked copy against the account and e-mails the
+maintainer once about the new installation; the copy is bound to the first account it checks and
+refused for any other (`../docs/store/TEST_BEFORE_UPLOAD.md`).
 
 On install the setup page opens (manifest `options_ui`; also right-click the toolbar button, then Options):
 accept the agreement (scroll to the end, four statements, typed name, "Accept and Continue"). There is nothing
@@ -152,7 +153,7 @@ only when a person must act:
 | 1 | portal tab open | | connect this portal / open my portal |
 | 2 | portal awake and signed in | GET the dashboard; on 5xx or `/nginx/init` wait 2 s, 5 s, 10 s ("waking up your portal...") | sign in to the portal in its tab |
 | 3 | agreement | | read and accept it, once per browser profile (the setup page) |
-| 4 | access approved | the background asks the access service about the account the dashboard shows, from this installation (cached: yes 24 h, no 10 min) | "Ask for access" when not approved: opens the request page with the account filled in; set up on another installation: "This account is already set up on another computer. Ask your lab lead to move it here." and no button; a build the service calls too old: "Install the current Beethoven from the lab's private listing."; read-only checks are never blocked on it |
+| 4 | access approved | the background asks the access service about the account the dashboard shows, from this installation (cached: yes 24 h, no 10 min) | "Ask for access" when not approved: opens the request page with the account filled in; set up for another account: "This installation of Beethoven is already set up for another account. Ask your lab lead to move it to yours." and no button (an older service's "set up on another computer" is still read and said the same way, with no button); a build the service calls too old: "Install the current Beethoven from the lab's private listing."; read-only checks are never blocked on it |
 | 5 | tool installed | where the site profile names a shared folder (`shared_install`): one line, `hpcworker install --shared`, run from the lab's copy, nothing uploaded; an own copy left by a build before 8.0.0 counts as installed | where there is no shared folder, or the account cannot use it: "Beethoven needs your lab's shared copy of the tool on the cluster, and your account cannot use it yet: ask your lab lead (Details says why)." and *Try again*; nothing is uploaded |
 | 6 | probe run | submit the five-minute probe once, wait for `probe.json` | |
 | 7 | signed in to Claude on the cluster | open the sign-in terminal (below) | sign in on Anthropic's page, paste the code |
@@ -376,17 +377,20 @@ reached; check 1 turns WARN after the first day); a no is kept 10 minutes, and t
 `https://openspineconsortium.com/beethoven/request.html?access_id=<account>`. The one URL taken from an answer is a
 page on that site. Workers start only while the answer is yes; read-only checks never wait on it.
 
-One approved account, one installation (8.0.0). `install_id` is the random identifier `src/ext/storage.ts`
-`installId()` makes once per installation (16 random bytes as 32 hex characters, from the browser's random generator
-and nothing about the device; it also names the acceptance record and the consent marker; uninstalling removes it and a
-reinstall makes a new one). The service binds an approved account to the first installation that asks; a no from
-another installation carries `"reason":"other_installation"`, which the strip says as "This account is already set up
-on another computer. Ask your lab lead to move it here." with no button (the maintainer moves the approval); an
-installation already bound to another approved account gets `"reason":"other_account"`, said as "This installation of
-Beethoven is already set up for another account. Ask your lab lead to move it to yours." with no button; and a
-check with no identifier (a build before 8.0.0) gets `"reason":"update_required"`, said as "Install the current
-Beethoven from the lab's private listing.". The reason is said ahead of a withdrawal: an installation whose approval
-was moved away hears the reason, not "Access withdrawn". `v` stays 1, because the service before 8.0.0 refuses any
+One person's approval, every installation of their own (20.0.0; one installation per account from 8.0.0 to 19.0.0).
+`install_id` is the random identifier `src/ext/storage.ts` `installId()` makes once per installation (16 random bytes as
+32 hex characters, from the browser's random generator and nothing about the device; it also names the acceptance record
+and the consent marker; uninstalling removes it and a reinstall makes a new one). The service approves an approved
+account from every installation that asks about it, records each one against the account (identifier, product, version,
+first and last seen; the ten most recently seen kept) and e-mails the maintainer, at most once a day per account, when a
+new one asks, with a link that withdraws the approval and none that moves it. An installation already bound to another
+approved account gets `"reason":"other_account"`, said as "This installation of Beethoven is already set up for another
+account. Ask your lab lead to move it to yours." with no button; and a check with no identifier (a build before 8.0.0)
+gets `"reason":"update_required"`, said as "Install the current Beethoven from the lab's private listing.".
+`"reason":"other_installation"`, which the service sent from 8.0.0 to 19.0.0 for an account bound to another
+installation, is never sent any more and is still read, said as "This account is already set up on another computer. Ask
+your lab lead to move it here." with no button. The reason is said ahead of a withdrawal: an installation that hears a
+reason hears it, not "Access withdrawn". `v` stays 1, because the service before 8.0.0 refuses any
 other `v` and ignores fields it does not know. This is a check in the client, not a proof: a modified copy could skip
 it, which the agreement forbids (section 6(d)); it keeps an approval from being passed around, and no text claims more.
 

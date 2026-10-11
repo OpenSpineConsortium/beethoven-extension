@@ -243,7 +243,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 19.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 20.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -257,15 +257,18 @@ first, through a bridge bundled in the package, with signed installers for it fr
 removes that way whole and keeps the one way, the university's VPN and the portal, with a press that
 waits for the VPN and goes ahead by itself; 17.0.0 reads the site profile through beethoven-base's
 reader and offers "Your grid" when a build carries two or more; 18.0.0 brings the grid's sign-in box
-to the front, keeps the sign-in tab long enough for Chrome's offer to save the password, and waits on
-GlobalProtect at once when the grid is known to be out of reach; 19.0.0 signs in to the grid itself
-with the AccessID and password typed into its own sheet, saves the password behind a passkey only
-when the student ticks *Remember it on this computer*, and keeps Chrome's sign-in box as the other
-way; `release/<version>/README.md` lists a version's changes, up to 14.0.0); the framework is the server repository's, `OpenSpineConsortium/hpcworker`, and the
-lab's shared copy at Wayne State is the version its `tools/deploy_shared.sh` last published (the
-panel shows it under *Details*); the agreement `LICENSE.txt` is version 12 and the extension's
-`TERMS_VERSION` (`extension/src/core/terms.ts`) is 12 to match; `PRIVACY.md` is version 13. All
-integers; a changed text moves its version with it.
+to the front, keeps the sign-in tab long enough for Chrome's offer to save the password, and waits
+on GlobalProtect at once when the grid is known to be out of reach; 19.0.0 signs in to the grid
+itself with the AccessID and password typed into its own sheet, saves the password behind a passkey
+only when the student ticks *Remember it on this computer*, and keeps Chrome's sign-in box as the
+other way; 20.0.0 approves an account from every installation of its own, the service keeping the
+ten most recent and e-mailing the maintainer of a new one with a link to withdraw and none to move,
+where 8.0.0 to 19.0.0 bound an account to one installation; `release/<version>/README.md` lists a
+version's changes, up to 14.0.0); the framework is the server repository's,
+`OpenSpineConsortium/hpcworker`, and the lab's shared copy at Wayne State is the version its
+`tools/deploy_shared.sh` last published (the panel shows it under *Details*); the agreement
+`LICENSE.txt` is version 13 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
+13 to match; `PRIVACY.md` is version 14. All integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -348,9 +351,12 @@ there, not from here, under two names with the same code, stores and secrets:
 `beethoven-access.openspineconsortium.workers.dev` for 7.0.0 and later, and the old
 `ashley-service.openspineconsortium.workers.dev` for Ashley for VS Code 3.0.0 (the VS Code edition
 before its rename; Beethoven for VS Code 4.0.0 uses the new name) and builds 4.0.0 to 6.0.0. It
-answers yes or no for one account on one installation: an approved account is bound to the first
-installation that asks, any other is refused until the maintainer moves the approval, and a build
-that sends no installation identifier (before 8.0.0) is refused once the service's
+answers yes or no for one account: since 2026-10-11 (20.0.0) an approved account is approved from
+every installation of its own, the service recording the ten most recent and e-mailing the
+maintainer when a new one asks, with a link to withdraw the approval and none to move it (from 8.0.0
+to 19.0.0 the first installation that asked was bound to the account and any other refused until the
+maintainer moved the approval); an installation bound to one account is refused for any other, and a
+build that sends no installation identifier (before 8.0.0) is refused once the service's
 `REQUIRE_INSTALL_ID` is on (`docs/store/SUBMISSION.md`, section 2).
 
 **Releasing a version.**
@@ -402,8 +408,8 @@ that sends no installation identifier (before 8.0.0) is refused once the service
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 12; the extension's
-  `TERMS_VERSION` is 12) and the privacy statement (version 13).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 13; the extension's
+  `TERMS_VERSION` is 13) and the privacy statement (version 14).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

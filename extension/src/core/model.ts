@@ -211,6 +211,8 @@ export const WORDS = {
     rowApproved: 'Approved',
     rowReady: 'Your grid account is ready',
     notApproved: { title: 'Ask for access', body: (account: string) => `${account} isn't approved for Beethoven yet. Beethoven checks again when you open it.`, button: 'Ask for access' },
+    // an older service's answer (other_installation, 8.0.0 to 19.0.0): not sent since 20.0.0, when every installation of the
+    // account's own became approved, still read and said as before
     otherInstallation: { title: 'Ask your lab lead', body: (account: string) => `${account} is set up on another computer. Your lab lead can move it here.` },
     otherAccount: { title: 'Ask your lab lead', body: 'This browser is set up for another AccessID. Ask your lab lead.' },
     withdrawn: { title: 'Update Beethoven', body: 'This version is out of date.', button: 'Update' },

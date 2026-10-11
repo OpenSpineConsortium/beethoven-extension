@@ -67,6 +67,17 @@ VPN is still needed. The old passkey of 12.0.0 to 15.0.0 is named with the Acces
 "beethoven" and can go; the one 19.0.0 uses for the grid sign-in is named "<AccessID> (grid)" and is
 deleted only after *Forget*. Agreement version 12, privacy statement version 13.
 
+**20.0.0** (2026-10-11): one person's approval, every installation of their own (the maintainer's
+decision of 2026-10-11). An approved account is approved from every installation that asks about it:
+a second computer, another Chrome profile or a reinstallation works at its first check, where 8.0.0
+to 19.0.0 refused it until the maintainer moved the approval. The access service records each
+installation the account asks from (its random identifier, the product, the version, first and last
+seen), keeps the ten most recent, and e-mails the maintainer, at most once a day per account, when a
+new one asks, with one link that withdraws the approval and none that moves it. An installation
+still serves one account. Nothing new is sent or read: the check carries what it carried, and the
+identifier is still random and says nothing about the device. Agreement version 13, privacy
+statement version 14.
+
 There is no other store, no download and no signed file: the package is the extension alone, and
 nothing of it is ever on the website. (12.0.0 to 15.0.0 offered the helper's installers from inside
 the package, the two for Windows and macOS signed; 16.0.0 offers none.)
@@ -209,7 +220,7 @@ YOU NEED
 A Wayne State AccessID with a grid account, GlobalProtect, Chrome on Windows, macOS or Linux, and Claude Pro or Max.
 
 By approval only: ask at https://openspineconsortium.com/
-One approval covers one installation: one Chrome profile on one computer.
+One approval covers every installation of your own: your computers and your Chrome profiles.
 
 YOUR DATA
 To check your approval, Beethoven sends our access service the account name the grid's website shows and a random installation identifier, with your portal's address and the version. It sends nothing else about you. Your password goes only to the grid, never to us, and Beethoven keeps it, encrypted on this computer, only if you ask it to. The service records each check with a salted hash of the network address it came from, never the address. Privacy: https://openspineconsortium.com/beethoven/privacy.html
@@ -235,7 +246,7 @@ WHAT YOU NEED
 - An account on a cluster where your lab keeps the shared copy of Beethoven's cluster-side scripts, and whatever your university needs to reach its Open OnDemand portal. At Wayne State: a grid account and the GlobalProtect VPN.
 - Your own Claude account on a plan that includes Claude Code Remote Control (Pro or Max).
 - Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/beethoven/request.html with your account name and the Google account at which you want the invitation to this listing, which is private. There is no licence key.
-- One computer. An approval covers one installation; another computer, another browser profile or a reinstallation is refused until the maintainer moves the approval to it.
+- Your own computers. An approval covers every installation you use yourself; a second computer, another browser profile or a reinstallation works at its first check, and the maintainer is told that a new installation asked. One installation serves one account.
 
 HOW IT WORKS
 1. Accept the agreement on the welcome page that opens on install: one tick and "Agree and continue". The full text is one click away, and can be saved and printed. The welcome page names the three things you need, each with a link to your university's or Anthropic's own page.
@@ -258,7 +269,7 @@ WHAT IT KEEPS
 On your device only: the portal address, your preferences, your acceptance of the agreement, the account name your portal showed and the last approval answer, the random identifier of this installation, your statement about each workspace, an audit log of every request it made to your portal, which you can read, export and clear, and your grid sign-in, only if you tick "Remember it on this computer" (never ticked for you): encrypted, under a key your passkey releases with Windows Hello, Touch ID or your screen lock, until you press Forget. Unticked, the password is held in memory for one sign-in and at most two minutes. If an earlier version of Beethoven added a key to your cluster account, Settings says so once, with its date, and your lab lead can remove it; Beethoven no longer uses or touches it. Privacy statement: https://openspineconsortium.com/beethoven/privacy.html
 
 ACCESS AND TERMS
-Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved, on one installation. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
+Beethoven is licensed, not sold, and works only from an institutional account the maintainer has approved, on the installations of your own. The Trial Edition is free for approved institutional accounts and ends by itself; nothing converts into a paid licence and no payment details are taken. Terms: https://openspineconsortium.com/beethoven/terms.html  Support: https://openspineconsortium.com/beethoven/support.html
 
 Beethoven runs Claude Code and is not an Anthropic product; "Claude" and "Claude Code" are Anthropic's marks, used here to say what it runs; "Open OnDemand" is the mark of its publisher. Beethoven is not provided by or on behalf of any university. It is a research and teaching tool, not a medical device. Offered in the United States.
 ```
@@ -320,7 +331,7 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Question | Answer |
 |---|---|
 | Does the extension collect or transmit user data? | Yes, two kinds. **Personally identifiable information**: the institutional account name the user's portal shows and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: Yes. The user's AccessID and cluster password, typed into the extension's own sign-in sheet, are sent only to the user's own university portal, as the answer to its HTTP sign-in, and never to the developer; the password is kept only if the user ticks "Remember it on this computer", and then only encrypted on the device, under a key the user's passkey releases (12.0.0 to 15.0.0 answered Yes for the direct way's sign-in sheet; 16.0.0 to 18.0.0 answered No). Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 13 names the approval check, what the developer records from it, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 14 names the approval check, what the developer records from it, the installations it keeps per approved account, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
 | Limited Use statement (on the landing page and the reviewers page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
@@ -354,9 +365,9 @@ and when it is kept).
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
-15.0.0, 16.0.0 or 19.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 12
-and `PRIVACY.md` version 13 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 13.
+15.0.0, 16.0.0, 19.0.0 or 20.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 13
+and `PRIVACY.md` version 14 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 14.
 
 ## Images and the promo video
 

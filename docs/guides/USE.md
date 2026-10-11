@@ -1,6 +1,6 @@
 # Use Beethoven
 
-For Beethoven 19.0.0. Written 2026-10-02, updated 2026-10-09.
+For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-11.
 
 **New in 19.0.0.** Beethoven signs in to the grid for you. When the grid needs your sign-in, the
 panel shows **Sign in to the grid**: type your AccessID and password there, press **Sign in**, and

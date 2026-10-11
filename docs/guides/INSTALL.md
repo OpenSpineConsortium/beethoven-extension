@@ -1,6 +1,6 @@
 # Install Beethoven
 
-For Beethoven 19.0.0. Written 2026-10-02, updated 2026-10-09.
+For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-11.
 
 **Updating from 16.0.0, 17.0.0 or 18.0.0.** Chrome updates Beethoven by itself from its page in the
 Chrome Web Store, and asks you nothing: 19.0.0 needs nothing Chrome shows in its list. Beethoven

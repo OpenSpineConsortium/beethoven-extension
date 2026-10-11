@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 13, 2026-10-09. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 14, 2026-10-11. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -30,7 +30,7 @@ encrypted, only if you tick a box.
 |---|---|---|---|
 | The portal address (your university's, filled in from the site profile, or one you typed), and the one website you granted the extension access to | the extension's own storage (`storage.local`) | to reach your portal | Settings (in the panel's *More* menu); removing the site permission in your browser; uninstalling |
 | Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched) and your appearance choice | `storage.local` | convenience | Settings |
-| The account name your portal's dashboard showed for the session you signed in to, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (your account is set up on another installation; this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
+| The account name your portal's dashboard showed for the session you signed in to, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
 | Only if an earlier version of Beethoven added a key for this computer to your grid account: a note of that, kept once from that version's record on the first run after the update: the account name it recorded, the key's fingerprint, when the key was added, and when the note was written (never the key itself, which is deleted unread) | `storage.local` | so Settings can tell you once that the key is there and that your lab lead can remove it | *Forget* beside that note in Settings (which removes the note and nothing on the grid); uninstalling |
 | Only if you tick *Remember it on this computer* on the grid sign-in sheet (it is never ticked for you): your saved grid sign-in: the account name you typed, your portal's address, your passkey's credential identifier (not secret), two random salts, a random value used once, and your password encrypted with AES-GCM under a 256-bit key derived (HKDF-SHA-256) from what your passkey releases, which is never written to disk; with when it was saved | the extension's own database in this browser profile on this computer (IndexedDB, `beethoven-signin`), which no website can read | so the extension can sign you in to your portal by itself once you have unlocked it with your passkey | *Forget* beside *Grid sign-in* in Settings; *Disconnect*; changing to another portal; uninstalling. Someone who can use this browser profile while it is unlocked, or who can unlock your passkey, could sign in to your portal with it, and so could the extension's own code |
 | Only while a saved grid sign-in exists, a note of it (never the password): the account name you typed, your portal's address, the passkey's credential identifier, when it was saved, when the extension last tried it, when it last worked and when your portal last turned it down, when its use was put on hold without it being turned down (a password you typed was turned down while it was saved, or the outcome of an earlier try could no longer be told: the browser closed before your portal replied, or one of your portal tabs asked for a sign-in or had a request answered meanwhile), when the extension last tried a password you typed while this one was saved, until that try's outcome comes, how many times in a row a password was turned down while it was saved, and the name your portal gives its sign-in (its realm); and, if your computer's passkey could not lock a password, when that happened and the name of your computer's operating system | `storage.local` | so the panel knows a sign-in is saved and which passkey opens it, never tries a password your portal turned down again, and stops offering *Remember it on this computer* where it cannot work | *Forget*; *Disconnect*; changing to another portal; uninstalling |
@@ -39,7 +39,7 @@ encrypted, only if you tick a box.
 | A note of the check job submitted from *Details* (the time and the job number), so it is not submitted again while it runs | `storage.local` | so that step does not repeat itself | uninstalling |
 | Which claude.ai link the extension opened by itself for a worker you started, so it opens once (kept with the connection state below) | `storage.session`, cleared when the browser closes | so it is not opened twice | closing the browser |
 | Your tick on the optional step *Connect Google Drive in claude.ai*: a yes or no. The step opens that claude.ai settings page in a new tab; the extension does nothing on it | `storage.local` | so Settings remembers what you finished | untick it; uninstalling |
-| The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier the extension makes for itself when you accept the agreement, from the browser's random number generator and from nothing about your device | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you; and, sent in the approval check, so that an approval is used from one installation (see *What Licensor receives*) | uninstalling (a reinstallation makes a new identifier) |
+| The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier the extension makes for itself when you accept the agreement, from the browser's random number generator and from nothing about your device | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you; and, sent in the approval check, so that Licensor sees which installations ask about your account (see *What Licensor receives*) | uninstalling (a reinstallation makes a new identifier) |
 | Your worker's last known state, kept across browser restarts so the panel can show it, and *Open my session* can work, before you sign in to the grid again: the worker's name, its claude.ai link and session title, its state and when it was seen, since when it has been online and when it renews itself, and the account name the portal showed with it | `storage.local` | so the panel is never blank and your session's link works without the grid or the VPN | uninstalling |
 | How the extension reaches your portal (directly from its background, or through a tab it opens), and whether the portal's shell opened without asking for a password, with the time this was last tested | `storage.local` | so it uses the way that works without testing again before every action | uninstalling |
 | Small notes for the panel: how long your last five waits for a computer took, in minutes ("Last time: 6 min."); whether the tour was seen, and to its end; when your worker was first seen online in this browser (*Try asking* shows for three days from then), whether the tour began playing below your first wait, and which one-time tips you have seen or dismissed (pinning the toolbar button, *Try asking*, the tour card, the *New session* tip), with when | `storage.local` | so the panel can tell you what to expect and does not repeat itself | uninstalling |
@@ -368,14 +368,13 @@ Licensor before you have accepted the agreement. After that:
   portal's dashboard shows for your session, your portal's hostname, the product name (`bridge`),
   the extension's version and the random installation identifier described above; like any request,
   it arrives at a time. The service answers yes or no, and nothing else about you or anyone else. A
-  no may carry one of three reasons: that your account is already set up on another installation
-  (the panel then says so and offers no button: your lab lead moves the approval), that this
-  installation is already set up for another account (the panel says so and offers no button: your
-  lab lead releases it), or that this version is too old (the panel asks you to install the current
-  one from the lab's private listing). The extension keeps a yes for up to a day, and for up to
-  seven days when the service cannot be reached, so an outage on Licensor's side does not stop your
-  work; it keeps a no for ten minutes, and while the answer is no it starts no worker and, unless
-  the reason is one of those three, offers you a button to ask for access.
+  no may carry one of two reasons: that this installation is already set up for another account (the
+  panel says so and offers no button: your lab lead releases it), or that this version is too old
+  (the panel asks you to install the current one from the lab's private listing). The extension
+  keeps a yes for up to a day, and for up to seven days when the service cannot be reached, so an
+  outage on Licensor's side does not stop your work; it keeps a no for ten minutes, and while the
+  answer is no it starts no worker and, unless the reason is one of those two, offers you a button
+  to ask for access.
 - **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
   of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
   list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
@@ -395,26 +394,28 @@ Those are the only requests the extension ever makes to Licensor. In particular:
 **What Licensor records from the checks.** One record for each account and product: the account
 name, the product, and the portal hostname and the version of the latest check; when the account was
 first and last checked; how many checks there have been; the answer of the latest check and, with a
-no, the reason the service gave, if any (another installation, another account, a version too old);
+no, the reason the service gave, if any (another account, a version too old);
 when the answer last changed; and a salted hash of the network address of the latest check (the
 address itself is not kept). The service also counts each day's checks per account and per hashed
 address, to limit them, and deletes those counts after two days. This record sits with your access
 record.
 
-**One approved account, one installation.** The first installation that asks about an approved
-account is bound to it: the service keeps that installation's identifier with the product, the
-version and the times it first and last asked, and, for that identifier, the account it is bound to.
-A check for the same account from any other installation (another computer, another browser profile,
-a reinstallation) is refused, and so is a check from that installation for any other account; the
-service counts such refusals and keeps the times of the first and the last one and the first eight
-characters of a one-way hash of the refused installation's identifier. When another installation
-asks about an account, the service e-mails Licensor, at most once a day per account, with a link
-that can move the approval to that installation, so that Licensor can move it or withdraw it. The
-identifier is random: it is not read from your device or derived from it, and Licensor cannot tell
-from it which computer it is on. One account is the exception: the account the store's reviewers use
-with the lab's mock portal (`st1234`) is approved only in a check whose portal is on the reviewer's
-own computer (`localhost`), from any installation, and binds none; from any other portal it is
-answered as an unknown account is, and nothing is bound or e-mailed.
+**Your installations.** Your approval works from every installation of your own: a second computer,
+another browser profile or a reinstallation is approved at its first check. For each approved
+account the service keeps the installations the account has asked from, up to the ten most recently
+seen, each with its identifier, the product, the version and the times it first and last asked, and,
+for each identifier, the account it is bound to. An installation serves one account: the first
+approved account it asks about is bound to it, and a check from it for any other account is refused
+(the panel says so and offers no button: your lab lead releases it); the service counts such
+refusals and keeps the times of the first and the last one and the first eight characters of a
+one-way hash of that installation's identifier. When a new installation asks about an account, the
+service e-mails Licensor, at most once a day per account, a notice with a link that can withdraw the
+approval; nothing is refused by the notice, and there is no link to move an approval, since nothing
+needs moving. The identifier is random: it is not read from your device or derived from it, and
+Licensor cannot tell from it which computer it is on. One account is the exception: the account the
+store's reviewers use with the lab's mock portal (`st1234`) is approved only in a check whose portal
+is on the reviewer's own computer (`localhost`), from any installation, and binds none; from any
+other portal it is answered as an unknown account is, and nothing is bound or e-mailed.
 
 **The *Ask for access* button.** When the answer is no, the panel's one button opens Licensor's
 request page (`https://openspineconsortium.com/beethoven/request.html`) in a new tab with your
@@ -436,7 +437,7 @@ that group, under Google's own terms.
 
 **Your access record.** Licensor's records hold the approval and withdrawal decisions about your
 account (an approval is for Beethoven, or for membership of Licensor's lab only), with the name and
-e-mail you gave when you asked, their dates, the installation your approval is bound to, and the
+e-mail you gave when you asked, their dates, the installations your account has asked from, and the
 check record above. Licensor does not publish the list of approved accounts: the access service
 answers about one account at a time. The same approved list serves Licensor's other product, an
 extension for VS Code, so one approval covers both.
@@ -499,11 +500,11 @@ your lab lead, or run `hpcworker browser-key remove` in a terminal on the cluste
 an earlier version had you install (on Windows from Settings, Apps; on a Mac or on Linux, and for a
 Bridge installed from a zip file with Beethoven 14.0.0 or earlier, with its uninstaller); remove the
 key of the one-time step from your cluster account with `hpcworker login-setup --remove`; ask
-Licensor to move your approval to another installation, or for a copy or deletion of your access
-records (deletion of your access record ends your approval and with it the license). Michigan
-residents and residents of other states may have further rights under their state's laws; Licensor
-honours requests it is obliged to honour and answers others where it reasonably can. Beethoven is
-offered in the United States.
+Licensor to release an installation that is bound to another account, or for a copy or deletion of
+your access records (deletion of your access record ends your approval and with it the license).
+Michigan residents and residents of other states may have further rights under their state's laws;
+Licensor honours requests it is obliged to honour and answers others where it reasonably can.
+Beethoven is offered in the United States.
 
 ## Children
 
@@ -513,6 +514,12 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 14 (2026-10-11, Beethoven 20.0.0): your approval works on every installation of your own: a
+second computer, browser profile or reinstall is approved at its first check instead of refused,
+Licensor's service keeps the list of the ten most recent installations your account asked from and
+tells Licensor of a new one by e-mail with a link to withdraw the approval and none to move it; an
+installation still serves one account. Version 13's other terms are unchanged.
 
 Version 13 (2026-10-09, Beethoven 19.0.0): Beethoven signs in to your portal for you. In Chrome,
 when your portal asks for a sign-in, the panel shows Beethoven's own sign-in sheet for your account

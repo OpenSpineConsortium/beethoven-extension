@@ -1,8 +1,10 @@
 // Scenario 5: the approval answers (SPEC moment 6, "If it goes wrong"), from the mock's stand-in for the
 // lab's access service, never the live one: not approved ("Ask for access", which opens the request
-// page with the AccessID), another installation, another account, a withdrawn version (the service's
-// "update_required"; a kill-list withdrawal needs the lab's signing key and is not played here), the
-// service unreachable, and an approval withdrawn after a yes. Each case is a fresh browser profile.
+// page with the AccessID), another installation (an older service's answer, which the extension still
+// reads; the live service since 20.0.0 approves every installation of the account's own), another
+// account, a withdrawn version (the service's "update_required"; a kill-list withdrawal needs the
+// lab's signing key and is not played here), the service unreachable, and an approval withdrawn
+// after a yes. Each case is a fresh browser profile.
 import { ACCOUNT, agree, expectWords, gridSignIn, moment, setup, Stop, teardown, useAnotherPortal, WAYNE_BASIC, welcomePage } from '../lib/flows.mjs';
 import { Browser, profileDir, sleep } from '../lib/harness.mjs';
 import { WORDS } from '../lib/words.mjs';
