@@ -45,6 +45,32 @@ gate the approval made redundant, and it is retired with 20.0.0: the request pag
 a Google account, the access service no longer sends the invitation reminder, and nobody is added
 to the group.
 
+## Releases from CI, after the first submission
+
+The first upload is by hand (below): the store gives the item its id only then, and 20.0.0's is the
+one that turned the listing public. From then on `.github/workflows/release.yml` does the rest, as
+one call of the Chrome Web Store release kit (OpenSpineConsortium/chrome-store-release-kit, its
+`release-kit/README.md`; symphony-extension calls the same one): every push to `main` runs
+`sync-profiles`, the typecheck and the tests, builds the zip with `npm run zip`, numbers it
+`<manifest version>.<commit count>` and makes the GitHub release `extension-v<that version>` with
+the zip attached, so the newest build is always at
+https://github.com/OpenSpineConsortium/beethoven-extension/releases/latest/download/beethoven-chrome.zip
+(members only; students install from the store). Once the five secrets `CWS_PUBLISHER_ID`,
+`CWS_ITEM_ID` (the listing's 32 letters), `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and
+`CWS_REFRESH_TOKEN` exist (Settings, Secrets and variables, Actions; the kit's README says where
+each comes from: an OAuth client of the store's own Google account and a refresh token from the
+OAuth 2.0 Playground, the same client serving every extension the account publishes) and the
+repository variable `CWS_ON_PUSH` is `upload`, that same zip becomes the store item's draft on every
+push; with `publish` the draft is submitted for review as well. Until then the store step says "Not
+configured" and the run stays green. A tag `extension-v<version>` releases the manifest's exact
+version and always uploads it; "Run workflow" with `upload` or `publish` ticked does it by hand.
+greg asked for it on 2026-10-13 ("i want to setup the automatic updates being pushed to the chrome
+webstore"), which replaces item 7's old rule that no store sign-in goes into CI: the five secrets
+are the store account's own OAuth grant, held by GitHub, and still no Claude credential and no API
+key. The access service and the withdrawn-versions list take the four-part version as they are
+(`VERSION_TEXT` allows it; a withdrawal names the full string). The listing's texts, images,
+privacy answers and Distribution tab are not in the zip: the kit never touches them.
+
 ## 0. Before the first submission
 
 Have these in hand, and check each once:
@@ -133,8 +159,10 @@ Have these in hand, and check each once:
 7. The developer account, one person, with a hardware security key or an authenticator app as the
    second factor. The one OAuth grant on it is the maintainer's own upload tool
    (`extension/scripts/publish-store.mjs`: a Desktop OAuth client in his own Google Cloud project, its
-   saved sign-in in the vendor folder on his own computer; the tool's own header says how it is run);
-   nothing else should hold one. No store sign-in or API key goes into any CI.
+   saved sign-in in the vendor folder on his own computer; the tool's own header says how it is
+   run), and, since 2026-10-13, the Web application OAuth client whose refresh token the release
+   workflow holds as a repository secret ("Releases from CI", above); nothing else should hold one.
+   No API key anywhere, and no Claude credential in CI.
 8. The name. Beethoven runs Claude Code and is not an Anthropic product; the name carries no
    Anthropic mark, and "Claude" and "Claude Code" appear in the listing only to say what it runs.
 9. **The grid side.** The lab's shared copy of the cluster-side tool, published to the site's

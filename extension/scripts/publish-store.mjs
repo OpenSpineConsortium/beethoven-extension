@@ -9,8 +9,13 @@
 //   node extension/scripts/publish-store.mjs upload  --publisher ID --item ID --zip FILE [--publish]
 //   node extension/scripts/publish-store.mjs publish --publisher ID --item ID
 //
-// Never in CI: a Google sign-in held as a CI secret is the standing credential this project keeps out
-// of CI altogether.
+// By hand only, from the maintainer's own computer. Until 2026-10-13 the rule was that no Google
+// sign-in was held as a CI secret; that day greg asked for "the automatic updates being pushed to
+// the chrome webstore", and .github/workflows/release.yml now calls the organisation's Chrome Web
+// Store release kit, which uploads each build from main through the five CWS_ repository secrets
+// (an OAuth client of the store account and its refresh token, the store's own credential and no
+// Claude's). This tool stays the one-off path beside it: the first upload of an item, a check of
+// its state, a release made away from CI.
 //
 // The sign-in is Google's installed-app loopback flow: a "Desktop app" OAuth client, a one-shot listener
 // on 127.0.0.1 at an ephemeral port, PKCE (S256) and a random state. The store's API page reaches a

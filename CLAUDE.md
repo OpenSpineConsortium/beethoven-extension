@@ -127,7 +127,13 @@ name and identifier carry no university name.
   links the listing. No Edge, Firefox or Safari listing, no download on the website or for students
   anywhere else. No signed file: since 16.0.0 the package carries no installer (15.0.0's two signed
   bridge installers went with the bridge). The Firefox build script stays because the code builds
-  for it; nothing submits it.
+  for it; nothing submits it. Since 2026-10-13 (greg: "i want to setup the automatic updates being
+  pushed to the chrome webstore") `.github/workflows/release.yml` calls the organisation's Chrome
+  Web Store release kit on every push to `main`: tests, `npm run zip`, a build number appended to
+  the version, a GitHub release `extension-v<version>`, and the upload to the item through the five
+  `CWS_` repository secrets once the maintainer sets them and the variable `CWS_ON_PUSH`
+  (`docs/store/SUBMISSION.md`, "Releases from CI"). Those secrets are the store account's own OAuth
+  grant and never a Claude credential; the first upload of 20.0.0 stays by hand.
 - **The direct way is gone (decided 2026-10-08, 16.0.0).** From 12.0.0 to 15.0.0 the extension first
   tried ssh to the login node with no VPN, through a native-messaging bridge bundled in the package
   (from 15.0.0 as signed, per-user installers for Windows and macOS, built and signed on the
@@ -382,6 +388,7 @@ The copy is taken the same way (`bash interface/pull.sh extension/src/base`) and
 
 CI (`.github/workflows/ci.yml`) runs the whole client suite hermetically on ubuntu: typecheck,
 vitest, the mock portal's full selftest with Playwright's Chromium for the terminal section, and a
-chrome build uploaded as an artifact. No secrets exist in this repository and the workflow needs
-none; the browser e2e harness (`extension/e2e/run.mjs`) stays a maintainer's tool, since its
-Chrome-native moments need Windows UIA (headless on a cluster node: `E2E_HEADLESS=1`).
+chrome build uploaded as an artifact. CI needs no secret; the only secrets in this repository are
+the release workflow's five `CWS_` ones, the store's own. The browser e2e harness
+(`extension/e2e/run.mjs`) stays a maintainer's tool, since its Chrome-native moments need Windows
+UIA (headless on a cluster node: `E2E_HEADLESS=1`).
