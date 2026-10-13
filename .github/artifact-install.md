@@ -18,5 +18,5 @@ repository is shared with. Your GitHub sign-in in the browser is what authorized
 
 Chrome shows its developer-mode notice for anything loaded this way and never auto-updates it:
 that is the browser's permanent price for an install from outside the Chrome Web Store. Students
-don't do any of this — they get Beethoven through the private Web Store listing, the one real
+don't do any of this — they get Beethoven through the Chrome Web Store listing, the one real
 one-click install, with updates handled by Chrome.

@@ -1,7 +1,7 @@
 # Testing Beethoven 20.0.0 by hand before the store upload
 
-One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in (a private
-listing on the Chrome Web Store; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up to date
+One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in (a public
+listing on the Chrome Web Store since 20.0.0; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up to date
 through 10.0.0, rewritten on 2026-10-02 for 12.0.0, which carried 11.0.0's first run (the welcome
 page, the window-wide panel) and added the direct way (ssh to the grid through a helper inside the
 package, a sign-in sheet, the browser's own key with its one restricted line on the grid, Windows
@@ -12,8 +12,8 @@ GlobalProtect and a note in Settings about a key an earlier version left. Brough
 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid itself: the AccessID and password
 typed into its own sheet, saved behind a passkey only when *Remember it on this computer* is ticked,
 and Chrome's own box (18.0.0's way) as the other way; and on 2026-10-11 for 20.0.0, which approves
-an account from every installation of its own. The agreement is version 13 and the privacy statement
-version 14. The build is in `extension/.output/chrome-mv3/`; the zip beside it is what the store
+an account from every installation of its own, and on 2026-10-13 for its public listing. The
+agreement is version 14 and the privacy statement version 15. The build is in `extension/.output/chrome-mv3/`; the zip beside it is what the store
 gets. To build it: Node 22, then `npm ci`, `npm run typecheck`, `npm test`, `npm run build` and `npm
 run zip` in `extension/` (`SUBMISSION.md`, section 0, item 1). Nothing is signed, and nothing is
 installed outside the browser.
@@ -35,7 +35,7 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
   approves it, and e-mails the maintainer once that a new installation asked (a notice; its one link
   withdraws, so do not press it). After the test, `admin.mjs reset-seat <your AccessID>` in the
   access service's own repository forgets the installations, if you want the list clean before you
-  install from the private listing.
+  install from the Chrome Web Store.
 - The lab's shared copy of the cluster-side tool is published (`docs/guides/LAB_LEAD.md`), and
   your account can read it.
 - You know your grid password. Wayne State disables an AccessID after the fifth wrong password, and
@@ -64,7 +64,7 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
    to protect.wayne.edu.", **How to set it up**) and **Claude Pro or Max** ("The account you use at
    claude.ai.", **See plans**). Each link opens the university's or Anthropic's own page in a new tab
    only when pressed; no QR code is drawn and no code-setup step is offered. **Show terms** opens
-   version 13 and the privacy statement version 14. Tick the box and press **Agree and continue**.
+   version 14 and the privacy statement version 15. Tick the box and press **Agree and continue**.
    Chrome asks to let Beethoven reach `ondemand.grid.wayne.edu`, that one site only: choose
    **Allow** (as in 11.0.0).
 3. **Pin the icon**: puzzle-piece icon, pin *Beethoven*.
@@ -206,13 +206,13 @@ allowed the portal, and then only that site.
   `sidePanel`, `webRequest` and `webRequestAuthProvider`, optional host `https://*/*`, nothing else
   (no `nativeMessaging`, no `webRequestBlocking`), and no `"key"`.
   `unzip -l` lists `fonts/` and no `bridge/`: no `.msi`, no `.pkg`, no script zip.
-- The five public pages open; `privacy.html` says version 14 and `terms.html` version 13 (the upload
-  waits for version 14 there); the reviewers page carries `LISTING.md`'s negative statements; none
+- The five public pages open; `privacy.html` says version 15 and `terms.html` version 14 (the upload
+  waits for version 15 there); the install card links the listing; the reviewers page carries `LISTING.md`'s negative statements; none
   offers a download or names another browser; `services.json` carries `access_check` and no
   `allowlist`; `killlist.json` answers 200 and verifies.
 - The access service answers `st1234` yes from two installation identifiers at portal `localhost`
   (`SUBMISSION.md`, section 0, item 5).
-- The screenshots are new captures of 19.0.0 (`PASTE.md`, field 7; none exists yet), and none shows
+- The screenshots are new captures of 20.0.0 (`PASTE.md`, field 7; none exists yet), and none shows
   a real AccessID or password.
 - The description in `PASTE.md` is 1,599 characters; paste it whole.
 - Before pasting the Test instructions in `PASTE.md`, see each of their steps on this build in a

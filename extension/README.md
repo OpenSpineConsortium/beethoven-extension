@@ -126,7 +126,7 @@ mock portal can be connected over plain http; a release build never lists it.
 
 ## Load unpacked
 
-For developers and the maintainer's hand test only; students install from the private listing.
+For developers and the maintainer's hand test only; students install from the Chrome Web Store listing.
 
 - Chrome: `chrome://extensions`, Developer mode, "Load unpacked", pick `.output/chrome-mv3`.
 
@@ -386,7 +386,7 @@ first and last seen; the ten most recently seen kept) and e-mails the maintainer
 new one asks, with a link that withdraws the approval and none that moves it. An installation already bound to another
 approved account gets `"reason":"other_account"`, said as "This installation of Beethoven is already set up for another
 account. Ask your lab lead to move it to yours." with no button; and a check with no identifier (a build before 8.0.0)
-gets `"reason":"update_required"`, said as "Install the current Beethoven from the lab's private listing.".
+gets `"reason":"update_required"`, said as "Install the current Beethoven from the Chrome Web Store.".
 `"reason":"other_installation"`, which the service sent from 8.0.0 to 19.0.0 for an account bound to another
 installation, is never sent any more and is still read, said as "This account is already set up on another computer. Ask
 your lab lead to move it here." with no button. A reason is said ahead of a withdrawal: an installation that was
@@ -411,5 +411,5 @@ Since 4.0.0 the list withdraws versions only; `revoked_lids` is read for older l
 ## Store listing pointers
 
 Single purpose, permission justifications (one sentence each, in `wxt.config.ts`), the privacy policy, the
-privacy-practices answers and the reviewer walk-through for the one private Chrome Web Store listing belong to the
+privacy-practices answers and the reviewer walk-through for the one Chrome Web Store listing belong to the
 docs stream (`../docs/STORE_LISTING.md`, `../docs/store/`). The manifest emitted for Chrome is the one to paste into the listing's permission section.

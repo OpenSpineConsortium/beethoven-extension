@@ -1,6 +1,6 @@
 # Use Beethoven
 
-For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-11.
+For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-13.
 
 **New in 20.0.0.** Your approval covers every installation of your own: Beethoven works on a second
 computer of yours, or in another Chrome profile, from its first check. Beethoven asks you to accept

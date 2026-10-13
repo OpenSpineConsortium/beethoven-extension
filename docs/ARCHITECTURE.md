@@ -126,7 +126,7 @@ student's account see them, then starts, watches and stops the worker.
 |---|---|---|---|
 | The worker image, with Claude Code pinned inside | rarely | the lab, once: `image_store` `/rs/rs_grp_oschome/shared/beethoven/containers/claude-node22`, `claude_bin` beside it | the maintainer, rebuilt inside a Slurm job (`jobs/build_image.sbatch`), never on the login node |
 | The framework (`hpcworker`) | with each framework version | the lab, once: `shared_install` `/rs/rs_grp_oschome/shared/beethoven/hpcworker/current`; an account set up by an extension build before 8.0.0 may still have its own copy in `~/.hpcworker` | the maintainer, with `tools/deploy_shared.sh`; since 8.0.0 the extension carries no copy of the framework and updates none |
-| The extension | with each extension version | the student's browser | its private Chrome Web Store listing (nothing to build) |
+| The extension | with each extension version | the student's browser | its Chrome Web Store listing, public since 20.0.0 (nothing to build) |
 | The student's state: the profile, the consent marker, the log, the run directories, Claude Code's sign-in | as the student works | the student's account (`~/.hpcworker`, `shared_state_dir`, `claude_config_dir`) | nobody else; no install in either mode replaces it |
 
 Fetching the framework from the private GitHub repository is not possible for a student (there is no
@@ -857,130 +857,125 @@ checklist step opening `https://claude.ai/settings/connectors` in a new tab with
 
 From the report's "Security controls", in the order a reviewer will look for them.
 
-- **One origin, granted at click time.** No install-time host permission; the single portal origin is
-  requested from the click on the icon (or the *Connect this portal* button in the strip). A malicious
-  update therefore inherits one origin per user rather than "all sites". Universities can confine it
-  further with Chrome's `ExtensionSettings.runtime_blocked_hosts` and `runtime_allowed_hosts`; the
-  exact host and permission list is published so a security office can set them.
-- **No `cookies` permission.** The portal cookie is used by the network stack and never read.
-- **No script on claude.ai or any Anthropic page.** The only content script is on the portal origin,
-  which removes the DOM-injection and prototype-skimming classes for everything except the portal page
-  itself. The two kinds of Anthropic page the extension opens (the sign-in page Claude Code printed;
-  the session's claude.ai/code link) open in a new tab with `tabs.create` and are never read. The
-  extension never stores a Claude credential and never touches the MFA approval step.
-- **The grid password, under a narrow rule (19.0.0).** The only answer the background gives to an
-  HTTP sign-in is the one in the 19.0.0 paragraph at the top: its own dashboard request, the granted
-  origin and, once one is recorded, realm, once per armed check, nothing after the first refusal
-  until the student types the password again. The password goes from the sheet straight to
+- **One origin, granted at click time.** No install-time host permission; the single portal origin
+  is requested from the click on the icon (or the *Connect this portal* button in the strip). A
+  malicious update therefore inherits one origin per user rather than "all sites". Universities can
+  confine it further with Chrome's `ExtensionSettings.runtime_blocked_hosts` and
+  `runtime_allowed_hosts`; the exact host and permission list is published so a security office can
+  set them. - **No `cookies` permission.** The portal cookie is used by the network stack and never
+  read. - **No script on claude.ai or any Anthropic page.** The only content script is on the portal
+  origin, which removes the DOM-injection and prototype-skimming classes for everything except the
+  portal page itself. The two kinds of Anthropic page the extension opens (the sign-in page Claude
+  Code printed; the session's claude.ai/code link) open in a new tab with `tabs.create` and are
+  never read. The extension never stores a Claude credential and never touches the MFA approval
+  step. - **The grid password, under a narrow rule (19.0.0).** The only answer the background gives
+  to an HTTP sign-in is the one in the 19.0.0 paragraph at the top: its own dashboard request, the
+  granted origin and, once one is recorded, realm, once per armed check, nothing after the first
+  refusal until the student types the password again. The password goes from the sheet straight to
   `storage.session` (one attempt, at most two minutes) or, if the student ticked *Remember*, into
   the IndexedDB record sealed with AES-GCM under a key from the passkey's PRF output; the page
   empties the field before it waits on anything, no action or message carries it, and no log, audit
-  line, error text or `storage.local` key can.
-- **The pasted code passes through and is not kept.** The one-time sign-in code the student pastes
-  into the panel goes over the login port to the page script and into the shell as keystrokes; it is
-  held in a local variable only, the box is cleared as it is sent, and the chokepoint's one audit line
-  for the sitting carries the count of bytes typed and never the text (`login terminal: <how it
-  ended>, N bytes read, M bytes typed, S s`). No storage key, error report or message to the vendor can
-  carry it. On the node the framework hands it to Claude Code's pseudo-terminal with echo off and never
-  copies Claude Code's screen to the terminal the extension reads. The extension has no `clipboardRead`
-  permission and reads no Anthropic page, so it cannot take the code by itself. The `AUTH-URL` it
-  opens must be `https` on `claude.ai`, `claude.com` or a subdomain of either; anything else the
-  cluster prints is reported as refused and not opened, so a compromised framework cannot make the
-  extension open an arbitrary page.
-- **Only the student's own answers reach Claude Code's prompts.** The extension types nothing into
-  Claude Code except the code the student pasted for that purpose. The Remote Control question is
-  answered by the worker job with `y` from the student's recorded statement (the consent marker the
-  strip wrote on their acknowledgement, then Claude Code's own `remoteDialogSeen`), once per prompt,
-  and never without a record.
-- **One chokepoint.** Every portal request passes through one function that appends an append-only,
-  on-device audit record (UTC time, endpoint, method, job id, byte count, outcome), viewable and
-  exportable by the student and never transmitted, and enforces the poll floor and the shell rules:
-  one command line per shell open, and the sign-in sitting as the one held-open use, one at a time,
-  ended by the framework after ten minutes and by the panel after fifteen.
-- **Signed kill-list, fail-safe.** Once a day the service worker fetches a signed JSON document
-  (permitted because JSON is data), verifies it with `crypto.subtle.verify` (Ed25519; ECDSA P-256
-  fallback below Chrome 137, Firefox 130 and Safari 17) against a public key compiled into the
-  bundle. A revoked version refuses to send commands and tells the student why. Offline, the last good
-  list applies; the extension refuses only on a verified revocation, so an outage of a one-person
-  vendor does not strand a campus. Since 4.0.0 the document withdraws versions only; its
-  `revoked_lids` field stays in the file for compatibility and the extension ignores it.
-- **Approval, not keys.** Authentication is the student's own portal sign-in; authorization is the
-  vendor's approved list. After acceptance, once the portal is connected and the dashboard's account
-  name is on record, the background asks the access service (`access_check` from `services.json`,
-  cached 24 h) whether that account is approved, on an icon click once the last answer is a day old or was no and once a day; a yes is kept
-  24 h and up to 7 days when the service is unreachable, a no for 10 minutes. The strip's `access`
-  step sits before `install`, so an unapproved or withdrawn account starts nothing, by the strip or
-  by the automatic start, and the one button is *Ask for access*. The name asked about is only the
-  one the dashboard page shows (`SessionInfo.username`), never a typed one (the AccessID typed into
-  the 19.0.0 sign-in sheet is only the HTTP sign-in's user name) and never the home-directory fallback. Nothing is read from a cookie.
-- **One person's approval, every installation of their own (20.0.0; one installation per account
-  from 8.0.0 to 19.0.0).** The check also carries `install_id`, the random identifier `installId()`
-  in `ext/storage.ts` makes once per installation (nothing about the device; a reinstall makes a new
-  one). The service approves an approved account from every installation that asks about it, records
-  each one against the account (identifier, product, version, first and last seen; the ten most
-  recently seen kept) and e-mails the maintainer, at most once a day per account, when a new one
-  asks, with a link that withdraws the approval and none that moves it; an installation already
-  bound to another approved account gets `"reason":"other_account"`, said as "This installation of
-  Beethoven is already set up for another account. Ask your lab lead to move it to yours." with no
-  button; a check without an identifier gets `"update_required"`. `"reason":"other_installation"`,
-  with which 8.0.0 to 19.0.0's service refused an account bound to another installation, is never
-  sent any more and still read, said as "This account is already set up on another computer. Ask
-  your lab lead to move it here." with no button. The wire stays `v:1`. The binding is enforced by
-  the extension against the service's answer, so it keeps an approval from being shared casually and
-  proves nothing against a modified copy; a withdrawal reaches an installation holding a fresh yes
-  within a day (7 days offline).
-- **Two gates between a request and a working installation: the group and the approval.** The
-  listing on the Chrome Web Store is private, so Chrome installs Beethoven only for the Google
-  accounts in the lab's Google Group `Beethoven-users`; the approval check then decides whether an
-  installation works. The access service records the steps on the student's record with their times:
-  submitted (the request form, which asks for the Google account), confirmed (the student's
-  *Confirm it is you* link from `<AccessID>@wayne.edu`, when `MAIL_STUDENTS` is `"1"`; until then the
-  maintainer's e-mail says the mailbox is not verified, and an unconfirmed request lapses after 7
-  days), decided (*Approve for Beethoven*, *Lab membership only* or *Deny*), invited and installed
-  (set when the first installation binds the seat). The group belongs to a personal Google account,
-  and Google has no programming interface for such a group's members (the Directory API serves only
-  groups a Google Workspace owns), so the invitation is a manual step the service tracks rather than
-  performs: the page after *Approve* shows the Google account in
-  a copy box, a link to the group's members page and a signed one-use *Done, invited* button, the
-  admin page has *Mark invited*, and a daily e-mail lists approvals not invited after an hour. A
-  `GROUP_MODE` `"workspace"` adapter (the Workspace Directory API's `members.insert`, a service
-  account with domain-wide delegation) is built behind a switch for a lab with a Google Workspace,
-  off by default and never called live; on any error it falls back to the manual step. Neither gate
-  carries anything from the extension: the extension never sees the group, and the group never sees
-  the extension's installation identifier. Removal takes both: Remove (or *Withdraw approval*) on the
-  service, and the account out of the group.
-- **The lab's shared copy is read-only to students.** The extension never writes into it: it reads
-  its `VERSION` and types the one install line. The launcher in the student's home is a regular file,
-  so no write in the student's account reaches the shared copy, and the published tree gives the
-  group no write (2.1). The folder name is used on a command line only when it is a plain absolute
-  path.
-- **Per-job token.** The worker carries its own random token so that a request reaching the proxy with
-  a valid portal session cannot drive another student's worker (the `/rnode/` handler does no job or
-  ownership lookup).
-- **Only the environment link is opened by itself.** The link the strip opens when the worker connects
-  must match `https://claude.ai/code?environment=env_...` exactly; anything else the job reports is
-  shown as text.
-- **Release pipeline.** Lockfile and `npm ci`; actions pinned by commit SHA; a build attestation from a
-  hosted builder (SLSA level 2 at minimum, signing material inaccessible to build steps as the level 3
-  target); reproducible-build instructions published for all stores; no long-lived store API key in CI;
-  publisher account and kill-list signing key behind a hardware security key with no third-party OAuth
-  grants.
-- **Cluster side.** Supervised mode by default; the task manifest (working directory, allowed
-  partitions, allowed egress hosts) enforced by the framework independently of the agent; input data
-  read-only with a separate writable working directory; scheduler polling never faster than the
-  profile's floor; tokens never on command lines, in argv, in logs, in job files or in
-  `sbatch --export`.
-- **Nothing deleted outside the run directories.** The framework removes only what is under its own
-  `<shared_state_dir>/<run>/`, the job's node-local temp and `/dev/shm` directories, and the sign-in
-  sitting's own `/dev/shm` directory; never the Claude Code login directory, the workspace, another
-  run or anything else under `$HOME`. A destructive subcommand refuses when `CLAUDECODE`,
-  `BEETHOVEN_REQUEST_ID` (or its older name `ASHLEY_REQUEST_ID`) or a similar agent marker is in the
-  environment, or when stdin is not a terminal. Added after the incident of 2026-09-28
-  (`SECURITY.md`).
-- **Claude Code's settings file, two keys.** `<claude_config_dir>/.claude.json` is read for
-  `remoteDialogSeen` and the workspace's `hasTrustDialogAccepted` only, and rewritten only to seed
-  `hasCompletedOnboarding`, `theme` and that trust key, only in the sign-in sitting or when a worker is
-  about to start a session. The credentials file beside it is never opened.
+  line, error text or `storage.local` key can. - **The pasted code passes through and is not kept.**
+  The one-time sign-in code the student pastes into the panel goes over the login port to the page
+  script and into the shell as keystrokes; it is held in a local variable only, the box is cleared
+  as it is sent, and the chokepoint's one audit line for the sitting carries the count of bytes
+  typed and never the text (`login terminal: <how it ended>, N bytes read, M bytes typed, S s`). No
+  storage key, error report or message to the vendor can carry it. On the node the framework hands
+  it to Claude Code's pseudo-terminal with echo off and never copies Claude Code's screen to the
+  terminal the extension reads. The extension has no `clipboardRead` permission and reads no
+  Anthropic page, so it cannot take the code by itself. The `AUTH-URL` it opens must be `https` on
+  `claude.ai`, `claude.com` or a subdomain of either; anything else the cluster prints is reported
+  as refused and not opened, so a compromised framework cannot make the extension open an arbitrary
+  page. - **Only the student's own answers reach Claude Code's prompts.** The extension types
+  nothing into Claude Code except the code the student pasted for that purpose. The Remote Control
+  question is answered by the worker job with `y` from the student's recorded statement (the consent
+  marker the strip wrote on their acknowledgement, then Claude Code's own `remoteDialogSeen`), once
+  per prompt, and never without a record. - **One chokepoint.** Every portal request passes through
+  one function that appends an append-only, on-device audit record (UTC time, endpoint, method, job
+  id, byte count, outcome), viewable and exportable by the student and never transmitted, and
+  enforces the poll floor and the shell rules: one command line per shell open, and the sign-in
+  sitting as the one held-open use, one at a time, ended by the framework after ten minutes and by
+  the panel after fifteen. - **Signed kill-list, fail-safe.** Once a day the service worker fetches
+  a signed JSON document (permitted because JSON is data), verifies it with `crypto.subtle.verify`
+  (Ed25519; ECDSA P-256 fallback below Chrome 137, Firefox 130 and Safari 17) against a public key
+  compiled into the bundle. A revoked version refuses to send commands and tells the student why.
+  Offline, the last good list applies; the extension refuses only on a verified revocation, so an
+  outage of a one-person vendor does not strand a campus. Since 4.0.0 the document withdraws
+  versions only; its `revoked_lids` field stays in the file for compatibility and the extension
+  ignores it. - **Approval, not keys.** Authentication is the student's own portal sign-in;
+  authorization is the vendor's approved list. After acceptance, once the portal is connected and
+  the dashboard's account name is on record, the background asks the access service (`access_check`
+  from `services.json`, cached 24 h) whether that account is approved, on an icon click once the
+  last answer is a day old or was no and once a day; a yes is kept 24 h and up to 7 days when the
+  service is unreachable, a no for 10 minutes. The strip's `access` step sits before `install`, so
+  an unapproved or withdrawn account starts nothing, by the strip or by the automatic start, and the
+  one button is *Ask for access*. The name asked about is only the one the dashboard page shows
+  (`SessionInfo.username`), never a typed one (the AccessID typed into the 19.0.0 sign-in sheet is
+  only the HTTP sign-in's user name) and never the home-directory fallback. Nothing is read from a
+  cookie. - **One person's approval, every installation of their own (20.0.0; one installation per
+  account from 8.0.0 to 19.0.0).** The check also carries `install_id`, the random identifier
+  `installId()` in `ext/storage.ts` makes once per installation (nothing about the device; a
+  reinstall makes a new one). The service approves an approved account from every installation that
+  asks about it, records each one against the account (identifier, product, version, first and last
+  seen; the ten most recently seen kept) and e-mails the maintainer, at most once a day per account,
+  when a new one asks, with a link that withdraws the approval and none that moves it; an
+  installation already bound to another approved account gets `"reason":"other_account"`, said as
+  "This installation of Beethoven is already set up for another account. Ask your lab lead to move
+  it to yours." with no button; a check without an identifier gets `"update_required"`.
+  `"reason":"other_installation"`, with which 8.0.0 to 19.0.0's service refused an account bound to
+  another installation, is never sent any more and still read, said as "This account is already set
+  up on another computer. Ask your lab lead to move it here." with no button. The wire stays `v:1`.
+  The binding is enforced by the extension against the service's answer, so it keeps an approval
+  from being shared casually and proves nothing against a modified copy; a withdrawal reaches an
+  installation holding a fresh yes within a day (7 days offline). - **One gate between a request and
+  a working installation: the approval.** Since 20.0.0 the listing on the Chrome Web Store is
+  public, so installing Beethoven needs no invitation, and the approval check decides whether an
+  installation works; from 8.0.0 to 19.0.0 the listing was private and Chrome installed Beethoven
+  only for the Google accounts in the lab's Google Group `Beethoven-users`, a second gate the
+  approval made redundant. The access service records the steps on the student's record with their
+  times: submitted (the request form; until 2026-10-13 it asked for the Google account too),
+  confirmed (the student's *Confirm it is you* link from `<AccessID>@wayne.edu`, when
+  `MAIL_STUDENTS` is `"1"`; until then the maintainer's e-mail says the mailbox is not verified, and
+  an unconfirmed request lapses after 7 days), decided (*Approve for Beethoven*, *Lab membership
+  only* or *Deny*) and installed (set when the first installation checks in); older records also
+  carry invited. Until 19.0.0 the invitation was a manual step the service tracked rather than
+  performed, since the group belongs to a personal Google account and Google has no programming
+  interface for such a group's members (the Directory API serves only groups a Google Workspace
+  owns): the page after *Approve* showed the Google account in a copy box, a link to the group's
+  members page and a signed one-use *Done, invited* button, the admin page had *Mark invited*, and a
+  daily e-mail listed approvals not invited after an hour; a `GROUP_MODE` `"workspace"` adapter (the
+  Workspace Directory API's `members.insert`, a service account with domain-wide delegation) stood
+  behind a switch, off by default and never called live. The gate carries nothing from the
+  extension: the group never saw the extension's installation identifier, and the service's approval
+  is by account name. Removal is one step, Remove (or *Withdraw approval*) on the service; until
+  19.0.0 it also meant taking the account out of the group. - **The lab's shared copy is read-only
+  to students.** The extension never writes into it: it reads its `VERSION` and types the one
+  install line. The launcher in the student's home is a regular file, so no write in the student's
+  account reaches the shared copy, and the published tree gives the group no write (2.1). The folder
+  name is used on a command line only when it is a plain absolute path. - **Per-job token.** The
+  worker carries its own random token so that a request reaching the proxy with a valid portal
+  session cannot drive another student's worker (the `/rnode/` handler does no job or ownership
+  lookup). - **Only the environment link is opened by itself.** The link the strip opens when the
+  worker connects must match `https://claude.ai/code?environment=env_...` exactly; anything else the
+  job reports is shown as text. - **Release pipeline.** Lockfile and `npm ci`; actions pinned by
+  commit SHA; a build attestation from a hosted builder (SLSA level 2 at minimum, signing material
+  inaccessible to build steps as the level 3 target); reproducible-build instructions published for
+  all stores; no long-lived store API key in CI; publisher account and kill-list signing key behind
+  a hardware security key with no third-party OAuth grants. - **Cluster side.** Supervised mode by
+  default; the task manifest (working directory, allowed partitions, allowed egress hosts) enforced
+  by the framework independently of the agent; input data read-only with a separate writable working
+  directory; scheduler polling never faster than the profile's floor; tokens never on command lines,
+  in argv, in logs, in job files or in `sbatch --export`. - **Nothing deleted outside the run
+  directories.** The framework removes only what is under its own `<shared_state_dir>/<run>/`, the
+  job's node-local temp and `/dev/shm` directories, and the sign-in sitting's own `/dev/shm`
+  directory; never the Claude Code login directory, the workspace, another run or anything else
+  under `$HOME`. A destructive subcommand refuses when `CLAUDECODE`, `BEETHOVEN_REQUEST_ID` (or its
+  older name `ASHLEY_REQUEST_ID`) or a similar agent marker is in the environment, or when stdin is
+  not a terminal. Added after the incident of 2026-09-28 (`SECURITY.md`). - **Claude Code's settings
+  file, two keys.** `<claude_config_dir>/.claude.json` is read for `remoteDialogSeen` and the
+  workspace's `hasTrustDialogAccepted` only, and rewritten only to seed `hasCompletedOnboarding`,
+  `theme` and that trust key, only in the sign-in sitting or when a worker is about to start a
+  session. The credentials file beside it is never opened.
 
 The data disclosure the extension shows at first run and at each job start, in the report's words:
 files the worker reads and every command's output are sent to Anthropic; while you are connected

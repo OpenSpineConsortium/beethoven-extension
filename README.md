@@ -10,7 +10,7 @@
 ## Trying it from this repository (collaborators)
 
 A page cannot install a Chrome extension — only the Chrome Web Store can, which is why students
-get Beethoven through the private listing, the one real one-click install. For people this
+get Beethoven through its Chrome Web Store listing, the one real one-click install. For people this
 repository is shared with, two developer paths, closest-to-one-click first:
 
 **No terminal at all.** Your GitHub sign-in in the browser is the authorization.
@@ -33,7 +33,7 @@ to a stable folder, and prints the one-time Load-unpacked step; later runs updat
 Chrome shows its developer-mode banner for anything loaded this way and never auto-updates it:
 that is the browser's permanent price for an install from outside the Web Store.
 
-The public name is **Beethoven** (decided 2026-09-29): the extension, its private store listing, its
+The public name is **Beethoven** (decided 2026-09-29): the extension, its store listing, its
 pages at `https://openspineconsortium.com/beethoven/`, its texts and every screen a student or a
 reviewer sees say Beethoven, and it is not an Anthropic product. The repository is
 `OpenSpineConsortium/beethoven-extension` since the split of 2026-10-03 (before that
@@ -98,13 +98,13 @@ Beethoven extension     ──▶ https://ondemand.<university>.edu ──▶ lo
                               └────────── shared storage <state_dir>/<run>/ ◀──────────────────────────┘
 ```
 
-What a student does, in order, after installing the extension from its private listing on the Chrome
-Web Store (open only to the Google accounts of students the maintainer approved; there is no
-download and no other store) and accepting the agreement once on its setup page (there is no licence
-key to enter: their own sign-in to the portal identifies them, and the extension confirms with
-the vendor's access service that the account the portal shows is approved on this installation, one
-installation per approved account; if it is not approved, the panel's one button is *Ask for
-access*):
+What a student does, in order, after installing the extension from its listing on the Chrome Web
+Store (public since 20.0.0; installing needs no invitation, and the approval check decides whether
+it works; there is no download and no other store) and accepting the agreement once on its setup
+page (there is no licence key to enter: their own sign-in to the portal identifies them, and the
+extension confirms with the vendor's access service that the account the portal shows is approved,
+from every installation of that person's own since 20.0.0; if it is not approved, the panel's one
+button is *Ask for access*):
 
 1. **Open your portal tab.** Sign in to `ondemand.<university>.edu` the usual way (VPN first if the
    university requires it) and keep the tab open. (The flow of 2026-09-29. Since 11.0.0 the welcome
@@ -267,8 +267,8 @@ where 8.0.0 to 19.0.0 bound an account to one installation; `release/<version>/R
 version's changes, up to 14.0.0); the framework is the server repository's,
 `OpenSpineConsortium/hpcworker`, and the lab's shared copy at Wayne State is the version its
 `tools/deploy_shared.sh` last published (the panel shows it under *Details*); the agreement
-`LICENSE.txt` is version 13 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
-13 to match; `PRIVACY.md` is version 14. All integers; a changed text moves its version with it.
+`LICENSE.txt` is version 14 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
+14 to match; `PRIVACY.md` is version 15. All integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -304,7 +304,7 @@ npm run zip:all        # -> .output/beethoven-<version>-{chrome,firefox,edge,saf
 test` after a build checks that, and that the package's JavaScript is minified with no comment or
 source map. Load `.output/chrome-mv3` unpacked in Chrome to try a build by hand
 (`docs/store/TEST_BEFORE_UPLOAD.md`); students never load a build by hand: they install from the
-private listing.
+Chrome Web Store.
 
 **Framework (the cluster side).** `HPCW_PYTHON=python3 bash framework/tests/run.sh` (about
 seven minutes under Git Bash on the Windows laptop, measured 2026-09-29; a few tests skip without a
@@ -377,7 +377,7 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
    the zip; the zip itself names the store's extension and stays on the maintainer's computer
    (`.gitignore`). Commit the record, tag `v<version>` and push. A GitHub release named `v<version>`
    on the organisation's private copy, if one is made, carries those checksums and no zip; it is
-   never a download page for students, who install only from the private listing. Records up to
+   never a download page for students, who install only from the Chrome Web Store. Records up to
    14.0.0 hold their zips and were made by hand (`release/10.0.0/` also holds the store kit and the
    reviewers' mock-portal zip).
 4. For a first submission, or whenever the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) comes
@@ -399,7 +399,8 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
 - `docs/OPEN_QUESTIONS.md`: the 12 ranked open questions, their first tests and results, and the
   live-portal findings of 2026-09-29.
 - `docs/STORE_LISTING.md`: single-purpose statement, permission justifications, privacy answers,
-  reviewer access and the checklist for the one private Chrome Web Store listing.
+  reviewer access and the checklist for the one Chrome Web Store listing (private then; public since
+  20.0.0).
 - `docs/store/`: the texts to paste into the Chrome Web Store dashboard (`LISTING.md`), the
   submission steps (`SUBMISSION.md`) and the hand test before upload (`TEST_BEFORE_UPLOAD.md`).
 - `docs/PUBLISHING_SITE.md`: the public pages, the services file and the kill-list, how they are built,
@@ -408,8 +409,8 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 13; the extension's
-  `TERMS_VERSION` is 13) and the privacy statement (version 14).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 14; the extension's
+  `TERMS_VERSION` is 14) and the privacy statement (version 15).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

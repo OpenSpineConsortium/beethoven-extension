@@ -1,6 +1,6 @@
 # Install Beethoven
 
-For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-11.
+For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-13.
 
 **Updating from 19.0.0.** Chrome updates Beethoven by itself and asks you nothing. Beethoven asks
 you to accept its terms once more, because they now say that your approval covers every
@@ -45,8 +45,8 @@ administrator rights.
 ## What you need
 
 - Google Chrome on Windows 10 or 11, a Mac, or Linux.
-- The invitation to Beethoven's private page. It goes to the Google account you gave when you asked
-  for access.
+- Approval from the lab lead, asked for on Beethoven's request page. Beethoven installs without it,
+  but starts a worker only once you are approved.
 - A Wayne State AccessID with a grid account.
 - GlobalProtect, Wayne State's VPN app, connected to `protect.wayne.edu`. Beethoven reaches the grid
   only through it. Wayne State's own guide is KB 20314; the welcome page's **How to set it up**
@@ -55,17 +55,16 @@ administrator rights.
 
 ## Install Beethoven
 
-1. Open the invitation in Chrome. Chrome must be signed in to the Google account the invitation was
-   sent to.
-2. Open the link to Beethoven's page in the Chrome Web Store.
+1. Open `https://openspineconsortium.com/beethoven/` in Chrome, in any Chrome of your own.
+2. Follow its Install card to Beethoven's page in the Chrome Web Store.
 3. Click **Add to Chrome**.
 4. Chrome asks whether to add Beethoven and lists what it can do. Click **Add extension**.
 5. Beethoven's welcome page opens. Carry on with [Use Beethoven](USE.md), part 1.
 6. Pin Beethoven so it is one click away: click the puzzle icon at the top right of Chrome, then the
    pin next to **Beethoven**.
 
-If the link shows no item, Chrome is signed in to another Google account. Switch to the account the
-invitation was sent to and open the link again.
+Any Google account, or none, will do: since 20.0.0 the listing is public. (Until 19.0.0 it opened
+only for the Google account your invitation went to.)
 
 ## Check that it works
 

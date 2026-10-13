@@ -1,14 +1,14 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 13, 2026-10-11. Applies to the Trial Edition of Beethoven 20.0.0 and later versions that
-ship this text, as distributed through its private listing on the Chrome Web Store, which only the
-Google accounts Licensor has invited can open. You can read, copy, save and print this text at any
-time: it is in the file LICENSE.txt inside the extension and inside the framework (in your computing
-account, or in your institution's shared copy), on Beethoven's welcome page ("Show terms", "Open in
-a tab", "Save a copy", "Print") and on its settings page, at
-https://openspineconsortium.com/beethoven/terms.html, and from the support page at
-https://openspineconsortium.com/beethoven/support.html. You may ask for a paper copy at the notice
-address there.
+Version 14, 2026-10-13. Applies to the Trial Edition of Beethoven 20.0.0 and later versions that
+ship this text, as distributed through its public listing on the Chrome Web Store, which needs no
+invitation to open or install from; the approval of section 3 decides whether it works for you. You
+can read, copy, save and print this text at any time: it is in the file LICENSE.txt inside the
+extension and inside the framework (in your computing account, or in your institution's shared
+copy), on Beethoven's welcome page ("Show terms", "Open in a tab", "Save a copy", "Print") and on
+its settings page, at https://openspineconsortium.com/beethoven/terms.html, and from the support
+page at https://openspineconsortium.com/beethoven/support.html. You may ask for a paper copy at the
+notice address there.
 
 Copyright (c) 2026 Gregory Schwing, trading as OpenSpineConsortium. All rights reserved.
 
@@ -66,17 +66,16 @@ license can end as this agreement says (sections 3 and 9). All rights not grante
 
 (a) The Trial Edition is available only to persons whose institutional account Licensor has approved
 for it. Approval is requested on the request page at
-https://openspineconsortium.com/beethoven/request.html, with your account name and the Google
-account at which you are to receive the invitation to the Extension's private listing, and may be
-refused or withdrawn at any time, with or without reason. Licensor may approve an account for
-membership of its lab only; such an approval does not cover Beethoven. There is no key and no
-password of Licensor's: your own sign-in to your institution's cluster identifies you. After you
-have accepted this agreement, and only once your cluster has accepted your sign-in to your portal,
-the Extension asks Licensor's access service whether your account name is approved: when you first
-sign in after accepting it, about once a day while it is in use, and again when you open its panel
-after a day has passed or after a no; and it starts a worker only while the answer is yes. A copy of
-Beethoven used from an account that is not approved does not start a worker; its panel offers a link
-to ask for access instead.
+https://openspineconsortium.com/beethoven/request.html, with your account name, and may be refused
+or withdrawn at any time, with or without reason. Licensor may approve an account for membership of
+its lab only; such an approval does not cover Beethoven. There is no key and no password of
+Licensor's: your own sign-in to your institution's cluster identifies you. After you have accepted
+this agreement, and only once your cluster has accepted your sign-in to your portal, the Extension
+asks Licensor's access service whether your account name is approved: when you first sign in after
+accepting it, about once a day while it is in use, and again when you open its panel after a day has
+passed or after a no; and it starts a worker only while the answer is yes. A copy of Beethoven used
+from an account that is not approved does not start a worker; its panel offers a link to ask for
+access instead.
 
 (b) Your approval is for you and the institutional account it names alone. Do not use Beethoven from
 an account that is not yours, and do not arrange for anyone else to use it under your approval.
@@ -103,8 +102,8 @@ recorded against it, and Licensor is told when a new one asks (section 10). An i
 one account: the first approved account it asks about is bound to it, and a check from it for any
 other account is refused, and the Extension says so, until Licensor releases it; ask your lab lead,
 or write to the notice address on the support page. Licensor may refuse every check from a version
-of the Extension that sends no installation identifier; the current version is on the private
-listing.
+of the Extension that sends no installation identifier; the current version is the one on the Chrome
+Web Store, which your browser installs by itself (section 17).
 
 4. YOUR ACCOUNTS AND THE TERMS THAT COME WITH THEM
 
@@ -463,16 +462,16 @@ receive them. The install id is the installation identifier of section 3(e), whi
 check in (a) sends, as it sends your account name.
 
 (d) Access records. An access request on the request page records what you enter there: your account
-name, your name, your institutional e-mail, the Google account at which you are to receive the
-invitation to the private listing (Licensor adds it to the Google Group that may open that listing),
-what you will use Beethoven for and, if you attach one, your CV; and, when the service asks you to
-confirm your institutional mailbox, the time you confirmed it. Licensor's own records hold the
-approval and withdrawal decisions about your account, with the name and e-mail given and their
-dates, the installations your account has asked from (section 3(e)) and the record of the approval
-checks described in (a). Licensor deletes a CV twelve months after deciding on the request (twelve
-months after the request, if no decision is made), or at once if it refuses the request or withdraws
-the approval, and keeps the other records for the life of your access and six years after, to prove
-the license and its terms.
+name, your name, your institutional e-mail, what you will use Beethoven for and, if you attach one,
+your CV (a Google account given on the request page before version 14 of this agreement, for the
+invitation the then private listing needed, stays in the record and is no longer used); and, when
+the service asks you to confirm your institutional mailbox, the time you confirmed it. Licensor's
+own records hold the approval and withdrawal decisions about your account, with the name and e-mail
+given and their dates, the installations your account has asked from (section 3(e)) and the record
+of the approval checks described in (a). Licensor deletes a CV twelve months after deciding on the
+request (twelve months after the request, if no decision is made), or at once if it refuses the
+request or withdraws the approval, and keeps the other records for the life of your access and six
+years after, to prove the license and its terms.
 
 (e) The full privacy statement is in PRIVACY.md, which forms part of this agreement.
 
@@ -549,9 +548,9 @@ else in this agreement.
 
 17. UPDATES AND CHANGES TO THESE TERMS
 
-Updates to the Extension are distributed through its private listing on the Chrome Web Store, and
-your browser installs them by itself. A Framework that an earlier version of the Extension installed
-in your own cluster account is never updated on its own, and the Extension no longer installs or
+Updates to the Extension are distributed through its listing on the Chrome Web Store, and your
+browser installs them by itself. A Framework that an earlier version of the Extension installed in
+your own cluster account is never updated on its own, and the Extension no longer installs or
 updates one. Where your institution's lab keeps one shared copy of the Framework, the lab updates
 that copy, your next worker start uses it, and the Extension shows the version in use under Details.
 Each version ships the terms that apply to it. Licensor may change these terms for future versions.

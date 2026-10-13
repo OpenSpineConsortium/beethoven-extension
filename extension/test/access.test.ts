@@ -166,7 +166,7 @@ describe('the answers', () => {
     const otherBody = { approved: false, access_id: 'st1234', requestPage: REQUEST_PAGE_URL, reason: 'other_installation' };
     // the exact sentences the strip shows
     expect(OTHER_INSTALLATION).toBe('This account is already set up on another computer. Ask your lab lead to move it here.');
-    expect(UPDATE_REQUIRED).toBe("Install the current Beethoven from the lab's private listing.");
+    expect(UPDATE_REQUIRED).toBe('Install the current Beethoven from the Chrome Web Store.');
     // a second installation asking for an approved account: refused with the reason, never called a withdrawal
     const second = await checkAccess({ accessId: 'st1234', portal: W, version: '8.0.0', installId: OTHER, fetchFn: fakeService({ body: otherBody }).fetchFn, now: () => at(T0) });
     expect(second.record).toMatchObject({ approved: false, reason: 'other_installation', checked_at: iso(T0) });
@@ -190,7 +190,7 @@ describe('the answers', () => {
     // the service asks for the current build
     const old = await checkAccess({ accessId: 'st1234', portal: W, version: '8.0.0', installId: INSTALL, fetchFn: fakeService({ body: { approved: false, access_id: 'st1234', reason: 'update_required' } }).fetchFn, now: () => at(T0) });
     expect(old.record.reason).toBe('update_required');
-    expect(old.detail).toMatch(/current Beethoven from the lab's private listing/);
+    expect(old.detail).toMatch(/current Beethoven from the Chrome Web Store/);
     expect(fact(old.record)).toMatchObject({ ok: false, state: 'update-required', detail: UPDATE_REQUIRED });
     // this installation is set up for another approved account: its own sentence, never "not on the approved list yet"
     expect(OTHER_ACCOUNT).toBe('This installation of Beethoven is already set up for another account. Ask your lab lead to move it to yours.');

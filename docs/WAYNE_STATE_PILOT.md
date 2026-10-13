@@ -26,9 +26,9 @@ For the student:
   fast a student is added is not yet known.
 - A Claude Pro or Max subscription in the student's own name. Remote Control is available on Pro, Max,
   Team and Enterprise; API keys and `setup-token` credentials do not work.
-- Google Chrome 148 or later, signed in with the Google account given on the request form. Beethoven
-  8.0.0 is offered only on a private Chrome Web Store listing, which opens for the members of the
-  lab's Google Group `Beethoven-users` and for no one else; there is no download and no other store.
+- Google Chrome 148 or later. Beethoven is offered only on the Chrome Web Store, as a public listing
+  since 20.0.0 (from 8.0.0 to 19.0.0 a private one, which opened for the members of the lab's Google
+  Group `Beethoven-users` and for no one else); there is no download and no other store.
 
 For the site profile (`framework/profiles/wayne.json`, `site: wayne`, so sessions are asked for as
 `wayne-<jobid>`): scheduler `slurm`, `submit_host: warrior`; `partition_cpu: secp` with `qos_cpu:
@@ -70,36 +70,34 @@ The admin page (`https://openspineconsortium.com/beethoven/admin.html`, behind t
 
 | Stage | What happens | Who acts | Recorded |
 |---|---|---|---|
-| Submitted | The form at `/beethoven/request.html`: AccessID, name, `<AccessID>@wayne.edu`, the Google account the student signs in to Chrome with, what it is for, an optional CV (PDF or Word, 5 MB) | student | `submitted_at` |
+| Submitted | The form at `/beethoven/request.html`: AccessID, name, `<AccessID>@wayne.edu`, what it is for, an optional CV (PDF or Word, 5 MB); until 2026-10-13 also the Google account the student signed in to Chrome with, for the invitation | student | `submitted_at` |
 | Confirmed | With `MAIL_STUDENTS` `"1"`, a *Confirm it is you* link goes to `<AccessID>@wayne.edu` (24 hours, one use), and the maintainer is e-mailed only once it is pressed; a request nobody confirms lapses after 7 days and the student can send the form again. With `"0"`, as deployed on 2026-09-30 (the sending domain is not verified at Resend yet), this stage is skipped and the maintainer's e-mail says the mailbox is not verified | student | `confirmed_at` |
 | Decided | *Approve for Beethoven*, *Lab membership only* or *Deny*, from the one-use links in the maintainer's e-mail or on the admin page | maintainer | `decided_at`, `decision` |
-| Invited | The maintainer adds the Google account to the Google Group `Beethoven-users` at `https://groups.google.com/g/beethoven-users/members`, then presses *Done, invited* on the page the Approve link shows, or *Mark invited* on the admin page. A daily e-mail (13:00 UTC, from `beethoven-access` only) lists every approval for Beethoven not invited after an hour, the store reviewers' mock account and accounts already installed aside, each with its own *Done, invited* link | maintainer | `invited_at`, `invited_by` |
-| Installed | The student installs from the private listing; its first approval check binds the account to that installation | student (the extension, by itself) | `installed_at` |
+| Invited | Retired with 20.0.0's public listing (kept on older records). Until 19.0.0 the maintainer added the Google account to the Google Group `Beethoven-users` at `https://groups.google.com/g/beethoven-users/members`, then pressed *Done, invited* on the page the Approve link showed, or *Mark invited* on the admin page, and a daily e-mail (13:00 UTC, from `beethoven-access` only) listed every approval for Beethoven not invited after an hour | maintainer, until 19.0.0 | `invited_at`, `invited_by` |
+| Installed | The student installs from the Chrome Web Store listing (public since 20.0.0; the Invited stage above is retired with it, and the daily e-mail no longer goes out); its first approval check binds the account to that installation | student (the extension, by itself) | `installed_at` |
 
-The invitation is by hand because the group belongs to a personal Google account, and Google offers
-no programming interface for the members of such a group (its Directory API serves only groups a
-Google Workspace owns); the service's part is to remember who is approved and not yet invited, and to
-remind the maintainer once a day. When the lab has a Google
-Workspace, `GROUP_MODE` `"workspace"` makes Approve add the account itself through the Workspace
-Directory API (`members.insert` on `beethoven-users@openspineconsortium.com`, as a service account with
-domain-wide delegation acting for a Workspace administrator; its key is `google_group_sa.json` in the
-vendor folder, sent as the secret `GROUP_SA_KEY`); any error there falls back to the manual step with
-the error shown. That adapter is off by default, tested against a stub only, and has never been
-called against Google. Google sends no invitation when the service adds someone, so in that mode the
-student's approval e-mail says they are already in the group and that the maintainer sends the
-listing's link, and the Approve page and the admin page tell the maintainer to send it.
+Until 19.0.0 the invitation was by hand because the group belongs to a personal Google account, and
+Google offers no programming interface for the members of such a group (its Directory API serves
+only groups a Google Workspace owns); the service's part was to remember who was approved and not
+yet invited, and to remind the maintainer once a day. A `GROUP_MODE` `"workspace"` adapter made
+Approve add the account itself through the Workspace Directory API (`members.insert` on
+`beethoven-users@openspineconsortium.com`, as a service account with domain-wide delegation acting
+for a Workspace administrator; its key `google_group_sa.json` in the vendor folder, sent as the
+secret `GROUP_SA_KEY`), falling back to the manual step on any error; it was off by default, tested
+against a stub only, and never called against Google. Since 20.0.0 none of this runs: the service's
+Approve page still shows a Google account an older request gave, marked as adding nothing.
 
-When the service e-mails students, an approval for Beethoven also tells the student to watch for the
-Google Groups invitation at the Google account they gave and accept it, to install from the private
-listing once, and where the page that says how it works is (`ONBOARDING_PAGE`,
-`https://openspineconsortium.com/beethoven/`). Being in the group is what lets Chrome install
-Beethoven; the approval check is what lets an installation work. Both are needed, and removing
-someone means both: Remove on the admin page (or *Withdraw approval* in an e-mail), and taking the
-account out of the group.
+When the service e-mails students, an approval for Beethoven also tells the student to install from
+the Chrome Web Store listing once, linked from the page that says how it works (`ONBOARDING_PAGE`,
+`https://openspineconsortium.com/beethoven/`); until 19.0.0 it told them to accept the Google Groups
+invitation first. Since 20.0.0 the approval check alone decides whether an installation works, and
+removing someone is one step: Remove on the admin page (or *Withdraw approval* in an e-mail). Until
+19.0.0 being in the group was what let Chrome install Beethoven, and removing someone meant taking
+the account out of the group too.
 
 ## The student's three steps
 
-Once, before the first run: install the extension from its private listing on the Chrome Web Store
+Once, before the first run: install the extension from its listing on the Chrome Web Store
 (above) and read and accept the agreement on its setup page. There is no key to paste: the extension
 reads the AccessID the portal's dashboard shows for the signed-in session and asks Licensor's access
 service whether that account is on the approved list. A student not yet on it presses *Ask for

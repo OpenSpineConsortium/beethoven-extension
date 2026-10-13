@@ -116,12 +116,18 @@ name and identifier carry no university name.
   device identifier, no fingerprinting, no obfuscation (Chrome forbids it; Vite's minification
   only): everything the check sends and the service keeps is written in `LICENSE.txt` section 3(e)
   and 10 and in `PRIVACY.md`. It is a check in the client, not a proof, and no text may claim more.
-- **One store, one private listing (decided 2026-09-30, 8.0.0).** Beethoven is offered only as a
-  Private item on the Chrome Web Store whose trusted testers are the maintainer's Google Group of
-  approved students (`docs/store/SUBMISSION.md`). No Edge, Firefox or Safari listing, no download on
-  the website or for students anywhere else. No signed file: since 16.0.0 the package carries no
-  installer (15.0.0's two signed bridge installers went with the bridge). The Firefox build script
-  stays because the code builds for it; nothing submits it.
+- **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
+  Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
+  2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
+  approval check decides whether it works, so nothing is lost by the open listing (its regions stay
+  the United States, so the texts say "no invitation", never "anyone"). From 8.0.0 to 19.0.0 it was
+  a Private item whose trusted testers were the maintainer's Google Group `Beethoven-users` of
+  approved students; with 20.0.0 the group, the request page's Google account and the access
+  service's invitation step are retired (`docs/store/SUBMISSION.md`), and the site's install card
+  links the listing. No Edge, Firefox or Safari listing, no download on the website or for students
+  anywhere else. No signed file: since 16.0.0 the package carries no installer (15.0.0's two signed
+  bridge installers went with the bridge). The Firefox build script stays because the code builds
+  for it; nothing submits it.
 - **The direct way is gone (decided 2026-10-08, 16.0.0).** From 12.0.0 to 15.0.0 the extension first
   tried ssh to the login node with no VPN, through a native-messaging bridge bundled in the package
   (from 15.0.0 as signed, per-user installers for Windows and macOS, built and signed on the
@@ -179,8 +185,11 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-11 and extension 20.0.0 `LICENSE.txt` is version 13 and `PRIVACY.md`
-  version 14, which describe the relaxed installation rule (sections 3(e) and 10: one person's
+  Edition; since 2026-10-13 and extension 20.0.0 `LICENSE.txt` is version 14 and `PRIVACY.md`
+  version 15, which describe the public listing (the head, sections 3(a), 3(e), 10(d) and 17: anyone
+  can install it, the approval decides whether it works, the request page asks for no Google account
+  and one given earlier stays in the record unused) on top of version 13 and 14 (2026-10-11, drafted
+  for 20.0.0 and never shipped: the relaxed installation rule, sections 3(e) and 10: one person's
   approval on every installation of their own, the ten most recent installations kept per account,
   a notice e-mail with a Withdraw link and none to move) on top of version 12 and 13 (19.0.0:
   Beethoven's own grid sign-in: the sheet, the answer to the portal's HTTP sign-in under the narrow
@@ -203,7 +212,7 @@ name and identifier carry no university name.
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 13 to match, with `TERMS_DATE` 2026-10-11; the framework's
+  `extension/src/core/terms.ts` is 14 to match, with `TERMS_DATE` 2026-10-13; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and
@@ -333,7 +342,7 @@ things, kept once on the lab's CephFS volume; the extension is the student's thi
 makes the student's account see them (`hpcworker install --shared`, typed through the portal's
 shell) and then starts, watches and stops the worker. Since 8.0.0 the extension carries no framework
 and uploads nothing; a site with no shared directory is told to ask its lab lead. The extension
-updates itself through its private Chrome Web Store listing. Fetching the framework from the private
+updates itself through its Chrome Web Store listing. Fetching the framework from the private
 GitHub repository is not possible for a student (no token) and is not designed.
 
 ## How to be useful here

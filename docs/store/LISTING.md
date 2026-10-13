@@ -9,9 +9,11 @@ the site's theme; an Anthropic address refused before any permission request), r
 2026-10-02 for 12.0.0, brought up to date on 2026-10-04 for 15.0.0 (13.0.0 and 14.0.0 left these
 texts as they were), rewritten again on 2026-10-08 for 16.0.0, which removed the direct way of
 12.0.0 to 15.0.0 whole, and brought up to date on 2026-10-09 for 19.0.0, in which Beethoven signs in
-to the grid itself (17.0.0 and 18.0.0 left these texts as they were), and on 2026-10-11 for 20.0.0,
+to the grid itself (17.0.0 and 18.0.0 left these texts as they were), on 2026-10-11 for 20.0.0,
 in which one approval covers every installation of the student's own (the description's approval
-line and its access link, the reviewed text's needs, and the privacy answer).
+line and its access link, the reviewed text's needs, and the privacy answer), and on 2026-10-13 for
+20.0.0's public listing (the description's approval line again, the privacy answer, the site's card;
+agreement version 14, privacy statement version 15).
 11.0.0 (2026-10-01) was built but never submitted, and its store documents
 were never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
@@ -248,7 +250,7 @@ Beethoven starts, watches and stops a Claude Code worker in your own account on 
 WHAT YOU NEED
 - An account on a cluster where your lab keeps the shared copy of Beethoven's cluster-side scripts, and whatever your university needs to reach its Open OnDemand portal. At Wayne State: a grid account and the GlobalProtect VPN.
 - Your own Claude account on a plan that includes Claude Code Remote Control (Pro or Max).
-- Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/beethoven/request.html with your account name and the Google account at which you want the invitation to this listing, which is private. There is no licence key.
+- Approval of your cluster account by the maintainer. The Trial Edition is free for approved institutional accounts; ask for access at https://openspineconsortium.com/beethoven/request.html with your account name. Installing Beethoven from this listing needs no invitation; it starts a worker only for an approved account. There is no licence key.
 - Your own computers. An approval covers every installation you use yourself; a second computer, another browser profile or a reinstallation works at its first check, and the maintainer is told that a new installation asked. One installation serves one account.
 
 HOW IT WORKS
@@ -334,7 +336,7 @@ No remote code. No eval, no new Function, no fetched scripts, no interpreter for
 | Question | Answer |
 |---|---|
 | Does the extension collect or transmit user data? | Yes, two kinds. **Personally identifiable information**: the institutional account name the user's portal shows and the random identifier of this installation, sent to the developer's access service in the approval check (with the portal's hostname, the product and the version). **Authentication information**: Yes. The user's AccessID and cluster password, typed into the extension's own sign-in sheet, are sent only to the user's own university portal, as the answer to its HTTP sign-in, and never to the developer; the password is kept only if the user ticks "Remember it on this computer", and then only encrypted on the device, under a key the user's passkey releases (12.0.0 to 15.0.0 answered Yes for the direct way's sign-in sheet; 16.0.0 to 18.0.0 answered No). Nothing else: no communications, no website content, no browsing history, no user activity, no location, no financial or health data. |
-| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 14 names the approval check, what the developer records from it, the installations it keeps per approved account, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
+| Is a privacy policy provided? | Yes: https://openspineconsortium.com/beethoven/privacy.html (version 15 names the public listing, the approval check, what the developer records from it, the installations it keeps per approved account, what your portal sees, what stays on the device, the grid sign-in Beethoven makes and the password it keeps only if you ask, where the passkey lives, what happens when the portal's shell asks for your password, and what an earlier version may have left). |
 | Certifications (Chrome's three) | I do not sell or transfer user data to third parties outside the approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes. |
 | Limited Use statement (on the landing page and the reviewers page) | Beethoven's use of information received from your browser complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. |
 
@@ -368,9 +370,9 @@ and when it is kept).
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
-15.0.0, 16.0.0, 19.0.0 or 20.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 13
-and `PRIVACY.md` version 14 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 14.
+15.0.0, 16.0.0, 19.0.0 or 20.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 14
+and `PRIVACY.md` version 15 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 15.
 
 ## Images and the promo video
 
@@ -447,6 +449,7 @@ word.
 
 ## No other store
 
-Edge Add-ons, Firefox Add-ons and Safari are not used from 8.0.0 (decided 2026-09-30): one private
-listing is what keeps the extension with the students the maintainer approved. `npm run build` and
+Edge Add-ons, Firefox Add-ons and Safari are not used from 8.0.0 (decided 2026-09-30): one listing,
+private until 19.0.0 and public since 20.0.0 (decided 2026-10-13), and the approval check is what
+keeps the extension working only for the students the maintainer approved. `npm run build` and
 `npm run zip` still produce a Firefox package, because the code builds for it; nothing uploads it.
