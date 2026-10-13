@@ -1,6 +1,6 @@
 # Beethoven for testers
 
-**16.0.0 (2026-10-08).** For 16.0.0, follow `guides/INSTALL.md` and `guides/USE.md`, which replace this page for installing and using Beethoven (one way to the grid: your university's VPN, then its Open OnDemand portal). The steps below, from asking for access to the invitation, still hold; where a panel word below differs from the guides, the guides have today's.
+**16.0.0 (2026-10-08).** For 16.0.0, follow `guides/INSTALL.md` and `guides/USE.md`, which replace this page for installing and using Beethoven (one way to the grid: your university's VPN, then its Open OnDemand portal). The steps below, from asking for access to the install, still hold (since 20.0.0 the listing is public and no invitation comes); where a panel word below differs from the guides, the guides have today's.
 
 What you do, in order, from asking for access to your first worker. There is no key and nothing to
 paste anywhere: your own sign-in to your university's Open OnDemand portal identifies you, and the
@@ -25,8 +25,8 @@ more.
   person, one account; you sign in yourself, once, and the extension never sees that sign-in.
 - At Wayne State, your grid account in the lab's research-storage group. Ask Greg to have it added;
   until it is, your worker cannot start.
-- Google Chrome, signed in to the Chrome Web Store with the Google account you give on the request
-  form. Beethoven is offered in no other browser and no other store, and there is no download.
+- Google Chrome, with any Google account or none. Beethoven is offered in no other browser and no
+  other store, and there is no download.
 - Your Wayne State mailbox (`<AccessID>@wayne.edu`), in case the service asks you to confirm your
   request from it (step 1).
 - The computers and Chrome profiles you will use it from (see step 2).
@@ -36,8 +36,8 @@ more.
 Open `https://openspineconsortium.com/beethoven/request.html` and fill in the form: the account name
 your portal shows for you (at Wayne State your AccessID, two letters and four digits, such as
 `ab1234`; it is the name the portal's dashboard shows next to "Logged in as"), your name, your
-institutional e-mail, the Google account at which you want the invitation to the private listing
-(the one you sign in to Chrome with), and a line on what you will use Beethoven for. You may attach a
+institutional e-mail, and a line on what you will use Beethoven for (until 19.0.0 the form also
+asked for a Google account, for the invitation the then private listing needed). You may attach a
 CV (PDF or Word, 5 MB at most); it is optional. Send it. The page then says one of two things:
 
 - **"Sent. Check your Wayne State mail for a confirmation link."** The service e-mailed
@@ -54,25 +54,22 @@ CV (PDF or Word, 5 MB at most); it is optional. Send it. The page then says one 
 
 Greg then decides: **Approve for Beethoven**, **Lab membership only** (the lab, not Beethoven), or
 **Deny**. When the service e-mails students, an approval for Beethoven e-mails you too: you are
-approved; watch for the Google Groups invitation to `Beethoven-users` at your Google account and
-accept it; then install Beethoven from the private Chrome listing; and a link to how it works
-(`https://openspineconsortium.com/beethoven/`). Otherwise Greg tells you.
+approved; install Beethoven from its Chrome Web Store listing, linked from
+`https://openspineconsortium.com/beethoven/`, which also says how it works. Otherwise Greg tells you.
 
-If you skip this step, the extension cannot be installed at all: the private listing opens only for
-the Google accounts in the lab's Google Group.
+Since 20.0.0 the listing is public: installing needs no invitation, and it is the approval that
+makes it work. (Until 19.0.0 the listing opened only for the Google accounts in the lab's Google
+Group `Beethoven-users`, and the approval e-mail told you to accept that group's invitation first.)
 
 ## 2. Install the extension, once, on the computer you will use
 
-When you are approved for Beethoven, Greg adds the Google account you gave to the lab's Google Group
-**Beethoven-users**, the list of accounts the private listing opens for. Google then e-mails that
-account about the group (if it is an invitation, accept it); the link to the listing comes with that
-e-mail or from Greg. Nothing
-arrives at your Wayne State address for this step, and an invitation to a different Google account
-does not help: the listing checks the account Chrome is signed in with. In Chrome, signed in with
-that Google account, open the listing's link and choose *Add to Chrome*, then *Add extension* in
-Chrome's own prompt. Updates come by themselves through Chrome. If the listing does not open for you,
-either Chrome is signed in with another Google account or yours is not in the group yet: check the
-first, then ask Greg.
+Open the Install section of `https://openspineconsortium.com/beethoven/` in Chrome and follow its
+link to Beethoven's listing on the Chrome Web Store; any Google account, or none, will do. (Until
+19.0.0 Greg first added the Google account you gave to the lab's Google Group **Beethoven-users**,
+the list of accounts the then private listing opened for, and the link came with Google's e-mail
+about the group or from Greg.) Nothing arrives at your Wayne State address for this step. On the
+listing choose *Add to Chrome*, then *Add extension* in Chrome's own prompt. Updates come by
+themselves through Chrome. If the listing does not open for you, ask Greg.
 
 Your approval, every installation of your own. Each installation that checks your account is
 recorded against it (Greg's list then shows it), and it works at its first check: another computer,
@@ -134,8 +131,8 @@ account name the panel shows under *Details* (check 4, "signed in as").
 
 This browser's Beethoven was first used with someone else's account, and one installation serves one
 account. There is no button; use your own installation, or ask Greg to release this one for you, then
-click the icon again. If it says "Install the current Beethoven from the lab's private listing.", your
-copy is older than the service accepts: update it from the private listing's page. "This account is
+click the icon again. If it says "Install the current Beethoven from the Chrome Web Store.", your
+copy is older than the service accepts: update it from the listing's page. "This account is
 already set up on another computer" is an answer the service gave before 20.0.0 and gives no more:
 every installation of your own is approved; if you still see it, Greg's service is out of date, and he
 knows what to do.
@@ -148,7 +145,7 @@ or no; the service records those with the time, a salted hash of your network ad
 answer, and keeps the ten most recent installations your account has asked from. Once a day it also
 downloads, without cookies, two small files from the maintainer's website (the service address and
 the signed list of withdrawn versions), which carry nothing about you. No usage data, no error
-reports, no activation. The full statement is `PRIVACY.md` (version 14), also at
+reports, no activation. The full statement is `PRIVACY.md` (version 15), also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
 ## What to send when something does not work

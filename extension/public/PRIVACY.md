@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 14, 2026-10-11. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 15, 2026-10-13. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -370,11 +370,11 @@ Licensor before you have accepted the agreement. After that:
   it arrives at a time. The service answers yes or no, and nothing else about you or anyone else. A
   no may carry one of two reasons: that this installation is already set up for another account (the
   panel says so and offers no button: your lab lead releases it), or that this version is too old
-  (the panel asks you to install the current one from the lab's private listing). The extension
-  keeps a yes for up to a day, and for up to seven days when the service cannot be reached, so an
-  outage on Licensor's side does not stop your work; it keeps a no for ten minutes, and while the
-  answer is no it starts no worker and, unless the reason is one of those two, offers you a button
-  to ask for access.
+  (the panel asks you to install the current one from the Chrome Web Store). The extension keeps a
+  yes for up to a day, and for up to seven days when the service cannot be reached, so an outage on
+  Licensor's side does not stop your work; it keeps a no for ten minutes, and while the answer is no
+  it starts no worker and, unless the reason is one of those two, offers you a button to ask for
+  access.
 - **Two files, once a day.** `https://openspineconsortium.com/beethoven/services.json` (the address
   of the access service) and `https://openspineconsortium.com/beethoven/killlist.json` (the signed
   list of withdrawn extension versions). Both requests are sent without cookies and carry nothing
@@ -423,24 +423,25 @@ account name in the page's address, so the form is filled in for you. As with an
 your browser's history and the web host's ordinary server logs may record that address.
 
 **Access requests.** If you ask for access on the request page (a web page, not the extension), the
-request form records what you enter: your account name, your name, your institutional e-mail, the
-Google account at which you want the invitation to Beethoven's private listing on the Chrome Web
-Store, what you will use Beethoven for, your CV if you attach one (PDF or Word, 5 MB at most), and
-the time; it also tells the service that it is Beethoven's request page, which Licensor's notice of
-the request shows. That notice is an e-mail to Licensor carrying those items, with a link to the CV
-that works for 14 days instead of the CV itself. When mailbox confirmation is on (the request page
-says so after you send), the service first e-mails a link to your university mailbox and passes the
-request on when you open it, and records the time you did; otherwise the notice says that the
-mailbox was not confirmed. If you are approved for Beethoven, Licensor adds that Google account to
-the Google Group whose members may open the private listing; Google then holds it as a member of
-that group, under Google's own terms.
+request form records what you enter: your account name, your name, your institutional e-mail, what
+you will use Beethoven for, your CV if you attach one (PDF or Word, 5 MB at most), and the time; it
+also tells the service that it is Beethoven's request page, which Licensor's notice of the request
+shows. That notice is an e-mail to Licensor carrying those items, with a link to the CV that works
+for 14 days instead of the CV itself. When mailbox confirmation is on (the request page says so
+after you send), the service first e-mails a link to your university mailbox and passes the request
+on when you open it, and records the time you did; otherwise the notice says that the mailbox was
+not confirmed. If you are approved for Beethoven, you install it from its listing on the Chrome Web
+Store, which is public since 20.0.0: no invitation is sent, and the request page no longer asks for
+a Google account. A Google account given on the request page before 2026-10-13, for the invitation
+the then private listing needed, stays in your access record and is no longer used.
 
 **Your access record.** Licensor's records hold the approval and withdrawal decisions about your
 account (an approval is for Beethoven, or for membership of Licensor's lab only), with the name and
-e-mail you gave when you asked, their dates, the installations your account has asked from, and the
-check record above. Licensor does not publish the list of approved accounts: the access service
-answers about one account at a time. The same approved list serves Licensor's other product, an
-extension for VS Code, so one approval covers both.
+e-mail you gave when you asked (and, for a request made before 2026-10-13, the Google account it
+asked for then), their dates, the installations your account has asked from, and the check record
+above. Licensor does not publish the list of approved accounts: the access service answers about one
+account at a time. The same approved list serves Licensor's other product, an extension for VS Code,
+so one approval covers both.
 
 **A notice under the agreement**, if you send one: what you write in it, kept with your access
 record.
@@ -515,11 +516,17 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
 
-Version 14 (2026-10-11, Beethoven 20.0.0): your approval works on every installation of your own: a
-second computer, browser profile or reinstall is approved at its first check instead of refused,
-Licensor's service keeps the list of the ten most recent installations your account asked from and
-tells Licensor of a new one by e-mail with a link to withdraw the approval and none to move it; an
-installation still serves one account. Version 13's other terms are unchanged.
+Version 15 (2026-10-13, Beethoven 20.0.0): Beethoven's listing on the Chrome Web Store is public:
+installing it needs no invitation, and your approval still decides whether it works. The request
+page no longer asks for a Google account, since no invitation is sent; a Google account given
+earlier stays in the access record and is no longer used. Version 14's other terms are unchanged.
+
+Version 14 (2026-10-11, drafted for Beethoven 20.0.0 and replaced by version 15 before 20.0.0
+shipped): your approval works on every installation of your own: a second computer, browser profile
+or reinstall is approved at its first check instead of refused, Licensor's service keeps the list of
+the ten most recent installations your account asked from and tells Licensor of a new one by e-mail
+with a link to withdraw the approval and none to move it; an installation still serves one account.
+Version 13's other terms are unchanged.
 
 Version 13 (2026-10-09, Beethoven 19.0.0): Beethoven signs in to your portal for you. In Chrome,
 when your portal asks for a sign-in, the panel shows Beethoven's own sign-in sheet for your account

@@ -100,7 +100,7 @@ export const OTHER_INSTALLATION = 'This account is already set up on another com
 /** the strip's sentence when this installation is set up for another approved account; only the lab lead can release it */
 export const OTHER_ACCOUNT = `This installation of ${PRODUCT_NAME} is already set up for another account. Ask your lab lead to move it to yours.`;
 /** the strip's sentence when the service asks for the current build */
-export const UPDATE_REQUIRED = `Install the current ${PRODUCT_NAME} from the lab's private listing.`;
+export const UPDATE_REQUIRED = `Install the current ${PRODUCT_NAME} from the Chrome Web Store.`;
 
 // Why the background did not ask the service, as bare reasons like checkAccess's own details; the
 // page that shows one puts the label in front (accessOutcomeWords), so the label is said once.
@@ -481,7 +481,7 @@ export async function checkAccess(o: CheckOpts): Promise<CheckOutcome> {
       : a.reason === 'other_account'
         ? `this installation is already set up for an account other than ${id}`
         : a.reason === 'update_required'
-          ? `the service asks for the current ${PRODUCT_NAME} from the lab's private listing`
+          ? `the service asks for the current ${PRODUCT_NAME} from the Chrome Web Store`
           : wasApproved
             ? `access withdrawn for ${id} at ${portal}`
             : `${id} is not on the approved list yet`;

@@ -40,7 +40,7 @@ session knew and the repository did not is written here. The reader needs nothin
 
 ### 2.1 The store's review
 
-If the review passes, nothing is needed: students update by themselves. If it fails over
+**Passed: the store accepted 19.0.0 (greg, 2026-10-13).** If the review passes, nothing is needed: students update by themselves. If it fails over
 `webRequest`, read the reviewer's reason against `store/PASTE.md`. Never answer it by requesting
 `webRequestBlocking`, which a store extension cannot have in any case. Taking the listener out would
 reverse greg's card of 03:01:45Z. That is a decision for him, with 18.0.0's tab and Chrome's own box

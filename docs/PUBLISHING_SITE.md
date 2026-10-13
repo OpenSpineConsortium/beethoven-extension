@@ -1,6 +1,6 @@
 # Publishing the site pages and the kill-list
 
-The public pages the private Chrome Web Store listing points at, the services file and the signed
+The public pages the Chrome Web Store listing points at, the services file and the signed
 kill-list the extension fetches once a day live in the site repository
 `openspineconsortium.github.io` (GitHub Pages, custom domain `openspineconsortium.com`), checked out
 beside this repository on the maintainer's machine. Nothing here commits or pushes: the tools write
@@ -51,9 +51,10 @@ overrides both) and checks every word of both texts is on the page in order, wri
 (`/` and `/beethoven/`, the same body), the support, request and reviewers pages, and stamps every
 asset with one `?v=` value per publish. Its README in the site repository is the manual. Since 8.0.0
 (2026-09-30) the site offers no download: `/beethoven/downloads/` is gone, and the product page
-shows one install card, Chrome, "Private listing, by invitation: after approval you receive an
-invitation at the Google account you gave", with no link; no other browser is named. The listing's
-link goes only to approved students (`docs/store/SUBMISSION.md`). The 7.0.0 zips stay in the site
+shows one install card, Chrome, which since 20.0.0 (2026-10-13) links the public listing on the
+Chrome Web Store (`BROWSERS` in the generator, `store_url`); from 8.0.0 to 19.0.0 the card said
+"Private listing, by invitation" with no link, since the listing opened only to the Google Group of
+approved students. No other browser is named. The 7.0.0 zips stay in the site
 repository's git history (commit 816e9c4) unless the maintainer rewrites it. This repository no
 longer builds pages; its old builder (`tools/site_beethoven_build.py`) and templates are retired and
 are in git history.
@@ -69,8 +70,9 @@ What this repository still owns on the site:
 - nothing else: the packages in `release/<version>/` are the maintainer's record and are not
   published on the site.
 
-The listing is private, so its URL is never set in `BROWSERS` at the top of the site generator: the
-card stays "Private listing, by invitation".
+The listing is public since 20.0.0, so its URL is set in `BROWSERS` at the top of the site generator
+and the card links it; until 19.0.0 the listing was private and the card stayed "Private listing, by
+invitation" with no link.
 
 ## The kill-list
 

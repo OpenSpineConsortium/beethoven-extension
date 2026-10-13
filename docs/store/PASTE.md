@@ -7,7 +7,7 @@ the reasons behind them are in `LISTING.md`; registration, the testers' group an
 `SUBMISSION.md`. Written 2026-09-30 for 9.0.0, brought up to date for 10.0.0 on 2026-10-01,
 rewritten on 2026-10-02 for 12.0.0 (11.0.0 was built and never submitted; its changes are carried
 here too: the welcome page, no `activeTab`, the window-wide panel), brought up to date on 2026-10-04
-for 15.0.0, on 2026-10-08 for 16.0.0, on 2026-10-09 for 19.0.0, and on 2026-10-11 for 20.0.0. 12.0.0 added the `nativeMessaging` permission, the
+for 15.0.0, on 2026-10-08 for 16.0.0, on 2026-10-09 for 19.0.0, on 2026-10-11 for 20.0.0, and on 2026-10-13 for 20.0.0's public listing (agreement version 14, privacy statement version 15; Visibility Public). 12.0.0 added the `nativeMessaging` permission, the
 helper's installers inside the package, and the Authentication information data type; 15.0.0 added
 the signed installers of the helper for Windows and macOS. 16.0.0 removes all of it with the direct
 way: no `nativeMessaging`, no helper, no installer, and Authentication information unticked again,
@@ -274,17 +274,17 @@ creditworthiness or for lending.
 https://openspineconsortium.com/beethoven/privacy.html
 ```
 
-It must show version 14 (2026-10-11) before the submission: the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 14 (and `terms.html` version
-13). Then **Save draft**.
+It must show version 15 (2026-10-13) before the submission: the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 15 (and `terms.html` version
+14). Then **Save draft**.
 
 ## Distribution tab
 
 | Field | Choice |
 |---|---|
 | Payments | **Free** (no in-app purchases) |
-| Visibility | **Private**. Never Unlisted or Public: either lets anyone with the link install it |
-| Trusted testers | the address of the Beethoven-users Google Group, the group of approved students (`SUBMISSION.md`, section 0, item 6) |
+| Visibility | **Public** (decided 2026-10-13 for 20.0.0; Private from 8.0.0 to 19.0.0). Installing needs no invitation; the approval check decides whether it works |
+| Trusted testers | leave empty (the Beethoven-users Google Group served the private listing until 19.0.0; `SUBMISSION.md`, section 0, item 6) |
 | Regions | **United States** only |
 
 Then **Save draft**.

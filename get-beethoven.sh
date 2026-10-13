@@ -11,7 +11,7 @@
 # Chrome's part stays manual once: chrome://extensions -> Developer mode -> Load unpacked ->
 # the folder this prints. After that, re-run this script and press the reload arrow on the
 # Beethoven card. (A true one-click install exists only on the Chrome Web Store: students use
-# the private listing, not this script.)
+# the listing, not this script.)
 set -uo pipefail
 REPO=${1:-OpenSpineConsortium/beethoven-extension}
 DIR="${BEETHOVEN_DIR:-$HOME/beethoven-extension}"

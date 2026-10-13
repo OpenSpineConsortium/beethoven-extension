@@ -3,7 +3,7 @@
 # pulls the newest green build straight from CI over the person's own GitHub sign-in. No Node,
 # no checkout, no token typed anywhere (gh keeps its own sign-in; a GITHUB_TOKEN another tool
 # exported is set aside). This is the DEVELOPER path for people with repository access;
-# students get Beethoven only through the private Chrome Web Store listing, the one offering
+# students get Beethoven only through the Chrome Web Store listing, the one offering
 # channel (CLAUDE.md, LICENSE.txt) — and only the store gives a true one-click install, which
 # Chrome allows from nowhere else.
 #

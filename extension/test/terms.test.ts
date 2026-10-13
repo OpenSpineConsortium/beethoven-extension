@@ -13,9 +13,9 @@ import { acceptanceComplete, AFFIRMATION, AFFIRMATIONS_TWO, AGREE_BUTTON, bindAc
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('the terms version', () => {
-  it("is 13, dated 2026-10-11 (20.0.0: one person's approval on every installation of their own, LICENSE version 13, PRIVACY version 14)", () => {
-    expect(TERMS_VERSION).toBe(13);
-    expect(TERMS_DATE).toBe('2026-10-11');
+  it("is 14, dated 2026-10-13 (20.0.0: the public listing on top of one person's approval on every installation of their own, LICENSE version 14, PRIVACY version 15)", () => {
+    expect(TERMS_VERSION).toBe(14);
+    expect(TERMS_DATE).toBe('2026-10-13');
   });
 
   it('is an integer that names the LICENSE.txt line at the repository root, with its date', () => {
@@ -27,8 +27,8 @@ describe('the terms version', () => {
   });
 
   // nothing else reads PRIVACY.md's line, so a statement left at its old version would pass every other gate
-  it('names PRIVACY.md version 14, with the same date, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['14', TERMS_DATE]);
+  it('names PRIVACY.md version 15, with the same date, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['15', TERMS_DATE]);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {
@@ -78,7 +78,7 @@ describe('the record (TermsRecord v2)', () => {
 
   it('says what was shown, what was ticked, whether the full text was opened, and from which installation', async () => {
     const r = await buildTermsRecord(input);
-    expect(r).toMatchObject({ v: 2, terms_version: 13, terms_date: '2026-10-11', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
+    expect(r).toMatchObject({ v: 2, terms_version: 14, terms_date: '2026-10-13', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
     expect(r.affirmations).toEqual([{ id: 'agree', label: tickLabel(AFFIRMATION), checked: true }]);
     expect(r.license_sha256).toBe(await sha256(input.license));
     // CRLF and LF hash alike: the text, not its line endings
@@ -93,9 +93,9 @@ describe('the record (TermsRecord v2)', () => {
     expect(openedSentence(opened)).toBe('The full text was opened before Agree.');
   });
 
-  it('is in force only as v2 for version 13 with the box ticked; a v1 record and a version 12 record are kept, out of force', async () => {
+  it('is in force only as v2 for version 14 with the box ticked; a v1 record and a version 12 record are kept, out of force', async () => {
     const r = await buildTermsRecord(input);
-    expect(r.terms_version).toBe(13);
+    expect(r.terms_version).toBe(14);
     expect(recordInForce({ ...r, terms_version: 12 })).toBe(false);
     expect(recordInForce({ ...r, terms_version: 11 })).toBe(false);
     expect(recordInForce({ ...r, terms_version: 10 })).toBe(false);
