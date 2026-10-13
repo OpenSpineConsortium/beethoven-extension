@@ -21,7 +21,9 @@ repository is shared with, two developer paths, closest-to-one-click first:
 3. In Chrome: `chrome://extensions` → turn on **Developer mode** → **Load unpacked** → pick the
    extracted folder.
 To update later, repeat with a newer run's artifact into the same folder and press the reload
-arrow on the Beethoven card.
+arrow on the Beethoven card. Since 2026-10-13 the same build is also the newest GitHub release
+(`extension-v<version>.<build>`, made by `.github/workflows/release.yml`), whose
+`beethoven-chrome.zip` is the same download with no run page to find.
 
 **One command, self-updating folder** (needs git and [gh](https://cli.github.com)):
 ```
@@ -375,11 +377,15 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
 3. The record: `release/<version>/` holds the record's `README.md` (what was built, from which
    commit, with which steps), `guides/` when the store kit changed, and `SHA256SUMS.txt`, which pins
    the zip; the zip itself names the store's extension and stays on the maintainer's computer
-   (`.gitignore`). Commit the record, tag `v<version>` and push. A GitHub release named `v<version>`
-   on the organisation's private copy, if one is made, carries those checksums and no zip; it is
-   never a download page for students, who install only from the Chrome Web Store. Records up to
-   14.0.0 hold their zips and were made by hand (`release/10.0.0/` also holds the store kit and the
-   reviewers' mock-portal zip).
+   (`.gitignore`). Commit the record and push: since 2026-10-13 that push runs
+   `.github/workflows/release.yml`, which tests, builds the zip again, appends the build number to
+   the version and makes the GitHub release `extension-v<version>.<build>` with the zip attached,
+   and sends it to the store item once the five `CWS_` secrets and the variable `CWS_ON_PUSH` are
+   set (`docs/store/SUBMISSION.md`, "Releases from CI"); a tag `extension-v<version>` releases
+   the exact version. The release is on the organisation's private copy and is never a download page
+   for students, who install only from the Chrome Web Store. Records up to 14.0.0 hold their zips
+   and were made by hand (`release/10.0.0/` also holds the store kit and the reviewers' mock-portal
+   zip).
 4. For a first submission, or whenever the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) comes
    before the upload, make the test on the recorded zip, then upload it as
    `docs/store/SUBMISSION.md` says (`node extension/scripts/publish-store.mjs upload`, on the
