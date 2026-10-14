@@ -17,6 +17,8 @@ against stand-ins on the build machine. Nothing was uploaded.
 | `beethoven-20.0.0-chrome.zip` | The Chrome Web Store listing (public since this version), or the hand test by hand. Not in the repository (`.gitignore`); `SHA256SUMS.txt` pins it | 441,350 |
 | `guides/` | From `docs/guides/` at the same commit: `INSTALL.md` and `USE.md` (students), `ACCOUNTS.md`, and `LAB_LEAD.md` (Greg) | 4 files |
 | `reviewer/beethoven-mock-portal.zip` | Only for a store reviewer who asks for the mock portal (`docs/store/SUBMISSION.md`, section 4) | 103,736 |
+| `store-kit/` | The submission package: every file the dashboard takes, numbered by its field in `docs/store/PASTE.md`'s order (the package as `00`, the description, the icon, the 9.0.0 promo video and its thumbnail, the tile, the five screenshots, the marquee, the three Test instructions texts and the fuller reply, and the paste sheet). Assembled 2026-10-14; screenshots 2 to 5 are 20.0.0's. The `00` zip is not in the repository; the other 16 files are | 17 files |
+| `store-kit-20.0.0.zip` | The same folder zipped, for the maintainer's download. Not in the repository (`.gitignore`); `SHA256SUMS.txt` pins it | 2,520,685 |
 | `SHA256SUMS.txt` | SHA-256 of every other file in this folder | |
 
 The package's SHA-256 is `33294f8b9ea662d9354eef416a05ca1d570918dbcb74cd4b8f73e05f9bbbd790`. Upload
@@ -72,6 +74,9 @@ source map. It is sent only to a reviewer who asks, with the recipe in `docs/sto
 
 The upload is Greg's, with his own tool and sign-in (`docs/store/SUBMISSION.md`, section 0): the
 listing's address goes into the site's `BROWSERS` first; the dashboard's Visibility becomes Public
-and its Trusted testers field stays empty; the five screenshots are captured again from this build;
-the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) runs on the real grid; and the access service
-answers `st1234` yes from two installation identifiers. None of these was done in this build.
+and its Trusted testers field stays empty; the hand test (`docs/store/TEST_BEFORE_UPLOAD.md`) runs
+on the real grid; and the access service answers `st1234` yes from two installation identifiers.
+None of these was done in this build. Screenshots 2 to 5 were captured from this build on
+2026-10-14 (`extension/store-assets/raw-20/`) and are in `store-kit/`, with the listing's address,
+https://chromewebstore.google.com/detail/beethoven/heoopgbkbkfckhhpbkkcgigohfekjicn, on the site's
+install card since the same day; the diagram screenshot and the promo video are still 9.0.0's.

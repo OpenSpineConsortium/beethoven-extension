@@ -376,15 +376,12 @@ https://openspineconsortium.com/beethoven/privacy.html shows version 15.
 
 ## Images and the promo video
 
-**Out of date, not redone in this pass.** The five screenshots, the tiles and the promo video were
-captured from 9.0.0 (`extension/store-assets/`): the setup page, the toolbar-button start, the old
-panel. None shows 11.0.0's welcome page, journey, home or tour, or 16.0.0's GlobalProtect screen
-with its link; 12.0.0's helper, its sign-in sheet (with the code field) and Settings' Connection
-section are screens 19.0.0 does not have, so none may appear either. A screenshot of 9.0.0's setup page is a screen 16.0.0 does
-not have; redo at least the screenshots from the 20.0.0 release build before submitting (not yet
-captured), to the rules below. 19.0.0's sign-in sheet, unlock screen and Settings' *Your grid* card are
-new screens; a capture of the sheet shows the mock account `st1234` and an empty or dotted password
-field, never a real one.
+**Screenshots 2 to 5 are 20.0.0's** (made 2026-10-14 from the 20.0.0 release build against the mock
+portal, `extension/store-assets/raw-20/`): the welcome page, the sign-in sheet (the mock account
+`st1234`, an empty password field), the home once online and Settings' *Your worker* and *Your grid*
+cards, each framed as 9.0.0's were. Screenshot 1 (the home page diagram), the tiles, the icon and
+the promo video are still 9.0.0's; the video shows the old panel and the toolbar-button start, so
+leave field 5 empty rather than show it, or make it again from a 20.0.0 screen recording first.
 
 The rules (from 9.0.0): the store icon is the package icon flattened on the site's cream; every
 product screen is a real capture of the release build, framed, never a drawn screen; a diagram may

@@ -3,7 +3,7 @@
 // build script never photographs a page that is still loading.
 //
 // A .shot shows one card cut out of a capture, as it was captured:
-//   data-src     the capture (a PNG in ../raw-9/, taken by the capture harness from the release build)
+//   data-src     the capture (a PNG in ../raw-20/, or ../raw-9/ for 9.0.0, taken from the release build)
 //   data-box     x,y,w,h of the card in the capture's pixels, its border included
 //   data-scale   screen pixels per capture pixel (the captures are 2x, so 0.5 is the page's own size)
 //   data-radius  the card's corner radii in CSS pixels, as the extension's stylesheet gives them

@@ -23,8 +23,8 @@ and 9 to 11 are typed, so they have no file, and so are the Privacy practices an
 the package is `00`, and the Test instructions tab (`12`, after Distribution) has one file per box
 and one for the fuller reply text. The kit was assembled for 12.0.0 on 2026-10-02 with that release
 (`release/12.0.0/README.md`); for 20.0.0 it is to be assembled again, with the 20.0.0 package as
-`00` and the texts of this sheet as they are now. Its screenshots are still 9.0.0's until field 7's
-captures replace them (`07-SCREENSHOTS-OUT-OF-DATE.txt` in the kit says which). The `00` zip, and
+`00` and the texts of this sheet as they are now. Its screenshots 2 to 5 are 20.0.0's, made on 2026-10-14
+(field 7); its promo video is 9.0.0's (field 5). The `00` zip, and
 the kit's own zip that holds it, stay out of the repository (`.gitignore`), like the record's zip,
 whose committed `SHA256SUMS.txt` pins it; 19.0.0's package, like 16.0.0's, names no store item and
 carries no installer, so nothing in the kit is bound to the item.
@@ -37,8 +37,7 @@ carries no installer, so nothing in the kit is bound to the item.
 | `05-promo-video-1280x720.mp4` | 5. Global promo video (to YouTube first) | `extension/store-assets/promo/beethoven-promo.mp4` (9.0.0's; see field 5) |
 | `05-promo-video-thumbnail.png` | 5. the video's YouTube thumbnail | `extension/store-assets/promo/beethoven-promo-poster.png` |
 | `06-promo-tile-440x280.png` | 6. Small promo tile | `extension/store-assets/promo-tile-440x280.png` |
-| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | **to be captured from the 20.0.0 build** (field 7) |
-| `07-SCREENSHOTS-OUT-OF-DATE.txt` | 7. not a field | which of the kit's 9.0.0 images and video no longer match 20.0.0's screens |
+| `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | `extension/store-assets/screenshot-01-your-grid.png` (9.0.0's diagram) and `screenshot-02-...` to `screenshot-05-...` (20.0.0's screens, field 7) |
 | `08-marquee-1400x560.png` | 8. Marquee promo tile | `extension/store-assets/marquee-1400x560.png` |
 | `12-test-username.txt` | 12. Test instructions: Username | the block under **Username** (no newline at the end) |
 | `12-test-password.txt` | 12. Test instructions: Password | the block under **Password** (no newline at the end) |
@@ -131,23 +130,28 @@ videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; p
 
 ### 7. Screenshots (up to 5, 1280x800), in this order
 
-**To be captured from the 20.0.0 release build before submission** (`LISTING.md`, "Images and the
-promo video"): 9.0.0's five show its setup page and old panel, and none has been captured yet.
-Suggested order, each a real capture on the mock account `st1234` (the GlobalProtect screen needs
-the real portal out of reach: the Wayne State portal chosen on the welcome page and GlobalProtect
-off, with nothing signed in):
+Five images, `extension/store-assets/screenshot-01-your-grid.png` to `screenshot-05-...png`
+(`manifest.txt` there says what each shows). The first is 9.0.0's drawing of the home page diagram,
+which still holds; 2 to 5 were made on 2026-10-14 from the 20.0.0 release build, each a real capture
+of a 20.0.0 screen against the mock portal on the mock account `st1234`, framed in the site's style
+with one headline and one line (`LISTING.md`, "Images and the promo video"):
 
-1. The home page diagram (`extension/store-assets/screenshot-01-your-grid.png` is a drawing and can
-   stay).
-2. The welcome page: "Claude, on your grid." with "You'll need" and its three needs, **A Wayne State
-   grid account**, **GlobalProtect**, **Claude Pro or Max**.
-3. The panel's **Sign in to the grid** sheet on the mock (`--auth basic`), with **AccessID** reading
-   `st1234`, an empty **Password** and the tick **Remember it on this computer** unticked; or, if
-   the sheet is not the one to show, the **Turn on GlobalProtect.** screen, with **Looking for the
-   grid…** and **How to set it up**. Never a real AccessID or a typed password.
-4. The panel's home, **You're online.** / **Open my session**, the Grid line reading **Signed in as
-   st1234**.
-5. **Settings**: **Your worker** and **Your grid**, with the **Grid sign-in** row.
+1. The home page diagram: "Your grid. From claude.ai."
+2. The welcome page, whole: "Claude, on your grid.", "You'll need" and its three needs, the agreement
+   in short, the tick untouched.
+3. The panel's **Sign in to the grid** sheet, with **AccessID** reading `st1234`, an empty
+   **Password** and **Remember it on this computer, unlocked with your screen lock** unticked:
+   "Sign in to the grid." Never a real AccessID or a typed password.
+4. The panel's home once online, **Online**, **Open my session**, the Grid row **Signed in as
+   st1234**: "Click once."
+5. **Settings**, the **Your worker** and **Your grid** cards with the **Grid sign-in** row: "Your
+   worker, your rules."
+
+To make them again (a changed screen, a new version): capture the raw screens into
+`extension/store-assets/raw-20/` as its `LIST.txt` describes (the 20.0.0 package loads only in Chrome
+148 or later, so a capture in an older Chromium needs the two changes that file names, in a copy of
+the package, never in the build), then `node src/build_assets.mjs --only shots` in
+`extension/store-assets/` with Playwright's Chromium.
 
 ### 8. Marquee promo tile (1400x560)
 

@@ -1,0 +1,4 @@
+Beethoven runs Claude Code in a Wayne State grid account. Needs the user's AccessID, password, the GlobalProtect VPN, Claude Pro/Max and our approval; we cannot lend accounts.
+1. Install: welcome page. Tick, Agree and continue. Chrome asks for ondemand.grid.wayne.edu only.
+2. Panel: Turn on GlobalProtect. It waits for the university's VPN, which you cannot reach; How to set it up opens the university's own page. No download, nothing installed.
+Mock portal with the sign-in sheet on request.

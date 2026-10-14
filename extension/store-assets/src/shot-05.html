@@ -2,25 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Screenshot 5: By approval only.</title>
+<title>Screenshot 5: Your worker, your rules.</title>
 <link rel="stylesheet" href="store.css">
+<link rel="stylesheet" href="split.css">
 <style>
-  .canvas { --w: 1280px; --h: 800px; --mask-y: 66%; }
-  .top { top: 150px; }
-  .h { font-size: 66px; }
-  .lede { font-size: 23px; margin-top: 14px; }
-  .shot { left: 145px; top: 355px; }
-  .fine { left: 0; right: 0; bottom: 30px; text-align: center; }
+  .canvas { --mask-x: 74%; }
+  .worker { left: 640px; top: 72px; }
+  .grid { left: 640px; top: 420px; }
 </style>
 </head>
 <body>
 <div class="canvas">
-  <div class="center top">
-    <h1 class="h">By <em>approval only.</em></h1>
-    <p class="lede">Ask for access. One approval, every computer of yours.</p>
+  <div class="text">
+    <h1 class="h"><span class="l">Your worker,</span> <em>your rules.</em></h1>
+    <p class="lede">Ask before each command, accept edits or plan only. Keep it running. Your grid sign-in stays yours.</p>
   </div>
-  <!-- the setup page's Access card (raw-9/07-setup-access-card.png) -->
-  <div class="shot" data-src="../raw-9/07-setup-access-card.png" data-box="9,124,1801,512" data-scale="0.55" data-radius="14"></div>
+  <!-- Settings (raw-20/05-settings.png): the Your worker card, and below it the Your grid card, which runs on
+       below the edge; the Appearance card between them is left out -->
+  <div class="shot worker" data-src="../raw-20/05-settings.png" data-box="728,366,1104,564" data-scale="0.55" data-radius="14"></div>
+  <div class="shot grid" data-src="../raw-20/05-settings.png" data-box="728,1228,1104,372" data-scale="0.55" data-radius="14"></div>
   <p class="fine">Not an Anthropic product.</p>
 </div>
 <script src="common.js"></script>
