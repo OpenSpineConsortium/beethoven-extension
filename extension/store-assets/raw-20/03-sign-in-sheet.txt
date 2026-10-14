@@ -1,0 +1,19 @@
+Beethoven
+Sign in to the grid
+
+Type your AccessID and password. Beethoven signs in to the grid for you, in the background.
+
+AccessID
+
+Password
+
+Remember it on this computer, unlocked with your screen lock
+
+Off unless you tick it. Your university may ask you to type your password each time; if it does, leave this off.
+
+Beethoven sends it only to the grid.
+
+Sign in
+
+Use Chrome's sign-in box instead
+Sign in to the grid

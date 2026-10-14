@@ -1,6 +1,10 @@
-Beethoven 9.0.0: store assets
+Beethoven store assets: screenshots 2 to 5 from 20.0.0, the rest from 9.0.0
 
-These images were made on the 9.0.0 build and are unchanged for 10.0.0.
+Screenshots 2 to 5 were made again on 2026-10-14 from the 20.0.0 release build (the real screens in
+raw-20/, captured headlessly against the mock portal; raw-20/LIST.txt says how, and what two changes the
+capture's copy of the package needed to load in the Chromium at hand, which is older than the manifest's
+Chrome 148), on the same pages and in the same style as 9.0.0's. The diagram screenshot, the two tiles,
+the icon and the promo video are 9.0.0's and unchanged; the video shows the old panel.
 
 Made 2026-10-01 between 01:46 and 02:03 UTC for 9.0.0 and rebuilt once at 02:38 to 02:40 UTC (the stills
 came out byte-identical; the video changed as described under promo/beethoven-promo.mp4), the release whose
@@ -39,28 +43,27 @@ screenshot-01-your-grid.png  (1280x800)
     up to the model and the one left to the H200 GPU. The diagram is the site's own SVG and CSS, copied
     verbatim (src/diagram.js, src/diagram.css), shown as the site shows it to a visitor who has asked for
     reduced motion: the dots held at the same point of each arrow.
-screenshot-02-click-once.png  (1280x800)
+screenshot-02-claude-on-your-grid.png  (1280x800, from 20.0.0)
+    The welcome page as it opens on install, whole, with no words added: "Claude, on your grid.", "Ask in
+    claude.ai or the Claude app. A worker on the Wayne State grid does the work.", "You'll need" with its
+    three needs (A Wayne State grid account, GlobalProtect, Claude Pro or Max), the agreement in short, the
+    untouched tick and the disabled "Agree and continue". raw-20/02-welcome.png at the page's own size.
+screenshot-03-sign-in-to-the-grid.png  (1280x800, from 20.0.0)
+    "Sign in to the grid." / "Your AccessID and password, typed into Beethoven, go to the grid and nowhere
+    else." Beside it the sign-in sheet at the side panel's width: AccessID reading st1234 (the mock
+    account), an empty Password, "Remember it on this computer, unlocked with your screen lock" unticked.
+    From raw-20/03-sign-in-sheet-panel.png; the card runs on below the bottom edge.
+screenshot-04-click-once.png  (1280x800, from 20.0.0)
     "Click once." / "One click on Beethoven starts your worker on the grid. Then open it in Claude." Beside
-    it the strip at step 11 of 11: "Your worker is online: node01-amber-lantern.", the teal "Open in
-    Claude", "Copy link", "Stop". From raw-9/05-online-panel.png (the side panel's width); the card runs on
-    below the bottom edge, where the output box of the last command is.
-screenshot-03-sign-in-once.png  (1280x800)
-    "Sign in to Claude, once." / "On Anthropic's own page. Then paste the code it shows." Beside it the strip
-    at step 7 of 11: the instruction, the portal's shell with the sign-in sitting, the box for the code and
-    "Open the sign-in page again". From raw-9/04-sign-in-panel.png; the card runs on below the bottom edge.
-screenshot-04-seventeen-checks.png  (1280x800)
-    "Seventeen checks. All OK." / "Your access, the portal, the scheduler, the node and your sign-in, in one
-    click." Beside it Details > Checks: "Run the checks", "last run ...: everything works" and the seventeen
-    rows, each tagged OK. From raw-9/06-details-checks-card.png (the page at 1280 px); the card runs on past
-    the right edge, which cuts the end of the longer rows. The headline says what the tags say (it read
-    "All green." until 2026-09-30; at listing size the pale tags do not read as green).
-screenshot-05-by-approval-only.png  (1280x800)
-    "By approval only." / "Ask for access. One approval, every computer of yours." (the source since
-    2026-10-11; the PNG here was rendered before and still reads "One approval, one installation.", and
-    its card is 9.0.0's, so both are made again from the 20.0.0 build before upload). Below it the setup page's
-    Access card: what the approval check sends, one installation per approval, "Access approved for st1234 at
-    localhost (checked 2026-10-01 01:32 UTC)", "Check my access now". From raw-9/07-setup-access-card.png,
-    the whole card.
+    it the panel's home once online: "Online", "Wayne State grid . online just now", the teal "Open my
+    session", New session, Copy link, Phone, and the rows Grid "Signed in as st1234", Claude "Signed in .
+    Max", Worker "Online". From raw-20/04-home-panel.png; the card runs on below the bottom edge.
+screenshot-05-your-worker-your-rules.png  (1280x800, from 20.0.0)
+    "Your worker, your rules." / "Ask before each command, accept edits or plan only. Keep it running. Your
+    grid sign-in stays yours." Beside it two cards of Settings: "Your worker" (the worker's name, the three
+    ways it may act, "Keep my worker running", "Open Claude when my worker is ready") and "Your grid"
+    (ondemand.grid.wayne.edu, Change, Disconnect, and "Grid sign-in: Not saved. Beethoven asks for it when
+    the grid needs it."). From raw-20/05-settings.png; the Appearance card between them is left out.
 promo-tile-440x280.png  (440x280)
     The icon, "Beethoven" in Newsreader and "Your grid. From claude.ai."
 marquee-1400x560.png  (1400x560)

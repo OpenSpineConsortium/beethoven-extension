@@ -1,0 +1,42 @@
+capture run 2026-10-14T00:03:45.114Z
+00:03:45.298 SETUP       mock portal on 127.0.0.1:443, reached by the browser as https://ondemand.grid.wayne.edu (--auth basic, --user st1234, --shared-install /rs/rs_grp_oschome/shared/beethoven/hpcworker/current: the Wayne profile's shared copy, the account not yet set up on it; the account starts signed in to Claude), MOCK_START_S=4, MOCK_QUEUE_S=0
+00:03:45.644 SETUP       Chromium 141.0.7390.37 headless with /tmp/claude-0/-home-user/8a6721da-30b6-5570-9480-675908593ae9/scratchpad/ext-141 (manifest 20.0.0), fresh profile, light scheme, extension lfaginobigjpobagllfemighibkdhjjo
+00:03:47.479 FONTS       welcome page: Newsreader 400, Newsreader 500, Newsreader 500 italic, IBM Plex Sans 400, IBM Plex Sans 500, IBM Plex Sans 600, IBM Plex Mono 400
+00:03:48.350 SHOT        02-welcome.png 2560x1600 (1280x800 CSS px at 2x): on-screen text carries localhost, hpcworker
+00:03:48.350 CHECK       welcome shows "Claude, on your grid.": true
+00:03:48.351 CHECK       welcome shows "You'll need": true
+00:03:48.351 CHECK       welcome shows "A Wayne State grid account": true
+00:03:48.351 CHECK       welcome shows "GlobalProtect": true
+00:03:48.351 CHECK       welcome shows "Claude Pro or Max": true
+00:03:48.411 GRANT       wrote https://ondemand.grid.wayne.edu/* into granted_permissions and active_permissions of lfaginobigjpobagllfemighibkdhjjo in Default/Preferences (headless Chromium shows no permission bubble, so the press on "Agree and continue" would otherwise wait for it forever)
+00:03:48.682 SETUP       Chromium 141.0.7390.37 headless with /tmp/claude-0/-home-user/8a6721da-30b6-5570-9480-675908593ae9/scratchpad/ext-141 (manifest 20.0.0), kept profile, light scheme, extension lfaginobigjpobagllfemighibkdhjjo
+00:03:48.695 GRANT       after the relaunch the extension holds ["https://ondemand.grid.wayne.edu/*"]
+00:03:50.293 PRESS       welcome: the tick, Agree and continue (the university's own address, which the resolver sends to the mock; the mock is down for the moment)
+00:03:53.299 PANEL       the real side panel opened from the press; closed in favour of the tab
+00:03:53.340 WEBAUTHN    a CDP virtual platform authenticator (internal, user-verifying, PRF) on the panel tab, so the sheet offers "Remember it on this computer"
+00:03:54.940 FONTS       panel tab: Newsreader 500, IBM Plex Sans 400, IBM Plex Sans 500, IBM Plex Mono 400
+00:03:55.751 SHOT        03-globalprotect.png 2560x1600 (1280x800 CSS px at 2x): on-screen text clean
+00:03:55.752 CHECK       GlobalProtect screen shows "Turn on GlobalProtect.": true; "Looking for the grid": true; "How to set it up": true
+00:03:56.513 SHOT        03-globalprotect-panel.png 720x1316 (360x658 CSS px at 2x): on-screen text clean
+00:03:56.677 MOCK        the mock is back; Beethoven should find the grid by itself
+00:04:03.206 SHOT        03-sign-in-sheet.png 2560x1600 (1280x800 CSS px at 2x): on-screen text clean
+00:04:03.206 CHECK       sheet shows "Sign in to the grid": true; "Remember it on this computer": true; "Use Chrome's sign-in box instead": true
+00:04:03.216 CHECK       the Remember tick is unticked; the Password field holds ""
+00:04:03.967 SHOT        03-sign-in-sheet-panel.png 720x1316 (360x658 CSS px at 2x): on-screen text clean
+00:04:04.026 PRESS       sheet: the password typed (not written here), Sign in
+00:04:04.071 PANEL       "Signed in as st1234"
+00:04:04.087 PANEL       "Your grid account is ready" (Beethoven set the account up on the shared copy)
+00:04:07.657 PRESS       statement: the tick, Connect
+00:04:15.219 FONTS       panel tab: Newsreader 400, Newsreader 500, IBM Plex Sans 400, IBM Plex Sans 500, IBM Plex Mono 400
+00:04:19.680 SHOT        04-online.png 2560x1600 (1280x800 CSS px at 2x): on-screen text clean
+00:04:19.680 CHECK       online shows "You're online.": true; "Open my session": true; "Signed in as st1234": true
+00:04:21.740 SHOT        04-online-panel.png 720x1316 (360x658 CSS px at 2x): on-screen text clean
+00:04:24.097 SHOT        04-home.png 2560x1600 (1280x800 CSS px at 2x): on-screen text clean
+00:04:24.097 CHECK       home shows "Open my session": true; "Signed in as st1234": true
+00:04:24.877 SHOT        04-home-panel.png 720x1316 (360x658 CSS px at 2x): on-screen text clean
+00:04:26.693 FONTS       settings: Newsreader 500, IBM Plex Sans 400, IBM Plex Sans 500, IBM Plex Sans 600, IBM Plex Mono 400
+00:04:27.655 SHOT        05-settings.png 2560x1600 (1280x800 CSS px at 2x): on-screen text carries localhost, hpcworker
+00:04:27.656 CHECK       settings shows "Your worker": true; "Your grid": false; "Grid sign-in": true
+00:04:27.657 REQUESTS    27 requests: GET https://openspineconsortium.com/beethoven/killlist.json | GET https://ondemand.grid.wayne.edu/ | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/ | GET https://ondemand.grid.wayne.edu/pun/sys/shell/ssh/default | GET https://openspineconsortium.com/beethoven/services.json | POST https://ondemand.grid.wayne.edu/beethoven/access_check | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/files | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/files/fs/home/st1234 | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/files/fs/home/st1234/.hpcworker | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/files/fs/home/st1234/.hpcworker/profile.json | GET https://ondemand.grid.wayne.edu/pun/sys/dashboard/files/fs/rs/rs_grp_oschome/st1234/hpcworker/worker
+00:04:27.657 REQUESTS    every request went to the mock (as the Wayne host, resolved to 127.0.0.1) or was answered locally; nothing was asked of any other host
+00:04:27.767 DONE        files under /tmp/claude-0/-home-user/8a6721da-30b6-5570-9480-675908593ae9/scratchpad/shots-20

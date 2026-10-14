@@ -163,10 +163,10 @@ async function render(file, out, w, h) {
 
 const SHOTS = [
   ['shot-01.html', 'screenshot-01-your-grid.png'],
-  ['shot-02.html', 'screenshot-02-click-once.png'],
-  ['shot-03.html', 'screenshot-03-sign-in-once.png'],
-  ['shot-04.html', 'screenshot-04-seventeen-checks.png'],
-  ['shot-05.html', 'screenshot-05-by-approval-only.png'],
+  ['shot-02.html', 'screenshot-02-claude-on-your-grid.png'],
+  ['shot-03.html', 'screenshot-03-sign-in-to-the-grid.png'],
+  ['shot-04.html', 'screenshot-04-click-once.png'],
+  ['shot-05.html', 'screenshot-05-your-worker-your-rules.png'],
 ];
 if (want('shots')) {
   console.log('screenshots (1280x800)');

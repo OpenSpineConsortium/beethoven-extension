@@ -1,0 +1,50 @@
+Beethoven 20.0.0: store screens, captured 2026-10-14 00:04 UTC
+
+02-welcome.png
+    2560x1600 (1280x800 CSS px at 2x)
+    the welcome page as it opens on install: "Claude, on your grid.", "You'll need" with its three needs (A Wayne State grid account, GlobalProtect, Claude Pro or Max), the agreement in short, the untouched tick and the disabled "Agree and continue"
+03-globalprotect.png
+    2560x1600 (1280x800 CSS px at 2x)
+    the GlobalProtect moment (the grid out of reach at the press): "Turn on GlobalProtect.", "How to set it up", protect.wayne.edu with Copy, "Looking for the grid..."
+03-globalprotect-panel.png
+    720x1316 (360x658 CSS px at 2x)
+    the GlobalProtect moment at the side panel's own 360 x 658
+03-sign-in-sheet.png
+    2560x1600 (1280x800 CSS px at 2x)
+    the panel's "Sign in to the grid" sheet (sidepanel.html opened as a tab, the mock on HTTP Basic): AccessID reading st1234, an empty Password, "Remember it on this computer" unticked
+03-sign-in-sheet-panel.png
+    720x1316 (360x658 CSS px at 2x)
+    the same sheet at the side panel's own 360 x 658
+04-online.png
+    2560x1600 (1280x800 CSS px at 2x)
+    the online moment: "You're online." with "Open my session" (the worker on the mock came online)
+04-online-panel.png
+    720x1316 (360x658 CSS px at 2x)
+    the online moment at the side panel's own 360 x 658
+04-home.png
+    2560x1600 (1280x800 CSS px at 2x)
+    the panel's home once online: the Online hero, "Open my session", the Grid row "Signed in as st1234", Claude and Worker rows, Stop
+04-home-panel.png
+    720x1316 (360x658 CSS px at 2x)
+    the home at the side panel's own 360 x 658
+05-settings.png
+    2560x1600 (1280x800 CSS px at 2x)
+    Settings (options.html once the agreement is in force): "Your worker" and "Your grid", with the "Grid sign-in" row
+
+Notes
+- Real captures of the 20.0.0 build (main at 0c9daaa, extension/.output/chrome-mv3) in Playwright's Chromium 141.0.7390.37,
+  headless, light scheme, the fonts loaded (Newsreader, IBM Plex Sans, IBM Plex Mono), against the mock portal served as
+  https://ondemand.grid.wayne.edu (the mock on 127.0.0.1:443, the browser's resolver mapping that host to it, --no-proxy-server;
+  nothing reached the university, Anthropic or the lab's site). Mock account st1234; the password was typed into the sheet
+  and appears nowhere. Nothing is drawn or composited.
+- The package is a scratchpad copy (ext-141) with two changes Chromium 141 needs, since 20.0.0 is built for Chrome 148:
+  manifest.minimum_chrome_version 148 -> 141 (Chromium refuses to load it otherwise), and one wrapper on the background's
+  runtime.onMessage listener that hands a Promise answer to the callback (background.js.shim.diff; Chromium 141 drops a
+  promise-returned answer, so every action's result was undefined and the sheet's sign-in never armed). Nothing visible changes.
+- The portal's site permission was granted by writing the origin into the profile's Preferences between two launches
+  (headless Chromium shows no permission bubble); the sheet's Remember tick is offered because the panel tab had a CDP virtual
+  platform authenticator.
+- The panel screens are sidepanel.html opened as a tab at 1280x800, as the 9.0.0 raw screens were; the "-panel" files are
+  the same screens at the side panel's own 360x658.
+- 02 and 05 carry the folded licence text in their DOM (it names localhost and hpcworker); none of it is on screen.
+- The home's "Renews itself at 8:04 AM" is the container's local clock (UTC).
