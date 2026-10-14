@@ -21,7 +21,10 @@ name: Release the extension
 # Beethoven is built by WXT, so the kit takes the zip `npm run zip` writes
 # (extension/.output/beethoven-<version>-chrome.zip; the Firefox zip beside it
 # is never uploaded) and stamps the build number into its manifest; the kit's
-# own packager is not used.
+# own packager is not used. The extension lives under extension/, and the kit
+# runs each command with eval in the shell that then looks for the zip, so
+# the cd is kept in a subshell: the first run (2026-10-13) found no zip because
+# its pattern was read from inside extension/.
 
 on:
   push:
@@ -53,9 +56,9 @@ jobs:
     with:
       name: beethoven
       node-version: '22'
-      setup: cd extension && npm ci
-      test: cd extension && npm run sync-profiles && npm run typecheck && npx vitest run
-      build: cd extension && npm run zip
+      setup: (cd extension && npm ci)
+      test: (cd extension && npm run sync-profiles && npm run typecheck && npx vitest run)
+      build: (cd extension && npm run zip)
       zip: extension/.output/*-chrome.zip
       on-push: ${{ vars.CWS_ON_PUSH }}
       upload: ${{ inputs.upload == true }}
