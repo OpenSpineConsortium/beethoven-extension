@@ -14,11 +14,14 @@
   0.0  the headline, then the diagram draws itself: the claude.ai window, the two arrows from its port,
        the Claude servers and the rack, the arrow up to the model, the GPU and the arrow to it; then the
        dots run along the arrows as on the site (its CSS, its timing, started later)
-  9.9  Click once.               the toolbar button (the package icon), then the strip at "Checking your
-                                 access..." (raw-9/03-checking-access-panel.png)
-  14.6 Sign in to Claude, once.  the strip at the sign-in step (raw-9/04-sign-in-panel.png)
-  19.3 Ask from claude.ai.       the strip with the worker online (raw-9/05-online-panel.png)
+  9.9  Sign in to the grid.      the panel's sign-in sheet, AccessID st1234 (raw-20/03-sign-in-sheet-panel.png)
+  14.6 Click once.               the toolbar button (the package icon), then the panel online
+                                 (raw-20/04-online-panel.png)
+  19.3 Ask from claude.ai.       the panel's home, "Open my session" (raw-20/04-home-panel.png)
   24.0 Beethoven, openspineconsortium.com, held to the end (28 s)
+
+  The screens are 20.0.0's, as captured; nothing is drawn on them. The sound is made by sound.mjs from
+  window.__cues below (what happens when: typing, a click, a chime), so it lands on the frame it belongs to.
 -->
 <style>
   .canvas { --w: 1280px; --h: 720px; --mask-y: 60%; }
@@ -40,7 +43,7 @@
   .text { position: absolute; left: 96px; top: 50%; transform: translateY(-50%); width: 500px; }
   .text .h { font-size: 60px; text-wrap: balance; }
   .text .lede { font-size: 22px; margin-top: 18px; max-width: 420px; }
-  .tap { position: absolute; left: 832px; top: 196px; width: 112px; height: 112px; }
+  .tap { position: absolute; left: 852px; top: 58px; width: 104px; height: 104px; }
   .drift { position: absolute; inset: 0; }
 
   /* the end card */
@@ -63,19 +66,19 @@
   </section>
 
   <section class="scene" id="b1">
-    <div class="text"><h2 class="h">Click <em>once.</em></h2><p class="lede">Click Beethoven on your portal tab.</p></div>
-    <img class="tap" id="b1-tap" src="icon/icon.svg" alt="">
-    <div class="shot" id="b1-shot" style="left: 642px; top: 330px" data-src="../raw-9/03-checking-access-panel.png" data-box="8,8,656,225" data-scale="0.75" data-radius="4 14 14 4"></div>
+    <div class="text"><h2 class="h"><span class="l">Sign in to</span> <em>the grid.</em></h2><p class="lede">Your AccessID and password go to the grid and nowhere else.</p></div>
+    <div class="drift" id="b1-drift"><div class="shot" id="b1-shot" style="left: 716px; top: 30px" data-src="../raw-20/03-sign-in-sheet-panel.png" data-box="8,8,704,1300" data-scale="0.52" data-radius="4 14 14 4"></div></div>
   </section>
 
   <section class="scene" id="b2">
-    <div class="text"><h2 class="h"><span class="l">Sign in to Claude,</span> <em>once.</em></h2><p class="lede">On Anthropic's own page.</p></div>
-    <div class="drift" id="b2-drift"><div class="shot" id="b2-shot" style="left: 688px; top: 84px" data-src="../raw-9/04-sign-in-panel.png" data-box="8,8,656,1536" data-scale="0.62" data-radius="4 14 14 4"></div></div>
+    <div class="text"><h2 class="h">Click <em>once.</em></h2><p class="lede">One click on Beethoven starts your worker on the grid.</p></div>
+    <img class="tap" id="b2-tap" src="icon/icon.svg" alt="">
+    <div class="shot" id="b2-shot" style="left: 686px; top: 196px" data-src="../raw-20/04-online-panel.png" data-box="8,8,704,800" data-scale="0.62" data-radius="4 14 14 4"></div>
   </section>
 
   <section class="scene" id="b3">
-    <div class="text"><h2 class="h">Ask from <em>claude.ai.</em></h2><p class="lede">Open in Claude. Your worker runs until you press Stop.</p></div>
-    <div class="shot" id="b3-shot" style="left: 652px; top: 284px" data-src="../raw-9/05-online-panel.png" data-box="8,8,656,996" data-scale="0.84" data-radius="4 14 14 4"></div>
+    <div class="text"><h2 class="h">Ask from <em>claude.ai.</em></h2><p class="lede">Open my session. Your worker runs until you press Stop.</p></div>
+    <div class="drift" id="b3-drift"><div class="shot" id="b3-shot" style="left: 686px; top: 40px" data-src="../raw-20/04-home-panel.png" data-box="8,8,704,1046" data-scale="0.62" data-radius="4 14 14 4"></div></div>
   </section>
 
   <section class="scene end" id="s5">
@@ -191,20 +194,22 @@
   // each scene has gone (0.45 s fade) before the next one comes in
   scene($('#b1'), 9.85, 14.0);
   rise($('#b1 .text'), 9.9, 0.9, 16);
-  rise($('#b1-tap'), 10.15, 0.7, 10);
-  anim($('#b1-tap'), [{ transform: 'scale(1)' }, { transform: 'scale(0.9)', offset: 0.4 }, { transform: 'scale(1)' }], 10.95, 0.35, 'ease-in-out');
-  rise($('#b1-shot'), 11.25, 0.8, 18);
+  rise($('#b1-shot'), 10.1, 0.9, 18);
+  // the sheet settles up a little while it is on screen (its bottom, 30 + 1300 x 0.52 = 706 px, stays in)
+  anim($('#b1-drift'), [{ translate: '0 0' }, { translate: '0 -12px' }], 11.0, 3.0, 'cubic-bezier(0.45, 0, 0.55, 1)');
 
   scene($('#b2'), 14.55, 18.7);
   rise($('#b2 .text'), 14.6, 0.9, 16);
-  rise($('#b2-shot'), 14.8, 0.9, 18);
-  // the sign-in strip moves up a little while it is on screen; 22 px, so the next box of the capture (the
-  // output of the probe, capture row 1077: 84 - 22 + 1069 x 0.62 = 724.8 px) stays below the frame's edge
-  anim($('#b2-drift'), [{ translate: '0 0' }, { translate: '0 -22px' }], 15.4, 3.3, 'cubic-bezier(0.45, 0, 0.55, 1)');
+  rise($('#b2-tap'), 14.85, 0.7, 10);
+  anim($('#b2-tap'), [{ transform: 'scale(1)' }, { transform: 'scale(0.9)', offset: 0.4 }, { transform: 'scale(1)' }], 15.65, 0.35, 'ease-in-out');
+  rise($('#b2-shot'), 16.0, 0.8, 18);
 
   scene($('#b3'), 19.25, 23.4);
   rise($('#b3 .text'), 19.3, 0.9, 16);
   rise($('#b3-shot'), 19.5, 0.9, 18);
+  // the home moves up a little; it ends under "Try asking" (capture row 1054), so the pin card below
+  // never shows: 40 - 20 + 1046 x 0.62 = 668.5 px
+  anim($('#b3-drift'), [{ translate: '0 0' }, { translate: '0 -20px' }], 20.6, 2.8, 'cubic-bezier(0.45, 0, 0.55, 1)');
 
   // ---------- the end card ----------
   scene($('#s5'), 23.95, 99);
@@ -212,6 +217,33 @@
   rise($('#end-name'), 24.25, 0.9, 12);
   rise($('#end-url'), 24.65, 0.8, 8);
 
+  // ---------- the sound: what happens, and when (sound.mjs turns these into the track) ----------
+  var cues = [
+    { t: 0, kind: 'bed', dur: DURATION },
+    { t: 0.15, kind: 'whoosh', dur: 0.9 },
+    { t: 1.5, kind: 'pop', pitch: 0 },                       // the claude.ai window
+    { t: 2.1, kind: 'blip' },                                // the question
+    { t: 2.55, kind: 'swish', dur: 1.0, pan: 0.2 },          // the two arrows from the port
+    { t: 3.6, kind: 'pop', pitch: 4, pan: 0.5 },             // Claude servers
+    { t: 3.85, kind: 'pop', pitch: 7, pan: 0.45 },           // the rack
+    { t: 4.35, kind: 'swish', dur: 0.55, pan: 0.5 },         // up to the model
+    { t: 4.95, kind: 'swish', dur: 0.65, pan: 0.1 },         // to the GPU
+    { t: 5.0, kind: 'pop', pitch: 12, pan: 0.1 },            // the GPU
+    { t: 9.85, kind: 'whoosh', dur: 0.8 }
+  ];
+  // typing the password into the sheet, then the Sign in press
+  [10.9, 11.04, 11.2, 11.31, 11.47, 11.6, 11.78, 11.9, 12.05, 12.21].forEach(function (t) { cues.push({ t: t, kind: 'key', pan: 0.35 }); });
+  cues.push({ t: 12.75, kind: 'click', pan: 0.35 });
+  cues.push({ t: 13.15, kind: 'chime', notes: [0, 7], pan: 0.3 });
+  cues.push({ t: 14.55, kind: 'whoosh', dur: 0.8 });
+  cues.push({ t: 15.65, kind: 'click', pan: 0.4 });         // the toolbar button
+  cues.push({ t: 16.0, kind: 'chime', notes: [0, 4, 7], pan: 0.35 });   // online
+  cues.push({ t: 19.25, kind: 'whoosh', dur: 0.8 });
+  cues.push({ t: 20.3, kind: 'click', pan: 0.35 });         // Open my session
+  cues.push({ t: 23.95, kind: 'whoosh', dur: 1.0 });
+  cues.push({ t: 24.05, kind: 'finale' });                  // the end card
+
+  window.__cues = cues;
   window.__duration = DURATION;
   window.__poster = 8.2;
   window.__seek = function (t) {

@@ -24,7 +24,7 @@ the package is `00`, and the Test instructions tab (`12`, after Distribution) ha
 and one for the fuller reply text. The kit was assembled for 12.0.0 on 2026-10-02 with that release
 (`release/12.0.0/README.md`); for 20.0.0 it is to be assembled again, with the 20.0.0 package as
 `00` and the texts of this sheet as they are now. Its screenshots 2 to 5 are 20.0.0's, made on 2026-10-14
-(field 7); its promo video is 9.0.0's (field 5). The `00` zip, and
+(field 7); its promo video is 20.0.0's, made on 2026-10-15 (field 5). The `00` zip, and
 the kit's own zip that holds it, stay out of the repository (`.gitignore`), like the record's zip,
 whose committed `SHA256SUMS.txt` pins it; 19.0.0's package, like 16.0.0's, names no store item and
 carries no installer, so nothing in the kit is bound to the item.
@@ -34,7 +34,7 @@ carries no installer, so nothing in the kit is bound to the item.
 | `00-beethoven-20.0.0-chrome.zip` | Package | `release/20.0.0/beethoven-20.0.0-chrome.zip` (built as `extension/.output/beethoven-20.0.0-chrome.zip`) |
 | `01-description.txt` | 1. Description | the block under field 1 (no newline at the end) |
 | `04-store-icon-128.png` | 4. Store icon | `extension/store-assets/store-icon-128.png` |
-| `05-promo-video-1280x720.mp4` | 5. Global promo video (to YouTube first) | `extension/store-assets/promo/beethoven-promo.mp4` (9.0.0's; see field 5) |
+| `05-promo-video-2560x1440.mp4` | 5. Global promo video (to YouTube first) | `extension/store-assets/promo/beethoven-promo.mp4` (20.0.0's, with sound; see field 5) |
 | `05-promo-video-thumbnail.png` | 5. the video's YouTube thumbnail | `extension/store-assets/promo/beethoven-promo-poster.png` |
 | `06-promo-tile-440x280.png` | 6. Small promo tile | `extension/store-assets/promo-tile-440x280.png` |
 | `07-screenshot-1-...png` to `07-screenshot-5-...png` | 7. Screenshots, 1 to 5 | `extension/store-assets/screenshot-01-your-grid.png` (9.0.0's diagram) and `screenshot-02-...` to `screenshot-05-...` (20.0.0's screens, field 7) |
@@ -119,10 +119,12 @@ English (United States)
 ### 5. Global promo video
 
 The field takes a YouTube address, not a file. The file, `extension/store-assets/promo/beethoven-promo.mp4`
-(28 seconds, 1280x720), was made from 9.0.0 and shows its toolbar-button start; **leave this field
-empty** until a video of 20.0.0 is made. To add one later: YouTube Studio, **Create**, **Upload
-videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; paste the
-`https://youtu.be/...` link here.
+(28 seconds, 2560x1440, with sound), was made on 2026-10-15 from the 20.0.0 screens: sign in to the grid,
+click once, ask from claude.ai (`extension/store-assets/manifest.txt` says what each moment shows). Upload
+it as it is; the 1440p file is what keeps the listing's preview sharp. YouTube Studio, **Create**,
+**Upload videos**, "No, it's not made for kids", **Visibility** **Unlisted**, **Save**; set
+`promo/beethoven-promo-poster.png` as the thumbnail if wanted; paste the `https://youtu.be/...` link here
+(replacing the 9.0.0 video's, if one is there).
 
 ### 6. Small promo tile (440x280)
 

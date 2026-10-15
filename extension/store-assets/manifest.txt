@@ -1,10 +1,11 @@
-Beethoven store assets: screenshots 2 to 5 from 20.0.0, the rest from 9.0.0
+Beethoven store assets: screenshots 2 to 5 and the promo video from 20.0.0, the rest from 9.0.0
 
 Screenshots 2 to 5 were made again on 2026-10-14 from the 20.0.0 release build (the real screens in
 raw-20/, captured headlessly against the mock portal; raw-20/LIST.txt says how, and what two changes the
 capture's copy of the package needed to load in the Chromium at hand, which is older than the manifest's
-Chrome 148), on the same pages and in the same style as 9.0.0's. The diagram screenshot, the two tiles,
-the icon and the promo video are 9.0.0's and unchanged; the video shows the old panel.
+Chrome 148), on the same pages and in the same style as 9.0.0's. The promo video was made again on
+2026-10-15 from the same raw-20/ screens, at 2560x1440 and with sound (below). The diagram screenshot, the
+two tiles and the icon are 9.0.0's and unchanged.
 
 Made 2026-10-01 between 01:46 and 02:03 UTC for 9.0.0 and rebuilt once at 02:38 to 02:40 UTC (the stills
 came out byte-identical; the video changed as described under promo/beethoven-promo.mp4), the release whose
@@ -69,22 +70,30 @@ promo-tile-440x280.png  (440x280)
 marquee-1400x560.png  (1400x560)
     The icon and the name, "Your grid. From claude.ai." and the site's line on the left; the home page
     diagram on the right (at this width the site sets "the heavy lifting" on two lines, and so does this).
-promo/beethoven-promo.mp4  (1280x720, 28.0 s, 30 fps, 840 frames, H.264 High, yuv420p, BT.709, no audio)
+promo/beethoven-promo.mp4  (2560x1440, 28.0 s, 30 fps, 840 frames, H.264 High, yuv420p, BT.709; AAC 48 kHz
+                           stereo at -16 LUFS)
+    Laid out at 1280x720 and photographed at 2x: YouTube gives a 1440p upload its better encoding at every
+    size it plays (the 720p file looked soft in the listing's preview); the captures are 2x, so nothing is
+    enlarged.
     0 s    the headline, then the diagram draws itself: the window, the two arrows from its port, the
            Claude servers and the rack, the arrow up to the model, the GPU and the arrow to it; then the
            dots run along the arrows, with the site's own CSS animation and timing, started once the
            arrows are there
-    9.9 s  "Click once." / "Click Beethoven on your portal tab.": the toolbar button (the package icon)
-           presses, then the strip at "Checking your access..." (raw-9/03-checking-access-panel.png)
-    14.6 s "Sign in to Claude, once." / "On Anthropic's own page.": the strip at the sign-in step, moving
-           up 22 px (raw-9/04-sign-in-panel.png)
-    19.3 s "Ask from claude.ai." / "Open in Claude. Your worker runs until you press Stop.": the strip with
-           the worker online (raw-9/05-online-panel.png)
+    9.9 s  "Sign in to the grid." / "Your AccessID and password go to the grid and nowhere else.": the
+           panel's sign-in sheet, AccessID st1234, settling up 12 px (raw-20/03-sign-in-sheet-panel.png)
+    14.6 s "Click once." / "One click on Beethoven starts your worker on the grid.": the toolbar button
+           (the package icon) presses, then the panel online (raw-20/04-online-panel.png, its top: the
+           Online hero, "Open my session" and the Grid, Claude and Worker rows)
+    19.3 s "Ask from claude.ai." / "Open my session. Your worker runs until you press Stop.": the panel's
+           home down to "Try asking", moving up 20 px (raw-20/04-home-panel.png); the pin card below it
+           never enters the frame
     24.0 s the end card, held: the icon, "Beethoven", openspineconsortium.com
     "Not an Anthropic product." stays at the bottom left throughout.
-    The sign-in and online strips run on below the bottom edge through plain card: the next box of each
-    capture (the output of the last command) starts below the frame in every frame (sign-in: at 724.8 px
-    at the end of its 22 px move; online: at 728.4 px), checked on all 840 decoded frames.
+    The sound (src/sound.mjs) is synthesised from the page's own list of cues, so each sound is on its
+    frame: a quiet held chord under everything, a soft whoosh as each scene comes in, a pop as each box of
+    the diagram appears and a swish as each arrow draws, typing and a click on the sign-in sheet, a click
+    and a chime as the worker comes online, a click on "Open my session", and bells on the end card. No
+    samples and nothing fetched; the same track on every build.
 promo/beethoven-promo-poster.png  (1280x720, RGB)
     The frame at 8.2 s (the diagram drawn, the dots on their way). For the YouTube thumbnail if wanted.
 
@@ -122,8 +131,9 @@ image shows one card exactly as captured: cut out of the capture along the card'
 the card's own corner radii and the hero window's shadow. Nothing inside a card is drawn, edited or
 composited. The video is drawn frame by frame: promo.html exposes __seek(t), which sets every animation on
 the page to time t; each frame is a screenshot, and ffmpeg (found on PATH, else inside WSL) encodes them.
-Without ffmpeg (or with --webm) the script records the page in real time with Playwright's recorder and
-keeps a .webm instead (VP8, about 28.9 s with the page's loading at the start); YouTube takes either.
+ffmpeg also adds the sound track (src/sound.mjs, from promo.html's window.__cues). Without ffmpeg (or with
+--webm) the script records the page in real time with Playwright's recorder and keeps a .webm instead (VP8,
+1280x720, no sound, about 28.9 s with the page's loading at the start); YouTube takes either.
 
 CAVEATS
 

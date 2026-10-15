@@ -14,8 +14,8 @@
 //
 // Writes, one folder up (store-assets/): screenshot-0[1-5]-*.png (1280x800), promo-tile-440x280.png,
 // marquee-1400x560.png, store-icon-128.png (the package's 128 px icon, copied from icon/icon.png, with its
-// transparent padding), promo/beethoven-promo.mp4 (1280x720, 30 fps, H.264, no sound) and
-// promo/beethoven-promo-poster.png. Every screenshot and tile is checked: exact size, 8-bit RGB, no alpha
+// transparent padding), promo/beethoven-promo.mp4 (2560x1440, 30 fps, H.264, with sound: AAC 48 kHz stereo) and
+// promo/beethoven-promo-poster.png (1280x720). Every screenshot and tile is checked: exact size, 8-bit RGB, no alpha
 // channel and no transparency chunk; one that Chromium wrote with alpha is flattened on the site's cream
 // (#F1EEE3) before the check. The icon is checked for its size and for being RGBA.
 //
@@ -23,12 +23,18 @@
 // (the site's own CSS animations of the diagram, and the scene's) to time t; each frame is a screenshot.
 // ffmpeg encodes the frames; it is looked for on PATH, then inside WSL (`wsl -e ffmpeg`). With neither, the
 // script records the page in real time with Playwright's video recorder instead and keeps that .webm.
+// The sound track is made by sound.mjs from the page's window.__cues (what happens on screen, and when), so
+// it is built with the frames and stays on them; the .webm fallback has no sound.
+// The page is laid out at 1280x720 and photographed at 2x, so the file is 2560x1440: YouTube, which the store
+// embeds, gives a 1440p upload its better encoding at every size it plays, where a 720p upload looked soft
+// in the listing's preview. The captures are 2x themselves, so nothing is enlarged.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL, fileURLToPath } from 'node:url';
+import { renderTrack, wav } from './sound.mjs';
 
 const SRC = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(SRC, '..');
@@ -202,11 +208,11 @@ function findFfmpeg() {
 }
 
 if (want('video')) {
-  const FPS = 30, W = 1280, H = 720;
+  const FPS = 30, W = 1280, H = 720, X = 2;            // laid out at W x H, photographed at X
   const promoDir = path.join(OUT, 'promo');
   fs.mkdirSync(promoDir, { recursive: true });
   const ff = argv.includes('--webm') ? null : findFfmpeg();
-  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1, colorScheme: 'light' });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: X, colorScheme: 'light' });
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('request', r => { if (!r.url().startsWith('file:') && !r.url().startsWith('data:')) errors.push(`network request: ${r.url()}`); });
@@ -216,12 +222,17 @@ if (want('video')) {
   if (info.faces.some(f => !f.endsWith('loaded'))) throw new Error('promo.html: fonts not loaded');
   const duration = await page.evaluate(() => window.__duration);
   const poster = await page.evaluate(() => window.__poster);
-  console.log(`promo video: ${duration} s at ${FPS} fps, ${W}x${H}; encoder: ${ff ? ff.name : 'none (Playwright .webm)'}`);
+  const cues = await page.evaluate(() => window.__cues);
+  console.log(`promo video: ${duration} s at ${FPS} fps, ${W * X}x${H * X}; encoder: ${ff ? ff.name : 'none (Playwright .webm)'}`);
 
-  // the poster frame
-  await page.evaluate((t) => window.__seek(t), poster);
+  // the poster frame, at 1280x720 (YouTube's thumbnail size)
+  const posterPage = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1, colorScheme: 'light' });
+  await posterPage.goto(pathToFileURL(path.join(SRC, 'promo.html')).href + '?record');
+  await posterPage.evaluate(() => window.__ready);
+  await posterPage.evaluate((t) => window.__seek(t), poster);
   const posterFile = path.join(promoDir, 'beethoven-promo-poster.png');
-  await page.screenshot({ path: posterFile, clip: { x: 0, y: 0, width: W, height: H } });
+  await posterPage.screenshot({ path: posterFile, clip: { x: 0, y: 0, width: W, height: H } });
+  await posterPage.close();
   ensureRgb(posterFile, W, H);
 
   if (ff) {
@@ -233,11 +244,18 @@ if (want('video')) {
       if (i % 150 === 0) console.log(`  frame ${i}/${n}`);
     }
     const mp4 = path.join(promoDir, 'beethoven-promo.mp4');
+    const track = path.join(frames, 'sound.wav');
+    fs.writeFileSync(track, wav(renderTrack(cues, duration)));
+    console.log(`  sound: ${cues.length} cues`);
     const args = [...ff.pre, '-y', '-loglevel', 'error', '-framerate', String(FPS), '-i', ff.p(path.join(frames, 'f%04d.png')),
+      '-i', ff.p(track),
       '-vf', 'scale=out_color_matrix=bt709:out_range=tv,format=yuv420p',
-      '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-profile:v', 'high', '-tune', 'animation',
+      '-c:v', 'libx264', '-preset', 'slow', '-crf', '14', '-profile:v', 'high', '-tune', 'animation', '-g', String(FPS / 2), '-bf', '2',
       '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-      '-movflags', '+faststart', '-an', ff.p(mp4)];
+      // the track's loudness to -16 LUFS, the level YouTube plays at; the limiter keeps the encoded peaks
+      // under -1 dBFS (loudnorm alone left the AAC peaks at 0 dB)
+      '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000,alimiter=limit=0.75:level=false', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-shortest',
+      '-movflags', '+faststart', ff.p(mp4)];
     const r = spawnSync(ff.cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr}`);
     fs.rmSync(frames, { recursive: true, force: true });
