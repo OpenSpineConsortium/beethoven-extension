@@ -865,9 +865,9 @@ From the report's "Security controls", in the order a reviewer will look for the
   set them. - **No `cookies` permission.** The portal cookie is used by the network stack and never
   read. - **No script on claude.ai or any Anthropic page.** The only content script is on the portal
   origin, which removes the DOM-injection and prototype-skimming classes for everything except the
-  portal page itself. The two kinds of Anthropic page the extension opens (the sign-in page Claude
-  Code printed; the session's claude.ai/code link) open in a new tab with `tabs.create` and are
-  never read. The extension never stores a Claude credential and never touches the MFA approval
+  portal page itself. The three kinds of Anthropic page the extension opens (the sign-in page Claude
+  Code printed; the session's claude.ai/code link; since 21.0.0 the project's page the student named
+  in Settings) open in a new tab with `tabs.create` and are never read. The extension never stores a Claude credential and never touches the MFA approval
   step. - **The grid password, under a narrow rule (19.0.0).** The only answer the background gives
   to an HTTP sign-in is the one in the 19.0.0 paragraph at the top: its own dashboard request, the
   granted origin and, once one is recorded, realm, once per armed check, nothing after the first

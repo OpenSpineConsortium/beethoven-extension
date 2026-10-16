@@ -646,6 +646,68 @@ describe('the pages of 19.0.0, drawn', () => {
     root.remove();
   });
 
+  it("21.0.0: Settings' project field: Add opens it, a refused address stays typed with the reason, a project's closes it, Escape closes it, Clear sends an empty one", async () => {
+    const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    const f = fixture('settings');
+    if (f?.surface !== 'settings') throw new Error('no fixture');
+    const acts: Action[] = [];
+    const answers: Array<{ saved: boolean }> = [];
+    const root = doc.createElement('div');
+    doc.body.append(root);
+    const gestures = { hasPanel: true, openPanel: () => Promise.resolve(true), request: () => Promise.resolve(true), openTab: () => undefined, url: (p: string) => p, productVersion: () => '21.0.0', host: () => 'Chrome', installId: () => Promise.resolve('x'), save: () => Promise.resolve(), unknownPasskey: () => undefined };
+    const page = settings.mountSettings(root as unknown as HTMLElement, {
+      act: (a: Action) => {
+        acts.push(a);
+        return Promise.resolve((a.kind === 'set-pref' ? answers.shift() : undefined) as never);
+      },
+      gestures,
+    });
+    page.show(f.view);
+    const row = () => live(root, '[data-key="project"]')!;
+    const field = () => live<HTMLInputElement>(root, '#project-url');
+    expect(row().textContent).toContain(WORDS.settings.projectNone);
+    fire(row().querySelector('#project-change')!, 'click');
+    expect(field()?.getAttribute('placeholder')).toBe('https://claude.ai/code/project/...');
+    // a session's link: the background refuses it; it stays in the field, with the reason, for the next try
+    const SESSION_LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
+    answers.push({ saved: false });
+    field()!.value = SESSION_LINK;
+    fire(field()!, 'input');
+    fire(field()!, 'keydown', { key: 'Enter' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { project_url: SESSION_LINK } });
+    expect(field()?.value).toBe(SESSION_LINK);
+    expect(field()?.getAttribute('aria-invalid')).toBe('true');
+    expect(field()?.getAttribute('aria-describedby')).toBe('project-url-error');
+    expect(live(root, '#project-url-error')?.getAttribute('role')).toBe('alert');
+    expect(live(root, '#project-url-error')?.textContent).toBe(WORDS.settings.projectBad);
+    // a project's address: kept, and the field closes
+    answers.push({ saved: true });
+    field()!.value = PROJECT;
+    fire(field()!, 'input');
+    fire(field()!, 'keydown', { key: 'Enter' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { project_url: PROJECT } });
+    expect(field()).toBeUndefined();
+    // the background's next view names it: the address, Change and Clear; Clear sends an empty address
+    const named = fixture('settings-project');
+    if (named?.surface !== 'settings') throw new Error('no fixture');
+    page.show(named.view);
+    expect(row().querySelector('.mono')?.textContent).toBe(PROJECT);
+    fire(Array.from(row().querySelectorAll('button')).find((b) => b.textContent === WORDS.settings.projectClear)!, 'click');
+    expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { project_url: '' } });
+    // Change opens the field with the address in it; Escape closes it with no word to the background
+    const before = acts.length;
+    fire(row().querySelector('#project-change')!, 'click');
+    expect(field()?.value).toBe(PROJECT);
+    fire(field()!, 'keydown', { key: 'Escape' });
+    expect(field()).toBeUndefined();
+    expect(acts.length).toBe(before);
+    root.remove();
+  });
+
   it("Settings never shows Forget's sentence under a sign-in saved again", () => {
     const view = (name: string): SettingsView => {
       const f = fixture(name);

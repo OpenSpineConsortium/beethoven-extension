@@ -666,11 +666,15 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
       const since = ms(r.onlineAt) ?? ms(f.lastKnown?.online_since);
       const sub = r.badLink ? WORDS.online.badLink(title) : r.readyMinutes !== undefined ? WORDS.online.ready(r.readyMinutes, title) : since !== undefined ? WORDS.home.onlineSub(title, f.now - since) : title;
       const pinTip = pinTipOf(f);
+      // 21.0.0: the same button as the home's, so a project named in Settings is opened from this screen too. A
+      // missing or odd link disables Open my session, which has nothing to open; the project's page opens regardless
+      const open = openClaude(f);
       return {
         moment: 'online',
         hero: WORDS.online.hero,
         sub,
-        primary: button(WORDS.online.open, 'teal', { kind: 'open-session' }, r.link ? {} : { disabled: true }),
+        primary: open.kind === 'open-session' && !r.link ? { ...open.button, disabled: true } : open.button,
+        ...(open.kind === 'open-project' ? { how: open.how } : {}),
         track: track(4),
         burst: f.onlineAnnouncedAt !== undefined && f.now - f.onlineAnnouncedAt < ONLINE_HOLD_MS,
         ...(pinTip ? { pinTip } : {}),
@@ -965,15 +969,23 @@ function liveHero(f: Facts, s: HeroState, title: string): HeroView {
   }
 }
 
+/**
+ * 21.0.0: the teal button that opens Claude, on the home and on the "You're online." moment alike: the project's page
+ * while a project is named in Settings, with what to do there under it, else the worker's own link. A project cannot
+ * take a session the worker started by itself, so the student is sent to the project; the worker's link stays on New
+ * session, Copy link and Phone, and on an outline Open my session where no new session can start there.
+ */
+function openClaude(f: Facts): Extract<HomePrimary, { kind: 'open-session' | 'open-project' }> {
+  const H = WORDS.home;
+  return isProjectUrl(f.prefs.project_url)
+    ? { kind: 'open-project', button: button(H.openProject, 'teal', { kind: 'open-project' }), how: H.projectHow }
+    : { kind: 'open-session', button: button(H.openSession, 'teal', { kind: 'open-session' }) };
+}
+
 function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
   const H = WORDS.home;
   const link = f.run.link ?? f.lastKnown?.environment_url;
-  // 21.0.0: a project named in Settings takes the primary's place whenever the worker's own link would be offered: a
-  // project cannot take a session the worker started by itself, so the student is sent to the project, with what to
-  // do there under the button; the worker's link stays on New session, Copy link and Phone
-  const open: HomePrimary = isProjectUrl(f.prefs.project_url)
-    ? { kind: 'open-project', button: button(H.openProject, 'teal', { kind: 'open-project' }), how: H.projectHow }
-    : { kind: 'open-session', button: button(H.openSession, 'teal', { kind: 'open-session' }) };
+  const open: HomePrimary = openClaude(f);
   const connect: HomePrimary = { kind: 'connect', button: button(f.press?.kind === 'connect' ? WORDS.statement.connectingWhenReady : H.connect, 'ink', { kind: 'connect' }, f.press?.kind === 'connect' ? { busy: true } : {}), reminder: H.connectReminder };
   // R12 for a run found already in the folder and never seen alive here (RunFacts.neverSeenAlive): Connect, whatever
   // its last known state says, online and needs-you included (after a browser restart the run record counts as
@@ -1101,7 +1113,8 @@ export function home(f: Facts): HomeView {
   const pin = onlineNow ? pinTipOf(f) : undefined;
   if (pin) cards.push({ id: 'pin-tip', text: pin.text, ...(pin.done ? { done: true } : {}), dismiss: { kind: 'dismiss', card: 'pin-tip' } });
   else if (onlineNow && !f.tourSeen && !f.once.tour_auto_played_at && !f.once.tour_card_dismissed_at) cards.push({ id: 'tour-card', text: H.tourCard, open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } });
-  // 21.0.0: then, while no project is named, the card that offers Settings for its address, until its x
+  // 21.0.0: then, while no project is named, the card that offers Settings for its address, until its x. One card at a
+  // time, in this order: a student who never pins and never dismisses the pin tip sees this one once the pin tip is done
   else if (onlineNow && !isProjectUrl(f.prefs.project_url) && !f.once.project_card_dismissed_at) cards.push({ id: 'project-tip', text: H.projectCard, open: { kind: 'open-settings' }, dismiss: { kind: 'dismiss', card: 'project-tip' } });
   return {
     header: {
@@ -1124,8 +1137,17 @@ export function home(f: Facts): HomeView {
     })(),
     // 14.0.0: "New session" whenever an environment link was reported, where a new session can start, whichever link
     // is the run's own (newSessionLinkOf); a resumed session's own link alone (Claude Code serves that one session there
-    // and exits when it is complete) keeps Copy link and Phone
-    ...((onlineNow || lastOnline) && link ? { secondary: { ...(newSessionLinkOf(f) ? { newSession: button(H.newSession, 'outline', { kind: 'new-session' }) } : {}), copyLink: H.copyLink, phone: H.phone } } : {}),
+    // and exits when it is complete) keeps Copy link and Phone; 21.0.0: and, while the project holds the primary, an
+    // outline "Open my session", so the running session keeps a button
+    ...((onlineNow || lastOnline) && link
+      ? {
+          secondary: {
+            ...(newSessionLinkOf(f) ? { newSession: button(H.newSession, 'outline', { kind: 'new-session' }) } : isProjectUrl(f.prefs.project_url) ? { openSession: button(H.openSession, 'outline', { kind: 'open-session' }) } : {}),
+            copyLink: H.copyLink,
+            phone: H.phone,
+          },
+        }
+      : {}),
     ...(link ? { link } : {}),
     title,
     rows: rowsOf(f, hero),

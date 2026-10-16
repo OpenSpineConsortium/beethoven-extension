@@ -48,6 +48,7 @@ export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksL
 export const SIGNIN_TAB_KEY = 'bridge.signinTab'; //  OpenedTab: the grid sign-in tab Beethoven opened or navigated (the welcome tab, or one opened for a press)
 export const ANTHROPIC_TAB_KEY = 'bridge.anthropicTab'; // AnthropicTab: Anthropic's sign-in tab Beethoven opened, and whether it has started a new load since the paste
 export const CLAUDE_TAB_KEY = 'bridge.claudeTab'; //  OpenedTab: the claude.ai tab Beethoven opened for "Open my session" (session storage: a tab id means nothing after a restart)
+export const PROJECT_TAB_KEY = 'bridge.projectTab'; // OpenedTab: the claude.ai tab Beethoven opened for the project's page (21.0.0, "Open my project"), its own record so each address keeps one tab
 export const TERMINAL_TAB_KEY = 'bridge.terminalTab'; // OpenedTab: the grid's terminal tab Beethoven opened for the one-time key step (AM2)
 export const ACTIVITY_KEY = 'bridge.activity'; //     ActivityEntry[]: Beethoven's own plain-words events for Show log, oldest first, at most ACTIVITY_MAX
 export const GRID_KEY = 'bridge.grid'; //             GridNote: whether the grid answers and whether the browser holds a grid sign-in, as last checked
@@ -187,8 +188,6 @@ export interface OpenedTab {
   windowId: number;
   /** the URL Beethoven loaded; the tab is closed only while tabs.get still shows it on this origin (and path, for the terminal) */
   url: string;
-  /** 21.0.0, claude.ai's tab: the exact address loaded (the worker's link or the project's page), so Open my session and Open my project bring forward only a tab opened for the same address */
-  link?: string;
   opened_at: string;
   /** "welcome": the welcome tab, navigated to the grid; "press": opened for a press; "session": claude.ai; "terminal": the grid's terminal (AM2); "anthropic": Anthropic's sign-in page (ANTHROPIC_TAB_KEY) */
   purpose: 'welcome' | 'press' | 'session' | 'terminal' | 'anthropic';

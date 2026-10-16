@@ -206,8 +206,8 @@ allowed the portal, and then only that site.
   `sidePanel`, `webRequest` and `webRequestAuthProvider`, optional host `https://*/*`, nothing else
   (no `nativeMessaging`, no `webRequestBlocking`), and no `"key"`.
   `unzip -l` lists `fonts/` and no `bridge/`: no `.msi`, no `.pkg`, no script zip.
-- The five public pages open; `privacy.html` says version 15 and `terms.html` version 14 (the upload
-  waits for version 15 there); the install card links the listing; the reviewers page carries `LISTING.md`'s negative statements; none
+- The five public pages open; `privacy.html` says version 16 and `terms.html` version 15 (the upload
+  waits for version 16 there); the install card links the listing; the reviewers page carries `LISTING.md`'s negative statements; none
   offers a download or names another browser; `services.json` carries `access_check` and no
   `allowlist`; `killlist.json` answers 200 and verifies.
 - The access service answers `st1234` yes from two installation identifiers at portal `localhost`

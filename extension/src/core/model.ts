@@ -375,12 +375,16 @@ export const WORDS = {
     /**
      * 21.0.0: with a project named in Settings (keys.ts Prefs.project_url), the primary opens the project's page in
      * place of a plain session, and the sentence under it says what to do there: a project reaches the worker's folder
-     * only through its own Work locally and the card it answers with. The card below the online home offers Settings
-     * while no project is named, once.
+     * only through its own Work locally and the card it answers with. Its three labels are claude.ai's own, from
+     * code.claude.com/docs/en/claude-projects, "Run a thread on your own computer", as read on 2026-10-16 ("choose
+     * Work locally from the + menu beside the message box"; the "Allow Claude to work in a folder on your device" card;
+     * "Then click Allow once"), so they follow that page when it changes. The card below the online home offers
+     * Settings while no project is named, once; it says what the address changes, not that a tab opens, since the
+     * switch above it in Settings decides that.
      */
     openProject: 'Open my project',
     projectHow: 'In your project, choose Work locally from the + menu, write the task, and press Allow once on the card.',
-    projectCard: 'Working in a project on claude.ai? Add its address in Settings and Beethoven opens it when your worker is ready.',
+    projectCard: 'Working in a project on claude.ai? Add its address in Settings, and Beethoven opens your project in place of a plain session.',
     connect: 'Connect',
     connectReminder: "Your worker's files and output go to Anthropic. Keep restricted data out.",
     signInClaude: 'Sign in to Claude',
@@ -477,7 +481,7 @@ export const WORDS = {
      */
     project: 'Your project on claude.ai',
     projectNone: 'None named. Open my session opens a plain session on your worker.',
-    projectNote: "Beethoven opens your project when your worker is ready, and you ask Claude there to work in your worker's folder.",
+    projectNote: "Open my project opens it, and so does the tab that opens when your worker is ready, in place of your session's page. In the project, ask Claude to work in your worker's folder.",
     projectBad: "That isn't a project's address. Copy it from the address bar while your project is open: it starts with https://claude.ai/code/project/.",
     projectAdd: 'Add',
     projectUse: 'Use',
@@ -854,8 +858,10 @@ export interface OnlineMoment {
   hero: string;
   /** "Ready in Claude, 7 min after you asked. Look for Wayne State grid." or the bad-link sentence */
   sub: string;
-  /** "Open my session" (teal) */
+  /** "Open my session" (teal); 21.0.0: "Open my project" while a project is named in Settings, as on the home */
   primary: ButtonView;
+  /** 21.0.0: what to do in the project (WORDS.home.projectHow), under "Open my project" */
+  how?: string;
   track: TrackView;
   /** play the 600 ms ring burst once */
   burst: boolean;
@@ -959,7 +965,8 @@ export interface HomeView {
   track?: TrackView;
   primary?: HomePrimary;
   /** online only: "New session" (14.0.0: only with an environment link), "Copy link", "Phone" */
-  secondary?: { newSession?: ButtonView; copyLink: string; phone: string };
+  /** 21.0.0: openSession, an outline "Open my session", while the project holds the primary and no new session can start there (a resumed session's own link), so the running session keeps a button */
+  secondary?: { newSession?: ButtonView; openSession?: ButtonView; copyLink: string; phone: string };
   /**
    * the worker's link (Copy link and Phone are page-local, from this), either form (14.0.0): the environment link
    * https://claude.ai/code?environment=env_…, or a resumed session's own https://claude.ai/code/session_…

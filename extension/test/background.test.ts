@@ -186,13 +186,43 @@ describe('the background, run whole', () => {
     // New session: the worker's own environment link, as before
     expect(await send(world, { type: 'action', action: { kind: 'new-session' } })).toMatchObject({ ok: true, value: { opened: true } });
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
-    // Open my session asks for the worker's link, which the recorded tab (the project's page) is not: one tab of its own
+    // Open my session asks for the worker's link; New session recorded no tab, so it opens one of its own
     expect(await send(world, { type: 'action', action: { kind: 'open-session' } })).toMatchObject({ ok: true, value: { focused: false, opened: true } });
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(2);
+    // each address keeps its own tab: Open my project brings the project's tab forward again, Open my session the session's
+    expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: true, opened: false } });
+    expect(await send(world, { type: 'action', action: { kind: 'open-session' } })).toMatchObject({ ok: true, value: { focused: true, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && (l.includes(PROJECT) || l.includes(LINK)))).toHaveLength(3);
+    // the project card's x is kept with the other one-time notes
+    expect(await send(world, { type: 'action', action: { kind: 'dismiss', card: 'project-tip' } })).toMatchObject({ ok: true, value: { recorded: true } });
+    expect(world.storage.local['bridge.once']).toMatchObject({ project_card_dismissed_at: expect.any(String) });
     // Clear: an empty address forgets the project
     expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { project_url: '' } } })).toMatchObject({ ok: true, value: { saved: true } });
     expect(stored()).toBeUndefined();
     expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: false, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
+  }, 40_000);
+
+  it('21.0.0: a project named with "Open Claude when my worker is ready" off: nothing opens when the worker is ready; Open my project opens it on request', async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { open_claude_on_connect: false, project_url: PROJECT } } })).toMatchObject({ ok: true, value: { saved: true } });
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    const at = new Date().toISOString();
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, environment_url: LINK, environment_id: 'env_01XzAN32jsbL8W1PAFSvitBt' }));
+    await sleep(8_000);
+    clearInterval(ticker);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes('claude.ai/code'))).toHaveLength(0);
+    expect(JSON.stringify(panel.last()?.view)).toContain('"kind":"open-project"');
+    expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: false, opened: true } });
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
   }, 40_000);
 

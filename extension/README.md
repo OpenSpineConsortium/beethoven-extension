@@ -189,8 +189,9 @@ access line, the settings and the Google Drive step with its done box.
   `~/.hpcworker/consent` ("yes <iso time> <install id>") first. Every start, from the strip or from the
   background's setting, goes through the background's one start path, which gathers the facts afresh and starts
   only when the machine says it is the next step; at most one start is in flight.
-- Once the job registers, the strip shows the green **Open in Claude** button (it opens the
-  `https://claude.ai/code?environment=env_...` link the job reported, and nothing else), **Copy link**, and
+- Once the job registers, the strip shows the green **Open my session** button (it opens the
+  `https://claude.ai/code?environment=env_...` link the job reported, and nothing else; since 21.0.0
+  **Open my project** in its place when a project is named in Settings), **Copy link**, and
   "Find `<session name>` under Code in the Claude app". A first message cannot be prefilled on claude.ai (no code
   runs there); the strip says so in one line. Claude Code names the session itself (`asx10-hazy-meadow` in the
   maintainer's run); the name and link are read from `connection.json`, `status.json`, or the registration block

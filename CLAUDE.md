@@ -232,7 +232,7 @@ name and identifier carry no university name.
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 14 to match, with `TERMS_DATE` 2026-10-13; the framework's
+  `extension/src/core/terms.ts` is 15 to match, with `TERMS_DATE` 2026-10-16; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and

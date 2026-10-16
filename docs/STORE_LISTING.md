@@ -128,7 +128,8 @@ send them to. Every other request goes to the one portal origin the person grant
 script on that origin, with the browser carrying the portal cookie (never read). The extension
 opens, in a new tab and with no code of its own on them, the portal's own pages, Anthropic's sign-in
 page (only an https address on claude.ai or claude.com, printed by the sitting), the session's
-`https://claude.ai/code?environment=...` link, `https://claude.ai/settings/connectors`, and, from
+`https://claude.ai/code?environment=...` link, the project's `https://claude.ai/code/project/...` page
+if one is named in the settings, `https://claude.ai/settings/connectors`, and, from
 the *Ask for access* button, the vendor's request page with the account name in its address. What
 stays on the device: portal hostname and granted origin, preferences, the acceptance record, the
 account name the portal showed and the last approval answer with its time, the service address, the

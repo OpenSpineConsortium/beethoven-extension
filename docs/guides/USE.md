@@ -4,8 +4,9 @@ For Beethoven 21.0.0. Written 2026-10-02, updated 2026-10-16.
 
 **New in 21.0.0.** If you work in a project on claude.ai, give Beethoven its address once, in
 Settings (copy it from the address bar while your project is open; it starts with
-`https://claude.ai/code/project/`). From then on the tab that opens when your worker is ready is your
-project, the panel's button reads **Open my project**, and under it the panel says what to do there:
+`https://claude.ai/code/project/`). From then on the tab that opens when your worker is ready, while
+that is on, is your project, the panel's button reads **Open my project**, and under it the panel
+says what to do there:
 choose **Work locally** from the **+** menu, write the task, and press **Allow once** on the card. A
 plain session opened from the worker's link cannot be made part of a project afterwards, which is why
 the project comes first. **New session**, **Copy link** and **Phone** keep the worker's own link.

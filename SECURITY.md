@@ -79,8 +79,10 @@ The other adversaries considered:
   during a sign-in sitting is opened only when it is `https` on `claude.ai` or `claude.com` (or a
   subdomain of either, never `platform.claude.com`, the Console's sign-in, which bills by use), and is
   reported as refused otherwise; the only link opened when a worker
-  connects must match `https://claude.ai/code?environment=env_...` exactly; anything else is shown
-  as text.
+  connects must match `https://claude.ai/code?environment=env_...` (or, since 14.0.0, a session's
+  `https://claude.ai/code/session_...`) exactly; anything else is shown as text. Since 21.0.0 the
+  project page the student named in Settings, kept in the one shape `https://claude.ai/code/project/<id>`
+  and refused otherwise, opens in that link's place.
 - Another portal user. The Open OnDemand `/rnode/` proxy does no job or ownership lookup: any
   authenticated portal user can reach any port on a matching host. The worker therefore trusts nothing
   the proxy adds (`X-Forwarded-User`, `Authorization`, the OIDC cookie) and requires its own per-job
@@ -183,9 +185,10 @@ Extension:
   storage listener never copies a value of the session sign-in keys.
 - The extension opens an Anthropic page only in a new tab through `tabs.create`, which needs no
   `tabs` permission, and only in a run the student started with the icon or a button: the sign-in
-  page Claude Code printed during the sign-in sitting, the session's claude.ai/code link when the
-  worker connects (a setting, on by default, that leaves the green *Open in Claude* button when off),
-  and the connectors page from the optional Google Drive step. It has no presence on any page it opens.
+  page Claude Code printed during the sign-in sitting, the session's claude.ai/code link, or since
+  21.0.0 the project page named in Settings, when the worker connects (a setting, on by default, that
+  leaves the green *Open my session* or *Open my project* button when off), and the connectors page
+  from the optional Google Drive step. It has no presence on any page it opens.
 - The pasted sign-in code passes through and is not kept. During the sign-in sitting the student
   pastes Anthropic's one-time code into one box in the panel; the extension sends it over its login
   port to the page script and into the student's own terminal on the cluster as keystrokes, holds it

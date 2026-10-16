@@ -1,6 +1,6 @@
 # Store listing texts
 
-The exact texts to paste into the Chrome Web Store dashboard for Beethoven 20.0.0, and the answers
+The exact texts to paste into the Chrome Web Store dashboard for Beethoven 21.0.0, and the answers
 to its questions. Written 2026-09-29 from the decision for 4.0.0 (no licence keys; approval of the
 account the portal shows, confirmed with the access service), brought up to date for 6.0.0 to 10.0.0
 (the lab's shared copy of the cluster-side tool; the public name Beethoven; a **Private** item whose
@@ -13,7 +13,8 @@ to the grid itself (17.0.0 and 18.0.0 left these texts as they were), on 2026-10
 in which one approval covers every installation of the student's own (the description's approval
 line and its access link, the reviewed text's needs, and the privacy answer), and on 2026-10-13 for
 20.0.0's public listing (the description's approval line again, the privacy answer, the site's card;
-agreement version 14, privacy statement version 15).
+agreement version 14, privacy statement version 15), and on 2026-10-16 for 21.0.0 (the project's page
+among the pages it opens, named in the settings; agreement version 15, privacy statement version 16).
 11.0.0 (2026-10-01) was built but never submitted, and its store documents
 were never brought up to date (`docs/V11_STATUS.md`, section 5), so the 12.0.0 rewrite carried both:
 
@@ -149,7 +150,8 @@ built extension once more for the sign-in before pasting):
   it.
 - It opens pages in new tabs and runs nothing on them: the portal's own pages, Anthropic's sign-in
   page (only an https address on claude.ai or claude.com, printed by the sign-in sitting), the
-  session's `https://claude.ai/code?environment=...` link, `https://claude.ai/settings/connectors`,
+  session's `https://claude.ai/code?environment=...` link, your project's page
+  (`https://claude.ai/code/project/...`) if you named one in the settings, `https://claude.ai/settings/connectors`,
   the plans page from "See plans", the university's own pages from the welcome page's three needs
   ("How to get one" for the grid account, "How to set it up" for GlobalProtect) and from the
   GlobalProtect screen, each only when chosen, and, from the *Ask for access* button, the
@@ -258,7 +260,7 @@ HOW IT WORKS
 2. Turn on your university's VPN (at Wayne State, GlobalProtect) and type your AccessID and password into Beethoven's sign-in sheet; Beethoven signs in to your Open OnDemand portal for you, in the background. You can choose the browser's own sign-in box in a portal tab instead, which Beethoven never reads. While the grid is out of reach, the panel says "Turn on GlobalProtect." with a link to your university's own page about it, and carries on by itself as soon as the grid answers; a Connect pressed in the meantime is kept, not dropped. Nothing is installed outside the browser.
 3. Where your work goes: read the four lines, tick, Connect. Sign in to Claude once, when the panel asks: it opens Anthropic's sign-in page in a new tab; you sign in with your own account and paste the code the page shows into the panel's one box. The code is typed once into your own job's terminal and is not kept.
 
-When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off), and the panel's "Open my session" opens it again. The worker stays on by itself until you press Stop.
+When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off), and the panel's "Open my session" opens it again; if you work in a project on claude.ai, name its address in the settings and Beethoven opens your project instead, with "Open my project". The worker stays on by itself until you press Stop.
 
 WHAT IT NEVER DOES
 - It has no site permission on claude.ai or any Anthropic page and never asks for one: it runs no code there, reads nothing there and changes nothing there. It only opens those pages in a new tab, as a bookmark would; an address on claude.ai, claude.com or anthropic.com is refused as a portal before any permission request.

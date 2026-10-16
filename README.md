@@ -129,10 +129,11 @@ button is *Ask for access*):
    itself, once for each new session link in this browser; after that, and on every later click on
    the icon, the panel shows the green *Open my session* button (with *Copy link* beside it), which
    opens it again. If you work in a project on claude.ai, give Beethoven its address once, in
-   Settings: the tab that opens is then your project, the button reads *Open my project*, and under
-   it the panel says what to do there (choose *Work locally* from the + menu, write the task, press
-   *Allow once* on the card), because a project cannot take a session your worker started by itself;
-   *New session*, *Copy link* and *Phone* keep the worker's own link.
+   Settings: the tab that opens when it connects, while that is on, is then your project, the button
+   reads *Open my project*, and under it the panel says what to do there (choose *Work locally* from
+   the + menu, write the task, press *Allow once* on the card), because a project cannot take a
+   session your worker started by itself; *New session*, *Copy link* and *Phone* keep the worker's
+   own link.
 
 The paste stays because that is where Anthropic's rule puts the line: the sign-in must complete
 through Anthropic's own flow, so the extension opens the page and takes the code from you, and never

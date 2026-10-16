@@ -46,6 +46,8 @@ function secondary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
     'div',
     { class: 'home-secondary' },
     s.newSession ? button({ ...s.newSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }) : null,
+    // 21.0.0: Open my session as an outline button while the project holds the primary and no new session can start
+    s.openSession ? button({ ...s.openSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }) : null,
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.copy(link, WORDS.home.linkCopied) }, el('span', { class: 'btn-label', text: s.copyLink })),
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.setPhone(true) }, el('span', { class: 'btn-label', text: s.phone })),
   );

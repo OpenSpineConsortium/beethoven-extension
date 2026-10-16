@@ -83,7 +83,7 @@ HOW IT WORKS
 1. Accept the agreement on Beethoven's welcome page.
 2. Turn on GlobalProtect, then type your AccessID and password into Beethoven's sign-in sheet. Beethoven signs in to the grid for you, in the background.
 3. Sign in to Claude once, on Anthropic's own page.
-4. Click Open my session. Your worker runs until you press Stop.
+4. Click Open my session, or Open my project once you named your project in the settings. Your worker runs until you press Stop.
 
 If the grid is out of reach, Beethoven waits and carries on by itself as soon as GlobalProtect is on. Nothing is installed outside Chrome.
 

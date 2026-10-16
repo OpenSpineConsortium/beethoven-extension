@@ -92,11 +92,16 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
     render();
   };
   const pref = (prefs: Extract<Action, { kind: 'set-pref' }>['prefs']) => void opts.act({ kind: 'set-pref', prefs });
-  // 21.0.0: the project's address is kept only in a project's form; a refused one stays in the field with the reason
+  // 21.0.0: the project's address is kept only in a project's form; a refused one stays in the field with the reason.
+  // The field's elements are looked up in the page the panel is drawn in (root's document), never the global one,
+  // so a caret sent after the field has closed finds the row's button in the browser and in a test alike.
+  const byId = <T extends HTMLElement>(id: string): T | null => root.ownerDocument.getElementById(id) as T | null;
   const useProject = (value: string) => {
     void opts.act({ kind: 'set-pref', prefs: { project_url: value } }).then((r) => {
-      if (r?.saved) set({ projectEditing: false, projectValue: undefined, projectError: undefined });
-      else set({ projectValue: value, projectError: WORDS.settings.projectBad });
+      if (r?.saved) {
+        set({ projectEditing: false, projectValue: undefined, projectError: undefined });
+        setTimeout(() => byId('project-change')?.focus(), 0);
+      } else set({ projectValue: value, projectError: WORDS.settings.projectBad });
     });
   };
 
@@ -191,11 +196,13 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         )
       : el('div', { class: 's-row' }, el('span', { class: 's-label', text: WORDS.statement.workerName(w.name) }), el('button', { type: 'button', class: 'btn btn-outline', text: v.grid.change, onClick: () => { set({ nameEditing: true }); setTimeout(() => (document.getElementById('worker-name') as HTMLInputElement | null)?.focus(), 0); } }));
     // 21.0.0: the project on claude.ai that Open my project and the tab opened when the worker is ready go to
-    const editProject = () => { set({ projectEditing: true, projectValue: w.project ?? '', projectError: undefined }); setTimeout(() => (document.getElementById('project-url') as HTMLInputElement | null)?.focus(), 0); };
+    const editProject = () => { set({ projectEditing: true, projectValue: w.project ?? '', projectError: undefined }); setTimeout(() => byId<HTMLInputElement>('project-url')?.focus(), 0); };
+    // the field closed by Escape or Enter: focus back on the row's button, not lost to the page
+    const closeProject = () => { set({ projectEditing: false, projectValue: undefined, projectError: undefined }); setTimeout(() => byId('project-change')?.focus(), 0); };
     const projectRow = local.projectEditing
       ? el(
           'div',
-          { class: 's-row stack' },
+          { class: 's-row stack', key: 'project' },
           el(
             'div',
             { class: 'field-row' },
@@ -217,28 +224,28 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
               },
               onKeydown: (e: Event) => {
                 const k = e as KeyboardEvent;
-                if (k.key === 'Escape') set({ projectEditing: false, projectValue: undefined, projectError: undefined });
+                if (k.key === 'Escape') closeProject();
                 if (k.key === 'Enter') {
                   k.preventDefault();
                   useProject((k.currentTarget as HTMLInputElement).value);
                 }
               },
             }),
-            el('button', { type: 'button', class: 'btn btn-ink', text: WORDS.settings.projectUse, onClick: () => useProject((document.getElementById('project-url') as HTMLInputElement | null)?.value ?? local.projectValue ?? '') }),
+            el('button', { type: 'button', class: 'btn btn-ink', text: WORDS.settings.projectUse, onClick: () => useProject(byId<HTMLInputElement>('project-url')?.value ?? local.projectValue ?? '') }),
           ),
-          local.projectError ? el('p', { class: 'field-error', id: 'project-url-error', role: 'alert', text: local.projectError }) : el('p', { class: 'fine', text: WORDS.settings.projectNote }),
+          local.projectError ? el('p', { class: 'field-error', id: 'project-url-error', key: 'project-error', role: 'alert', text: local.projectError }) : el('p', { class: 'fine', key: 'project-note', text: WORDS.settings.projectNote }),
         )
       : w.project
         ? el(
             'div',
-            { class: 's-row' },
+            { class: 's-row', key: 'project' },
             el('span', { class: 's-label' }, el('span', { class: 'mono', text: w.project }), el('span', { class: 's-sub', text: WORDS.settings.projectNote })),
             el('div', { class: 'btns' },
-              el('button', { type: 'button', class: 'btn btn-outline', text: v.grid.change, onClick: editProject }),
+              el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: v.grid.change, onClick: editProject }),
               el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.projectClear, onClick: () => pref({ project_url: '' }) }),
             ),
           )
-        : el('div', { class: 's-row' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.projectAdd, onClick: editProject }));
+        : el('div', { class: 's-row', key: 'project' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: WORDS.settings.projectAdd, onClick: editProject }));
     const next = el(
       'main',
       { class: 'settings' },

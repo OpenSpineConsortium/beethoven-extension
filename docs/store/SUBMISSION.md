@@ -28,7 +28,10 @@ visibility changes from Private to Public. 21.0.0 (2026-10-16) changes no permis
 type: Settings takes the address of a project of yours on claude.ai, kept with the other
 preferences, and the page opened when the worker is ready is then the project's page, which a plain
 session cannot be made part of; the agreement is version 15 and the privacy statement version 16.
-Beethoven is offered in one place only: one item on the
+The site's privacy.html and terms.html, built from this repository's texts, show versions 16 and 15
+before any upload of 21.0.0, as the gates below say: the listing's privacy policy link points at that
+page, and `release.yml` uploads every push to `main` once `CWS_ON_PUSH` is set. Beethoven is
+offered in one place only: one item on the
 Chrome Web Store, Public since 20.0.0; from 8.0.0 to 19.0.0 it was a Private item visible to the
 trusted testers the maintainer named, a Google Group he kept with his personal Google account and to
 which he added each student he approved for Beethoven. No other store, no download from the website
@@ -123,7 +126,7 @@ Have these in hand, and check each once:
    The listing's address (`https://chromewebstore.google.com/detail/<item-id>`, item 4) goes into
    the site generator's `BROWSERS` first, so the card has its button before students are sent to it.
    `docs/PUBLISHING_SITE.md` builds and checks them. **The upload waits until
-   https://openspineconsortium.com/beethoven/privacy.html shows version 15**: 19.0.0's Authentication
+   https://openspineconsortium.com/beethoven/privacy.html shows version 16**: 19.0.0's Authentication
    information answer and its two permissions rest on that text, 20.0.0's installation rule and its
    public listing too, and the reviewers page
    (`/beethoven/reviewers.html`) must carry `LISTING.md`'s negative-statement block word for word.
@@ -214,7 +217,7 @@ The item (about thirty minutes):
    using remote code?" No; Data usage: tick "Personally identifiable information" and
    "Authentication information", each with its sentence from `PASTE.md`, and leave every other
    category unticked; tick the three certifications; Privacy policy URL
-   `https://openspineconsortium.com/beethoven/privacy.html` (version 15 live). Save draft.
+   `https://openspineconsortium.com/beethoven/privacy.html` (version 16 live). Save draft.
 7. **Distribution** tab: Payments Free; Visibility **Public** (decided 2026-10-13 for 20.0.0; the
    item was Private from its first submission to 19.0.0, with the Beethoven-users group as its
    trusted testers, which stays empty from now on). Regions: United States only, which is why the
