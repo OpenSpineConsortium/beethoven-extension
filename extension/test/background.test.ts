@@ -203,6 +203,33 @@ describe('the background, run whole', () => {
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
   }, 40_000);
 
+  it("21.0.0: the project's tab Beethoven opened before the worker was ready is brought forward when the worker is ready, never a second one", async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    const created = () => world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT)).length;
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { project_url: PROJECT } } })).toMatchObject({ ok: true, value: { saved: true } });
+    expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: false, opened: true } });
+    expect(created()).toBe(1);
+    const tab = (world.storage.session['bridge.projectTab'] as { tabId: number }).tabId;
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    const at = new Date().toISOString();
+    const before = world.log.length;
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, environment_url: LINK, environment_id: 'env_01XzAN32jsbL8W1PAFSvitBt' }));
+    await sleep(8_000);
+    clearInterval(ticker);
+    expect(created()).toBe(1);
+    expect(world.log.slice(before).some((l) => l.endsWith(`tabs.update #${tab} active`))).toBe(true);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(0);
+  }, 40_000);
+
   it('21.0.0: a project named with "Open Claude when my worker is ready" off: nothing opens when the worker is ready; Open my project opens it on request', async () => {
     await boot(world);
     world.opts.claudeSignedIn = true;

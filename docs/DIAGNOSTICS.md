@@ -22,7 +22,7 @@ A click on the toolbar icon (or the portal tab connecting, when the automatic st
 the strip, whose decision function (`decide` in `extension/src/core/steps.ts`) picks the first step
 not yet satisfied from facts gathered by reads only (`gatherFacts` in `core/facts.ts`;
 `ARCHITECTURE.md` 6.1). Each step is idempotent: on a cluster where everything is already in place the
-strip goes straight to *Open in Claude*. The student reads the title and the status line; the
+strip goes straight to *Open my session*. The student reads the title and the status line; the
 engineer's test is in the third column.
 
 | # | id | Title the student reads | What it does | Stops, and the student sees |
@@ -95,9 +95,10 @@ tail, the audit log (view, export, clear), the access and agreement line, the se
 Drive step. A student never sees close codes, endpoint paths, environment variable names or module
 lists; those go to the log the student can open and export.
 
-Three things in the same panel are not checks. The green *Open in Claude* button appears when the
+Three things in the same panel are not checks. The green *Open my session* button appears when the
 files carry the session's claude.ai link and opens it in a new tab (with *Copy link* beside it); the
-strip opens that tab once by itself unless the student turned the setting off. The setting *start my
+strip opens that tab once by itself unless the student turned the setting off. Since 21.0.0, with a
+project named in Settings, *Open my project* takes its place and the project's page is the tab. The setting *start my
 worker when I open my portal* runs the same steps when the portal tab connects, and is explained in one
 sentence where it is switched (on by default in the current build; the maintainer's review settles
 which ships). The optional step *Connect Google Drive in claude.ai* opens

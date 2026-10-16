@@ -986,6 +986,8 @@ function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
   const H = WORDS.home;
   const link = f.run.link ?? f.lastKnown?.environment_url;
   const open: HomePrimary = openClaude(f);
+  // 21.0.0: the project's page needs no worker link, so a link that looks wrong takes away only Open my session
+  const canOpen = !!link || open.kind === 'open-project';
   const connect: HomePrimary = { kind: 'connect', button: button(f.press?.kind === 'connect' ? WORDS.statement.connectingWhenReady : H.connect, 'ink', { kind: 'connect' }, f.press?.kind === 'connect' ? { busy: true } : {}), reminder: H.connectReminder };
   // R12 for a run found already in the folder and never seen alive here (RunFacts.neverSeenAlive): Connect, whatever
   // its last known state says, online and needs-you included (after a browser restart the run record counts as
@@ -996,7 +998,7 @@ function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
   switch (hero.state) {
     case 'online':
     case 'online-new':
-      return link ? open : undefined;
+      return canOpen ? open : undefined;
     case 'needs-claude':
       return { kind: 'sign-in-claude', button: button(H.signInClaude, 'ink', { kind: 'sign-in-claude' }) };
     case 'needs-consent':
@@ -1007,7 +1009,7 @@ function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
     case 'unknown':
       return connect;
     case 'unreachable':
-      return f.lastKnown?.state === 'online' && link ? open : connect;
+      return f.lastKnown?.state === 'online' && canOpen ? open : connect;
     default:
       // asked, in line, starting or renewing: none (the stale found run's Connect is above)
       return undefined;

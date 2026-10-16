@@ -470,7 +470,7 @@ export const FIXTURES: Fixture[] = [
   { name: 'j-online', surface: 'panel', note: 'You’re online. (one 600 ms ring burst)', view: journey(onlineMoment(), { toolbar: { title: WORDS.toolbar.online, lit: true } }) },
   { name: 'j-online-pin', surface: 'panel', note: 'the one-time pin tip', view: journey(onlineMoment({ pinTip: { text: WORDS.online.pinTip, done: false } })) },
   { name: 'j-online-pinned', surface: 'panel', note: 'the pin tip, done by itself', view: journey(onlineMoment({ pinTip: { text: WORDS.online.pinned, done: true } })) },
-  { name: 'j-online-project', surface: 'panel', note: '21.0.0: You\u2019re online, with a project named: Open my project and what to do there under it (measured at 360 x 658, 560 and 500: the sentence takes two lines, the press moves up 58 px, both in view)', view: journey(onlineMoment({ primary: teal(WORDS.home.openProject, { kind: 'open-project' }), how: WORDS.home.projectHow })) },
+  { name: 'j-online-project', surface: 'panel', note: '21.0.0: You\u2019re online, with a project named: Open my project and what to do there under it (measured at 360 x 658, 560 and 500: the sentence takes two lines, 10 px under the press as on the home, the press moves up 48 px, both in view)', view: journey(onlineMoment({ primary: teal(WORDS.home.openProject, { kind: 'open-project' }), how: WORDS.home.projectHow })) },
   { name: 'j-online-bad-link', surface: 'panel', note: 'the link is not an environment link', view: journey(onlineMoment({ sub: WORDS.online.badLink(TITLE), primary: { ...teal(WORDS.online.open, { kind: 'open-session' }), disabled: true } })) },
 
   // the home: the waiting table

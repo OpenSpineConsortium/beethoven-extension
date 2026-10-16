@@ -122,12 +122,13 @@ function tryAsking(h: HomeView, ctx: HomeCtx): HTMLElement | null {
 
 function cards(h: HomeView, ctx: HomeCtx): Array<HTMLElement> {
   return h.cards.map((c) => {
-    // 21.0.0: the project tip, with Settings behind its one button
+    // 21.0.0: the project tip, with Settings behind its one button; a folder, not the pin tip's pin, since it takes the
+    // pin tip's place once that one is done
     if (c.id === 'project-tip')
       return el(
         'div',
         { class: 'once', key: c.id },
-        icon('pin', 18),
+        icon('folder', 18),
         el('p', { text: c.text }),
         c.open ? el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.home.menu.settings, onClick: () => c.open && ctx.onAct(c.open) }) : null,
         el('button', { type: 'button', class: 'btn btn-icon bare', 'aria-label': LABELS.dismiss, onClick: () => ctx.onAct(c.dismiss) }, icon('close', 15)),

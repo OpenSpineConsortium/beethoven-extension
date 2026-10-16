@@ -506,15 +506,23 @@ describe('home: the waiting and status table, one primary or none', () => {
       expect(moment.how).toBe('In your project, choose Work locally from the + menu, write the task, and press Allow once on the card.');
     }
     const plain = journey(facts({ run: online }), 'online');
+    expect(plain.moment).toBe('online');
     if (plain.moment === 'online') {
       expect(plain.primary).toEqual({ label: 'Open my session', tone: 'teal', action: { kind: 'open-session' } });
       expect(plain.how).toBeUndefined();
     }
     // a link that looks wrong disables Open my session, which has nothing to open; the project's page opens regardless
     const badPlain = journey(facts({ run: run({ phase: 'online', badLink: true }) }), 'online');
+    expect(badPlain.moment).toBe('online');
     if (badPlain.moment === 'online') expect(badPlain.primary.disabled).toBe(true);
     const badProject = journey(facts({ run: run({ phase: 'online', badLink: true }), prefs: { ...DEFAULT_PREFS, project_url: PROJECT } }), 'online');
+    expect(badProject.moment).toBe('online');
     if (badProject.moment === 'online') expect(badProject.primary).toEqual({ label: 'Open my project', tone: 'teal', action: { kind: 'open-project' } });
+    // and the home after it keeps the project's button; Copy link and Phone, which need the worker's link, stay away
+    const badHome = hv({ run: run({ phase: 'online', badLink: true }), tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } });
+    expect(badHome.primary?.kind).toBe('open-project');
+    expect(badHome.secondary).toBeUndefined();
+    expect(hv({ run: run({ phase: 'online', badLink: true }), tourSeen: seen }).primary).toBeUndefined();
     // a resumed session's own link offers no New session, so Open my session moves to the secondary row while the project holds the primary
     const SESSION = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
     const resumed = hv({ run: run({ phase: 'online', link: SESSION }), tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } });

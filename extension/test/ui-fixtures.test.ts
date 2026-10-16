@@ -646,7 +646,7 @@ describe('the pages of 19.0.0, drawn', () => {
     root.remove();
   });
 
-  it("21.0.0: Settings' project field: Add opens it, a refused address stays typed with the reason, a project's closes it, Escape closes it, Clear sends an empty one", async () => {
+  it("21.0.0: Settings' project field: Add opens it, a refused address stays typed with the reason, a project's closes it, Escape closes it, Clear sends an empty one, and the caret stays on the row's button", async () => {
     const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
     const f = fixture('settings');
     if (f?.surface !== 'settings') throw new Error('no fixture');
@@ -668,6 +668,15 @@ describe('the pages of 19.0.0, drawn', () => {
     expect(row().textContent).toContain(WORDS.settings.projectNone);
     fire(row().querySelector('#project-change')!, 'click');
     expect(field()?.getAttribute('placeholder')).toBe('https://claude.ai/code/project/...');
+    // no answer from the background (its message failed): the field stays as typed, with no reason under it
+    field()!.value = PROJECT;
+    fire(field()!, 'input');
+    fire(field()!, 'keydown', { key: 'Enter' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(field()?.value).toBe(PROJECT);
+    expect(field()?.getAttribute('aria-invalid')).toBeNull();
+    expect(live(root, '#project-url-error')).toBeUndefined();
     // a session's link: the background refuses it; it stays in the field, with the reason, for the next try
     const SESSION_LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
     answers.push({ saved: false });
@@ -691,13 +700,29 @@ describe('the pages of 19.0.0, drawn', () => {
     await Promise.resolve();
     expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { project_url: PROJECT } });
     expect(field()).toBeUndefined();
-    // the background's next view names it: the address, Change and Clear; Clear sends an empty address
+    // the caret goes to the row's button (Add, in the view drawn before the background's next one)
+    await new Promise((r) => setTimeout(r, 0));
+    const caret = focused.at(-1);
+    expect(caret?.id).toBe('project-change');
+    expect(caret?.textContent).toBe(WORDS.settings.projectAdd);
+    // the background's next view names it: the address, Change and Clear; the caret's button is the one that stays, as Change
     const named = fixture('settings-project');
     if (named?.surface !== 'settings') throw new Error('no fixture');
     page.show(named.view);
     expect(row().querySelector('.mono')?.textContent).toBe(PROJECT);
+    expect(caret?.isConnected).toBe(true);
+    expect(live(root, '#project-change')).toBe(caret);
+    // Clear sends an empty address, and the caret goes to the row's first button first, which stays, as Add, once the
+    // next view names none
     fire(Array.from(row().querySelectorAll('button')).find((b) => b.textContent === WORDS.settings.projectClear)!, 'click');
     expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { project_url: '' } });
+    expect(focused.at(-1)).toBe(caret);
+    page.show(f.view);
+    expect(row().textContent).toContain(WORDS.settings.projectNone);
+    expect(caret?.isConnected).toBe(true);
+    expect(live(root, '#project-change')).toBe(caret);
+    expect(caret?.textContent).toBe(WORDS.settings.projectAdd);
+    page.show(named.view);
     // Change opens the field with the address in it; Escape closes it with no word to the background
     const before = acts.length;
     fire(row().querySelector('#project-change')!, 'click');

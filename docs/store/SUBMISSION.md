@@ -117,8 +117,8 @@ Have these in hand, and check each once:
    until a 20.0.0 video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a
    one-line check). Look at each one before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
-   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 15), `.../beethoven/terms.html`
-   (the text of `LICENSE.txt` version 14), `.../beethoven/support.html` and
+   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 16), `.../beethoven/terms.html`
+   (the text of `LICENSE.txt` version 15), `.../beethoven/support.html` and
    `.../beethoven/request.html` (which must fill its AccessID field from `?access_id=<account>`,
    since the panel's *Ask for access* button opens it that way, and which no longer asks for a
    Google account). The pages show one install card, Chrome, linking the listing, and no download and
@@ -253,9 +253,9 @@ updated from one of them loses the `nativeMessaging` permission without a prompt
 direct way left in the browser on its first run, and notes once in Settings a key an earlier version
 added to the grid account). An update to 19.0.0 adds `webRequest` and `webRequestAuthProvider`,
 neither of which shows a line in Chrome's install dialog, so Chrome does not disable the installed
-copy or ask the student anything; an update to 20.0.0 changes no permission at all. The changed
-agreement (version 14) is shown again on the first run and accepted again before Beethoven does
-anything.
+copy or ask the student anything; an update to 20.0.0 or 21.0.0 changes no permission at all. The
+changed agreement (version 15 since 21.0.0) is shown again on the first run and accepted again
+before Beethoven does anything.
 
 ## 2. The deploy order with the access service
 

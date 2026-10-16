@@ -117,16 +117,20 @@ name and identifier carry no university name.
   only): everything the check sends and the service keeps is written in `LICENSE.txt` section 3(e)
   and 10 and in `PRIVACY.md`. It is a check in the client, not a proof, and no text may claim more.
 - **The project's page before a plain session (decided 2026-10-16, 21.0.0).** A Claude project
-  (`https://claude.ai/code/project/<id>`) cannot take a session the worker started by itself: it
-  reaches the worker's folder only when the student asks for the work in the project (*Work locally*
-  from the + menu) and allows the folder on the card (greg, 2026-10-15: the extension "opens a worker
-  in claude code but projects can only be opened in" the project). So Settings takes the project's
+  (`https://claude.ai/code/project/<id>`, or the same on `claude.com`) cannot take a session the
+  worker started by itself: it reaches the worker's folder only when the student asks for the work
+  in the project (*Work locally* from the + menu) and allows the folder on the card (greg,
+  2026-10-15: the extension "opens a worker in claude code but projects can only be opened in" the
+  project). So Settings takes the project's
   address (`Prefs.project_url`, kept in one form by `projectLinkOf` in `core/contract.ts`, cleared by
-  an empty one), and with one named the home's primary is *Open my project* with that sentence under
-  it, the tab opened when a worker the student started comes online is the project's page, the
-  recorded claude.ai tab is brought forward only for the address it was opened for, and *New
-  session*, *Copy link* and *Phone* keep the worker's link; while none is named, a one-time card
-  after the tour card points at Settings. hpcworker is unchanged. Agreement 15, privacy 16.
+  an empty one), and with one named the primary of the home and of the "You're online." moment is
+  *Open my project* with that sentence under it, whatever the worker's link looks like; the tab
+  opened when a worker the student started comes online is the project's page; the worker's link and
+  the project's page each keep a claude.ai tab record of their own (`CLAUDE_TAB_KEY`,
+  `PROJECT_TAB_KEY`), so each is brought forward rather than opened twice; and *New session*, *Copy
+  link* and *Phone* keep the worker's link, with an outline *Open my session* where no new session
+  can start. While none is named, a one-time card after the tour card points at Settings. hpcworker
+  is unchanged. Agreement 15, privacy 16.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the

@@ -3894,10 +3894,13 @@ async function afterRead(): Promise<void> {
   }
   if (gotComputer) await activity(LOG_WORDS.gotComputer);
   if (online) {
-    dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? (isProjectUrl(open) ? '; opening the project in a new tab' : '; opening it in a new tab') : ''}`);
+    dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? (isProjectUrl(open) ? "; opening the project, or bringing forward the project's tab Beethoven opened" : '; opening it in a new tab') : ''}`);
     await once({ first_online_at: nowIso() });
     await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? (await welcomeSite())))?.session_title, prefs.worker_name)));
-    if (open) await openSessionTab(open);
+    // 21.0.0: the project's page is the same page every time, so the tab Beethoven opened for it is brought forward
+    // while it has had no new load since, as Open my project does, never a second one; the worker's link is a new
+    // page with each new link, so it opens in a tab of its own as before
+    if (open) await (isProjectUrl(open) ? focusOrOpen(open, 'the worker is online') : openSessionTab(open));
     await releaseKeptTab();
     setTimeout(() => schedulePush(), 4_100);
   }

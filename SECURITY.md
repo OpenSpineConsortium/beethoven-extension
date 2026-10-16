@@ -82,7 +82,7 @@ The other adversaries considered:
   connects must match `https://claude.ai/code?environment=env_...` (or, since 14.0.0, a session's
   `https://claude.ai/code/session_...`) exactly; anything else is shown as text. Since 21.0.0 the
   project page the student named in Settings, kept in the one shape `https://claude.ai/code/project/<id>`
-  and refused otherwise, opens in that link's place.
+  (or the same on `claude.com`) and refused otherwise, opens in that link's place.
 - Another portal user. The Open OnDemand `/rnode/` proxy does no job or ownership lookup: any
   authenticated portal user can reach any port on a matching host. The worker therefore trusts nothing
   the proxy adds (`X-Forwarded-User`, `Authorization`, the OIDC cookie) and requires its own per-job

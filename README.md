@@ -251,7 +251,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 20.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 21.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -271,12 +271,15 @@ itself with the AccessID and password typed into its own sheet, saves the passwo
 only when the student ticks *Remember it on this computer*, and keeps Chrome's sign-in box as the
 other way; 20.0.0 approves an account from every installation of its own, the service keeping the
 ten most recent and e-mailing the maintainer of a new one with a link to withdraw and none to move,
-where 8.0.0 to 19.0.0 bound an account to one installation; `release/<version>/README.md` lists a
+where 8.0.0 to 19.0.0 bound an account to one installation; 21.0.0 takes the address of the
+student's project on claude.ai in Settings and opens that project, with what to do there, in place
+of a plain session, since a project reaches the worker only through its own *Work locally*;
+`release/<version>/README.md` lists a
 version's changes, up to 14.0.0); the framework is the server repository's,
 `OpenSpineConsortium/hpcworker`, and the lab's shared copy at Wayne State is the version its
 `tools/deploy_shared.sh` last published (the panel shows it under *Details*); the agreement
-`LICENSE.txt` is version 14 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
-14 to match; `PRIVACY.md` is version 15. All integers; a changed text moves its version with it.
+`LICENSE.txt` is version 15 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
+15 to match; `PRIVACY.md` is version 16. All integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -421,8 +424,8 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 14; the extension's
-  `TERMS_VERSION` is 14) and the privacy statement (version 15).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 15; the extension's
+  `TERMS_VERSION` is 15) and the privacy statement (version 16).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

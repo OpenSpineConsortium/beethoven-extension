@@ -372,9 +372,9 @@ and when it is kept).
 | Terms (in the reviewed description) | `https://openspineconsortium.com/beethoven/terms.html` |
 
 The six addresses answered 200 on 2026-09-30 (curl from WSL); they were not fetched again for 12.0.0,
-15.0.0, 16.0.0, 19.0.0 or 20.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 14
-and `PRIVACY.md` version 15 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
-https://openspineconsortium.com/beethoven/privacy.html shows version 15.
+15.0.0, 16.0.0, 19.0.0, 20.0.0 or 21.0.0. `terms.html` and `privacy.html` must be regenerated from `LICENSE.txt` version 15
+and `PRIVACY.md` version 16 before submission (`docs/PUBLISHING_SITE.md`), and the upload waits until
+https://openspineconsortium.com/beethoven/privacy.html shows version 16.
 
 ## Images and the promo video
 

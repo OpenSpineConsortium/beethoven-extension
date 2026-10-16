@@ -96,12 +96,15 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
   // The field's elements are looked up in the page the panel is drawn in (root's document), never the global one,
   // so a caret sent after the field has closed finds the row's button in the browser and in a test alike.
   const byId = <T extends HTMLElement>(id: string): T | null => root.ownerDocument.getElementById(id) as T | null;
+  // No answer at all (the message to the background failed) says nothing about the address: the field stays as typed,
+  // with no reason under it, for the next press of Use.
   const useProject = (value: string) => {
     void opts.act({ kind: 'set-pref', prefs: { project_url: value } }).then((r) => {
       if (r?.saved) {
         set({ projectEditing: false, projectValue: undefined, projectError: undefined });
         setTimeout(() => byId('project-change')?.focus(), 0);
-      } else set({ projectValue: value, projectError: WORDS.settings.projectBad });
+      } else if (r?.saved === false) set({ projectValue: value, projectError: WORDS.settings.projectBad });
+      else set({ projectValue: value });
     });
   };
 
@@ -242,10 +245,13 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
             el('span', { class: 's-label' }, el('span', { class: 'mono', text: w.project }), el('span', { class: 's-sub', text: WORDS.settings.projectNote })),
             el('div', { class: 'btns' },
               el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: v.grid.change, onClick: editProject }),
-              el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.projectClear, onClick: () => pref({ project_url: '' }) }),
+              // the caret goes to the row's first button before the row is redrawn: that button stays, as Add, and Clear goes
+              el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.projectClear, onClick: () => { byId('project-change')?.focus(); pref({ project_url: '' }); } }),
             ),
           )
-        : el('div', { class: 's-row', key: 'project' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: WORDS.settings.projectAdd, onClick: editProject }));
+        : // Add sits where Change will be, in the same group, so the redraw that names the project keeps the very button
+          // the caret is on (the morph pairs children by tag and place)
+          el('div', { class: 's-row', key: 'project' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('div', { class: 'btns' }, el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: WORDS.settings.projectAdd, onClick: editProject })));
     const next = el(
       'main',
       { class: 'settings' },

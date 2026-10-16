@@ -125,13 +125,14 @@ click of the icon after the approval re-checks.
    sitting and forgotten; Claude Code keeps the credential in `$HOME/.beethoven/claude`; the sitting
    ends by itself within ten minutes. The worker is then started, registers, and the claude.ai tab
    opens by itself, once per new session link in this browser (the setting *open claude.ai when my
-   worker connects* is on unless the student turns it off; the green *Open in Claude* button stays
+   worker connects* is on unless the student turns it off; the green *Open my session* button, *Open
+   in Claude* until 14.0.0 and *Open my project* with a project named in Settings since 21.0.0, stays
    either way). A student whose sign-in still holds sees this step end at once with no page to open.
 
 From then on the worker is always on: before its wall time ends the job queues one successor
 (`sbatch --dependency=afterany:<its own id>,singleton` of the same job file, never more than one), and
 the successor reconnects the same session. A later click on the icon, with the worker alive, brings
-up the panel at *Open in Claude*, whose green button opens the claude.ai tab again (*Copy link*
+up the panel at *Open my session*, whose green button opens the claude.ai tab again (*Copy link*
 beside it); the tab opens by itself only once per new link in this browser. *Stop* under *Details*
 writes the stop file that ends the chain and cancels the job. Settings (shell host, site profile, permission mode, the two automatic behaviours,
 error reports) are on the extension's options page, not in the panel. The optional step *Connect

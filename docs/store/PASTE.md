@@ -7,7 +7,7 @@ the reasons behind them are in `LISTING.md`; registration, the testers' group an
 `SUBMISSION.md`. Written 2026-09-30 for 9.0.0, brought up to date for 10.0.0 on 2026-10-01,
 rewritten on 2026-10-02 for 12.0.0 (11.0.0 was built and never submitted; its changes are carried
 here too: the welcome page, no `activeTab`, the window-wide panel), brought up to date on 2026-10-04
-for 15.0.0, on 2026-10-08 for 16.0.0, on 2026-10-09 for 19.0.0, on 2026-10-11 for 20.0.0, and on 2026-10-13 for 20.0.0's public listing (agreement version 14, privacy statement version 15; Visibility Public). 12.0.0 added the `nativeMessaging` permission, the
+for 15.0.0, on 2026-10-08 for 16.0.0, on 2026-10-09 for 19.0.0, on 2026-10-11 for 20.0.0, and on 2026-10-13 for 20.0.0's public listing (agreement version 14, privacy statement version 15; Visibility Public), and on 2026-10-16 for 21.0.0 (the project's page among the pages Beethoven opens; agreement version 15, privacy statement version 16). 12.0.0 added the `nativeMessaging` permission, the
 helper's installers inside the package, and the Authentication information data type; 15.0.0 added
 the signed installers of the helper for Windows and macOS. 16.0.0 removes all of it with the direct
 way: no `nativeMessaging`, no helper, no installer, and Authentication information unticked again,
