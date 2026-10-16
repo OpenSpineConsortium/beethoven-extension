@@ -127,8 +127,12 @@ button is *Ask for access*):
    shows into the one box in the extension's panel. The code is typed once into the sign-in sitting
    running on a compute node and is not kept. When your worker connects, the claude.ai tab opens by
    itself, once for each new session link in this browser; after that, and on every later click on
-   the icon, the panel shows the green *Open in Claude* button (with *Copy link* beside it), which
-   opens it again.
+   the icon, the panel shows the green *Open my session* button (with *Copy link* beside it), which
+   opens it again. If you work in a project on claude.ai, give Beethoven its address once, in
+   Settings: the tab that opens is then your project, the button reads *Open my project*, and under
+   it the panel says what to do there (choose *Work locally* from the + menu, write the task, press
+   *Allow once* on the card), because a project cannot take a session your worker started by itself;
+   *New session*, *Copy link* and *Phone* keep the worker's own link.
 
 The paste stays because that is where Anthropic's rule puts the line: the sign-in must complete
 through Anthropic's own flow, so the extension opens the page and takes the code from you, and never
@@ -137,8 +141,8 @@ through, no `y` to type at Claude Code's one-time Remote Control question (the p
 answer in the same statement, records it in your cluster account, and your worker gives it to Claude
 Code when asked) and no terminal to break out of: the sitting ends itself when Claude Code says it is
 signed in. The settings that exist (shell host, site profile, permission mode, *start my worker when I
-open my portal* and *open claude.ai when my worker connects*, both on by default in the current build)
-live on the extension's options page, and the seventeen checks and the logs sit under
+open my portal* and *open claude.ai when my worker connects*, both on by default in the current build,
+and the address of your project on claude.ai, if you work in one) live on the extension's options page, and the seventeen checks and the logs sit under
 *Details* in the panel for the day something does not work.
 
 The optional step *Connect Google Drive in claude.ai* is still there: it opens
@@ -150,9 +154,10 @@ box kept only in the browser; the extension has no presence on that page.
 From the report's "deliberately absent" list and its security controls:
 
 - No code on claude.ai or any Anthropic page: no content script, no host permission, no `fetch`
-  patch, no forged responses. It opens exactly two kinds of page outside the portal, in a new tab,
-  as a bookmark would: the sign-in page Claude Code printed during the sitting you started, and your
-  session's `https://claude.ai/code?environment=...` link (plus the connectors page from the optional
+  patch, no forged responses. It opens exactly three kinds of page outside the portal, in a new tab,
+  as a bookmark would: the sign-in page Claude Code printed during the sitting you started, your
+  session's `https://claude.ai/code?environment=...` link, and, when you gave its address in Settings,
+  your project's `https://claude.ai/code/project/...` page (plus the connectors page from the optional
   step). It never reads those pages.
 - No handling of a Claude credential: no `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no reading of
   Claude Code's credentials file, no multi-account rotation. The student signs in through Anthropic's

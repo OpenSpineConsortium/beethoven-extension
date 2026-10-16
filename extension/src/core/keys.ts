@@ -2,7 +2,7 @@
 //
 // storage.local (survives restarts; nothing secret and no credential ever):
 export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site}
-export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect}
+export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect, project_url}
 export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {fetched_at, list}
 export const REVOKED_KEY = 'bridge.revoked'; //  {revoked, message}: what the chokepoint consults before a command
 export const ACCESS_KEY = 'bridge.access'; //    the access service's last word on this account at this portal (licensing/access.ts AccessRecord)
@@ -89,6 +89,15 @@ export interface Prefs {
   open_claude_on_connect: boolean;
   /** 11.0.0: Settings, "Appearance": "Cream" (cream, the default whatever the system says) / "Match system" (system). Optional so a 10.0.0 profile reads as cream. */
   appearance?: Appearance;
+  /**
+   * 21.0.0: Settings, "Your project on claude.ai": the project's address as contract.ts projectLinkOf keeps it
+   * (https://claude.ai/code/project/<id>); absent while none is named. A project cannot take a session the worker
+   * started by itself; it reaches the worker's folder when the student asks for the task there (Work locally) and
+   * allows the folder on the card. So with one named, the home's primary is "Open my project" and the tab opened
+   * when a worker the student started comes online is the project's page, in place of the worker's own link;
+   * New session, Copy link and Phone keep the worker's link.
+   */
+  project_url?: string;
   // 12.0.0 to 15.0.0 stored `connection: 'direct' | 'vpn'` here; 16.0.0 has one way, ignores a stored value and removes it on its first run (background.ts cleanupDirectWay).
 }
 
@@ -168,6 +177,8 @@ export interface OnceNotes {
   tour_auto_played_at?: string;
   /** "Start a new session there. It runs on your worker." was shown */
   new_session_tip_at?: string;
+  /** 21.0.0: the card offering Settings for a project's address, below the online home while none is named, was dismissed */
+  project_card_dismissed_at?: string;
 }
 
 /** SIGNIN_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY (session): a tab Beethoven opened or navigated itself, so it may bring it forward or close it */
@@ -176,6 +187,8 @@ export interface OpenedTab {
   windowId: number;
   /** the URL Beethoven loaded; the tab is closed only while tabs.get still shows it on this origin (and path, for the terminal) */
   url: string;
+  /** 21.0.0, claude.ai's tab: the exact address loaded (the worker's link or the project's page), so Open my session and Open my project bring forward only a tab opened for the same address */
+  link?: string;
   opened_at: string;
   /** "welcome": the welcome tab, navigated to the grid; "press": opened for a press; "session": claude.ai; "terminal": the grid's terminal (AM2); "anthropic": Anthropic's sign-in page (ANTHROPIC_TAB_KEY) */
   purpose: 'welcome' | 'press' | 'session' | 'terminal' | 'anthropic';

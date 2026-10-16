@@ -116,6 +116,17 @@ name and identifier carry no university name.
   device identifier, no fingerprinting, no obfuscation (Chrome forbids it; Vite's minification
   only): everything the check sends and the service keeps is written in `LICENSE.txt` section 3(e)
   and 10 and in `PRIVACY.md`. It is a check in the client, not a proof, and no text may claim more.
+- **The project's page before a plain session (decided 2026-10-16, 21.0.0).** A Claude project
+  (`https://claude.ai/code/project/<id>`) cannot take a session the worker started by itself: it
+  reaches the worker's folder only when the student asks for the work in the project (*Work locally*
+  from the + menu) and allows the folder on the card (greg, 2026-10-15: the extension "opens a worker
+  in claude code but projects can only be opened in" the project). So Settings takes the project's
+  address (`Prefs.project_url`, kept in one form by `projectLinkOf` in `core/contract.ts`, cleared by
+  an empty one), and with one named the home's primary is *Open my project* with that sentence under
+  it, the tab opened when a worker the student started comes online is the project's page, the
+  recorded claude.ai tab is brought forward only for the address it was opened for, and *New
+  session*, *Copy link* and *Phone* keep the worker's link; while none is named, a one-time card
+  after the tour card points at Settings. hpcworker is unchanged. Agreement 15, privacy 16.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
@@ -191,8 +202,11 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-13 and extension 20.0.0 `LICENSE.txt` is version 14 and `PRIVACY.md`
-  version 15, which describe the public listing (the head, sections 3(a), 3(e), 10(d) and 17: anyone
+  Edition; since 2026-10-16 and extension 21.0.0 `LICENSE.txt` is version 15 and `PRIVACY.md`
+  version 16, which add the project's page among the pages Beethoven opens and the project's
+  address among the preferences it keeps (the head and section 5(f) of the agreement; the
+  preferences row, the small-notes row, the page paragraph and Changes of the statement) on top of
+  version 14 and 15 (2026-10-13, 20.0.0), which describe the public listing (the head, sections 3(a), 3(e), 10(d) and 17: anyone
   can install it, the approval decides whether it works, the request page asks for no Google account
   and one given earlier stays in the record unused) on top of version 13 and 14 (2026-10-11, drafted
   for 20.0.0 and never shipped: the relaxed installation rule, sections 3(e) and 10: one person's
@@ -333,7 +347,7 @@ most one, ended by a stop file; the successor runs `claude remote-control --cont
 directory when `connection.json` is younger than seven days, else registers afresh in the same environment);
 `hpcworker claude login` is one sitting (`claude auth login`, then `claude remote-control` once in the
 workspace if `remoteDialogSeen` is not yet true; `claude consent` stays as an alias that explains);
-the panel's green *Open in Claude* button opens `environment_url` with `browser.tabs.create` (no
+the panel's green *Open in Claude* button (*Open my session* since 14.0.0; *Open my project* with a project named, 21.0.0) opens `environment_url` with `browser.tabs.create` (no
 `tabs` permission is needed for `create`) with *Copy link* beside it, and the link is opened by
 itself once per new link per browser when *open claude.ai when my worker connects* is on; the setting
 *start my worker when I open my portal* starts the worker when the portal tab connects and status is

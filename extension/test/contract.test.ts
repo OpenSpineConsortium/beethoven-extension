@@ -2,7 +2,7 @@
 // the discovery document, the stop file and restricted marker paths, and the registration block
 // `claude remote-control` prints, parsed the way the extension will meet them.
 import { describe, expect, it } from 'vitest';
-import { commands, expandPath, isClaudeCodeLink, isEnvironmentUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
+import { commands, expandPath, isClaudeCodeLink, isEnvironmentUrl, isProjectUrl, parseDiscovery, parseJobId, parseRegistration, paths, profileRestricts, projectLinkOf, sessionName, siteFrom, stateDirFrom } from '../src/core/contract';
 
 /** the maintainer's live output of `claude remote-control` (2.1.283) on 2026-09-28/29, after the QR code */
 const REGISTRATION = `  █▀▀▀▀▀█ ▄▀▄▀ █▀▀▀▀▀█
@@ -165,5 +165,43 @@ describe('framework contract', () => {
       ' https://claude.ai/code/session_01N4R9',
     ])
       expect(isClaudeCodeLink(bad), String(bad)).toBe(false);
+  });
+
+  it("21.0.0: projectLinkOf keeps a project's page in one form, from the address bar as pasted, and nothing else", () => {
+    const kept = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    for (const ok of [kept, `${kept}/`, `  ${kept}\n`, `${kept}?thread=cmsg_01JV1B5DpVW16Xd9rDo7wKF5`, `${kept}#top`, 'HTTPS://Claude.AI/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc'])
+      expect(projectLinkOf(ok), ok).toBe(kept);
+    expect(projectLinkOf('https://claude.com/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc')).toBe('https://claude.com/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc');
+    for (const bad of [
+      undefined,
+      '',
+      '   ',
+      'chan_01HxQ7mK2pT9vR4sW8nL3bYc',
+      'claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc',
+      'http://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc',
+      'https://claude.ai/code/project/',
+      'https://claude.ai/code/project/chan_01Hx/settings',
+      'https://claude.ai/code/projects',
+      'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt',
+      'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj',
+      'https://claude.ai/code',
+      'https://claude.ai.evil.example/code/project/chan_01Hx',
+      'https://evil.example/https://claude.ai/code/project/chan_01Hx',
+      'https://user:pw@claude.ai/code/project/chan_01Hx',
+      'https://claude.ai:8443/code/project/chan_01Hx',
+      'https://claude.org/code/project/chan_01Hx',
+      'https://claude.ai/code/project/chan_01Hx%2F..%2Fsettings',
+    ])
+      expect(projectLinkOf(bad), String(bad)).toBeUndefined();
+  });
+
+  it('21.0.0: isProjectUrl takes the kept form only, never a session or environment link', () => {
+    expect(isProjectUrl('https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc')).toBe(true);
+    expect(isProjectUrl('https://claude.com/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc')).toBe(true);
+    for (const bad of [undefined, '', 'https://claude.ai/code/project/chan_01Hx/', 'https://claude.ai/code/project/chan_01Hx?thread=cmsg_01', 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj', 'https://evil.example/code/project/chan_01Hx'])
+      expect(isProjectUrl(bad), String(bad)).toBe(false);
+    // a project's page is not a Claude Code link: New session and Copy link never take it
+    expect(isClaudeCodeLink('https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc')).toBe(false);
+    expect(isEnvironmentUrl('https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc')).toBe(false);
   });
 });

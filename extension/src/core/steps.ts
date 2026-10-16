@@ -11,7 +11,7 @@
 // shell output. The words come from the state, the reason class and the failure code (D14).
 import type { ChannelNote, KnownState, LastKnown, OnceNotes, PendingPress, Prefs, TourSeen } from './keys';
 import { formatAgo, formatClock, LOG_WORDS, placeOf, WORDS, type Action, type WelcomeMoment, type ButtonView, type ChecklistRow, type ConnectFailure, type GridSheet, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
-import { isEnvironmentUrl, planWord, type ReasonClass, type StopReason } from './contract';
+import { isEnvironmentUrl, isProjectUrl, planWord, type ReasonClass, type StopReason } from './contract';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_BUTTON, STATEMENT_TICK } from './disclosure';
 import { SUMMARY, TERMS_REFUSAL, ticks } from './terms';
 import type { AccessFact } from '../licensing/access';
@@ -968,7 +968,12 @@ function liveHero(f: Facts, s: HeroState, title: string): HeroView {
 function primaryOf(f: Facts, hero: HeroView): HomePrimary | undefined {
   const H = WORDS.home;
   const link = f.run.link ?? f.lastKnown?.environment_url;
-  const open: HomePrimary = { kind: 'open-session', button: button(H.openSession, 'teal', { kind: 'open-session' }) };
+  // 21.0.0: a project named in Settings takes the primary's place whenever the worker's own link would be offered: a
+  // project cannot take a session the worker started by itself, so the student is sent to the project, with what to
+  // do there under the button; the worker's link stays on New session, Copy link and Phone
+  const open: HomePrimary = isProjectUrl(f.prefs.project_url)
+    ? { kind: 'open-project', button: button(H.openProject, 'teal', { kind: 'open-project' }), how: H.projectHow }
+    : { kind: 'open-session', button: button(H.openSession, 'teal', { kind: 'open-session' }) };
   const connect: HomePrimary = { kind: 'connect', button: button(f.press?.kind === 'connect' ? WORDS.statement.connectingWhenReady : H.connect, 'ink', { kind: 'connect' }, f.press?.kind === 'connect' ? { busy: true } : {}), reminder: H.connectReminder };
   // R12 for a run found already in the folder and never seen alive here (RunFacts.neverSeenAlive): Connect, whatever
   // its last known state says, online and needs-you included (after a browser restart the run record counts as
@@ -1096,6 +1101,8 @@ export function home(f: Facts): HomeView {
   const pin = onlineNow ? pinTipOf(f) : undefined;
   if (pin) cards.push({ id: 'pin-tip', text: pin.text, ...(pin.done ? { done: true } : {}), dismiss: { kind: 'dismiss', card: 'pin-tip' } });
   else if (onlineNow && !f.tourSeen && !f.once.tour_auto_played_at && !f.once.tour_card_dismissed_at) cards.push({ id: 'tour-card', text: H.tourCard, open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } });
+  // 21.0.0: then, while no project is named, the card that offers Settings for its address, until its x
+  else if (onlineNow && !isProjectUrl(f.prefs.project_url) && !f.once.project_card_dismissed_at) cards.push({ id: 'project-tip', text: H.projectCard, open: { kind: 'open-settings' }, dismiss: { kind: 'dismiss', card: 'project-tip' } });
   return {
     header: {
       wordmark: WORDS.product,

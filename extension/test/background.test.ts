@@ -149,6 +149,53 @@ describe('the background, run whole', () => {
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
   }, 40_000);
 
+  // 21.0.0: a project named in Settings: the tab opened when the worker the student started comes online is the project's
+  // page, once, never the worker's own link; Open my project brings that tab forward; New session still opens the environment link
+  it("a project named in Settings: its page opens when the worker is ready, once; Open my project brings it forward; New session keeps the worker's link", async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    const stored = () => (world.storage.local['bridge.prefs'] as { project_url?: string } | undefined)?.project_url;
+    // a session's or environment link is refused and nothing is kept; the address pasted with a thread open is kept in its one form
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { project_url: LINK } } })).toMatchObject({ ok: true, value: { saved: false } });
+    expect(stored()).toBeUndefined();
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { project_url: `  ${PROJECT}?thread=cmsg_01JV1B5DpVW16Xd9rDo7wKF5 ` } } })).toMatchObject({ ok: true, value: { saved: true } });
+    expect(stored()).toBe(PROJECT);
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    const at = new Date().toISOString();
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, environment_url: LINK, environment_id: 'env_01XzAN32jsbL8W1PAFSvitBt' }));
+    await sleep(8_000);
+    clearInterval(ticker);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(0);
+    const h = JSON.stringify(panel.last()?.view);
+    expect(h).toContain('"kind":"open-project"');
+    expect(h).toContain('Work locally');
+    expect(h).toContain('"kind":"new-session"');
+    expect(h).toContain(LINK);
+    // Open my project: the tab Beethoven opened, brought forward; no second tab
+    expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: true, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
+    // New session: the worker's own environment link, as before
+    expect(await send(world, { type: 'action', action: { kind: 'new-session' } })).toMatchObject({ ok: true, value: { opened: true } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
+    // Open my session asks for the worker's link, which the recorded tab (the project's page) is not: one tab of its own
+    expect(await send(world, { type: 'action', action: { kind: 'open-session' } })).toMatchObject({ ok: true, value: { focused: false, opened: true } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(2);
+    // Clear: an empty address forgets the project
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { project_url: '' } } })).toMatchObject({ ok: true, value: { saved: true } });
+    expect(stored()).toBeUndefined();
+    expect(await send(world, { type: 'action', action: { kind: 'open-project' } })).toMatchObject({ ok: true, value: { focused: false, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
+  }, 40_000);
+
   it("the scheduler's reason is never asked while a Stop waits: the Stop goes first", async () => {
     await boot(world);
     world.opts.claudeSignedIn = true;

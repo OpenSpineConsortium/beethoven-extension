@@ -53,7 +53,7 @@ export async function focusTab(tabId: number, windowId?: number): Promise<boolea
   }
 }
 
-/** open a tab; never on an Anthropic address unless `anthropicOk` (Anthropic's own sign-in page and the claude.ai environment link, opened as a bookmark would) */
+/** open a tab; never on an Anthropic address unless `anthropicOk` (Anthropic's own sign-in page, the claude.ai environment link and, 21.0.0, the project's page, opened as a bookmark would) */
 export async function openTab(url: string, o: { windowId?: number; active: boolean; anthropicOk?: boolean }): Promise<{ tabId: number; windowId: number } | undefined> {
   if (isAnthropicAddress(url) && !o.anthropicOk) return undefined;
   try {

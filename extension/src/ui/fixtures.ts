@@ -33,6 +33,8 @@ const TITLE = 'Wayne State grid';
 const LINK = 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt';
 /** 14.0.0: the link Claude Code prints when it resumes a session (the worker serves that one session) */
 const SESSION_LINK = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+/** 21.0.0: a project's page on claude.ai, as Settings keeps it */
+const PROJECT_LINK = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
 const HOST = 'ondemand.grid.wayne.edu';
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
 const VPN_APP = 'GlobalProtect';
@@ -488,6 +490,8 @@ export const FIXTURES: Fixture[] = [
   { name: 'h-online-session-link', surface: 'panel', note: "14.0.0: online on a resumed session's own link: Copy link and Phone, no New session", view: onlineHome({ secondary: { copyLink: WORDS.home.copyLink, phone: WORDS.home.phone }, link: SESSION_LINK }) },
   { name: 'h-online-try', surface: 'panel', note: 'Online, first 3 days: Try asking', view: onlineHome({ tryAsking: TRY }) },
   { name: 'h-online-cards', surface: 'panel', note: 'the one-time cards', view: onlineHome({ cards: [{ id: 'pin-tip', text: WORDS.online.pinTip, dismiss: { kind: 'dismiss', card: 'pin-tip' } }, { id: 'tour-card', text: WORDS.home.tourCard, open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } }] }) },
+  { name: 'h-online-project-tip', surface: 'panel', note: '21.0.0: online with no project named: the one-time card that points at Settings', view: onlineHome({ cards: [{ id: 'project-tip', text: WORDS.home.projectCard, open: { kind: 'open-settings' }, dismiss: { kind: 'dismiss', card: 'project-tip' } }] }) },
+  { name: 'h-online-project', surface: 'panel', note: '21.0.0: online with a project named: Open my project and how Claude there takes the worker; New session keeps the worker\'s link', view: onlineHome({ primary: { kind: 'open-project', button: teal(WORDS.home.openProject, { kind: 'open-project' }), how: WORDS.home.projectHow } }) },
   { name: 'h-online-confirm', surface: 'panel', note: 'Stop, then its confirmation', view: onlineHome({ tryAsking: TRY }), local: { confirmStop: true } },
   { name: 'h-online-phone', surface: 'panel', note: 'Phone: the QR code', view: onlineHome(), local: { phone: true } },
   { name: 'h-online-log', surface: 'panel', note: 'Show log open: the sample timeline', view: onlineHome(), local: { logOpen: true }, log: SAMPLE_LOG },
@@ -509,6 +513,8 @@ export const FIXTURES: Fixture[] = [
   // Settings
   { name: 'settings', surface: 'settings', note: 'Settings', view: settingsView() },
   { name: 'settings-system', surface: 'settings', note: 'Appearance: Match system', view: settingsView('system') },
+  { name: 'settings-project', surface: 'settings', note: '21.0.0: a project named: its address, Change and Clear', view: { ...settingsView(), worker: { ...settingsView().worker, project: PROJECT_LINK } } },
+  { name: 'settings-project-editing', surface: 'settings', note: '21.0.0: the project field open, with the refusal of an address that is not a project\'s', view: settingsView(), local: { projectEditing: true, projectValue: 'https://claude.ai/code?environment=env_01XzAN32jsbL8W1PAFSvitBt', projectError: WORDS.settings.projectBad } },
   { name: 'settings-open', surface: 'settings', note: 'Change, terms and the lab lead fold open', view: settingsView(), local: { changeOpen: true, portalInput: HOST, termsOpen: true, labLeadOpen: true } },
   { name: 'settings-signin-saved', surface: 'settings', note: '19.0.0: a saved grid sign-in and its Forget', view: { ...settingsView(), signin: SIGNIN_SAVED } },
   { name: 'settings-signin-refused', surface: 'settings', note: '19.0.0: saved, but the grid turned it down last time', view: { ...settingsView(), signin: SIGNIN_REFUSED } },

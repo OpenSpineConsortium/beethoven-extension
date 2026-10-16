@@ -1007,6 +1007,43 @@ export function isClaudeCodeLink(url: string | undefined): url is string {
 }
 
 /**
+ * 21.0.0: the address of a project at claude.ai/code, the student's own, pasted into Settings; nothing the cluster
+ * writes. The registration block below ends "Or ask Claude to work in this folder from your projects on claude.ai":
+ * a project cannot take a session the worker started by itself, which is what the two links above open, and reaches
+ * the worker's folder only when the student asks for the task in the project (Work locally) and allows the folder on
+ * the card Claude answers with. So where a project is named, the panel opens its page in place of a plain session.
+ * The shape is the page's own, https://claude.ai/code/project/<id> (or claude.com), the id letters, digits, _ and -.
+ */
+export const PROJECT_URL = /https:\/\/claude\.(?:ai|com)\/code\/project\/[A-Za-z0-9_-]+/;
+
+/** a project's address, exactly (nothing before or after it), as projectLinkOf keeps it */
+export function isProjectUrl(url: string | undefined): url is string {
+  return typeof url === 'string' && new RegExp(`^${PROJECT_URL.source}$`).test(url);
+}
+
+/**
+ * The project's address to keep from what the student pasted: trimmed, its query and fragment dropped (a thread's
+ * address is the project's with ?thread=... after it), a trailing slash removed, the host in lower case; undefined
+ * for anything else, a plain claude.ai/code address and a session's or an environment's link among them, so the
+ * panel never opens a page the student did not name as their project.
+ */
+export function projectLinkOf(text: string | undefined): string | undefined {
+  const raw = String(text ?? '').trim();
+  if (!raw) return undefined;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return undefined;
+  }
+  if (u.protocol !== 'https:' || u.username || u.password || u.port) return undefined;
+  const host = u.hostname.toLowerCase();
+  if (host !== 'claude.ai' && host !== 'claude.com') return undefined;
+  const id = /^\/code\/project\/([A-Za-z0-9_-]+)\/?$/.exec(u.pathname)?.[1];
+  return id ? `https://${host}/code/project/${id}` : undefined;
+}
+
+/**
  * Parse the registration block `claude remote-control` (2.1.283) prints after its QR code:
  *
  *   ·✔︎· Connected · phone · HEAD

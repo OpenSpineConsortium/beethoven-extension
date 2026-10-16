@@ -24,7 +24,11 @@ recent and e-mailing the maintainer of a new one with a link to withdraw and non
 agreement is version 13 and the privacy statement version 14; 19.0.0 was accepted by the store (greg,
 2026-10-13). On 2026-10-13 the maintainer decided that 20.0.0 goes out **Public** ("i want to release
 20 and public"): the agreement is version 14 and the privacy statement version 15, and the item's
-visibility changes from Private to Public. Beethoven is offered in one place only: one item on the
+visibility changes from Private to Public. 21.0.0 (2026-10-16) changes no permission and no data
+type: Settings takes the address of a project of yours on claude.ai, kept with the other
+preferences, and the page opened when the worker is ready is then the project's page, which a plain
+session cannot be made part of; the agreement is version 15 and the privacy statement version 16.
+Beethoven is offered in one place only: one item on the
 Chrome Web Store, Public since 20.0.0; from 8.0.0 to 19.0.0 it was a Private item visible to the
 trusted testers the maintainer named, a Google Group he kept with his personal Google account and to
 which he added each student he approved for Beethoven. No other store, no download from the website

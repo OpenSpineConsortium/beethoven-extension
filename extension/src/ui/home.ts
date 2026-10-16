@@ -33,6 +33,8 @@ function primary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
     { class: 'home-primary' },
     button(p.button, ctx.onAct, { pending: ctx.pending, block: true }),
     p.kind === 'connect' ? el('p', { class: 'home-reminder', text: p.reminder }) : null,
+    // 21.0.0: what to do in the project, in the reminder's place
+    p.kind === 'open-project' ? el('p', { class: 'home-reminder', text: p.how }) : null,
   );
 }
 
@@ -118,6 +120,16 @@ function tryAsking(h: HomeView, ctx: HomeCtx): HTMLElement | null {
 
 function cards(h: HomeView, ctx: HomeCtx): Array<HTMLElement> {
   return h.cards.map((c) => {
+    // 21.0.0: the project tip, with Settings behind its one button
+    if (c.id === 'project-tip')
+      return el(
+        'div',
+        { class: 'once', key: c.id },
+        icon('pin', 18),
+        el('p', { text: c.text }),
+        c.open ? el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.home.menu.settings, onClick: () => c.open && ctx.onAct(c.open) }) : null,
+        el('button', { type: 'button', class: 'btn btn-icon bare', 'aria-label': LABELS.dismiss, onClick: () => ctx.onAct(c.dismiss) }, icon('close', 15)),
+      );
     if (c.id === 'tour-card')
       return el(
         'div',
