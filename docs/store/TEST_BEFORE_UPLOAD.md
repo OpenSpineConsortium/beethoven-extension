@@ -1,4 +1,4 @@
-# Testing Beethoven 20.0.0 by hand before the store upload
+# Testing Beethoven 21.0.0 by hand before the store upload
 
 One person, one afternoon, one browser: Chrome, the only one Beethoven is offered in (a public
 listing on the Chrome Web Store since 20.0.0; `SUBMISSION.md`). Written 2026-09-29 for 4.0.0, brought up to date
@@ -12,8 +12,9 @@ GlobalProtect and a note in Settings about a key an earlier version left. Brough
 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid itself: the AccessID and password
 typed into its own sheet, saved behind a passkey only when *Remember it on this computer* is ticked,
 and Chrome's own box (18.0.0's way) as the other way; and on 2026-10-11 for 20.0.0, which approves
-an account from every installation of its own, and on 2026-10-13 for its public listing. The
-agreement is version 14 and the privacy statement version 15. The build is in `extension/.output/chrome-mv3/`; the zip beside it is what the store
+an account from every installation of its own, and on 2026-10-13 for its public listing; and on
+2026-10-16 for 21.0.0, which opens the student's project on claude.ai, named in Settings, in place
+of a plain session (step 20). The agreement is version 15 and the privacy statement version 16. The build is in `extension/.output/chrome-mv3/`; the zip beside it is what the store
 gets. To build it: Node 22, then `npm ci`, `npm run typecheck`, `npm test`, `npm run build` and `npm
 run zip` in `extension/` (`SUBMISSION.md`, section 0, item 1). Nothing is signed, and nothing is
 installed outside the browser.
@@ -64,7 +65,7 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
    to protect.wayne.edu.", **How to set it up**) and **Claude Pro or Max** ("The account you use at
    claude.ai.", **See plans**). Each link opens the university's or Anthropic's own page in a new tab
    only when pressed; no QR code is drawn and no code-setup step is offered. **Show terms** opens
-   version 14 and the privacy statement version 15. Tick the box and press **Agree and continue**.
+   version 15 and the privacy statement version 16. Tick the box and press **Agree and continue**.
    Chrome asks to let Beethoven reach `ondemand.grid.wayne.edu`, that one site only: choose
    **Allow** (as in 11.0.0).
 3. **Pin the icon**: puzzle-piece icon, pin *Beethoven*.
@@ -193,6 +194,32 @@ portal, not the grid, so that nothing real is typed where it should not be: the 
     **Use another portal** field): `claude.ai`, `anthropic.com`, `www.claude.com` each answer
     "That's a Claude address, not your grid." and Chrome shows no prompt; `chrome://extensions`,
     Beethoven, *Details*, *Site access* lists no Anthropic site.
+20. **Your project on claude.ai.** New in 21.0.0; on the grid, with a project of yours open in
+    another tab (claude.ai, **Projects**). With the worker online and no project named, once the pin
+    tip and the tour card are gone, the home shows one card: "Working in a project on claude.ai? Add
+    its address in Settings, and Beethoven opens your project in place of a plain session." Its
+    **Settings** opens Settings; its x hides it for good. In **Settings**, **Your project on
+    claude.ai** says "None named. Open my session opens a plain session on your worker." with
+    **Add**. Press **Add**, paste the worker's link (the home's **Copy link**) and press **Use**:
+    "That isn't a project's address. ..." under the field, the address still typed. Paste the
+    project's address from the address bar instead, with a thread open in it, and press **Use**: the
+    field closes, the row shows `https://claude.ai/code/project/<id>` alone, with **Change** and
+    **Clear**, and the caret is on **Change**; **Change**, then Escape, closes the field with nothing
+    saved. The home's button now reads **Open my project**, with "In your project, choose Work
+    locally from the + menu, write the task, and press Allow once on the card." under it, and **New
+    session**, **Copy link** and **Phone** keep the worker's link. **Open my project** opens the
+    project in a new tab; pressed again, it brings that tab forward. In the project, choose **Work
+    locally** from the + menu, ask for something that shows where it runs ("print the hostname and
+    the current folder"), and press **Allow once** on the card "Allow Claude to work in a folder on
+    your device": the answer names a compute node and the worker's folder. Write down, word for word,
+    the card, the folder it offers, and whether **Open my project** opens a second tab once a thread
+    is open in the project (not yet measured). Then **Stop** and **Connect** with **Open Claude when
+    my worker is ready** on: when the worker is ready, the project's tab Beethoven opened is brought
+    forward, or the project opens in a new tab, and the worker's own link opens nothing; with the
+    switch off, nothing opens. When the job ends and the next one takes over, write down whether the
+    project's thread carries on or the project says "Lost contact with your folder" (not yet
+    measured). Last, **Settings**, **Clear**: "None named." again, the caret on **Add**, and the
+    home's button is **Open my session** again.
 
 Chrome-specific things to look at: the install prompt and the permission prompt name only what the
 manifest asks for; `chrome://extensions` shows no host permission under *Site access* until you
@@ -200,20 +227,22 @@ allowed the portal, and then only that site.
 
 ## Just before uploading
 
-- `unzip -p release/20.0.0/beethoven-20.0.0-chrome.zip manifest.json` (the file you upload; its
-  SHA-256 matches `release/20.0.0/SHA256SUMS.txt`) shows version 20.0.0, the name Beethoven, the
+- `unzip -p release/21.0.0/beethoven-21.0.0-chrome.zip manifest.json` (the file you upload, recorded
+  under `release/21.0.0/` as 20.0.0's was, `SUBMISSION.md`, section 0, item 1; its SHA-256 matches
+  that folder's `SHA256SUMS.txt`) shows version 21.0.0, the name Beethoven, the
   128-character `description` in `LISTING.md`, the permissions `storage`, `alarms`, `scripting`,
   `sidePanel`, `webRequest` and `webRequestAuthProvider`, optional host `https://*/*`, nothing else
   (no `nativeMessaging`, no `webRequestBlocking`), and no `"key"`.
   `unzip -l` lists `fonts/` and no `bridge/`: no `.msi`, no `.pkg`, no script zip.
-- The five public pages open; `privacy.html` says version 15 and `terms.html` version 14 (the upload
-  waits for version 15 there); the install card links the listing; the reviewers page carries `LISTING.md`'s negative statements; none
+- The five public pages open; `privacy.html` says version 16 and `terms.html` version 15 (the upload
+  waits for version 16 there); the install card links the listing; the reviewers page carries `LISTING.md`'s negative statements; none
   offers a download or names another browser; `services.json` carries `access_check` and no
   `allowlist`; `killlist.json` answers 200 and verifies.
 - The access service answers `st1234` yes from two installation identifiers at portal `localhost`
   (`SUBMISSION.md`, section 0, item 5).
-- The screenshots are new captures of 20.0.0 (`PASTE.md`, field 7; none exists yet), and none shows
-  a real AccessID or password.
+- The screenshots are captures of the version you upload or of one whose screens they still show
+  truthfully (`PASTE.md`, field 7; 20.0.0's are in `release/20.0.0/store-kit/`, taken before
+  21.0.0's project card and button existed), and none shows a real AccessID or password.
 - The description in `PASTE.md` is 1,599 characters; paste it whole.
 - Before pasting the Test instructions in `PASTE.md`, see each of their steps on this build in a
   fresh profile with no portal granted and GlobalProtect off: the welcome page, **Agree and

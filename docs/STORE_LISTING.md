@@ -44,14 +44,16 @@ for one; it never sees your Claude sign-in; it runs no code it did not ship with
 > it, starts your worker through the portal's own shell, and waits for Claude Code to connect. If
 > Claude Code on the cluster is not signed in, the extension opens Anthropic's sign-in page in a new
 > tab and asks you to paste the code that page shows into one box; the code is typed once into your
-> own job's terminal and not kept. When the worker connects, your session's claude.ai/code page
-> opens in a new tab (you can turn that off). The extension has no popup menu: its settings are on
+> own job's terminal and not kept. When the worker connects, your session's claude.ai/code page,
+> or your project's page if you gave its address in the settings, opens in a new tab (you can turn
+> that off). The extension has no popup menu: its settings are on
 > its options page, and its checks and logs are under "Details" in the panel.
 
 The extension opens two kinds of page outside the portal, always in a new tab and never with any
 code of its own on them: your university's portal pages (its dashboard and shell), and Anthropic's
-pages (the sign-in page Claude Code printed, and your session's
-`https://claude.ai/code?environment=...` link; the optional Google Drive step opens
+pages (the sign-in page Claude Code printed, your session's
+`https://claude.ai/code?environment=...` link and, if you gave its address in the settings, your
+project's `https://claude.ai/code/project/...` page; the optional Google Drive step opens
 `https://claude.ai/settings/connectors`). It never reads those pages. One ordinary button, *Ask for
 access*, opens the vendor's own request page in a new tab when the account the portal shows is not
 yet approved, with that account name in the page's address so the form is filled in; it is a link
@@ -72,7 +74,7 @@ the person's own; one installation serves one account).
 | `optional_host_permissions` | `["https://*/*"]` | You connect your university's Open OnDemand portal from its own tab, from the panel or by typing its address on the setup page; access is requested at that click for that one origin only, an Anthropic address is refused before any request, and the extension refuses to work until the portal is granted. |
 | `host_permissions` | none | |
 | `action` (no `default_popup`) | | A click on the icon runs the steps above and opens the panel; there is no popup. |
-| `options_ui` | the setup page | The agreement, your portal (connect by address or disconnect), the statement about where your work goes, the settings (shell host, site profile, worker permission mode, "start my worker when I open my portal" and "open claude.ai when my worker connects", both on by default in the current build and each explained where it is switched), the audit log with its export, and the optional Google Drive step. It opens on install. |
+| `options_ui` | the setup page | The agreement, your portal (connect by address or disconnect), the statement about where your work goes, the settings (shell host, site profile, worker permission mode, "start my worker when I open my portal" and "open claude.ai when my worker connects", both on by default in the current build and each explained where it is switched, and the address of your project on claude.ai, if you work in one), the audit log with its export, and the optional Google Drive step. It opens on install. |
 | Never requested | `cookies`, `tabs`, `webRequest`, `webRequestBlocking`, `declarativeNetRequest`, `nativeMessaging`, `debugger`, `identity`, `clipboardRead`; any `claude.ai`, `anthropic.com` or `claude.com` origin | Stated in the negative in the listing and in PRIVACY.md. |
 
 The wildcard in `optional_host_permissions` is what triggers in-depth review at Chrome; the
@@ -126,7 +128,8 @@ send them to. Every other request goes to the one portal origin the person grant
 script on that origin, with the browser carrying the portal cookie (never read). The extension
 opens, in a new tab and with no code of its own on them, the portal's own pages, Anthropic's sign-in
 page (only an https address on claude.ai or claude.com, printed by the sitting), the session's
-`https://claude.ai/code?environment=...` link, `https://claude.ai/settings/connectors`, and, from
+`https://claude.ai/code?environment=...` link, the project's `https://claude.ai/code/project/...` page
+if one is named in the settings, `https://claude.ai/settings/connectors`, and, from
 the *Ask for access* button, the vendor's request page with the account name in its address. What
 stays on the device: portal hostname and granted origin, preferences, the acceptance record, the
 account name the portal showed and the last approval answer with its time, the service address, the

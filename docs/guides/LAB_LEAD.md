@@ -1,9 +1,9 @@
-# Beethoven 20.0.0 for the lab lead
+# Beethoven 21.0.0 for the lab lead
 
 For Greg (and any lab lead after him). Written 2026-10-02 by the texts stream of the 12.0.0 build
 and corrected by fixer B after the four reviews, against framework 11 as it then stood in the
 working tree; rewritten 2026-10-08 for 16.0.0, which removed the direct way of 12.0.0 to 15.0.0
-whole, brought up to date 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid, and on 2026-10-11 for 20.0.0, which approves a student from every installation of their own, and on 2026-10-13 when 20.0.0's listing became public. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
+whole, brought up to date 2026-10-09 for 19.0.0, in which Beethoven signs in to the grid, and on 2026-10-11 for 20.0.0, which approves a student from every installation of their own, and on 2026-10-13 when 20.0.0's listing became public, and on 2026-10-16 for 21.0.0, which opens a student's Claude project. The grid tests `docs/V12_STATUS.md` listed for that way are moot. Section 9, who can read the
 lab's folders on the grid, was added 2026-10-02 with `tools/grid_access.sh` and revised that evening
 after its review.
 
@@ -57,6 +57,21 @@ installation still serves one account: a browser first used with another student
 refused for this one until you release it (`reset-seat` or `remove` on the account that holds it).
 The agreement is version 14 and the privacy statement version 15, of 2026-10-13, so every student
 accepts once more.
+
+**21.0.0 (2026-10-16).** A student who works in a Claude project on claude.ai names the project's
+address in **Settings**, **Your project on claude.ai** (copied from the address bar; Beethoven keeps
+`https://claude.ai/code/project/<id>` alone and refuses a session's link). The panel's button is
+then **Open my project**, with "In your project, choose Work locally from the + menu, write the
+task, and press Allow once on the card." under it, and the tab opened when the worker is ready is
+the project's page: a project cannot take the session the worker started by itself and reaches the
+worker only through its own *Work locally* (code.claude.com/docs/en/claude-projects, "Run a thread
+on your own computer"). **New session**, **Copy link** and **Phone** keep the worker's own link.
+Nothing changes on the grid: no framework change and no new line typed. A project's thread needs
+Claude Code 2.1.280 or later in the worker, and the image's is 2.1.283 (hpcworker's
+`docs/OPEN_QUESTIONS.md`); it is not available where an organization requires trusted devices.
+Whether the next job of a worker's chain brings a project's thread back by itself is not yet
+measured. The agreement is version 15 and the privacy statement version 16, of 2026-10-16, so every
+student accepts once more.
 
 ## 1. What changes for you
 

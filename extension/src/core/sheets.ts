@@ -123,6 +123,7 @@ export function settingsView(i: SettingsInput): SettingsView {
       modes: (['default', 'acceptEdits', 'plan'] as const).map((value) => ({ value, label: S.modes[value] })),
       keepRunning: i.prefs.auto_start,
       openClaude: i.prefs.open_claude_on_connect,
+      ...(i.prefs.project_url ? { project: i.prefs.project_url } : {}),
     },
     appearance: { value: appearance, options: (['cream', 'system'] as const).map((value) => ({ value, label: S.appearances[value] })) },
     // address says a portal IS stored (the label, and Disconnect's enabled state); the bundled

@@ -1,6 +1,6 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 14, 2026-10-13. Applies to the Trial Edition of Beethoven 20.0.0 and later versions that
+Version 15, 2026-10-16. Applies to the Trial Edition of Beethoven 21.0.0 and later versions that
 ship this text, as distributed through its public listing on the Chrome Web Store, which needs no
 invitation to open or install from; the approval of section 3 decides whether it works for you. You
 can read, copy, save and print this text at any time: it is in the file LICENSE.txt inside the
@@ -317,15 +317,17 @@ Its only page script runs on the one portal website you connect: where your port
 its sign-in with the Extension, to carry the Extension's requests there, and, during the one-time
 step in (b)(i), on the portal's terminal page, where it watches only the page's title and types only
 the one line described there. It opens an Anthropic page only in a new tab, as a bookmark would: the
-sign-in page during the sign-in described in (a), your worker's session page when a worker you
-started is ready (unless you turn that off) and when you choose "Open my session" or "New session",
-the connectors settings page if you choose the optional Google Drive step, and the plans page if you
-follow "See plans" on the welcome page; it closes the sign-in tab it opened once you are signed in,
-and it may bring forward a claude.ai tab it opened itself. Of an Anthropic tab it opened, it learns
-only that the tab has begun loading a page, which the browser tells it without the page's address or
-content. In the same way, the welcome page and the step that asks you to turn on your VPN link your
-institution's own pages about its computing accounts and its VPN; each opens in a new tab only when
-you choose it, and the Extension learns nothing of your visit.
+sign-in page during the sign-in described in (a), your worker's session page, or the page of a
+project of yours on claude.ai whose address you have given in the Extension's settings, when a
+worker you started is ready (unless you turn that off) and when you choose "Open my session", "Open
+my project" or "New session", the connectors settings page if you choose the optional Google Drive
+step, and the plans page if you follow "See plans" on the welcome page; it closes the sign-in tab it
+opened once you are signed in, and it may bring forward a claude.ai tab it opened itself. Of an
+Anthropic tab it opened, it learns only that the tab has begun loading a page, which the browser
+tells it without the page's address or content. In the same way, the welcome page and the step that
+asks you to turn on your VPN link your institution's own pages about its computing accounts and its
+VPN; each opens in a new tab only when you choose it, and the Extension learns nothing of your
+visit.
 
 (g) Of (a) to (f), only your account name in (c) is sent to Licensor, in the approval check that
 section 10 describes; nothing else is, and in particular not your cluster password or the account

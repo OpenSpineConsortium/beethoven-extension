@@ -469,10 +469,67 @@ describe('home: the waiting and status table, one primary or none', () => {
     expect(hv({ run: online, once: { first_online_at: ago(4 * 24 * 60 * MIN) } }).tryAsking).toBeUndefined();
     expect(hv({ run: online, once: { first_online_at: ago(MIN), try_asking_dismissed_at: ago(1) } }).tryAsking).toBeUndefined();
     expect(h.cards).toEqual([{ id: 'tour-card', text: 'See what it can do · 16 s', open: { kind: 'tour', event: 'start' }, dismiss: { kind: 'dismiss', card: 'tour-card' } }]);
-    expect(hv({ run: online, tourSeen: { seen_at: ago(1), completed: false } }).cards).toEqual([]);
+    // 21.0.0: once the tour card is gone, the project card takes its place while no project is named (the test below)
+    expect(hv({ run: online, tourSeen: { seen_at: ago(1), completed: false } }).cards.map((c) => c.id)).toEqual(['project-tip']);
     expect(h.header.menu.map((m) => m.label)).toEqual(['See what it can do', 'Your files', 'Settings', 'Details for your lab lead', 'Copy debug log', 'Help']);
     expect(h.header.moreLabel).toBe('More');
     expect(h.log).toEqual({ show: 'Show log ›', hide: 'Hide log', copy: 'Copy log' });
+  });
+
+  it("21.0.0: a project named in Settings: Open my project with what to do there, New session kept; the card while none is named, until its x", () => {
+    const PROJECT = 'https://claude.ai/code/project/chan_01HxQ7mK2pT9vR4sW8nL3bYc';
+    const online = run({ phase: 'online', link: LINK });
+    const seen = { seen_at: ago(1), completed: true };
+    const named = hv({ run: online, tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } });
+    expect(named.primary).toEqual({ kind: 'open-project', button: { label: 'Open my project', tone: 'teal', action: { kind: 'open-project' } }, how: 'In your project, choose Work locally from the + menu, write the task, and press Allow once on the card.' });
+    // the worker's own link stays where it was: New session, Copy link and Phone
+    expect(named.secondary).toEqual({ newSession: { label: 'New session', tone: 'outline', action: { kind: 'new-session' } }, copyLink: 'Copy link', phone: 'Phone' });
+    expect(named.link).toBe(LINK);
+    expect(named.cards).toEqual([]);
+    // a run found already online, never pressed here, offers the project the same way
+    expect(hv({ run: run({ phase: 'online', link: LINK, pressed: false }), tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } }).primary?.kind).toBe('open-project');
+    // no project named: the card that points at Settings, after the tour card, until its x; never while not online
+    const none = hv({ run: online, tourSeen: seen });
+    expect(none.primary?.kind).toBe('open-session');
+    expect(none.cards).toEqual([{ id: 'project-tip', text: 'Working in a project on claude.ai? Add its address in Settings, and Beethoven opens your project in place of a plain session.', open: { kind: 'open-settings' }, dismiss: { kind: 'dismiss', card: 'project-tip' } }]);
+    expect(hv({ run: online, tourSeen: seen, once: { first_online_at: ago(60 * MIN), project_card_dismissed_at: ago(1) } }).cards).toEqual([]);
+    expect(hv({ tourSeen: seen }).cards).toEqual([]);
+    expect(hv({ run: run({ phase: 'queued' }), tourSeen: seen }).cards).toEqual([]);
+    // a stored address that is not a project's page counts as none named
+    expect(hv({ run: online, tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: LINK } }).primary?.kind).toBe('open-session');
+    expect(hv({ run: online, tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: `${PROJECT}/` } }).primary?.kind).toBe('open-session');
+    // the "You're online." moment, shown for a few seconds after a worker the student pressed comes online, offers the same button
+    const moment = journey(facts({ run: online, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } }), 'online');
+    expect(moment.moment).toBe('online');
+    if (moment.moment === 'online') {
+      expect(moment.primary).toEqual({ label: 'Open my project', tone: 'teal', action: { kind: 'open-project' } });
+      expect(moment.how).toBe('In your project, choose Work locally from the + menu, write the task, and press Allow once on the card.');
+    }
+    const plain = journey(facts({ run: online }), 'online');
+    expect(plain.moment).toBe('online');
+    if (plain.moment === 'online') {
+      expect(plain.primary).toEqual({ label: 'Open my session', tone: 'teal', action: { kind: 'open-session' } });
+      expect(plain.how).toBeUndefined();
+    }
+    // a link that looks wrong disables Open my session, which has nothing to open; the project's page opens regardless
+    const badPlain = journey(facts({ run: run({ phase: 'online', badLink: true }) }), 'online');
+    expect(badPlain.moment).toBe('online');
+    if (badPlain.moment === 'online') expect(badPlain.primary.disabled).toBe(true);
+    const badProject = journey(facts({ run: run({ phase: 'online', badLink: true }), prefs: { ...DEFAULT_PREFS, project_url: PROJECT } }), 'online');
+    expect(badProject.moment).toBe('online');
+    if (badProject.moment === 'online') expect(badProject.primary).toEqual({ label: 'Open my project', tone: 'teal', action: { kind: 'open-project' } });
+    // and the home after it keeps the project's button; Copy link and Phone, which need the worker's link, stay away
+    const badHome = hv({ run: run({ phase: 'online', badLink: true }), tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } });
+    expect(badHome.primary?.kind).toBe('open-project');
+    expect(badHome.secondary).toBeUndefined();
+    expect(hv({ run: run({ phase: 'online', badLink: true }), tourSeen: seen }).primary).toBeUndefined();
+    // a resumed session's own link offers no New session, so Open my session moves to the secondary row while the project holds the primary
+    const SESSION = 'https://claude.ai/code/session_01N4R9mLRJ5wFbf1oaDe5pyj';
+    const resumed = hv({ run: run({ phase: 'online', link: SESSION }), tourSeen: seen, prefs: { ...DEFAULT_PREFS, project_url: PROJECT } });
+    expect(resumed.primary?.kind).toBe('open-project');
+    expect(resumed.secondary).toEqual({ openSession: { label: 'Open my session', tone: 'outline', action: { kind: 'open-session' } }, copyLink: 'Copy link', phone: 'Phone' });
+    expect(resumed.link).toBe(SESSION);
+    expect(hv({ run: run({ phase: 'online', link: SESSION }), tourSeen: seen }).secondary).toEqual({ copyLink: 'Copy link', phone: 'Phone' });
   });
 
   it('exactly one primary in the states that have one, and none while asked, in line, starting or renewing', () => {

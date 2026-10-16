@@ -33,6 +33,8 @@ function primary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
     { class: 'home-primary' },
     button(p.button, ctx.onAct, { pending: ctx.pending, block: true }),
     p.kind === 'connect' ? el('p', { class: 'home-reminder', text: p.reminder }) : null,
+    // 21.0.0: what to do in the project, in the reminder's place
+    p.kind === 'open-project' ? el('p', { class: 'home-reminder', text: p.how }) : null,
   );
 }
 
@@ -44,6 +46,8 @@ function secondary(h: HomeView, ctx: HomeCtx): HTMLElement | null {
     'div',
     { class: 'home-secondary' },
     s.newSession ? button({ ...s.newSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }) : null,
+    // 21.0.0: Open my session as an outline button while the project holds the primary and no new session can start
+    s.openSession ? button({ ...s.openSession, tone: 'outline' }, ctx.onAct, { pending: ctx.pending, block: false }) : null,
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.copy(link, WORDS.home.linkCopied) }, el('span', { class: 'btn-label', text: s.copyLink })),
     el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.setPhone(true) }, el('span', { class: 'btn-label', text: s.phone })),
   );
@@ -118,6 +122,17 @@ function tryAsking(h: HomeView, ctx: HomeCtx): HTMLElement | null {
 
 function cards(h: HomeView, ctx: HomeCtx): Array<HTMLElement> {
   return h.cards.map((c) => {
+    // 21.0.0: the project tip, with Settings behind its one button; a folder, not the pin tip's pin, since it takes the
+    // pin tip's place once that one is done
+    if (c.id === 'project-tip')
+      return el(
+        'div',
+        { class: 'once', key: c.id },
+        icon('folder', 18),
+        el('p', { text: c.text }),
+        c.open ? el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.home.menu.settings, onClick: () => c.open && ctx.onAct(c.open) }) : null,
+        el('button', { type: 'button', class: 'btn btn-icon bare', 'aria-label': LABELS.dismiss, onClick: () => ctx.onAct(c.dismiss) }, icon('close', 15)),
+      );
     if (c.id === 'tour-card')
       return el(
         'div',

@@ -25,8 +25,8 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 14;
-export const TERMS_DATE = '2026-10-13';
+export const TERMS_VERSION = 15;
+export const TERMS_DATE = '2026-10-16';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Agree and continue';

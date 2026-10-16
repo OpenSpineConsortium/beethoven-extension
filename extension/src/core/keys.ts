@@ -2,7 +2,7 @@
 //
 // storage.local (survives restarts; nothing secret and no credential ever):
 export const PORTAL_KEY = 'bridge.portal'; //   {origin, hostname, connected_at, shell_host, site}
-export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect}
+export const PREFS_KEY = 'bridge.prefs'; //      {worker_name, permission_mode, auto_start, open_claude_on_connect, project_url}
 export const KILLLIST_KEY = 'bridge.killlist'; // the last verified kill-list, {fetched_at, list}
 export const REVOKED_KEY = 'bridge.revoked'; //  {revoked, message}: what the chokepoint consults before a command
 export const ACCESS_KEY = 'bridge.access'; //    the access service's last word on this account at this portal (licensing/access.ts AccessRecord)
@@ -48,6 +48,7 @@ export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksL
 export const SIGNIN_TAB_KEY = 'bridge.signinTab'; //  OpenedTab: the grid sign-in tab Beethoven opened or navigated (the welcome tab, or one opened for a press)
 export const ANTHROPIC_TAB_KEY = 'bridge.anthropicTab'; // AnthropicTab: Anthropic's sign-in tab Beethoven opened, and whether it has started a new load since the paste
 export const CLAUDE_TAB_KEY = 'bridge.claudeTab'; //  OpenedTab: the claude.ai tab Beethoven opened for "Open my session" (session storage: a tab id means nothing after a restart)
+export const PROJECT_TAB_KEY = 'bridge.projectTab'; // OpenedTab: the claude.ai tab Beethoven opened for the project's page (21.0.0, "Open my project"), its own record so each address keeps one tab
 export const TERMINAL_TAB_KEY = 'bridge.terminalTab'; // OpenedTab: the grid's terminal tab Beethoven opened for the one-time key step (AM2)
 export const ACTIVITY_KEY = 'bridge.activity'; //     ActivityEntry[]: Beethoven's own plain-words events for Show log, oldest first, at most ACTIVITY_MAX
 export const GRID_KEY = 'bridge.grid'; //             GridNote: whether the grid answers and whether the browser holds a grid sign-in, as last checked
@@ -89,6 +90,15 @@ export interface Prefs {
   open_claude_on_connect: boolean;
   /** 11.0.0: Settings, "Appearance": "Cream" (cream, the default whatever the system says) / "Match system" (system). Optional so a 10.0.0 profile reads as cream. */
   appearance?: Appearance;
+  /**
+   * 21.0.0: Settings, "Your project on claude.ai": the project's address as contract.ts projectLinkOf keeps it
+   * (https://claude.ai/code/project/<id>); absent while none is named. A project cannot take a session the worker
+   * started by itself; it reaches the worker's folder when the student asks for the task there (Work locally) and
+   * allows the folder on the card. So with one named, the home's primary is "Open my project" and the tab opened
+   * when a worker the student started comes online is the project's page, in place of the worker's own link;
+   * New session, Copy link and Phone keep the worker's link.
+   */
+  project_url?: string;
   // 12.0.0 to 15.0.0 stored `connection: 'direct' | 'vpn'` here; 16.0.0 has one way, ignores a stored value and removes it on its first run (background.ts cleanupDirectWay).
 }
 
@@ -168,6 +178,8 @@ export interface OnceNotes {
   tour_auto_played_at?: string;
   /** "Start a new session there. It runs on your worker." was shown */
   new_session_tip_at?: string;
+  /** 21.0.0: the card offering Settings for a project's address, below the online home while none is named, was dismissed */
+  project_card_dismissed_at?: string;
 }
 
 /** SIGNIN_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY (session): a tab Beethoven opened or navigated itself, so it may bring it forward or close it */

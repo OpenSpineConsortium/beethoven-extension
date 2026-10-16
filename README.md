@@ -127,8 +127,13 @@ button is *Ask for access*):
    shows into the one box in the extension's panel. The code is typed once into the sign-in sitting
    running on a compute node and is not kept. When your worker connects, the claude.ai tab opens by
    itself, once for each new session link in this browser; after that, and on every later click on
-   the icon, the panel shows the green *Open in Claude* button (with *Copy link* beside it), which
-   opens it again.
+   the icon, the panel shows the green *Open my session* button (with *Copy link* beside it), which
+   opens it again. If you work in a project on claude.ai, give Beethoven its address once, in
+   Settings: the tab that opens when it connects, while that is on, is then your project, the button
+   reads *Open my project*, and under it the panel says what to do there (choose *Work locally* from
+   the + menu, write the task, press *Allow once* on the card), because a project cannot take a
+   session your worker started by itself; *New session*, *Copy link* and *Phone* keep the worker's
+   own link.
 
 The paste stays because that is where Anthropic's rule puts the line: the sign-in must complete
 through Anthropic's own flow, so the extension opens the page and takes the code from you, and never
@@ -137,8 +142,8 @@ through, no `y` to type at Claude Code's one-time Remote Control question (the p
 answer in the same statement, records it in your cluster account, and your worker gives it to Claude
 Code when asked) and no terminal to break out of: the sitting ends itself when Claude Code says it is
 signed in. The settings that exist (shell host, site profile, permission mode, *start my worker when I
-open my portal* and *open claude.ai when my worker connects*, both on by default in the current build)
-live on the extension's options page, and the seventeen checks and the logs sit under
+open my portal* and *open claude.ai when my worker connects*, both on by default in the current build,
+and the address of your project on claude.ai, if you work in one) live on the extension's options page, and the seventeen checks and the logs sit under
 *Details* in the panel for the day something does not work.
 
 The optional step *Connect Google Drive in claude.ai* is still there: it opens
@@ -150,9 +155,10 @@ box kept only in the browser; the extension has no presence on that page.
 From the report's "deliberately absent" list and its security controls:
 
 - No code on claude.ai or any Anthropic page: no content script, no host permission, no `fetch`
-  patch, no forged responses. It opens exactly two kinds of page outside the portal, in a new tab,
-  as a bookmark would: the sign-in page Claude Code printed during the sitting you started, and your
-  session's `https://claude.ai/code?environment=...` link (plus the connectors page from the optional
+  patch, no forged responses. It opens exactly three kinds of page outside the portal, in a new tab,
+  as a bookmark would: the sign-in page Claude Code printed during the sitting you started, your
+  session's `https://claude.ai/code?environment=...` link, and, when you gave its address in Settings,
+  your project's `https://claude.ai/code/project/...` page (plus the connectors page from the optional
   step). It never reads those pages.
 - No handling of a Claude credential: no `setup-token`, no `CLAUDE_CODE_OAUTH_TOKEN`, no reading of
   Claude Code's credentials file, no multi-account rotation. The student signs in through Anthropic's
@@ -245,7 +251,7 @@ asks again every minute." Their fixes and the three-step flow above are being bu
 product name and identifier carry no university name. Written approval from Wayne State C&IT and a
 written answer from Anthropic precede any paid edition.
 
-Versions in this tree: the extension is 20.0.0 (4.0.0 was the first version without licence keys;
+Versions in this tree: the extension is 21.0.0 (4.0.0 was the first version without licence keys;
 6.0.0 sets up the lab's shared copy of the framework where a site has one; 7.0.0 is the first named
 Beethoven, with new public addresses and nothing new about data; 8.0.0 carries no framework code at
 all, sets an account up only from the lab's shared copy, sends its installation's random identifier
@@ -265,12 +271,15 @@ itself with the AccessID and password typed into its own sheet, saves the passwo
 only when the student ticks *Remember it on this computer*, and keeps Chrome's sign-in box as the
 other way; 20.0.0 approves an account from every installation of its own, the service keeping the
 ten most recent and e-mailing the maintainer of a new one with a link to withdraw and none to move,
-where 8.0.0 to 19.0.0 bound an account to one installation; `release/<version>/README.md` lists a
+where 8.0.0 to 19.0.0 bound an account to one installation; 21.0.0 takes the address of the
+student's project on claude.ai in Settings and opens that project, with what to do there, in place
+of a plain session, since a project reaches the worker only through its own *Work locally*;
+`release/<version>/README.md` lists a
 version's changes, up to 14.0.0); the framework is the server repository's,
 `OpenSpineConsortium/hpcworker`, and the lab's shared copy at Wayne State is the version its
 `tools/deploy_shared.sh` last published (the panel shows it under *Details*); the agreement
-`LICENSE.txt` is version 14 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
-14 to match; `PRIVACY.md` is version 15. All integers; a changed text moves its version with it.
+`LICENSE.txt` is version 15 and the extension's `TERMS_VERSION` (`extension/src/core/terms.ts`) is
+15 to match; `PRIVACY.md` is version 16. All integers; a changed text moves its version with it.
 
 ## Build and release (for the next developer)
 
@@ -415,8 +424,8 @@ build that sends no installation identifier (before 8.0.0) is refused once the s
 - `docs/MAC_AND_SAFARI.md`: what a Safari edition would need (none is offered).
 - `docs/LICENSE-FULL-NOTE.md`: how a paid edition's agreement will be made.
 - `docs/TESTERS.md`: what a tester does, from asking for access to the first worker; no key to enter.
-- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 14; the extension's
-  `TERMS_VERSION` is 14) and the privacy statement (version 15).
+- `LICENSE.txt`, `PRIVACY.md`: the Trial Edition agreement (version 15; the extension's
+  `TERMS_VERSION` is 15) and the privacy statement (version 16).
 - `SECURITY.md`: threat model, controls, how to report a problem.
 - `CLAUDE.md`: working rules for this repository.
 - `docs/prior_analysis_architecture.txt`, `docs/prior_analysis_protocols.txt`: the two earlier

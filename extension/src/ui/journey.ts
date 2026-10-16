@@ -625,6 +625,7 @@ function online(m: OnlineMoment, ctx: JourneyCtx): HTMLElement {
       ? el('div', { class: `once${m.pinTip.done ? ' done' : ''}`, role: 'status', style: 'margin-top:24px' }, m.pinTip.done ? drawnCheck(18) : icon('pin', 18), el('p', { text: m.pinTip.text }))
       : null,
     spacer(),
-    el('div', { class: 'm-foot' }, button(m.primary, ctx.onAct, { pending: ctx.pending })),
+    // 21.0.0: with "Open my project", what to do in the project, in the home's reminder style
+    el('div', { class: 'm-foot' }, button(m.primary, ctx.onAct, { pending: ctx.pending }), m.how ? el('p', { class: 'home-reminder', text: m.how }) : null),
   );
 }

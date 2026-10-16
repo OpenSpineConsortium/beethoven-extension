@@ -22,7 +22,7 @@ A click on the toolbar icon (or the portal tab connecting, when the automatic st
 the strip, whose decision function (`decide` in `extension/src/core/steps.ts`) picks the first step
 not yet satisfied from facts gathered by reads only (`gatherFacts` in `core/facts.ts`;
 `ARCHITECTURE.md` 6.1). Each step is idempotent: on a cluster where everything is already in place the
-strip goes straight to *Open in Claude*. The student reads the title and the status line; the
+strip goes straight to *Open my session*. The student reads the title and the status line; the
 engineer's test is in the third column.
 
 | # | id | Title the student reads | What it does | Stops, and the student sees |
@@ -37,7 +37,7 @@ engineer's test is in the third column.
 | S8 | `statement` | Where your work goes | The disclosure is shown; the statement text (the classification sentence and the Remote Control sentence) is on record for this workspace on the text version in force; the first acknowledgement writes the consent marker `~/.hpcworker/consent` (4.4); also when the run says `need_consent` | "Read where your work goes and make the statement about worker `<name>`" with the tick and *I have read this and the statement is true*; a workspace marked restricted (listing rule) stops here with the marker's path |
 | S9 | `start` | Starting your worker | No live worker (a run set less than ten minutes ago with no `status.json` yet counts as live); the consent marker written if still owed; one shell line `hpcworker worker start` under the 60 s floor | "Starting your worker in N s (the scheduler is asked at most once a minute)"; "Your worker could not be started: `<reason>`" (*Try again*); "Your worker is stopped. Start it again when you want it" (*Start my worker*); "Your worker ended with a problem: `<message>`" (*Start it again*) |
 | S10 | `online` | Waiting for your worker | `status.json` and `connection.json` read every 10 s for the first two minutes after a start and every 60 s after that while the strip is open (once a minute from the background's alarm otherwise; file reads touch no scheduler) until the environment link appears; a preempted job with a successor queued waits for it | "Your worker (job N): waiting for the job to start / the job is starting Claude Code / Claude Code is registering..." |
-| S11 | `open` | Open in Claude | The link matches `https://claude.ai/code?environment=env_...`; opened once per link per browser (`bridge.opened`) when *open claude.ai when my worker connects* is on; the green button stays | "Your worker is online: `<session name>`" |
+| S11 | `open` | Open my session (Open my project with a project named in Settings, 21.0.0) | The link matches `https://claude.ai/code?environment=env_...` (or a session's link, 14.0.0); opened once per link per browser (`bridge.opened`) when *open claude.ai when my worker connects* is on, the project's page in its place when one is named; the green button stays | "Your worker is online: `<session name>`" |
 
 ## The 17 checks under Details
 
@@ -77,7 +77,7 @@ that explains it. What the two steps hold themselves to:
 | Step | What the student reads when it fails | What the extension does | Ends with | Note |
 |---|---|---|---|---|
 | S7, the sitting | "The sign-in did not complete: `<the framework's sentence>`. You can try again; nothing was stored" | One shell held open for the sitting (`openLoginShell`, one audit line with the bytes read and typed); the framework's lines arrive in order (`HPCW-LOGIN:` progress, then `AUTH-URL:` or an immediate `SIGNED-IN`, then `SIGNED-IN` or `HPCW-LOGIN-FAILED:`); `AUTH-URL` is `https` on `claude.ai` or `claude.com` before it is opened (else reported as refused); the code goes to the shell as keystrokes and is kept nowhere; the framework ends the sitting after ten minutes for the paste (and waits at most ten for a node), the panel closes the socket after fifteen | `SIGNED-IN` | Engineer: nothing is printed while the framework waits for the code and no keep-alive is sent; whether the portal's five-minute idle timer closes a slow sitting is not yet measured (a progress line once a minute is the fix if it does). A portal tab reload ends the sitting, and the strip says so |
-| S11, the link | (nothing; a link that does not match is shown as text) | The link the job reported matches `https://claude.ai/code?environment=env_...` exactly; anything else is shown as text and never opened; a matching link is opened once per link per browser (`bridge.opened`) when the setting is on, and by the green button on request | the tab open | The only claude.ai page the strip opens by itself |
+| S11, the link | (nothing; a link that does not match is shown as text) | The link the job reported matches `https://claude.ai/code?environment=env_...` exactly; anything else is shown as text and never opened; a matching link is opened once per link per browser (`bridge.opened`) when the setting is on, and by the green button on request; since 21.0.0 the project's page named in Settings opens in its place, and the link stays on New session and Copy link | the tab open | The only claude.ai page the strip opens by itself, or the project's page |
 
 ## What the student sees
 
@@ -95,9 +95,10 @@ tail, the audit log (view, export, clear), the access and agreement line, the se
 Drive step. A student never sees close codes, endpoint paths, environment variable names or module
 lists; those go to the log the student can open and export.
 
-Three things in the same panel are not checks. The green *Open in Claude* button appears when the
+Three things in the same panel are not checks. The green *Open my session* button appears when the
 files carry the session's claude.ai link and opens it in a new tab (with *Copy link* beside it); the
-strip opens that tab once by itself unless the student turned the setting off. The setting *start my
+strip opens that tab once by itself unless the student turned the setting off. Since 21.0.0, with a
+project named in Settings, *Open my project* takes its place and the project's page is the tab. The setting *start my
 worker when I open my portal* runs the same steps when the portal tab connects, and is explained in one
 sentence where it is switched (on by default in the current build; the maintainer's review settles
 which ships). The optional step *Connect Google Drive in claude.ai* opens

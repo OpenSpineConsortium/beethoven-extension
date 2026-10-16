@@ -372,6 +372,19 @@ export const WORDS = {
     unreachableHero: "Can't reach the grid",
     unreachableSub: (app: string) => `Is ${app} on? Your worker keeps running.`,
     openSession: 'Open my session',
+    /**
+     * 21.0.0: with a project named in Settings (keys.ts Prefs.project_url), the primary opens the project's page in
+     * place of a plain session, and the sentence under it says what to do there: a project reaches the worker's folder
+     * only through its own Work locally and the card it answers with. Its three labels are claude.ai's own, from
+     * code.claude.com/docs/en/claude-projects, "Run a thread on your own computer", as read on 2026-10-16 ("choose
+     * Work locally from the + menu beside the message box"; the "Allow Claude to work in a folder on your device" card;
+     * "Then click Allow once"), so they follow that page when it changes. The card below the online home offers
+     * Settings while no project is named, once; it says what the address changes, not that a tab opens, since the
+     * switch above it in Settings decides that.
+     */
+    openProject: 'Open my project',
+    projectHow: 'In your project, choose Work locally from the + menu, write the task, and press Allow once on the card.',
+    projectCard: 'Working in a project on claude.ai? Add its address in Settings, and Beethoven opens your project in place of a plain session.',
     connect: 'Connect',
     connectReminder: "Your worker's files and output go to Anthropic. Keep restricted data out.",
     signInClaude: 'Sign in to Claude',
@@ -462,6 +475,17 @@ export const WORDS = {
     modes: { default: 'Ask before each command', acceptEdits: 'Accept edits', plan: 'Plan only' },
     keepRunning: 'Keep my worker running',
     openClaude: 'Open Claude when my worker is ready',
+    /**
+     * 21.0.0: the project row under Your worker. The address is the page's own, copied from the address bar; a
+     * thread's address is taken too, since it carries the project's. The sentences say what the address changes.
+     */
+    project: 'Your project on claude.ai',
+    projectNone: 'None named. Open my session opens a plain session on your worker.',
+    projectNote: "Open my project opens it, and so does the tab that opens when your worker is ready, in place of your session's page. In the project, ask Claude to work in your worker's folder.",
+    projectBad: "That isn't a project's address. Copy it from the address bar while your project is open: it starts with https://claude.ai/code/project/.",
+    projectAdd: 'Add',
+    projectUse: 'Use',
+    projectClear: 'Clear',
     appearance: 'Appearance',
     appearances: { cream: 'Cream', system: 'Match system' },
     grid: 'Your grid',
@@ -834,8 +858,10 @@ export interface OnlineMoment {
   hero: string;
   /** "Ready in Claude, 7 min after you asked. Look for Wayne State grid." or the bad-link sentence */
   sub: string;
-  /** "Open my session" (teal) */
+  /** "Open my session" (teal); 21.0.0: "Open my project" while a project is named in Settings, as on the home */
   primary: ButtonView;
+  /** 21.0.0: what to do in the project (WORDS.home.projectHow), under "Open my project" */
+  how?: string;
   track: TrackView;
   /** play the 600 ms ring burst once */
   burst: boolean;
@@ -896,6 +922,8 @@ export interface HeroView {
 export type HomePrimary =
   /** "Open my session" (teal), when online or last seen online; never needs the grid */
   | { kind: 'open-session'; button: ButtonView }
+  /** 21.0.0: "Open my project" (teal) in its place while a project is named in Settings, with `how` (WORDS.home.projectHow) under it */
+  | { kind: 'open-project'; button: ButtonView; how: string }
   /** "Connect" (ink), when stopped or never started, with "Your worker's files and output go to Anthropic. Keep restricted data out." beside it */
   | { kind: 'connect'; button: ButtonView; reminder: string }
   /** "Sign in to Claude" (ink), when the worker needs it (moment 8 follows) */
@@ -937,7 +965,8 @@ export interface HomeView {
   track?: TrackView;
   primary?: HomePrimary;
   /** online only: "New session" (14.0.0: only with an environment link), "Copy link", "Phone" */
-  secondary?: { newSession?: ButtonView; copyLink: string; phone: string };
+  /** 21.0.0: openSession, an outline "Open my session", while the project holds the primary and no new session can start there (a resumed session's own link), so the running session keeps a button */
+  secondary?: { newSession?: ButtonView; openSession?: ButtonView; copyLink: string; phone: string };
   /**
    * the worker's link (Copy link and Phone are page-local, from this), either form (14.0.0): the environment link
    * https://claude.ai/code?environment=env_…, or a resumed session's own https://claude.ai/code/session_…
@@ -950,7 +979,7 @@ export interface HomeView {
   /** online only, for the first 3 days or until dismissed with its × */
   tryAsking?: { eyebrow: string; prompts: readonly string[]; copied: string; dismiss: Action };
   /** the pin tip; "See what it can do · 16 s" on the first online home if the tour never played */
-  cards: Array<{ id: 'pin-tip' | 'tour-card'; text: string; done?: boolean; open?: Action; dismiss: Action }>;
+  cards: Array<{ id: 'pin-tip' | 'tour-card' | 'project-tip'; text: string; done?: boolean; open?: Action; dismiss: Action }>;
   /** Show log: closed every time the panel opens (page-local); the lines arrive when it is opened */
   log: { show: string; hide: string; copy: string; lines?: LogLine[] };
   /** a toast the core asks for once ("Start a new session there. It runs on your worker.") */
@@ -1088,6 +1117,8 @@ export interface SettingsView {
     modes: Array<{ value: 'default' | 'acceptEdits' | 'plan'; label: string }>;
     keepRunning: boolean;
     openClaude: boolean;
+    /** 21.0.0: the project's address as stored (keys.ts Prefs.project_url); absent while none is named */
+    project?: string;
   };
   appearance: { value: Appearance; options: Array<{ value: Appearance; label: string }> };
   grid: { address?: string; suggested?: string; change: string; disconnect: string };
@@ -1184,6 +1215,8 @@ export type Action =
   // the home
   /** "Open my session": brings forward the claude.ai tab Beethoven opened if it has had no new load, else opens the link in one new tab; never needs the grid */
   | { kind: 'open-session' }
+  /** 21.0.0: "Open my project": the page named in Settings */
+  | { kind: 'open-project' }
   /** "New session": opens the environment link in a new tab (the first time, the toast) */
   | { kind: 'new-session' }
   /** "Your files": the worker's folder in the portal's Files app, in a tab (needs the grid sign-in) */
@@ -1194,7 +1227,7 @@ export type Action =
   /** the tour started, was skipped, or ended (records TOUR_SEEN_KEY) */
   | { kind: 'tour'; event: 'start' | 'auto' | 'skip' | 'done' }
   /** a one-time card's × or its done state */
-  | { kind: 'dismiss'; card: 'try-asking' | 'pin-tip' | 'tour-card' }
+  | { kind: 'dismiss'; card: 'try-asking' | 'pin-tip' | 'tour-card' | 'project-tip' }
   /** Show log opened or closed: while open, the background downloads progress.log when it changes */
   | { kind: 'log'; open: boolean }
   // AM2: the one-time key step (UNPROVEN ON THE GRID)
@@ -1208,7 +1241,8 @@ export type Action =
   /** "Check a compute node": the probe, Details only */
   | { kind: 'check-compute-node' }
   // Settings
-  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance }> }
+  /** 21.0.0: project_url is what the student typed; the background keeps it in the one shape it opens (contract.ts projectLinkOf), an empty one clears it, and refuses anything else (saved: false) */
+  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance; project_url: string }> }
   /** "Change" (Your grid): the welcome page's portal field, in Settings */
   | { kind: 'change-portal'; origin: string; granted: boolean }
   /** "Disconnect": forgets the portal and removes the origin grant */
@@ -1250,6 +1284,8 @@ export interface ActionResults {
   'reopen-claude-tab': { opened: boolean };
   retry: { started: boolean };
   'open-session': { focused: boolean; opened: boolean };
+  /** 21.0.0: the project's page, brought forward or opened; neither when no project is named */
+  'open-project': { focused: boolean; opened: boolean };
   'new-session': { opened: boolean; firstTime: boolean };
   'open-files': { opened: boolean };
   'open-settings': { opened: boolean };

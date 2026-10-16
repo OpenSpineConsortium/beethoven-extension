@@ -1,6 +1,16 @@
 # Use Beethoven
 
-For Beethoven 20.0.0. Written 2026-10-02, updated 2026-10-13.
+For Beethoven 21.0.0. Written 2026-10-02, updated 2026-10-16.
+
+**New in 21.0.0.** If you work in a project on claude.ai, give Beethoven its address once, in
+Settings (copy it from the address bar while your project is open; it starts with
+`https://claude.ai/code/project/`). From then on the tab that opens when your worker is ready, while
+that is on, is your project, the panel's button reads **Open my project**, and under it the panel
+says what to do there:
+choose **Work locally** from the **+** menu, write the task, and press **Allow once** on the card. A
+plain session opened from the worker's link cannot be made part of a project afterwards, which is why
+the project comes first. **New session**, **Copy link** and **Phone** keep the worker's own link.
+Beethoven asks you to accept its terms once more, because they now say so.
 
 **New in 20.0.0.** Your approval covers every installation of your own: Beethoven works on a second
 computer of yours, or in another Chrome profile, from its first check. Beethoven asks you to accept
@@ -148,7 +158,9 @@ These steps are the same as in earlier versions.
    **Continue**.
 10. **In line for a computer.** You can close the panel. It starts as soon as a computer is free.
 11. **You're online.** Click **Open my session**. Ask in claude.ai, or in the Claude app on your
-    phone.
+    phone. If you gave your project's address in Settings, the button is **Open my project**: in the
+    project, choose **Work locally** from the **+** menu, write the task, and press **Allow once** on
+    the card.
 
 ## 2. Every day
 
@@ -161,8 +173,8 @@ These steps are the same as in earlier versions.
    if you saved your sign-in, the link says **Unlock** instead: click it and use Windows Hello or
    Touch ID. If it says **Can't reach**, GlobalProtect is off (part 3). Chrome stays signed in to
    the grid until you close it, so you sign in about once each time you open Chrome.
-4. Use the panel as before: **Connect**, **Open my session**, **New session**, **Copy link**,
-   **Phone**, **Stop**. **New session** is there only when your worker can start a new conversation;
+4. Use the panel as before: **Connect**, **Open my session** (or **Open my project**), **New
+   session**, **Copy link**, **Phone**, **Stop**. **New session** is there only when your worker can start a new conversation;
    a worker that picked up an earlier conversation runs that one, and **Open my session** opens it.
 
 Your worker keeps running when you close the panel, the browser or the laptop, and when

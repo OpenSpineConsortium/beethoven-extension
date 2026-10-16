@@ -105,7 +105,9 @@ welcome page needs; nothing else is entered there.
    terminal, and the extension does not keep it.
 
 When your worker connects, your session's claude.ai page opens in a new tab (you can turn that off
-in Settings), and the panel shows a green *Open my session* button for later. The worker stays
+in Settings), and the panel shows a green *Open my session* button for later. If you work in a
+project on claude.ai, name its address in Settings, under *Your project on claude.ai*: Beethoven then
+opens your project instead, with *Open my project*, and says what to do there. The worker stays
 on by itself until you press *Stop*.
 
 ## After it connects, nothing on your laptop is needed

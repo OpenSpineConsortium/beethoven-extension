@@ -22,6 +22,10 @@ import type { Gestures } from './welcome';
 export interface SettingsLocal {
   nameEditing: boolean;
   nameValue?: string;
+  /** 21.0.0: the project's address being typed (Your project on claude.ai), and the refusal when the address is not a project's */
+  projectEditing: boolean;
+  projectValue?: string;
+  projectError?: string;
   changeOpen: boolean;
   portalInput?: string;
   portalError?: string;
@@ -75,7 +79,7 @@ function switchRow(id: string, label: string, on: boolean, onToggle: (on: boolea
 
 export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Gestures; local?: Partial<SettingsLocal>; onAppearance?: (a: Appearance) => void }): { show: (v: SettingsView) => void } {
   const g = opts.gestures;
-  const local: SettingsLocal = { nameEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmStartOver: false, confirmForget: false, ...(opts.local ?? {}) };
+  const local: SettingsLocal = { nameEditing: false, projectEditing: false, changeOpen: false, termsOpen: false, activityOpen: false, labLeadOpen: false, confirmDisconnect: false, confirmStartOver: false, confirmForget: false, ...(opts.local ?? {}) };
   let view: SettingsView | undefined;
   let texts: Texts | undefined;
   let page: HTMLElement | undefined;
@@ -88,6 +92,21 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
     render();
   };
   const pref = (prefs: Extract<Action, { kind: 'set-pref' }>['prefs']) => void opts.act({ kind: 'set-pref', prefs });
+  // 21.0.0: the project's address is kept only in a project's form; a refused one stays in the field with the reason.
+  // The field's elements are looked up in the page the panel is drawn in (root's document), never the global one,
+  // so a caret sent after the field has closed finds the row's button in the browser and in a test alike.
+  const byId = <T extends HTMLElement>(id: string): T | null => root.ownerDocument.getElementById(id) as T | null;
+  // No answer at all (the message to the background failed) says nothing about the address: the field stays as typed,
+  // with no reason under it, for the next press of Use.
+  const useProject = (value: string) => {
+    void opts.act({ kind: 'set-pref', prefs: { project_url: value } }).then((r) => {
+      if (r?.saved) {
+        set({ projectEditing: false, projectValue: undefined, projectError: undefined });
+        setTimeout(() => byId('project-change')?.focus(), 0);
+      } else if (r?.saved === false) set({ projectValue: value, projectError: WORDS.settings.projectBad });
+      else set({ projectValue: value });
+    });
+  };
 
   const changePortal = (value: string) => {
     const c = checkPortal(value);
@@ -179,6 +198,60 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
           el('button', { type: 'button', class: 'btn btn-outline', text: v.grid.change, onClick: () => { const name = (local.nameValue ?? w.name).trim(); if (name) pref({ worker_name: name }); set({ nameEditing: false }); } }),
         )
       : el('div', { class: 's-row' }, el('span', { class: 's-label', text: WORDS.statement.workerName(w.name) }), el('button', { type: 'button', class: 'btn btn-outline', text: v.grid.change, onClick: () => { set({ nameEditing: true }); setTimeout(() => (document.getElementById('worker-name') as HTMLInputElement | null)?.focus(), 0); } }));
+    // 21.0.0: the project on claude.ai that Open my project and the tab opened when the worker is ready go to
+    const editProject = () => { set({ projectEditing: true, projectValue: w.project ?? '', projectError: undefined }); setTimeout(() => byId<HTMLInputElement>('project-url')?.focus(), 0); };
+    // the field closed by Escape or Enter: focus back on the row's button, not lost to the page
+    const closeProject = () => { set({ projectEditing: false, projectValue: undefined, projectError: undefined }); setTimeout(() => byId('project-change')?.focus(), 0); };
+    const projectRow = local.projectEditing
+      ? el(
+          'div',
+          { class: 's-row stack', key: 'project' },
+          el(
+            'div',
+            { class: 'field-row' },
+            el('input', {
+              type: 'text',
+              class: 'field',
+              id: 'project-url',
+              value: local.projectValue ?? w.project ?? '',
+              placeholder: LABELS.projectExample,
+              'aria-label': LABELS.projectAddress,
+              'aria-invalid': local.projectError ? 'true' : undefined,
+              'aria-describedby': local.projectError ? 'project-url-error' : undefined,
+              autocomplete: 'off',
+              spellcheck: 'false',
+              inputmode: 'url',
+              'data-autofocus': '',
+              onInput: (e: Event) => {
+                local.projectValue = (e.currentTarget as HTMLInputElement).value;
+              },
+              onKeydown: (e: Event) => {
+                const k = e as KeyboardEvent;
+                if (k.key === 'Escape') closeProject();
+                if (k.key === 'Enter') {
+                  k.preventDefault();
+                  useProject((k.currentTarget as HTMLInputElement).value);
+                }
+              },
+            }),
+            el('button', { type: 'button', class: 'btn btn-ink', text: WORDS.settings.projectUse, onClick: () => useProject(byId<HTMLInputElement>('project-url')?.value ?? local.projectValue ?? '') }),
+          ),
+          local.projectError ? el('p', { class: 'field-error', id: 'project-url-error', key: 'project-error', role: 'alert', text: local.projectError }) : el('p', { class: 'fine', key: 'project-note', text: WORDS.settings.projectNote }),
+        )
+      : w.project
+        ? el(
+            'div',
+            { class: 's-row', key: 'project' },
+            el('span', { class: 's-label' }, el('span', { class: 'mono', text: w.project }), el('span', { class: 's-sub', text: WORDS.settings.projectNote })),
+            el('div', { class: 'btns' },
+              el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: v.grid.change, onClick: editProject }),
+              // the caret goes to the row's first button before the row is redrawn: that button stays, as Add, and Clear goes
+              el('button', { type: 'button', class: 'btn btn-outline', text: WORDS.settings.projectClear, onClick: () => { byId('project-change')?.focus(); pref({ project_url: '' }); } }),
+            ),
+          )
+        : // Add sits where Change will be, in the same group, so the redraw that names the project keeps the very button
+          // the caret is on (the morph pairs children by tag and place)
+          el('div', { class: 's-row', key: 'project' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('div', { class: 'btns' }, el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: WORDS.settings.projectAdd, onClick: editProject })));
     const next = el(
       'main',
       { class: 'settings' },
@@ -191,6 +264,7 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         switchRow('keep-running', WORDS.settings.keepRunning, w.keepRunning, (on) => pref({ auto_start: on })),
         switchRow('open-claude', WORDS.settings.openClaude, w.openClaude, (on) => pref({ open_claude_on_connect: on })),
       ),
+      card(WORDS.settings.project, projectRow),
       card(
         WORDS.settings.appearance,
         el('div', { class: 's-row' }, seg(LABELS.appearance, v.appearance.value, v.appearance.options, (a) => { opts.onAppearance?.(a); pref({ appearance: a }); })),

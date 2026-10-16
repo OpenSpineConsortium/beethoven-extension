@@ -48,7 +48,7 @@ import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/chan
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, isClaudeCodeLink, isEnvironmentUrl, parseJobId, paths, planAllowsRemoteControl, planWord, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { commands, isClaudeCodeLink, isEnvironmentUrl, isProjectUrl, parseJobId, paths, planAllowsRemoteControl, planWord, projectLinkOf, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
@@ -63,6 +63,7 @@ import {
   CHECKLIST_KEY,
   CHECKS_KEY,
   CLAUDE_TAB_KEY,
+  PROJECT_TAB_KEY,
   DEFAULT_PREFS,
   GRID_KEY,
   IDENTITY_KEY,
@@ -331,7 +332,7 @@ function setFail(detail: string, logged?: string): void {
 /** a link as the debug log names it: whether there is one, and its form (never the link) */
 function linkWord(link: string | undefined): string {
   if (!link) return 'none';
-  return isEnvironmentUrl(link) ? 'present (environment link)' : isClaudeCodeLink(link) ? 'present (session link)' : 'not a Claude Code link';
+  return isEnvironmentUrl(link) ? 'present (environment link)' : isClaudeCodeLink(link) ? 'present (session link)' : isProjectUrl(link) ? 'present (project link)' : 'not a Claude Code link';
 }
 
 /** an address as the debug log may show it: host and path only (an authorize link keeps nothing of its query) */
@@ -1221,6 +1222,8 @@ async function actInner(a: Action): Promise<unknown> {
       return retry();
     case 'open-session':
       return openSession();
+    case 'open-project':
+      return openProject();
     case 'new-session': {
       const f = await buildFacts();
       // 14.0.0: a new session needs an environment link, the one the home's button was offered for (newSessionLinkOf): any
@@ -1260,7 +1263,7 @@ async function actInner(a: Action): Promise<unknown> {
       }
       return { recorded: true } satisfies ActionResults['tour'];
     case 'dismiss':
-      await once(a.card === 'try-asking' ? { try_asking_dismissed_at: nowIso() } : a.card === 'pin-tip' ? { pin_tip_done_at: nowIso() } : { tour_card_dismissed_at: nowIso() });
+      await once(a.card === 'try-asking' ? { try_asking_dismissed_at: nowIso() } : a.card === 'pin-tip' ? { pin_tip_done_at: nowIso() } : a.card === 'project-tip' ? { project_card_dismissed_at: nowIso() } : { tour_card_dismissed_at: nowIso() });
       return { recorded: true } satisfies ActionResults['dismiss'];
     case 'log': {
       mem.logOpen = a.open;
@@ -1292,6 +1295,13 @@ async function actInner(a: Action): Promise<unknown> {
         // another worker: its own run, its own statement
         await mutateRun(() => null);
         mem.restricted = false;
+      }
+      // 21.0.0: the project's address is kept in one form (projectLinkOf); an empty one clears it; anything else is refused, so the panel can say so
+      if ('project_url' in a.prefs) {
+        const link = projectLinkOf(a.prefs.project_url);
+        if (String(a.prefs.project_url ?? '').trim() && !link) return { saved: false } satisfies ActionResults['set-pref'];
+        if (link) next.project_url = link;
+        else delete next.project_url;
       }
       await local.set(PREFS_KEY, next);
       return { saved: true } satisfies ActionResults['set-pref'];
@@ -2649,10 +2659,10 @@ async function setShellWord(shell: ChannelNote['shell']): Promise<void> {
 // ---- tabs Beethoven opened ---------------------------------------------------------------------------
 
 async function onTabUpdated(tabId: number, info: { status?: string; url?: string }, tab: { url?: string; windowId?: number }): Promise<void> {
-  // every tab load in the browser wakes this: one read of the four records, and nothing more for a tab not Beethoven's
+  // every tab load in the browser wakes this: one read of the five records, and nothing more for a tab not Beethoven's
   if (!info.status) return;
-  const T = await session.many([SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY]);
-  if (![SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, TERMINAL_TAB_KEY].some((k) => (T[k] as OpenedTab | undefined)?.tabId === tabId)) return;
+  const T = await session.many([SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, PROJECT_TAB_KEY, TERMINAL_TAB_KEY]);
+  if (![SIGNIN_TAB_KEY, ANTHROPIC_TAB_KEY, CLAUDE_TAB_KEY, PROJECT_TAB_KEY, TERMINAL_TAB_KEY].some((k) => (T[k] as OpenedTab | undefined)?.tabId === tabId)) return;
   const signin = T[SIGNIN_TAB_KEY] as OpenedTab | undefined;
   if (signin && signin.tabId === tabId && info.status) {
     const rec = noteLoad(signin, info.status);
@@ -2691,6 +2701,11 @@ async function onTabUpdated(tabId: number, info: { status?: string; url?: string
     await session.set(CLAUDE_TAB_KEY, noteLoad(claude, info.status));
     return;
   }
+  const project = await session.get<OpenedTab>(PROJECT_TAB_KEY);
+  if (project && project.tabId === tabId && info.status) {
+    await session.set(PROJECT_TAB_KEY, noteLoad(project, info.status));
+    return;
+  }
   const term = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
   if (term && term.tabId === tabId && info.status === 'complete') await watchTerminal(term);
 }
@@ -2710,6 +2725,8 @@ async function onTabRemoved(tabId: number): Promise<void> {
   }
   const claude = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
   if (claude?.tabId === tabId) await session.remove(CLAUDE_TAB_KEY);
+  const project = await session.get<OpenedTab>(PROJECT_TAB_KEY);
+  if (project?.tabId === tabId) await session.remove(PROJECT_TAB_KEY);
   const term = await session.get<OpenedTab>(TERMINAL_TAB_KEY);
   if (term?.tabId === tabId) {
     await session.remove(TERMINAL_TAB_KEY);
@@ -3865,7 +3882,8 @@ async function afterRead(): Promise<void> {
       if (r.started_by !== 'found' || rf.pressed) mem.onlineAnnouncedAt = now;
       if (rf.pressed && prefs.open_claude_on_connect && rf.link && r.opened_env !== rf.link) {
         r = { ...r, opened_env: rf.link };
-        open = rf.link;
+        // 21.0.0: a named project opens in place of the worker's own link, since a project takes the worker only through Work locally there
+        open = isProjectUrl(prefs.project_url) ? prefs.project_url : rf.link;
       }
     }
     return changed ? r : undefined;
@@ -3876,10 +3894,13 @@ async function afterRead(): Promise<void> {
   }
   if (gotComputer) await activity(LOG_WORDS.gotComputer);
   if (online) {
-    dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? '; opening it in a new tab' : ''}`);
+    dbg('online', `job ${run?.job ?? '-'} is online, link ${linkWord(runFacts(run, now).link)}${open ? (isProjectUrl(open) ? "; opening the project, or bringing forward the project's tab Beethoven opened" : '; opening it in a new tab') : ''}`);
     await once({ first_online_at: nowIso() });
     await activity(LOG_WORDS.online(titled ?? sessionTitleFor((await siteProfile((await settingsNow())?.site ?? (await welcomeSite())))?.session_title, prefs.worker_name)));
-    if (open) await openSessionTab(open);
+    // 21.0.0: the project's page is the same page every time, so the tab Beethoven opened for it is brought forward
+    // while it has had no new load since, as Open my project does, never a second one; the worker's link is a new
+    // page with each new link, so it opens in a tab of its own as before
+    if (open) await (isProjectUrl(open) ? focusOrOpen(open, 'the worker is online') : openSessionTab(open));
     await releaseKeptTab();
     setTimeout(() => schedulePush(), 4_100);
   }
@@ -3924,9 +3945,14 @@ async function maybeKeepRunning(): Promise<void> {
 
 // ---- claude.ai --------------------------------------------------------------------------------------
 
-/** open the worker's link in one new tab and remember it (claude.ai's tab is never closed by Beethoven); 14.0.0: either form */
+/** the record of the claude.ai tab opened for this address: the project's page and the worker's link each keep one (21.0.0) */
+function tabKeyOf(link: string): string {
+  return isProjectUrl(link) ? PROJECT_TAB_KEY : CLAUDE_TAB_KEY;
+}
+
+/** open the worker's link, or the project's page, in one new tab and remember it (claude.ai's tab is never closed by Beethoven); 14.0.0: either form of link; 21.0.0: the project's page too, under its own record */
 async function openSessionTab(link: string): Promise<boolean> {
-  if (!isClaudeCodeLink(link)) {
+  if (!isClaudeCodeLink(link) && !isProjectUrl(link)) {
     dbg('open', `session tab: not opened (link ${linkWord(link)})`);
     return false;
   }
@@ -3934,11 +3960,27 @@ async function openSessionTab(link: string): Promise<boolean> {
   const t = await openTab(link, { active: true, anthropicOk: true, ...(win !== undefined ? { windowId: win } : {}) });
   dbg('open', `session tab: ${t ? 'opened' : 'the browser opened no tab'} (link ${linkWord(link)})`);
   if (!t) return false;
-  await session.set(CLAUDE_TAB_KEY, { tabId: t.tabId, windowId: t.windowId, url: `${new URL(link).origin}/code`, opened_at: nowIso(), purpose: 'session', loaded: false, loads_after: 0 } satisfies OpenedTab);
+  await session.set(tabKeyOf(link), { tabId: t.tabId, windowId: t.windowId, url: `${new URL(link).origin}/code`, opened_at: nowIso(), purpose: 'session', loaded: false, loads_after: 0 } satisfies OpenedTab);
   return true;
 }
 
-/** "Open my session": the claude.ai tab Beethoven opened when it has had no new load since, else one new tab; never two; never needs the grid */
+/**
+ * the claude.ai tab Beethoven opened for this address, brought forward when it has had no new load since, else one new
+ * tab; never two; never needs the grid. 21.0.0: the worker's link and the project's page each keep a record of their own
+ * (tabKeyOf), so Open my session and Open my project each bring forward their own tab and never take the other's.
+ */
+async function focusOrOpen(link: string, what: string): Promise<{ focused: boolean; opened: boolean }> {
+  const rec = await session.get<OpenedTab>(tabKeyOf(link));
+  const exists = rec ? !!(await tabNow(rec.tabId)) : false;
+  if (rec && sessionTabDecision(rec, exists) === 'focus') {
+    const ok = await focusTab(rec.tabId, rec.windowId);
+    dbg('open', `${what}: ${ok ? 'the tab Beethoven opened, focused' : 'focusing its tab failed'}`);
+    if (ok) return { focused: true, opened: false };
+  }
+  return { focused: false, opened: await openSessionTab(link) };
+}
+
+/** "Open my session": the worker's own link (focusOrOpen) */
 async function openSession(): Promise<ActionResults['open-session']> {
   const f = await buildFacts();
   const link = f.run.link ?? f.lastKnown?.environment_url;
@@ -3946,14 +3988,17 @@ async function openSession(): Promise<ActionResults['open-session']> {
     dbg('open', `open my session: no link (${linkWord(link)})`);
     return { focused: false, opened: false };
   }
-  const rec = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
-  const exists = rec ? !!(await tabNow(rec.tabId)) : false;
-  if (rec && sessionTabDecision(rec, exists) === 'focus') {
-    const ok = await focusTab(rec.tabId, rec.windowId);
-    dbg('open', `open my session: ${ok ? 'the tab Beethoven opened, focused' : 'focusing its tab failed'}`);
-    if (ok) return { focused: true, opened: false };
+  return focusOrOpen(link, 'open my session');
+}
+
+/** "Open my project" (21.0.0): the project's page the student named in Settings, where Claude takes the worker through Work locally */
+async function openProject(): Promise<ActionResults['open-project']> {
+  const link = (await loadPrefs()).project_url;
+  if (!isProjectUrl(link)) {
+    dbg('open', `open my project: no project named (${linkWord(link)})`);
+    return { focused: false, opened: false };
   }
-  return { focused: false, opened: await openSessionTab(link) };
+  return focusOrOpen(link, 'open my project');
 }
 
 

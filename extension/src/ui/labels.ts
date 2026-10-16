@@ -19,6 +19,9 @@ export const LABELS = {
   appearance: 'Appearance',
   workerName: 'Worker name',
   portalAddress: 'Grid address',
+  /** 21.0.0: the project field in Settings and what it shows while empty */
+  projectAddress: 'Project address',
+  projectExample: 'https://claude.ai/code/project/...',
   codeBox: 'Code from the Claude tab',
   tick: 'Required',
   newTab: 'Opens in a new tab',

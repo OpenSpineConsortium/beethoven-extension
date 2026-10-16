@@ -24,7 +24,14 @@ recent and e-mailing the maintainer of a new one with a link to withdraw and non
 agreement is version 13 and the privacy statement version 14; 19.0.0 was accepted by the store (greg,
 2026-10-13). On 2026-10-13 the maintainer decided that 20.0.0 goes out **Public** ("i want to release
 20 and public"): the agreement is version 14 and the privacy statement version 15, and the item's
-visibility changes from Private to Public. Beethoven is offered in one place only: one item on the
+visibility changes from Private to Public. 21.0.0 (2026-10-16) changes no permission and no data
+type: Settings takes the address of a project of yours on claude.ai, kept with the other
+preferences, and the page opened when the worker is ready is then the project's page, which a plain
+session cannot be made part of; the agreement is version 15 and the privacy statement version 16.
+The site's privacy.html and terms.html, built from this repository's texts, show versions 16 and 15
+before any upload of 21.0.0, as the gates below say: the listing's privacy policy link points at that
+page, and `release.yml` uploads every push to `main` once `CWS_ON_PUSH` is set. Beethoven is
+offered in one place only: one item on the
 Chrome Web Store, Public since 20.0.0; from 8.0.0 to 19.0.0 it was a Private item visible to the
 trusted testers the maintainer named, a Google Group he kept with his personal Google account and to
 which he added each student he approved for Beethoven. No other store, no download from the website
@@ -110,8 +117,8 @@ Have these in hand, and check each once:
    until a 20.0.0 video exists. Each PNG without alpha or JPEG at the exact size (`PASTE.md` has a
    one-line check). Look at each one before it is uploaded.
 3. The five public pages, live and answering 200: `https://openspineconsortium.com/beethoven/`,
-   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 15), `.../beethoven/terms.html`
-   (the text of `LICENSE.txt` version 14), `.../beethoven/support.html` and
+   `.../beethoven/privacy.html` (the text of `PRIVACY.md` version 16), `.../beethoven/terms.html`
+   (the text of `LICENSE.txt` version 15), `.../beethoven/support.html` and
    `.../beethoven/request.html` (which must fill its AccessID field from `?access_id=<account>`,
    since the panel's *Ask for access* button opens it that way, and which no longer asks for a
    Google account). The pages show one install card, Chrome, linking the listing, and no download and
@@ -119,7 +126,7 @@ Have these in hand, and check each once:
    The listing's address (`https://chromewebstore.google.com/detail/<item-id>`, item 4) goes into
    the site generator's `BROWSERS` first, so the card has its button before students are sent to it.
    `docs/PUBLISHING_SITE.md` builds and checks them. **The upload waits until
-   https://openspineconsortium.com/beethoven/privacy.html shows version 15**: 19.0.0's Authentication
+   https://openspineconsortium.com/beethoven/privacy.html shows version 16**: 19.0.0's Authentication
    information answer and its two permissions rest on that text, 20.0.0's installation rule and its
    public listing too, and the reviewers page
    (`/beethoven/reviewers.html`) must carry `LISTING.md`'s negative-statement block word for word.
@@ -210,7 +217,7 @@ The item (about thirty minutes):
    using remote code?" No; Data usage: tick "Personally identifiable information" and
    "Authentication information", each with its sentence from `PASTE.md`, and leave every other
    category unticked; tick the three certifications; Privacy policy URL
-   `https://openspineconsortium.com/beethoven/privacy.html` (version 15 live). Save draft.
+   `https://openspineconsortium.com/beethoven/privacy.html` (version 16 live). Save draft.
 7. **Distribution** tab: Payments Free; Visibility **Public** (decided 2026-10-13 for 20.0.0; the
    item was Private from its first submission to 19.0.0, with the Beethoven-users group as its
    trusted testers, which stays empty from now on). Regions: United States only, which is why the
@@ -246,9 +253,9 @@ updated from one of them loses the `nativeMessaging` permission without a prompt
 direct way left in the browser on its first run, and notes once in Settings a key an earlier version
 added to the grid account). An update to 19.0.0 adds `webRequest` and `webRequestAuthProvider`,
 neither of which shows a line in Chrome's install dialog, so Chrome does not disable the installed
-copy or ask the student anything; an update to 20.0.0 changes no permission at all. The changed
-agreement (version 14) is shown again on the first run and accepted again before Beethoven does
-anything.
+copy or ask the student anything; an update to 20.0.0 or 21.0.0 changes no permission at all. The
+changed agreement (version 15 since 21.0.0) is shown again on the first run and accepted again
+before Beethoven does anything.
 
 ## 2. The deploy order with the access service
 

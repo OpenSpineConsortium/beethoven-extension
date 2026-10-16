@@ -584,7 +584,8 @@ The name line and the `https://claude.ai/code?environment=...` URL go into `conn
 the same login joins the same environment. The extension opens `environment_url` in a new tab with
 `browser.tabs.create` (which needs no `tabs` permission and puts no code on claude.ai) once per link
 per browser (`bridge.opened` remembers which links it opened) when the setting *open claude.ai when my
-worker connects* is on (its default), and shows the green *Open in Claude* button and *Copy link*
+worker connects* is on (its default), and shows the green *Open my session* button (*Open in Claude*
+until 14.0.0) and *Copy link*
 either way; it still names the session for students who prefer to pick it at claude.ai/code or under
 *Code* in the Claude app. No QR code is needed.
 
@@ -787,7 +788,7 @@ installed and is never set up again by itself; the tool keeps the profile; 2.1),
 worker the student stopped stays stopped until they press *Start my worker*), `online` (`status.json`
 and `connection.json` once a minute until the link appears; a preempted job with a successor waits for
 it) and `open` (the environment link, opened once per link per browser when the setting is on). A run
-on a cluster where everything is in place goes from the click to *Open in Claude* with the warm-up,
+on a cluster where everything is in place goes from the click to *Open my session* with the warm-up,
 a few Files reads and no scheduler call. A step that needs a person shows one line and one button and
 resumes when the person acts (the page script's hello after a portal sign-in, the tick, the paste); a
 step that fails for a cluster reason shows the reason and a *Try again* button and points at the check
@@ -809,7 +810,7 @@ ships. The options page explains each in one sentence where it is switched.
 
 **The panel** (`ui/strip.ts`, `ui/terminal.ts`, `ui/details.ts`): the strip, with the step's own
 input when it has one (the statement, the sign-in terminal with its one box and *Open the
-sign-in page again*); when the run is green, the *Open in Claude* button, *Copy link*, *Stop* and the
+sign-in page again*); when the run is green, the *Open my session* button, *Copy link*, *Stop* and the
 session name; and under *Details*: the worker card (job, node, state, the sign-in and consent the
 heartbeat reports, the chain), the buttons *Set up the cluster again*, *Run the probe job again*, *Sign
 in on the cluster*, *Start worker*, *Stop* and *Read status now*, the seventeen checks with *Run the
@@ -827,7 +828,8 @@ type: approval is confirmed by the background against the access service for the
 portal shows, and the strip and *Details* say what the last answer was. Nothing on the setup page is
 needed for the three steps once the agreement is in place.
 
-**Two further panel items** decided on 2026-09-29 and unchanged since: *Open in Claude* and *Copy
+**Two further panel items** decided on 2026-09-29: *Open in Claude*, *Open my session* since 14.0.0
+and *Open my project* in its place with a project named in Settings since 21.0.0, and *Copy
 link* (shown when the files carry `environment_url`, opening it with `browser.tabs.create`, no `tabs`
 permission needed, nothing of the extension on the page), and *Connect Google Drive in claude.ai* (a
 checklist step opening `https://claude.ai/settings/connectors` in a new tab with one sentence and a
@@ -865,9 +867,9 @@ From the report's "Security controls", in the order a reviewer will look for the
   set them. - **No `cookies` permission.** The portal cookie is used by the network stack and never
   read. - **No script on claude.ai or any Anthropic page.** The only content script is on the portal
   origin, which removes the DOM-injection and prototype-skimming classes for everything except the
-  portal page itself. The two kinds of Anthropic page the extension opens (the sign-in page Claude
-  Code printed; the session's claude.ai/code link) open in a new tab with `tabs.create` and are
-  never read. The extension never stores a Claude credential and never touches the MFA approval
+  portal page itself. The three kinds of Anthropic page the extension opens (the sign-in page Claude
+  Code printed; the session's claude.ai/code link; since 21.0.0 the project's page the student named
+  in Settings) open in a new tab with `tabs.create` and are never read. The extension never stores a Claude credential and never touches the MFA approval
   step. - **The grid password, under a narrow rule (19.0.0).** The only answer the background gives
   to an HTTP sign-in is the one in the 19.0.0 paragraph at the top: its own dashboard request, the
   granted origin and, once one is recorded, realm, once per armed check, nothing after the first
