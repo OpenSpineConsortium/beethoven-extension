@@ -25,8 +25,8 @@
  * bump both with the text (integer, never fractional) and every install re-accepts. The build
  * (scripts/sync-profiles.mjs) refuses to bundle a LICENSE.txt whose line disagrees with these.
  */
-export const TERMS_VERSION = 16;
-export const TERMS_DATE = '2026-10-18';
+export const TERMS_VERSION = 15;
+export const TERMS_DATE = '2026-10-16';
 export const PRODUCT_NAME = 'Beethoven';
 export const TERMS_TITLE = `${PRODUCT_NAME} Trial Edition License Agreement`;
 export const AGREE_BUTTON = 'Agree and continue';
@@ -253,9 +253,6 @@ export function bindAccount(r: TermsRecord, account: string, at = new Date().toI
  * 20.0.0 (LICENSE version 14, PRIVACY version 15: one person's approval on every installation of their
  * own, and the public listing; versions 13 and 14 of 2026-10-11 were drafted for 20.0.0 and never
  * shipped): a version 12 acceptance is kept in the history the same way and is out of force.
- * 22.0.0 (LICENSE version 16, PRIVACY version 17: the lab lead's GitHub Actions gate, section 5(h)): a
- * version 15 acceptance is kept in the history the same way and is out of force, as section 17 asks of
- * any change to the agreement, the privacy statement being part of it.
  */
 export function recordInForce(r: unknown): r is TermsRecord {
   const x = r as TermsRecord | undefined;

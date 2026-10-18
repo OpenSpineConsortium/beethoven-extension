@@ -537,8 +537,10 @@ acceptance when it changes materially.
 Version 17 (2026-10-18, Beethoven 22.0.0): *For your lab lead* in Settings gains *Connect GitHub
 Actions* and *Remove*, which type one line each in the portal's shell to set up or take out the
 grid's ssh gate for one GitHub repository from the lab lead's own copy of hpcworker, as the section
-on your cluster account says, and section 5(h) of the agreement, version 16, says the same.
-Nothing is stored and nothing reaches Licensor. Version 16's other terms are unchanged.
+on your cluster account says. Nothing is stored and nothing reaches Licensor. Licensor treats this
+change as not material to the agreement, since nothing is typed unless a lab lead presses one of the
+two buttons, so the agreement stays at version 15 and an acceptance of it stays in force. Version 16's
+other terms are unchanged.
 
 Version 16 (2026-10-16, Beethoven 21.0.0): Settings takes the address of a project of yours on
 claude.ai, kept in `storage.local` with your other preferences until you clear it. With one given,

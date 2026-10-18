@@ -13,9 +13,9 @@ import { acceptanceComplete, AFFIRMATION, AFFIRMATIONS_TWO, AGREE_BUTTON, bindAc
 const read = (rel: string) => readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
 describe('the terms version', () => {
-  it("is 16, dated 2026-10-18 (22.0.0: the lab lead's GitHub Actions gate, section 5(h), on top of 21.0.0's project page; LICENSE version 16, PRIVACY version 17)", () => {
-    expect(TERMS_VERSION).toBe(16);
-    expect(TERMS_DATE).toBe('2026-10-18');
+  it("is 15, dated 2026-10-16 (21.0.0: the project's page among the pages Beethoven opens and its address among the preferences, on top of 20.0.0's public listing; LICENSE version 15, PRIVACY version 16)", () => {
+    expect(TERMS_VERSION).toBe(15);
+    expect(TERMS_DATE).toBe('2026-10-16');
   });
 
   it('is an integer that names the LICENSE.txt line at the repository root, with its date', () => {
@@ -27,8 +27,11 @@ describe('the terms version', () => {
   });
 
   // nothing else reads PRIVACY.md's line, so a statement left at its old version would pass every other gate
-  it('names PRIVACY.md version 17, with the same date, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['17', TERMS_DATE]);
+  // 22.0.0 raised the statement alone (version 17, 2026-10-18), greg's choice of that day ("Statement only"): its one
+  // change is the lab lead's two buttons, which type nothing unless a lab lead presses them, so the agreement and the
+  // acceptance in force stay as they were
+  it('names PRIVACY.md version 17, of 2026-10-18, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['17', '2026-10-18']);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {
@@ -78,7 +81,7 @@ describe('the record (TermsRecord v2)', () => {
 
   it('says what was shown, what was ticked, whether the full text was opened, and from which installation', async () => {
     const r = await buildTermsRecord(input);
-    expect(r).toMatchObject({ v: 2, terms_version: 16, terms_date: '2026-10-18', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
+    expect(r).toMatchObject({ v: 2, terms_version: 15, terms_date: '2026-10-16', edition: 'trial', summary_lines: [...SUMMARY], button_label: 'Agree and continue', surface: 'welcome', terms_opened: false, terms_end_reached: false, opened_in_tab: false, saved_copy: true, printed: false, accepted_at: '2026-10-01T12:00:00.000Z', product_version: '11.0.0', host: 'Chrome 153', install_id: input.installId });
     expect(r.affirmations).toEqual([{ id: 'agree', label: tickLabel(AFFIRMATION), checked: true }]);
     expect(r.license_sha256).toBe(await sha256(input.license));
     // CRLF and LF hash alike: the text, not its line endings
@@ -93,10 +96,9 @@ describe('the record (TermsRecord v2)', () => {
     expect(openedSentence(opened)).toBe('The full text was opened before Agree.');
   });
 
-  it('is in force only as v2 for version 16 with the box ticked; a v1 record and a version 15 record are kept, out of force', async () => {
+  it('is in force only as v2 for version 15 with the box ticked; a v1 record and a version 14 record are kept, out of force', async () => {
     const r = await buildTermsRecord(input);
-    expect(r.terms_version).toBe(16);
-    expect(recordInForce({ ...r, terms_version: 15 })).toBe(false);
+    expect(r.terms_version).toBe(15);
     expect(recordInForce({ ...r, terms_version: 14 })).toBe(false);
     expect(recordInForce({ ...r, terms_version: 12 })).toBe(false);
     expect(recordInForce({ ...r, terms_version: 11 })).toBe(false);
