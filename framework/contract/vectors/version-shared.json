@@ -5,7 +5,7 @@
  "command": "hpcworker version",
  "exit": 0,
  "stdout": [
-  "17 (shared copy at /scratch/shared/current)"
+  "18 (shared copy at /scratch/shared/current)"
  ],
  "stderr": []
 }

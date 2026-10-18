@@ -4,7 +4,7 @@
  "summary": "status.json as `worker start` writes it, the worker in line",
  "file": "status.json",
  "json": {
-  "version": 17,
+  "version": 18,
   "site": "testsite",
   "run": "worker",
   "job": "40501234",
