@@ -15,8 +15,10 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   clean,
+  CLONE_RE,
   commands,
   consentSourceWords,
+  DEFAULT_CLONE,
   DEFAULT_WORKER_NAME,
   INSTALL_RE,
   isClaudeAuthUrl,
@@ -35,6 +37,7 @@ import {
   parseStepLine,
   PROGRESS,
   PROGRESS_LINE_RE,
+  REPO_RE,
   SITE_RE,
   STEP_EXIT,
   STEP_RE,
@@ -193,7 +196,7 @@ const TOOL = { tool: `${SHARED}/bin/hpcworker`, shared_install: SHARED };
  * Each builder of `commands` and the cli.json command it types. The others type a line cli.json does not
  * list, each named with its reason; a builder on neither list fails, and so does a stale entry.
  */
-const TYPED: Record<string, string> = { connect: 'connect', statusJson: 'worker-status', stop: 'worker-stop', restrict: 'worker-restrict', consentRecord: 'consent-record', installShared: 'install-shared', loginSetup: 'login-setup' };
+const TYPED: Record<string, string> = { connect: 'connect', statusJson: 'worker-status', stop: 'worker-stop', restrict: 'worker-restrict', consentRecord: 'consent-record', installShared: 'install-shared', loginSetup: 'login-setup', gateSetup: 'grid-gate-setup', gateOff: 'grid-gate-off' };
 const NOT_IN_CLI: Record<string, string> = {
   discover: "typed by checks.ts (the login node's discovery) through ~/.hpcworker/bin: kept by framework 10 for 10.0.0 (framework/contract-text/V11_CONTRACT.md section 19), not in cli.json",
   probe: 'typed by background.ts (the compute-node check): the same section 19, not in cli.json',
@@ -212,6 +215,10 @@ describe('the commands it types, against cli.json', () => {
     expect(SITE_RE.source).toBe(CLI.values.site?.pattern);
     expect(INSTALL_RE.source).toBe(CLI.values.install_id?.pattern);
     expect(INSTALL_ID_RE.source).toBe(CLI.values.install_id?.pattern);
+    // a literal regular expression writes cli.json's / as \/, as RegExp does with the same pattern
+    expect(REPO_RE.source).toBe(new RegExp(CLI.values.repo?.pattern ?? '(none)').source);
+    expect(CLONE_RE.source).toBe(new RegExp(CLI.values.clone?.pattern ?? '(none)').source);
+    expect(DEFAULT_CLONE).toBe(CLI.values.clone?.default);
     expect([...LOGINS]).toEqual(CLI.values.login?.enum);
     expect([...MODES]).toEqual(CLI.values.permission_mode?.enum);
     // the build refuses a profile whose name the commands could not carry (scripts/sync-profiles.mjs)
@@ -244,6 +251,11 @@ describe('the commands it types, against cli.json', () => {
     expect(templateRe(cliLine('consent-record'), TOOL).test(commands.consentRecord(SHARED, ID))).toBe(true);
     expect(templateRe(cliLine('install-shared'), TOOL).test(commands.installShared(SHARED, 'wayne'))).toBe(true);
     expect(templateRe(cliLine('login-setup'), TOOL).test(commands.loginSetup(SHARED))).toBe(true);
+    // 22.0.0: the lab lead's gate, from their own clone
+    for (const [clone, repo] of [['hpcworker', 'OpenSpineConsortium/symphony-template'], ['src/hpc_worker.2', 'a/b'], ['_x', 'A-1/.github']]) {
+      expect(templateRe(cliLine('grid-gate-setup'), {}).test(commands.gateSetup(clone!, repo!, 'wayne')), `${clone} ${repo}`).toBe(true);
+      expect(templateRe(cliLine('grid-gate-off'), {}).test(commands.gateOff(clone!, repo!, 'wayne')), `${clone} ${repo}`).toBe(true);
+    }
   });
 
   it('refuses before anything is typed a value cli.json would refuse', () => {
@@ -253,6 +265,11 @@ describe('the commands it types, against cli.json', () => {
       expect(() => commands.statusJson(SHARED, name), name).toThrow();
       expect(() => commands.stop(SHARED, name), name).toThrow();
       expect(() => commands.restrict(SHARED, name), name).toThrow();
+    }
+    // 22.0.0: a repository, a clone or a site the gate's lines would refuse
+    for (const [clone, repo, site] of [['../x', 'a/b', 'wayne'], ['.ssh', 'a/b', 'wayne'], ['/abs', 'a/b', 'wayne'], ["h'x", 'a/b', 'wayne'], ['hpcworker', 'a', 'wayne'], ['hpcworker', "a/b'c", 'wayne'], ['hpcworker', '-a/b', 'wayne'], ['hpcworker', 'a/b', '-w'], ['a/../b', 'a/b', 'wayne']]) {
+      expect(() => commands.gateSetup(clone!, repo!, site!), `${clone} ${repo} ${site}`).toThrow();
+      expect(() => commands.gateOff(clone!, repo!, site!), `${clone} ${repo} ${site}`).toThrow();
     }
     // a site name that begins with "-": cli.json refuses it, and until 2026-10-07 connect and the install typed it
     for (const site of ['-wayne', 'Wayne', '', 'a'.repeat(33)]) {

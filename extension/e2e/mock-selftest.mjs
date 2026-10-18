@@ -395,7 +395,9 @@ if (section('connect') || section('queue')) {
   check('rc.log carries the registration block parseRegistration reads', C.parseRegistration(readOn(path.join(rd, 'rc.log')) ?? '').environment_url === on?.environment_url);
   const prog = (readOn(path.join(rd, 'progress.log')) ?? '').trim().split('\n').map(C.parseProgressLine);
   check('progress.log: asked, got a computer, connecting, online with the link', JSON.stringify(prog.map((p) => p?.kind)) === JSON.stringify(['asked', 'got-computer', 'connecting', 'online']) && prog[3]?.arg === on?.environment_url, JSON.stringify(prog.map((p) => p?.kind)));
-  check("the job's output says \"<H:MM> Online. Open in Claude: <link>\"", new RegExp(`^\\d{1,2}:\\d\\d Online\\. Open in Claude: ${on?.environment_url.replace(/[?]/g, '\\?')}`).test(readOn(path.join(rd, `slurm_${q.job}.out`)) ?? ''));
+  // The job's output line follows status.json, so it too is waited for rather than read once.
+  const onlineOut = new RegExp(`^\\d{1,2}:\\d\\d Online\\. Open in Claude: ${on?.environment_url.replace(/[?]/g, '\\?')}`);
+  check("the job's output says \"<H:MM> Online. Open in Claude: <link>\"", !!(await until(() => onlineOut.test(readOn(path.join(rd, `slurm_${q.job}.out`)) ?? ''), 5_000)));
   const sj2 = C.parseStatusJson(await sh.run(C.commands.statusJson(SHARED_WAYNE, 'worker')));
   check('worker status --json once online: no scheduler question, "Your worker is online (ready N min after you asked)."', sj2?.scheduler === null && /^Your worker is online \(ready \d+ min after you asked\)\.$/.test(sj2?.line ?? ''), sj2?.line);
   check('the chain queued a successor (next.id, next_job)', /^\d+ \d+$/.test((readOn(path.join(rd, 'next.id')) ?? '').trim()) && !!on?.next_job);
@@ -513,8 +515,13 @@ if (section('clock')) {
   const m = await mock({ sharedInstall: '/lab/shared/hpcworker/current', seedShared: true, claudeSignedIn: false, queueS: 1, startS: 1, abandonS: 5 });
   await connectTranscript(m, C.commands.connect('/lab/shared/hpcworker/current', { name: 'worker', site: 'mock', login: 'never', permissionMode: 'default', chain: true }));
   const rd = runDirOf(m, 'worker', false);
-  const nl = await until(() => statusOf(m, 'worker', false)?.state === 'need_login' && statusOf(m, 'worker', false), 15_000);
-  check('signed out of Claude: status need_login, needs login, "Waiting for your Claude sign-in"', nl?.needs === 'login' && /Waiting for your Claude sign-in$/m.test(readOn(path.join(rd, 'progress.log')) ?? ''));
+  // The mock writes status.json before it appends the progress line, so both are waited for: a read
+  // between the two writes saw need_login with no line yet and failed on CI.
+  const nl = await until(() => {
+    const s = statusOf(m, 'worker', false);
+    return s?.state === 'need_login' && /Waiting for your Claude sign-in$/m.test(readOn(path.join(rd, 'progress.log')) ?? '') && s;
+  }, 15_000);
+  check('signed out of Claude: status need_login, needs login, "Waiting for your Claude sign-in"', nl?.needs === 'login');
   const ab = await until(async () => {
     const s = statusOf(m, 'worker', false);
     const lastLine = (readOn(path.join(rd, 'progress.log')) ?? '').trim().split('\n').pop();

@@ -4,10 +4,10 @@
 // restrict`; the scheduler's reason comes from `worker status --json`. A refused floor is waited out
 // silently and retried, never shown. And a queued worker is live.
 import { describe, expect, it } from 'vitest';
-import { FloorError } from '../src/core/audit';
+import { classifyCommand, FloorError } from '../src/core/audit';
 import { commands, paths } from '../src/core/contract';
 import type { PortalApi } from '../src/core/portal';
-import { clusterContext, connectLine, recordConsentByShell, restrictByShell, restrictedReason, statusByShell, stopByShell, withFloor, workerLive } from '../src/core/worker';
+import { clusterContext, connectLine, gateByShell, gateSentence, recordConsentByShell, restrictByShell, restrictedReason, statusByShell, stopByShell, withFloor, workerLive } from '../src/core/worker';
 
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
@@ -121,5 +121,36 @@ describe('the worker through the shell', () => {
     expect(workerLive({ state: 'stopped', updated_at: '2026-10-01T11:59:59Z' }, now)).toBe(false);
     expect(workerLive({ state: 'preempted', updated_at: '2026-10-01T11:59:59Z' }, now)).toBe(false);
     expect(workerLive({ state: 'error' }, now)).toBe(false);
+  });
+});
+
+describe('22.0.0: the grid\'s ssh gate, from the lab lead\'s own clone', () => {
+  const REPO = 'OpenSpineConsortium/symphony-template';
+  it('types one line, the setup from the clone after it is brought up to date, and reads the tool\'s own sentence', async () => {
+    const said = 'the gate is set up: its key is on this account\'s authorized_keys line for x and in the environment grid\'s secret, and no copy is left here';
+    const { p, typed, writes } = fake({ output: `${said}\ngrid-gate.yml is running with status, the gate's first call from outside: https://github.com/${REPO}/actions/workflows/grid-gate.yml\n` });
+    expect(await gateByShell(p, commands.gateSetup('hpcworker', REPO, 'wayne'), noSleep)).toEqual({ ok: true, said });
+    expect(typed).toEqual([`cd "$HOME"/'hpcworker' && git checkout -q main && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${REPO}' --site 'wayne'`]);
+    expect(writes).toEqual([]);
+  });
+
+  it('a refusal is the last grid_runner: line, without its prefix; with none, the last line the shell printed', () => {
+    expect(gateSentence('note for the university: x\ngrid_runner: the account gh is signed in as is not an admin of a/b. Nothing was changed.\n', false)).toBe('the account gh is signed in as is not an admin of a/b. Nothing was changed.');
+    expect(gateSentence("error: Your local changes would be overwritten by checkout:\n\ttools/x\nAborting\n", false)).toBe('Aborting');
+    expect(gateSentence('no gate key for a/b was in ~/.ssh/authorized_keys\n', true)).toBe('no gate key for a/b was in ~/.ssh/authorized_keys');
+    expect(gateSentence('', false)).toBe('');
+    // the reason is on the line before when the last says only that nothing was changed (refuse_public, visibility)
+    expect(gateSentence('refused: a/b is public. A self-hosted runner serves a private or internal repository only\ngrid_runner: nothing was changed\n', false)).toBe('refused: a/b is public. A self-hosted runner serves a private or internal repository only Nothing was changed.');
+    // done, but grid-gate.yml could not be started: the ask to start it by hand comes first
+    expect(gateSentence('the gate is set up: x\nstart grid-gate.yml with status yourself: https://github.com/a/b/actions/workflows/grid-gate.yml, Run workflow\n', true)).toMatch(/^start grid-gate\.yml with status yourself/);
+    expect(gateSentence(`grid_runner: ${'x'.repeat(500)}`, false)).toHaveLength(400);
+  });
+
+  it('the removal is its own line, and neither line counts as a scheduler call', async () => {
+    const { p, typed } = fake({ output: 'grid_runner: --gate-off changes how your account signs in', exitCode: 1 });
+    expect((await gateByShell(p, commands.gateOff('hpcworker', REPO, 'wayne'), noSleep)).ok).toBe(false);
+    expect(typed).toEqual([`cd "$HOME"/'hpcworker' && bash tools/grid_runner.sh --gate-off --repo '${REPO}' --site 'wayne'`]);
+    expect(classifyCommand(commands.gateSetup('hpcworker', REPO, 'wayne'))).toBe('shell');
+    expect(classifyCommand(commands.gateOff('hpcworker', REPO, 'wayne'))).toBe('shell');
   });
 });

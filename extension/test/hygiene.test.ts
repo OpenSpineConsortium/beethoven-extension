@@ -354,7 +354,8 @@ describe('the words a student reads', () => {
     expect(BANNED('Chrome asks to allow ondemand.grid.wayne.edu.')).toBe(true);
     expect(BANNED('Open Ondemand')).toBe(true);
     expect(BANNED('ondemand.grid.wayne.edu')).toBe(false);
-    const all = [...strings(WORDS, ['details']), ...strings(LOG_WORDS), ...strings(LABELS)];
+    // 22.0.0: Settings' labLeadGate is drawn only inside For your lab lead, exempt as Details is
+    const all = [...strings(WORDS, ['details', 'labLeadGate']), ...strings(LOG_WORDS), ...strings(LABELS)];
     expect(all.length).toBeGreaterThan(200);
     expect(all.filter((t) => BANNED(t) && !ALLOWED.has(t))).toEqual([]);
     // the allow-list is exactly what it says: each allowed sentence is still in the tables

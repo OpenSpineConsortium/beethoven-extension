@@ -512,6 +512,28 @@ export const WORDS = {
     startOverButton: 'Start over',
     labLead: 'For your lab lead',
     /**
+     * 22.0.0: GitHub Actions on the grid. The button runs the gate's setup from the lab lead's own copy of
+     * hpcworker, signed in to GitHub with gh on the grid; Beethoven never sees the key or a GitHub sign-in.
+     */
+    labLeadGate: {
+      title: 'GitHub Actions on the grid',
+      note: "Lets a repository's grid-gate.yml start, check and stop its runner on the grid, and nothing else. Needs your own copy of hpcworker in your grid home, gh signed in there as an admin of the repository, and grid-gate.yml on its main branch.",
+      repo: 'Repository (OWNER/NAME)',
+      clone: 'Your copy of hpcworker, in your grid home',
+      setup: 'Connect GitHub Actions',
+      off: 'Remove',
+      working: 'Working on the grid… this can take a minute.',
+      badRepo: 'Type the repository as OWNER/NAME, like OpenSpineConsortium/symphony-template.',
+      badClone: 'Type the folder under your grid home, like hpcworker.',
+      noGrid: "Beethoven can't reach your grid's shell right now. Sign in to the grid and try again.",
+      cutOff: "The grid stopped answering before the setup said it was done, so it may have run partway. Press it again: each run starts over.",
+      notApproved: "This account isn't approved for Beethoven yet, so nothing was typed.",
+      busy: 'Already working on the grid. Wait for that answer first.',
+      noSite: "Beethoven doesn't know which grid profile this portal uses, so nothing was typed.",
+      failed: 'It stopped on the grid:',
+      open: 'Open grid-gate.yml',
+    },
+    /**
      * 19.0.0: the saved sign-in's row under Your grid. `user` is the AccessID typed into the sheet, `w` the
      * computer's own unlock (as in WORDS.grid). Forget removes the saved password, Beethoven's notes about
      * it and the unlock in memory; the passkey itself is the operating system's or Chrome's to delete, so
@@ -1252,6 +1274,12 @@ export type Action =
   | { kind: 'drive-connected'; done: boolean }
   /** 16.0.0: "Forget" on Settings' note about an earlier version's key: drops the note (nothing on the grid changes) */
   | { kind: 'forget-old-key' }
+  /**
+   * 22.0.0: For your lab lead, "Connect GitHub Actions" (setup) or "Remove" (off): the grid's ssh gate for one
+   * repository, typed through the portal's shell from the lab lead's own hpcworker clone (contract.ts
+   * commands.gateSetup, gateOff); nothing is stored
+   */
+  | { kind: 'gate'; op: 'setup' | 'off'; repo: string; clone: string }
   | { kind: 'start-over' };
 
 export type ActionKind = Action['kind'];
@@ -1306,6 +1334,8 @@ export interface ActionResults {
   'drive-connected': { recorded: boolean };
   'forget-old-key': { forgotten: boolean };
   'start-over': { restarted: boolean };
+  /** 22.0.0: the tool's own sentence (contract.ts gateSentence), or Beethoven's when nothing was typed; `link` the gate's workflow once set up */
+  gate: { ok: boolean; text: string; link?: string };
 }
 
 export type ResultOf<K extends ActionKind> = ActionResults[K];

@@ -27,8 +27,11 @@ describe('the terms version', () => {
   });
 
   // nothing else reads PRIVACY.md's line, so a statement left at its old version would pass every other gate
-  it('names PRIVACY.md version 16, with the same date, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['16', TERMS_DATE]);
+  // 22.0.0 raised the statement alone (version 17, 2026-10-18), greg's choice of that day ("Statement only"): its one
+  // change is the lab lead's two buttons, which type nothing unless a lab lead presses them, so the agreement and the
+  // acceptance in force stay as they were
+  it('names PRIVACY.md version 17, of 2026-10-18, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['17', '2026-10-18']);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {

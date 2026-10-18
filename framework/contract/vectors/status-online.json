@@ -4,7 +4,7 @@
  "summary": "status.json as the job writes it once Remote Control registered",
  "file": "status.json",
  "json": {
-  "version": 17,
+  "version": 18,
   "site": "testsite",
   "run": "worker",
   "job": "4242",

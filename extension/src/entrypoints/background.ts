@@ -48,7 +48,7 @@ import { testChannel, tabPortal, withPortalTab, readyScript } from '../core/chan
 import { buildNodes, type DiagCtx } from '../core/checks';
 import { DEBUG_DETAILS_LINES, DebugRing } from '../core/debuglog';
 import { acceptedSettings, isAnthropicAddress, normaliseOrigin, SCRIPT_ID } from '../core/connect';
-import { commands, isClaudeCodeLink, isEnvironmentUrl, isProjectUrl, parseJobId, paths, planAllowsRemoteControl, planWord, projectLinkOf, reasonClass, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
+import { CLONE_RE, commands, isClaudeCodeLink, isEnvironmentUrl, isProjectUrl, parseJobId, paths, planAllowsRemoteControl, planWord, projectLinkOf, reasonClass, REPO_RE, sessionTitleFor, sharedRootOf, SITE_RE, WORKER_NAME_RE, type ConnectEvent, type ConnectLogin, type ConnectOptions, type SiteProfile, type StatusFile, type ConnectionFile } from '../core/contract';
 import { formatReport, runDiagnostics, type DiagReport } from '../core/diagnostics';
 import { makeAcknowledgement, statementFor, withConsentRecorded, type Statements } from '../core/disclosure';
 import { addActivity, addWait, applyConnection, applyRcLog, applyStatus, claudeLinkOf, listingPlan, mergeLog, runFacts, waitMinutes, type RunState } from '../core/facts';
@@ -124,7 +124,7 @@ import { detailsView, settingsView } from '../core/sheets';
 import { firstRunDone, heroOf, home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type OwnSigninFacts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
-import { connectLine, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
+import { connectLine, gateByShell, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
 import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, requestUrl, type AccessRecord, type AccessTrigger, type StoredServices } from '../licensing/access';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
@@ -252,6 +252,8 @@ const mem = {
   answeredAt: undefined as number | undefined,
   accessChecking: false,
   stopping: false,
+  /** 22.0.0: a lab lead's gate setup or removal is on the grid now (pressGate) */
+  gateBusy: false,
   restricted: false,
   logOpen: false,
   checksRunning: false,
@@ -1345,6 +1347,8 @@ async function actInner(a: Action): Promise<unknown> {
       await local.remove(OLD_KEY_KEY);
       schedulePush();
       return { forgotten: true } satisfies ActionResults['forget-old-key'];
+    case 'gate':
+      return pressGate(a.op, a.repo.trim(), a.clone.trim());
   }
 }
 
@@ -3646,6 +3650,44 @@ async function doRestrict(name: string): Promise<boolean> {
       offerLoginSetup();
     }
     return false;
+  }
+}
+
+/**
+ * 22.0.0: For your lab lead, the grid's ssh gate (greg, 2026-10-18): one line through the shell, from the
+ * lab lead's own clone, now or not at all. It is no press kept for later and waits on no approval: it
+ * changes the lab lead's own account and their own repository, and the tool itself refuses whatever is
+ * not set up (gh, the repository's admin, grid-gate.yml on main) with a sentence shown as it is.
+ */
+async function pressGate(op: 'setup' | 'off', repo: string, clone: string): Promise<ActionResults['gate']> {
+  const G = WORDS.settings.labLeadGate;
+  // GitHub refuses . and .. as a repository's name; the tool would too, but the link shown after would point elsewhere
+  if (!REPO_RE.test(repo) || /\/\.{1,2}$/.test(repo)) return { ok: false, text: G.badRepo };
+  if (!CLONE_RE.test(clone)) return { ok: false, text: G.badClone };
+  // one at a time across every page: two setups at once each make a key, and the grid's line and GitHub's
+  // secret could end up from different runs while both report success
+  if (mem.gateBusy) return { ok: false, text: G.busy };
+  mem.gateBusy = true;
+  try {
+    // the listing is public since 20.0.0: only an approved account's installation types anything, as for connect
+    if (!(await buildFacts()).access.ok) return { ok: false, text: G.notApproved };
+    const s = await settingsNow();
+    if (!s) return { ok: false, text: G.noGrid };
+    const site = await siteForConnect(s);
+    if (!SITE_RE.test(site)) return { ok: false, text: G.noSite };
+    const line = op === 'setup' ? commands.gateSetup(clone, repo, site) : commands.gateOff(clone, repo, site);
+    let typed = false;
+    try {
+      const out = await withShell((p) => gateByShell(p, line, undefined, () => (typed = true)));
+      if (!out.ok) return { ok: false, text: `${G.failed} ${out.said}` };
+      return { ok: true, text: out.said, ...(op === 'setup' ? { link: `https://github.com/${repo}/actions/workflows/grid-gate.yml` } : {}) };
+    } catch (e) {
+      if (isPasswordError(e)) await setShellWord('password');
+      // once the line may have reached the shell, a lost answer says nothing about how far it got
+      return { ok: false, text: typed && !isPasswordError(e) && (e as Error)?.name !== 'FloorError' ? G.cutOff : G.noGrid };
+    }
+  } finally {
+    mem.gateBusy = false;
   }
 }
 

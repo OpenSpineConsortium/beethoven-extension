@@ -8,6 +8,7 @@
 // itself): what is saved and how it opens, and Forget behind its confirm row. Nothing typed is ever on
 // this page; Forget hands the passkey's public credential id to the browser's own "unknown credential"
 // signal, best-effort and never awaited, then asks the background to forget.
+import { DEFAULT_CLONE } from '../core/contract';
 import type { Appearance } from '../core/keys';
 import { WORDS, type Action, type SettingsView } from '../core/model';
 import { signalUnknownPasskey } from '../ext/gridSignin';
@@ -33,6 +34,11 @@ export interface SettingsLocal {
   activityOpen: boolean;
   activityText?: string;
   labLeadOpen: boolean;
+  /** 22.0.0: GitHub Actions on the grid, under For your lab lead: the two fields as typed, a press in flight, and its answer */
+  gateRepo?: string;
+  gateClone?: string;
+  gateBusy?: boolean;
+  gateResult?: { ok: boolean; text: string; link?: string };
   confirmDisconnect: boolean;
   /** "Start over?" [Start over] [Keep going] */
   confirmStartOver: boolean;
@@ -106,6 +112,57 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
       } else if (r?.saved === false) set({ projectValue: value, projectError: WORDS.settings.projectBad });
       else set({ projectValue: value });
     });
+  };
+
+  // 22.0.0: one press at a time; the answer stays under the buttons until the next press
+  const pressGate = (op: 'setup' | 'off') => {
+    if (local.gateBusy) return;
+    const repo = byId<HTMLInputElement>('gate-repo')?.value ?? local.gateRepo ?? '';
+    const clone = byId<HTMLInputElement>('gate-clone')?.value ?? local.gateClone ?? DEFAULT_CLONE;
+    set({ gateRepo: repo, gateClone: clone, gateBusy: true, gateResult: undefined });
+    void opts.act({ kind: 'gate', op, repo, clone }).then(
+      (r) => set({ gateBusy: false, gateResult: r ? { ok: !!r.ok, text: String(r.text ?? ''), ...(r.link ? { link: String(r.link) } : {}) } : { ok: false, text: WORDS.settings.labLeadGate.noGrid } }),
+      () => set({ gateBusy: false, gateResult: { ok: false, text: WORDS.settings.labLeadGate.noGrid } }),
+    );
+  };
+  const gateField = (id: string, label: string, value: string, keep: (v: string) => void) =>
+    el(
+      'label',
+      { class: 's-row stack', style: 'border-top:0;padding:4px 0' },
+      el('span', { class: 's-sub', text: label }),
+      el('input', { type: 'text', class: 'field', id, value, autocomplete: 'off', spellcheck: 'false', disabled: local.gateBusy, onInput: (e: Event) => keep((e.currentTarget as HTMLInputElement).value) }),
+    );
+  const gateSection = () => {
+    const G = WORDS.settings.labLeadGate;
+    const r = local.gateResult;
+    return el(
+      'div',
+      { class: 's-gate', key: 'gate', style: 'padding:0 0 14px' },
+      el('p', { class: 's-label', text: G.title }),
+      el('p', { class: 'fine', text: G.note }),
+      gateField('gate-repo', G.repo, local.gateRepo ?? '', (v) => {
+        // an answer belongs to the repository it was for
+        local.gateRepo = v;
+        delete local.gateResult;
+      }),
+      gateField('gate-clone', G.clone, local.gateClone ?? DEFAULT_CLONE, (v) => (local.gateClone = v)),
+      el(
+        'div',
+        { class: 'btns', style: 'padding-top:8px' },
+        el('button', { type: 'button', class: 'btn btn-ink', id: 'gate-setup', text: G.setup, disabled: local.gateBusy, onClick: () => pressGate('setup') }),
+        el('button', { type: 'button', class: 'btn btn-outline', id: 'gate-off', text: G.off, disabled: local.gateBusy, onClick: () => pressGate('off') }),
+      ),
+      local.gateBusy
+        ? el('p', { class: 'fine', role: 'status', text: G.working })
+        : r
+          ? el(
+              'p',
+              { class: r.ok ? 'fine' : 'field-error', role: r.ok ? 'status' : 'alert' },
+              el('span', { text: r.text }),
+              r.link ? el('a', { class: 'btn btn-link', href: r.link, target: '_blank', rel: 'noopener noreferrer' }, el('span', { text: ` ${G.open}` }), icon('external', 13)) : null,
+            )
+          : null,
+    );
   };
 
   const changePortal = (value: string) => {
@@ -371,7 +428,12 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         fold(
           's-lablead',
           local.labLeadOpen,
-          el('div', { class: 's-kv', style: 'padding:0 0 14px' }, el('div', { text: `${v.labLead.shellHost}` }), el('div', { text: `${v.labLead.siteProfile}` }), ...v.labLead.hashes.map((h) => el('div', { text: h }))),
+          el(
+            'div',
+            {},
+            el('div', { class: 's-kv', style: 'padding:0 0 14px' }, el('div', { text: `${v.labLead.shellHost}` }), el('div', { text: `${v.labLead.siteProfile}` }), ...v.labLead.hashes.map((h) => el('div', { text: h }))),
+            gateSection(),
+          ),
         ),
       ),
       el('p', { class: 's-version' }, LABELS.version(g.productVersion()), ' ', el('button', { type: 'button', class: 'btn btn-link', style: 'font-size:13px', 'aria-label': LABELS.copy, onClick: () => void copyText(LABELS.version(g.productVersion())).then((ok) => ok && toast(WORDS.globalprotect.copied)) }, icon('copy', 13))),

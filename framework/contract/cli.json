@@ -1,7 +1,7 @@
 {
  "format": 1,
  "title": "What a client may ask hpcworker",
- "description": "The command lines another program types to the lab's shared copy (docs/V11_CONTRACT.md section 4) and the lines the gate accepts as its forced command (docs/V12_CONTRACT.md 'The gate'). Everything else hpcworker takes is for people at a terminal and may change in any release. <tool> is <shared_install>/bin/hpcworker, <shared_install> the site profile's value. A value is checked against its pattern before it is placed; a client never quotes around a bad value. Outputs are read through lines.json and the schemas.",
+ "description": "The command lines another program types to the lab's shared copy (docs/V11_CONTRACT.md section 4) and the lines the gate accepts as its forced command (docs/V12_CONTRACT.md 'The gate'). Everything else hpcworker takes is for people at a terminal and may change in any release. <tool> is <shared_install>/bin/hpcworker, <shared_install> the site profile's value; the two grid-gate lines are a lab lead's and run from the lab lead's own clone instead. A value is checked against its pattern before it is placed; a client never quotes around a bad value. Outputs are read through lines.json and the schemas.",
  "values": {
   "name": {"pattern": "^[A-Za-z0-9_-]{1,32}$", "default": "worker"},
   "gate_name": {"pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$"},
@@ -9,7 +9,9 @@
   "install_id": {"pattern": "^[0-9a-f]{32}$"},
   "login": {"enum": ["auto", "always", "never"], "note": "fresh is refused: HPCW-STEP failed usage, exit 2"},
   "permission_mode": {"enum": ["default", "acceptEdits", "plan"]},
-  "gate_file": {"enum": ["status.json", "connection.json", "progress.log", "node"]}
+  "gate_file": {"enum": ["status.json", "connection.json", "progress.log", "node"]},
+  "repo": {"pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}/[A-Za-z0-9_.][A-Za-z0-9_.-]{0,99}$", "note": "a GitHub repository, OWNER/NAME"},
+  "clone": {"pattern": "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}(/[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}){0,7}$", "default": "hpcworker", "note": "the lab lead's own clone of OpenSpineConsortium/hpcworker, a folder under the home; no part begins with a dot, so never .."}
  },
  "commands": [
   {"id": "connect", "line": "exec bash '<tool>' connect --name '<name>' --profile '<site>' [--consent '<install_id>'] --login '<login>' --permission-mode '<permission_mode>' [--no-chain]", "reads": "lines.json step and login families", "stdin": "the pasted code, once, after the code-prompt line"},
@@ -19,7 +21,9 @@
   {"id": "consent-record", "line": "bash '<tool>' claude consent --record '<install_id>'"},
   {"id": "install-shared", "line": "bash '<tool>' install --shared '<shared_install>' --profile '<site>'"},
   {"id": "login-setup", "line": "bash <tool> login-setup", "reads": "lines.json login-setup family", "note": "typed by the student in their own terminal, never by a client's own shell"},
-  {"id": "version", "line": "bash '<tool>' version", "reads": "lines.json version family"}
+  {"id": "version", "line": "bash '<tool>' version", "reads": "lines.json version family"},
+  {"id": "grid-gate-setup", "line": "cd \"$HOME\"/'<clone>' && git checkout -q main && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '<repo>' --site '<site>'", "reads": "the exit status: 0 set up and grid-gate.yml started; anything else refused or failed, the last line beginning grid_runner: says why, or, where it says only that nothing was changed, the line before it does (a public repository, gh unable to read it)", "note": "a lab lead's tool, pressed by a person: the pull asks nothing at the terminal (no HTTPS prompt, ssh in batch mode), since the line runs with a terminal on stdin; it runs from the lab lead's own clone, which the ssh gate's forced command runs from (README.md, A GitHub Actions runner on the grid), never from the shared copy"},
+  {"id": "grid-gate-off", "line": "cd \"$HOME\"/'<clone>' && bash tools/grid_runner.sh --gate-off --repo '<repo>' --site '<site>'", "reads": "the exit status: 0 the line is out, or was not there", "note": "takes the gate's line for the repository out of ~/.ssh/authorized_keys; the secret stays at GitHub until it is deleted there"}
  ],
  "gate": {
   "description": "SSH_ORIGINAL_COMMAND, exactly one of these lines; anything else: HPCW-GATE refused, exit 126",
