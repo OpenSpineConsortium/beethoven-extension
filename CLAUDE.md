@@ -131,6 +131,17 @@ name and identifier carry no university name.
   link* and *Phone* keep the worker's link, with an outline *Open my session* where no new session
   can start. While none is named, a one-time card after the tour card points at Settings. hpcworker
   is unchanged. Agreement 15, privacy 16.
+- **The grid's ssh gate from a lab lead's button (decided 2026-10-18, 22.0.0).** greg chose a
+  Beethoven button over typing (2026-10-18: "i want this to be done by a button click"): Settings'
+  folded *For your lab lead* has *Connect GitHub Actions* and *Remove*, which type hpcworker's
+  published lines `grid-gate-setup` and `grid-gate-off` (its `contract` export, cli.json) through
+  the portal's shell, run from the lab lead's own hpcworker clone in their home (default
+  `hpcworker`) for one repository (OWNER/NAME), with the site profile's name. The tool does the rest
+  with the account's own `gh` sign-in, and its own check that a person pressed it holds because the
+  portal's shell is a terminal with no agent's marker. Beethoven never sees the key or a GitHub
+  sign-in and stores nothing of it; the words are `WORDS.settings.labLeadGate`, exempt from the
+  student's hygiene rule as Details is. Privacy 17 alone (the agreement stays 15 and the acceptance in
+  force stays in force: nothing is typed unless a lab lead presses).
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
@@ -206,7 +217,9 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-16 and extension 21.0.0 `LICENSE.txt` is version 15 and `PRIVACY.md`
+  Edition; since 2026-10-18 and extension 22.0.0 `PRIVACY.md` is version 17, which adds the lab
+  lead's gate buttons to the shell's commands and the cluster account's paragraph, with `LICENSE.txt`
+  unchanged; since 2026-10-16 and extension 21.0.0 `LICENSE.txt` is version 15 and `PRIVACY.md`
   version 16, which add the project's page among the pages Beethoven opens and the project's
   address among the preferences it keeps (the head and section 5(f) of the agreement; the
   preferences row, the small-notes row, the page paragraph and Changes of the statement) on top of

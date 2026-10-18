@@ -151,6 +151,11 @@ export interface ConnectOptions {
 export const WORKER_NAME_RE = /^[A-Za-z0-9_-]{1,32}$/;
 export const SITE_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 export const INSTALL_RE = /^[0-9a-f]{32}$/;
+/** 22.0.0: the lab lead's GitHub repository for the grid's ssh gate, OWNER/NAME (cli.json `repo`) */
+export const REPO_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}\/[A-Za-z0-9_.][A-Za-z0-9_.-]{0,99}$/;
+/** 22.0.0: the lab lead's own hpcworker clone, a path under the home with no `..` and no leading dot (cli.json `clone`) */
+export const CLONE_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}(\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}){0,7}$/;
+export const DEFAULT_CLONE = 'hpcworker';
 export const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
 export const LOGINS: readonly ConnectLogin[] = ['auto', 'always', 'never'];
 
@@ -305,6 +310,23 @@ export const commands = {
   loginSetup(sharedDir: string): string {
     if (!sharedRootOf(sharedDir)) throw new Error('no usable shared copy');
     return `bash ${toolPath(sharedDir)} login-setup`;
+  },
+
+  // ---- 22.0.0 (greg, 2026-10-18: the grid's ssh gate set up by a button, not typed). The lab lead's
+  // own tools, under For your lab lead: they run the lab lead's own clone of hpcworker, never the
+  // shared copy, because the gate's line in authorized_keys points at the clone it was made from and
+  // the setup signs in to GitHub with that account's own gh. The shell is the portal's terminal, so the
+  // tool's own check that a person pressed it (a terminal, no agent's marker) still holds.
+
+  /** the gate's key made, its line written, the environment and its secret set on GitHub, grid-gate.yml started with status */
+  gateSetup(clone: string, repo: string, site: string): string {
+    if (!CLONE_RE.test(clone) || !REPO_RE.test(repo) || !SITE_RE.test(site)) throw new Error('bad gate arguments');
+    return `cd "$HOME"/'${clone}' && git checkout -q main && GIT_TERMINAL_PROMPT=0 git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${repo}' --site '${site}'`;
+  },
+  /** the gate's line out of the account's authorized_keys; the secret on GitHub stays until it is deleted there */
+  gateOff(clone: string, repo: string, site: string): string {
+    if (!CLONE_RE.test(clone) || !REPO_RE.test(repo) || !SITE_RE.test(site)) throw new Error('bad gate arguments');
+    return `cd "$HOME"/'${clone}' && bash tools/grid_runner.sh --gate-off --repo '${repo}' --site '${site}'`;
   },
 };
 

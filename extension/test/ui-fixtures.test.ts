@@ -733,6 +733,47 @@ describe('the pages of 19.0.0, drawn', () => {
     root.remove();
   });
 
+  it("22.0.0: For your lab lead, Connect GitHub Actions sends the two fields as typed, waits one press at a time, and shows the grid's answer with the workflow's link", async () => {
+    const f = fixture('settings-open');
+    if (f?.surface !== 'settings') throw new Error('no fixture');
+    const acts: Action[] = [];
+    let answer!: (r: unknown) => void;
+    const root = doc.createElement('div');
+    doc.body.append(root);
+    const gestures = { hasPanel: true, openPanel: () => Promise.resolve(true), request: () => Promise.resolve(true), openTab: () => undefined, url: (p: string) => p, productVersion: () => '22.0.0', host: () => 'Chrome', installId: () => Promise.resolve('x'), save: () => Promise.resolve(), unknownPasskey: () => undefined };
+    const page = settings.mountSettings(root as unknown as HTMLElement, {
+      act: (a: Action) => {
+        acts.push(a);
+        return new Promise((r) => (answer = r)) as never;
+      },
+      gestures,
+      local: f.local ?? {},
+    });
+    page.show(f.view);
+    const repo = live<HTMLInputElement>(root, '#gate-repo')!;
+    expect(live<HTMLInputElement>(root, '#gate-clone')?.value).toBe('hpcworker');
+    repo.value = 'OpenSpineConsortium/symphony-template';
+    fire(repo, 'input');
+    fire(live(root, '#gate-setup')!, 'click');
+    fire(live(root, '#gate-setup')!, 'click');
+    expect(acts).toEqual([{ kind: 'gate', op: 'setup', repo: 'OpenSpineConsortium/symphony-template', clone: 'hpcworker' }]);
+    expect(root.textContent).toContain(WORDS.settings.labLeadGate.working);
+    expect(live<HTMLButtonElement>(root, '#gate-off')?.disabled).toBe(true);
+    const link = 'https://github.com/OpenSpineConsortium/symphony-template/actions/workflows/grid-gate.yml';
+    answer({ ok: true, text: 'the gate is set up', link });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(root.textContent).toContain('the gate is set up');
+    expect(live(root, `a[href="${link}"]`)).toBeDefined();
+    fire(live(root, '#gate-off')!, 'click');
+    expect(acts.at(-1)).toEqual({ kind: 'gate', op: 'off', repo: 'OpenSpineConsortium/symphony-template', clone: 'hpcworker' });
+    answer({ ok: false, text: `${WORDS.settings.labLeadGate.failed} no` });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(live(root, '.field-error')?.getAttribute('role')).toBe('alert');
+    root.remove();
+  });
+
   it("Settings never shows Forget's sentence under a sign-in saved again", () => {
     const view = (name: string): SettingsView => {
       const f = fixture(name);

@@ -136,3 +136,23 @@ export function workerLive(status: StatusFile | undefined, now = Date.now()): bo
   const age = now - new Date(status.updated_at).getTime();
   return !Number.isFinite(age) || age < STALE_AFTER_MS;
 }
+
+/**
+ * 22.0.0: the lab lead's ssh gate, set up or taken out through the portal's shell (commands.gateSetup,
+ * commands.gateOff). The setup asks GitHub several times and makes a key, so it gets five minutes. `said`
+ * is the tool's own sentence: its refusal (the last `grid_runner:` line) when it failed, else what it did.
+ */
+export async function gateByShell(portal: PortalApi, line: string, sleep?: (ms: number) => Promise<void>): Promise<{ ok: boolean; said: string }> {
+  const r = await withFloor(() => portal.shell(line, { timeoutMs: 300_000 }), sleep);
+  const ok = r.exitCode === 0;
+  return { ok, said: gateSentence(r.output, ok) };
+}
+
+/** the one sentence of the gate's output a lab lead reads; at most 400 characters */
+export function gateSentence(output: string, ok: boolean): string {
+  const lines = String(output ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const refusal = [...lines].reverse().find((l) => l.startsWith('grid_runner: '));
+  const done = ok ? lines.find((l) => /^(the gate is set up|the gate's key for |no gate key for )/.test(l)) : undefined;
+  const said = (!ok && refusal ? refusal.slice('grid_runner: '.length) : done) ?? lines[lines.length - 1] ?? '';
+  return said.slice(0, 400);
+}

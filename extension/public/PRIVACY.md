@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 16, 2026-10-16. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 17, 2026-10-18. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -150,6 +150,19 @@ folder when a sign-in starts, so that a worker waiting for that sign-in does not
 while you are on Anthropic's page. Everything there is in your own account under your institution's
 rules; Licensor has no access to it.
 
+Only if you are a lab lead and press *Connect GitHub Actions* under *For your lab lead* in Settings,
+the extension types one line in the portal's shell that runs the gate's setup from your own copy of
+hpcworker in your grid home, after bringing that copy up to date from its own repository. The
+setup, not Beethoven, makes a key for the gate on the cluster, adds one line for it to your account's
+`~/.ssh/authorized_keys` that lets that key do nothing but start, check or stop the runner of the one
+repository you named, and, with the `gh` sign-in already in your grid account, saves the key as a
+secret of that repository's environment `grid` on GitHub, sets two variables there and starts its
+`grid-gate.yml`; no copy of the key is left on the cluster. *Remove* types the line that takes that
+line out of `authorized_keys`; the secret stays on GitHub until you delete it there. Beethoven
+never sees the key or your GitHub sign-in, keeps neither the repository's name nor the folder you
+typed, and sends nothing of it to Licensor; the line and its answer are in the activity record like
+every other shell command.
+
 ## What your portal sees
 
 The extension makes requests to your university's Open OnDemand portal, and only to it, using the
@@ -165,7 +178,8 @@ panel is open, every thirty seconds while it starts and the panel is closed, and
 otherwise), and reading the version number of your lab's shared copy of the framework; and opening
 the shell for one command at a time (setting your account up to use the lab's copy; connect, which
 starts your worker and, when needed, holds the sign-in sitting described below; status, about once a
-minute while your worker waits for a computer and the panel is open; stop; and mark restricted),
+minute while your worker waits for a computer and the panel is open; stop; mark restricted; and,
+for a lab lead who presses them, *Connect GitHub Actions* and *Remove*),
 once after your first sign-in to test how the portal's shell can be reached (opened and closed with
 nothing typed but `exit`), during the one-time step below to test whether the shell still asks for a
 password, and, from *Details*, for the checks and the check job you start there. The extension types
@@ -516,6 +530,12 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 17 (2026-10-18, Beethoven 22.0.0): *For your lab lead* in Settings gains *Connect GitHub
+Actions* and *Remove*, which type one line each in the portal's shell to set up or take out the
+grid's ssh gate for one GitHub repository from the lab lead's own copy of hpcworker, as the section
+on your cluster account says. Nothing is stored and nothing reaches Licensor. Version 16's other
+terms are unchanged.
 
 Version 16 (2026-10-16, Beethoven 21.0.0): Settings takes the address of a project of yours on
 claude.ai, kept in `storage.local` with your other preferences until you clear it. With one given,
