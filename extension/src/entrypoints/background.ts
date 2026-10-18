@@ -86,6 +86,7 @@ import {
   SIGNIN_STATE_KEY,
   SIGNIN_TAB_KEY,
   SIGNIN_UNLOCK_KEY,
+  UPDATE_READY_KEY,
   STATEMENTS_KEY,
   TERMINAL_TAB_KEY,
   TOUR_SEEN_KEY,
@@ -123,6 +124,7 @@ import { isPasswordError, shellPageUrl, type ShellSession } from '../core/shell'
 import { detailsView, settingsView } from '../core/sheets';
 import { firstRunDone, heroOf, home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, welcomeView, type ConnectFacts, type Facts, type OwnSigninFacts, type SetupFacts, type SigninFacts, type SiteWords } from '../core/steps';
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
+import { UPDATE_CHECK_PERIOD_MINUTES, updateMustWait } from '../core/update';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
 import { connectLine, gateByShell, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
 import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, requestUrl, type AccessRecord, type AccessTrigger, type StoredServices } from '../licensing/access';
@@ -142,6 +144,8 @@ const SIGNIN_ALARM = 'bridge.signin';
 const SIGNIN_ONCE_ALARM = 'bridge.signinOnce';
 const KILLLIST_ALARM = 'bridge.killlist';
 const ACCESS_ALARM = 'bridge.access';
+/** 23.0.0: once a day, ask the store whether a newer Beethoven is out (core/update.ts) */
+const UPDATE_ALARM = 'bridge.updateCheck';
 /** the daily alarm leaves the kill-list alone when it was fetched this recently */
 const KILLLIST_ALARM_SKIP_MS = 60 * 60_000;
 
@@ -507,12 +511,20 @@ export default defineBackground({
     }
 
     browser.alarms.onAlarm.addListener(async (alarm) => {
-      if (alarm.name === POLL_ALARM) await backgroundPoll();
+      if (alarm.name === POLL_ALARM) {
+        await backgroundPoll();
+        await restartForUpdateIfIdle();
+      }
       else if (alarm.name === SIGNIN_ALARM) await signinAlarm();
       else if (alarm.name === SIGNIN_ONCE_ALARM) await signinOnceAlarm();
       else if (alarm.name === KILLLIST_ALARM) await refreshKillListNow({ skipIfFetchedWithinMs: KILLLIST_ALARM_SKIP_MS });
       else if (alarm.name === ACCESS_ALARM) await checkAccessNow('alarm');
+      else if (alarm.name === UPDATE_ALARM) await checkForUpdate();
     });
+
+    // 23.0.0: with a listener here Chrome no longer installs a downloaded version by itself when the
+    // extension is idle; restartForUpdateIfIdle does it, as soon as nothing a restart would lose is under way
+    browser.runtime.onUpdateAvailable?.addListener((details) => void updateDownloaded(details.version));
 
     browser.runtime.onMessage.addListener((message: unknown, sender): Promise<Answer> | undefined => {
       // the OWASP rule: check who is talking before reading what they say
@@ -597,6 +609,49 @@ async function ensureAlarms(): Promise<void> {
   if (!(await browser.alarms.get(POLL_ALARM))) await setPollEvery(1);
   if (!(await browser.alarms.get(KILLLIST_ALARM))) await browser.alarms.create(KILLLIST_ALARM, { delayInMinutes: 1, periodInMinutes: KILLLIST_PERIOD_MINUTES });
   if (!(await browser.alarms.get(ACCESS_ALARM))) await browser.alarms.create(ACCESS_ALARM, { delayInMinutes: 2, periodInMinutes: ACCESS_PERIOD_MINUTES });
+  if (!(await browser.alarms.get(UPDATE_ALARM))) await browser.alarms.create(UPDATE_ALARM, { delayInMinutes: 5, periodInMinutes: UPDATE_CHECK_PERIOD_MINUTES });
+}
+
+// ---- 23.0.0: restarting into a newer version (core/update.ts) -------------------------------------------
+
+/** the daily question to the store; Chrome answers through onUpdateAvailable as well when one is downloaded */
+async function checkForUpdate(): Promise<void> {
+  try {
+    const check = (browser.runtime as unknown as { requestUpdateCheck?: () => Promise<{ status: string; version?: string } | [string, { version?: string }]> }).requestUpdateCheck;
+    if (!check) return;
+    const answer = await check();
+    // Chrome's promise gives an object; Firefox gives [status, details]
+    const [status, v] = Array.isArray(answer) ? [answer[0], answer[1]?.version] : [answer.status, answer.version];
+    dbg('update', `the store says ${status}${v ? ` (${v})` : ''}`);
+    if (status === 'update_available' && v) await updateDownloaded(v);
+  } catch (e) {
+    dbg('update', `the store was not asked (${(e as Error).message})`);
+  }
+}
+
+async function updateDownloaded(v: string): Promise<void> {
+  await session.set(UPDATE_READY_KEY, v);
+  dbg('update', `version ${v} is downloaded`);
+  await restartForUpdateIfIdle();
+}
+
+/** restarts into the downloaded version unless something a restart would lose is under way; asked again on every poll and when the last page closes */
+async function restartForUpdateIfIdle(): Promise<void> {
+  const v = await session.get<string>(UPDATE_READY_KEY);
+  if (!v) return;
+  const S = await session.many([PRESS_KEY, SIGNIN_ONCE_KEY]);
+  const wait = updateMustWait({
+    pageOpen: mem.ports.size > 0,
+    pressing: mem.pressDepth > 0 || mem.startId !== 0 || mem.busy.press || mem.busy.keep || mem.busy.setup || mem.connect.inFlight,
+    pressKept: S[PRESS_KEY] !== undefined,
+    sitting: mem.sitting !== undefined || mem.loginSetup !== undefined,
+    stopping: mem.stopping,
+    gate: mem.gateBusy,
+    gridSignin: mem.signin.waiting || mem.gridAuth.working || mem.gridCheck !== undefined || S[SIGNIN_ONCE_KEY] !== undefined,
+  });
+  if (wait) return dbg('update', `version ${v} waits: ${wait}`);
+  dbg('update', `restarting into version ${v}`);
+  browser.runtime.reload();
 }
 
 /** the background's own alarm: every 30 s from Connect until online, then every 60 s */
@@ -971,6 +1026,7 @@ function onViewPort(port: ViewPort): void {
   });
   port.onDisconnect.addListener(() => {
     mem.ports.delete(port);
+    if (mem.ports.size === 0) void restartForUpdateIfIdle();
     if (![...mem.ports.values()].some((s) => s.surface === 'panel')) {
       // the log is closed every time the panel opens
       mem.logOpen = false;
