@@ -140,7 +140,11 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
       { class: 's-gate', key: 'gate', style: 'padding:0 0 14px' },
       el('p', { class: 's-label', text: G.title }),
       el('p', { class: 'fine', text: G.note }),
-      gateField('gate-repo', G.repo, local.gateRepo ?? '', (v) => (local.gateRepo = v)),
+      gateField('gate-repo', G.repo, local.gateRepo ?? '', (v) => {
+        // an answer belongs to the repository it was for
+        local.gateRepo = v;
+        delete local.gateResult;
+      }),
       gateField('gate-clone', G.clone, local.gateClone ?? DEFAULT_CLONE, (v) => (local.gateClone = v)),
       el(
         'div',

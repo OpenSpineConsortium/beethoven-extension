@@ -130,7 +130,7 @@ describe('22.0.0: the grid\'s ssh gate, from the lab lead\'s own clone', () => {
     const said = 'the gate is set up: its key is on this account\'s authorized_keys line for x and in the environment grid\'s secret, and no copy is left here';
     const { p, typed, writes } = fake({ output: `${said}\ngrid-gate.yml is running with status, the gate's first call from outside: https://github.com/${REPO}/actions/workflows/grid-gate.yml\n` });
     expect(await gateByShell(p, commands.gateSetup('hpcworker', REPO, 'wayne'), noSleep)).toEqual({ ok: true, said });
-    expect(typed).toEqual([`cd "$HOME"/'hpcworker' && git checkout -q main && GIT_TERMINAL_PROMPT=0 git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${REPO}' --site 'wayne'`]);
+    expect(typed).toEqual([`cd "$HOME"/'hpcworker' && git checkout -q main && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${REPO}' --site 'wayne'`]);
     expect(writes).toEqual([]);
   });
 
@@ -139,6 +139,10 @@ describe('22.0.0: the grid\'s ssh gate, from the lab lead\'s own clone', () => {
     expect(gateSentence("error: Your local changes would be overwritten by checkout:\n\ttools/x\nAborting\n", false)).toBe('Aborting');
     expect(gateSentence('no gate key for a/b was in ~/.ssh/authorized_keys\n', true)).toBe('no gate key for a/b was in ~/.ssh/authorized_keys');
     expect(gateSentence('', false)).toBe('');
+    // the reason is on the line before when the last says only that nothing was changed (refuse_public, visibility)
+    expect(gateSentence('refused: a/b is public. A self-hosted runner serves a private or internal repository only\ngrid_runner: nothing was changed\n', false)).toBe('refused: a/b is public. A self-hosted runner serves a private or internal repository only Nothing was changed.');
+    // done, but grid-gate.yml could not be started: the ask to start it by hand comes first
+    expect(gateSentence('the gate is set up: x\nstart grid-gate.yml with status yourself: https://github.com/a/b/actions/workflows/grid-gate.yml, Run workflow\n', true)).toMatch(/^start grid-gate\.yml with status yourself/);
     expect(gateSentence(`grid_runner: ${'x'.repeat(500)}`, false)).toHaveLength(400);
   });
 

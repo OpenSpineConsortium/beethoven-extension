@@ -1,6 +1,6 @@
 BEETHOVEN TRIAL EDITION LICENSE AGREEMENT
 
-Version 15, 2026-10-16. Applies to the Trial Edition of Beethoven 21.0.0 and later versions that
+Version 16, 2026-10-18. Applies to the Trial Edition of Beethoven 22.0.0 and later versions that
 ship this text, as distributed through its public listing on the Chrome Web Store, which needs no
 invitation to open or install from; the approval of section 3 decides whether it works for you. You
 can read, copy, save and print this text at any time: it is in the file LICENSE.txt inside the
@@ -332,6 +332,17 @@ visit.
 (g) Of (a) to (f), only your account name in (c) is sent to Licensor, in the approval check that
 section 10 describes; nothing else is, and in particular not your cluster password or the account
 name you type to sign in. Section 10 describes the only things that may be.
+
+(h) For a lab lead. Settings' folded "For your lab lead" offers "Connect GitHub Actions" and
+"Remove". Only if you press one does the Extension type one line into your portal's shell, which
+runs the Framework's gate setup, or its removal, from your own copy of the Framework in your
+computing account, for the one GitHub repository you name. The setup, with the GitHub sign-in
+already in your computing account, makes a key, lets it only start, check or stop that
+repository's runner jobs in your account, stores it as a secret of that repository on GitHub, and
+starts the repository's gate workflow; the removal takes the key's line out of your account. You are
+responsible for the repository and for what its workflows run in your account under section 4. The
+Extension never sees the key or your GitHub sign-in, stores nothing of it, and sends nothing of it to
+Licensor.
 
 6. RESTRICTIONS
 

@@ -151,17 +151,20 @@ while you are on Anthropic's page. Everything there is in your own account under
 rules; Licensor has no access to it.
 
 Only if you are a lab lead and press *Connect GitHub Actions* under *For your lab lead* in Settings,
-the extension types one line in the portal's shell that runs the gate's setup from your own copy of
-hpcworker in your grid home, after bringing that copy up to date from its own repository. The
-setup, not Beethoven, makes a key for the gate on the cluster, adds one line for it to your account's
+the extension types one line in the portal's shell that switches your own copy of hpcworker in your
+grid home to its main branch, brings it up to date from its own repository, and runs the gate's
+setup from it. The setup, not Beethoven, removes others' write access to that copy's `tools` and
+`framework` folders, makes a key for the gate on the cluster, adds one line for it to your account's
 `~/.ssh/authorized_keys` that lets that key do nothing but start, check or stop the runner of the one
-repository you named, and, with the `gh` sign-in already in your grid account, saves the key as a
-secret of that repository's environment `grid` on GitHub, sets two variables there and starts its
-`grid-gate.yml`; no copy of the key is left on the cluster. *Remove* types the line that takes that
-line out of `authorized_keys`; the secret stays on GitHub until you delete it there. Beethoven
-never sees the key or your GitHub sign-in, keeps neither the repository's name nor the folder you
-typed, and sends nothing of it to Licensor; the line and its answer are in the activity record like
-every other shell command.
+repository you named, and, with the `gh` sign-in already in your grid account, makes that
+repository's environment `grid` on GitHub where it is missing (usable from its main branch only),
+saves the key there as a secret, sets two variables there (your account name and the grid's host
+key) and starts its `grid-gate.yml`; no copy of the key is left on the cluster. *Remove* types the
+line that takes that line out of `authorized_keys`; the secret stays on GitHub until you delete it
+there. Beethoven never sees the key or your GitHub sign-in, keeps neither the repository's name nor
+the folder you typed, and sends nothing of it to Licensor; its audit log records the shell's use as
+it records every command, with the time, the size and the exit status and never the line or its
+output.
 
 ## What your portal sees
 
@@ -534,8 +537,8 @@ acceptance when it changes materially.
 Version 17 (2026-10-18, Beethoven 22.0.0): *For your lab lead* in Settings gains *Connect GitHub
 Actions* and *Remove*, which type one line each in the portal's shell to set up or take out the
 grid's ssh gate for one GitHub repository from the lab lead's own copy of hpcworker, as the section
-on your cluster account says. Nothing is stored and nothing reaches Licensor. Version 16's other
-terms are unchanged.
+on your cluster account says, and section 5(h) of the agreement, version 16, says the same.
+Nothing is stored and nothing reaches Licensor. Version 16's other terms are unchanged.
 
 Version 16 (2026-10-16, Beethoven 21.0.0): Settings takes the address of a project of yours on
 claude.ai, kept in `storage.local` with your other preferences until you clear it. With one given,

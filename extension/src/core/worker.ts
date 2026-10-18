@@ -139,20 +139,38 @@ export function workerLive(status: StatusFile | undefined, now = Date.now()): bo
 
 /**
  * 22.0.0: the lab lead's ssh gate, set up or taken out through the portal's shell (commands.gateSetup,
- * commands.gateOff). The setup asks GitHub several times and makes a key, so it gets five minutes. `said`
- * is the tool's own sentence: its refusal (the last `grid_runner:` line) when it failed, else what it did.
+ * commands.gateOff). Four minutes: the setup asks GitHub several times and makes a key, and the whole
+ * press must end inside the browser's five minutes for one event and OnDemand's own idle limit for a
+ * shell, which the setup's quiet stretches between gh calls do not reset. `onTyped` is told just before
+ * the line goes to the shell, so a lost answer after it can be told from one before. `said` is the
+ * tool's own sentence: its refusal when it failed, else what it did.
  */
-export async function gateByShell(portal: PortalApi, line: string, sleep?: (ms: number) => Promise<void>): Promise<{ ok: boolean; said: string }> {
-  const r = await withFloor(() => portal.shell(line, { timeoutMs: 300_000 }), sleep);
+export async function gateByShell(portal: PortalApi, line: string, sleep?: (ms: number) => Promise<void>, onTyped?: () => void): Promise<{ ok: boolean; said: string }> {
+  const r = await withFloor(() => {
+    onTyped?.();
+    return portal.shell(line, { timeoutMs: 240_000 });
+  }, sleep);
   const ok = r.exitCode === 0;
   return { ok, said: gateSentence(r.output, ok) };
 }
 
-/** the one sentence of the gate's output a lab lead reads; at most 400 characters */
+/**
+ * The one sentence of the gate's output a lab lead reads, at most 400 characters. A refusal is the last
+ * `grid_runner:` line, or, where that says only that nothing was changed, the line before it, which
+ * says why (a public repository, gh unable to read it; cli.json's `reads`). Done, it is the tool's own
+ * word of what it did, or its ask to start grid-gate.yml by hand where it could not.
+ */
 export function gateSentence(output: string, ok: boolean): string {
   const lines = String(output ?? '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const refusal = [...lines].reverse().find((l) => l.startsWith('grid_runner: '));
-  const done = ok ? lines.find((l) => /^(the gate is set up|the gate's key for |no gate key for )/.test(l)) : undefined;
-  const said = (!ok && refusal ? refusal.slice('grid_runner: '.length) : done) ?? lines[lines.length - 1] ?? '';
-  return said.slice(0, 400);
+  const last = lines[lines.length - 1] ?? '';
+  if (ok) {
+    const byHand = lines.find((l) => /^start grid-gate\.yml with status yourself/.test(l));
+    const done = lines.find((l) => /^(the gate is set up|the gate's key for |no gate key for )/.test(l));
+    return (byHand ?? done ?? last).slice(0, 400);
+  }
+  const at = lines.map((l) => l.startsWith('grid_runner: ')).lastIndexOf(true);
+  if (at < 0) return last.slice(0, 400);
+  const refusal = lines[at]!.slice('grid_runner: '.length);
+  const why = /^nothing (was changed|started)\.?$/i.test(refusal) && at > 0 ? `${lines[at - 1]} ${refusal.charAt(0).toUpperCase()}${refusal.slice(1)}.`.replace(/\.\.$/, '.') : refusal;
+  return why.slice(0, 400);
 }

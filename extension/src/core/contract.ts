@@ -318,10 +318,14 @@ export const commands = {
   // the setup signs in to GitHub with that account's own gh. The shell is the portal's terminal, so the
   // tool's own check that a person pressed it (a terminal, no agent's marker) still holds.
 
-  /** the gate's key made, its line written, the environment and its secret set on GitHub, grid-gate.yml started with status */
+  /**
+   * the gate's key made, its line written, the environment and its secret set on GitHub, grid-gate.yml started with
+   * status. The line runs with a terminal on stdin (which the tool's person check needs), so the pull may ask
+   * nothing there: no HTTPS prompt, and ssh in batch mode, which fails where it would ask for a passphrase or a host
+   */
   gateSetup(clone: string, repo: string, site: string): string {
     if (!CLONE_RE.test(clone) || !REPO_RE.test(repo) || !SITE_RE.test(site)) throw new Error('bad gate arguments');
-    return `cd "$HOME"/'${clone}' && git checkout -q main && GIT_TERMINAL_PROMPT=0 git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${repo}' --site '${site}'`;
+    return `cd "$HOME"/'${clone}' && git checkout -q main && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND='ssh -o BatchMode=yes' git pull -q --ff-only && bash tools/grid_runner.sh --gate-setup --repo '${repo}' --site '${site}'`;
   },
   /** the gate's line out of the account's authorized_keys; the secret on GitHub stays until it is deleted there */
   gateOff(clone: string, repo: string, site: string): string {

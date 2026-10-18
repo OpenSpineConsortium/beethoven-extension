@@ -252,6 +252,8 @@ const mem = {
   answeredAt: undefined as number | undefined,
   accessChecking: false,
   stopping: false,
+  /** 22.0.0: a lab lead's gate setup or removal is on the grid now (pressGate) */
+  gateBusy: false,
   restricted: false,
   logOpen: false,
   checksRunning: false,
@@ -3659,20 +3661,33 @@ async function doRestrict(name: string): Promise<boolean> {
  */
 async function pressGate(op: 'setup' | 'off', repo: string, clone: string): Promise<ActionResults['gate']> {
   const G = WORDS.settings.labLeadGate;
-  if (!REPO_RE.test(repo)) return { ok: false, text: G.badRepo };
+  // GitHub refuses . and .. as a repository's name; the tool would too, but the link shown after would point elsewhere
+  if (!REPO_RE.test(repo) || /\/\.{1,2}$/.test(repo)) return { ok: false, text: G.badRepo };
   if (!CLONE_RE.test(clone)) return { ok: false, text: G.badClone };
-  const s = await settingsNow();
-  if (!s) return { ok: false, text: G.noGrid };
-  const site = await siteForConnect(s);
-  if (!SITE_RE.test(site)) return { ok: false, text: G.noSite };
-  const line = op === 'setup' ? commands.gateSetup(clone, repo, site) : commands.gateOff(clone, repo, site);
+  // one at a time across every page: two setups at once each make a key, and the grid's line and GitHub's
+  // secret could end up from different runs while both report success
+  if (mem.gateBusy) return { ok: false, text: G.busy };
+  mem.gateBusy = true;
   try {
-    const out = await withShell((p) => gateByShell(p, line));
-    if (!out.ok) return { ok: false, text: `${G.failed} ${out.said}` };
-    return { ok: true, text: out.said, ...(op === 'setup' ? { link: `https://github.com/${repo}/actions/workflows/grid-gate.yml` } : {}) };
-  } catch (e) {
-    if (isPasswordError(e)) await setShellWord('password');
-    return { ok: false, text: G.noGrid };
+    // the listing is public since 20.0.0: only an approved account's installation types anything, as for connect
+    if (!(await buildFacts()).access.ok) return { ok: false, text: G.notApproved };
+    const s = await settingsNow();
+    if (!s) return { ok: false, text: G.noGrid };
+    const site = await siteForConnect(s);
+    if (!SITE_RE.test(site)) return { ok: false, text: G.noSite };
+    const line = op === 'setup' ? commands.gateSetup(clone, repo, site) : commands.gateOff(clone, repo, site);
+    let typed = false;
+    try {
+      const out = await withShell((p) => gateByShell(p, line, undefined, () => (typed = true)));
+      if (!out.ok) return { ok: false, text: `${G.failed} ${out.said}` };
+      return { ok: true, text: out.said, ...(op === 'setup' ? { link: `https://github.com/${repo}/actions/workflows/grid-gate.yml` } : {}) };
+    } catch (e) {
+      if (isPasswordError(e)) await setShellWord('password');
+      // once the line may have reached the shell, a lost answer says nothing about how far it got
+      return { ok: false, text: typed && !isPasswordError(e) && (e as Error)?.name !== 'FloorError' ? G.cutOff : G.noGrid };
+    }
+  } finally {
+    mem.gateBusy = false;
   }
 }
 

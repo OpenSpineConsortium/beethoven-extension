@@ -136,12 +136,17 @@ name and identifier carry no university name.
   folded *For your lab lead* has *Connect GitHub Actions* and *Remove*, which type hpcworker's
   published lines `grid-gate-setup` and `grid-gate-off` (its `contract` export, cli.json) through
   the portal's shell, run from the lab lead's own hpcworker clone in their home (default
-  `hpcworker`) for one repository (OWNER/NAME), with the site profile's name. The tool does the rest
-  with the account's own `gh` sign-in, and its own check that a person pressed it holds because the
-  portal's shell is a terminal with no agent's marker. Beethoven never sees the key or a GitHub
-  sign-in and stores nothing of it; the words are `WORDS.settings.labLeadGate`, exempt from the
-  student's hygiene rule as Details is. Privacy 17 alone (the agreement stays 15 and the acceptance in
-  force stays in force: nothing is typed unless a lab lead presses).
+  `hpcworker`) for one repository (OWNER/NAME), with the site profile's name, only for an approved
+  account and one press at a time across pages (`mem.gateBusy`). The tool does the rest with the
+  account's own `gh` sign-in, and its own check that a person pressed it holds because the portal's
+  shell is a terminal with no agent's marker; the pull asks nothing at that terminal (ssh in batch
+  mode). Two exceptions this makes, on purpose: the press runs git, ssh-keygen and a few `gh` calls
+  on the login node, as typing the setup there does (no container, nothing under its `/tmp`); and
+  the fold's words (`WORDS.settings.labLeadGate`) name hpcworker, gh and grid-gate.yml, so the
+  hygiene test skips them as it skips Details, though any student can open the fold. Beethoven never
+  sees the key or a GitHub sign-in and stores nothing of it. Agreement 16 (section 5(h)), privacy 17:
+  everyone accepts again, as section 17 asks of any change, the statement being part of the
+  agreement.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
@@ -217,9 +222,10 @@ name and identifier carry no university name.
   endpoint paths or variable names in the panel. Container builds, runtimes, QoS and vendor tooling stay
   admin-only.
 - **Terms.** `LICENSE.txt` and `PRIVACY.md` at the repository root are the canonical texts (Trial
-  Edition; since 2026-10-18 and extension 22.0.0 `PRIVACY.md` is version 17, which adds the lab
-  lead's gate buttons to the shell's commands and the cluster account's paragraph, with `LICENSE.txt`
-  unchanged; since 2026-10-16 and extension 21.0.0 `LICENSE.txt` is version 15 and `PRIVACY.md`
+  Edition; since 2026-10-18 and extension 22.0.0 `LICENSE.txt` is version 16 and `PRIVACY.md`
+  version 17, which add the lab lead's gate buttons (section 5(h) of the agreement; the cluster
+  account's paragraph, the shell's commands and Changes of the statement), with `TERMS_VERSION` 16 and
+  `TERMS_DATE` 2026-10-18; since 2026-10-16 and extension 21.0.0 `LICENSE.txt` is version 15 and `PRIVACY.md`
   version 16, which add the project's page among the pages Beethoven opens and the project's
   address among the preferences it keeps (the head and section 5(f) of the agreement; the
   preferences row, the small-notes row, the page paragraph and Changes of the statement) on top of
@@ -249,7 +255,7 @@ name and identifier carry no university name.
   approval check against the access service with the account name the cluster confirmed and the
   installation identifier; the daily fetch of `services.json` and the withdrawn-versions list; no
   activation step, no error reports; all requests only after acceptance); `TERMS_VERSION` in
-  `extension/src/core/terms.ts` is 15 to match, with `TERMS_DATE` 2026-10-16; the framework's
+  `extension/src/core/terms.ts` is 16 to match, with `TERMS_DATE` 2026-10-18; the framework's
   `VERSION` does not follow them). The copies the extension ships in `extension/public/` must be
   byte-identical to them at build time. Change a text and its version together (integer). Never
   pre-tick a box; the button label is part of the record; a changed agreement is shown again and
