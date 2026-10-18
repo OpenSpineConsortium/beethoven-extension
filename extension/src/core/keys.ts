@@ -58,6 +58,8 @@ export const WELCOME_PRESS_KEY = 'bridge.welcomePress'; // {at}: the welcome pag
 export const SIGNIN_UNLOCK_KEY = 'bridge.signinUnlock'; // SigninUnlock: the passkey's output that opens the saved password, until the browser closes or Beethoven reloads
 export const SIGNIN_ONCE_KEY = 'bridge.signinOnce'; //     SigninOnce: a password typed without Remember, for one attempt and at most two minutes
 export const SIGNIN_STATE_KEY = 'bridge.signinState'; //   SigninState: which requests were given the password and how the last tries went; nothing typed
+// 23.0.0 (session): the version Chrome has downloaded from the store, kept until Beethoven restarts into it (core/update.ts); a restart clears it
+export const UPDATE_READY_KEY = 'bridge.updateReady';
 
 export interface PortalSettings {
   origin: string;

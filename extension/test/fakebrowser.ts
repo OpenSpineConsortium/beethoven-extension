@@ -143,6 +143,10 @@ export interface World {
   realm: string;
   /** what runtime.getPlatformInfo() says the operating system is; undefined is 'win' */
   os?: string;
+  /** 23.0.0: what runtime.requestUpdateCheck() answers; undefined is no update */
+  updateCheck?: { status: string; version?: string };
+  /** 23.0.0: how many times runtime.reload() was called */
+  reloads: number;
   /** Chrome's own sign-in box, by the tab it is over */
   boxes: Map<number, { requestId: string; url: string }>;
   /** what storage.session.setAccessLevel last set (undefined: Chrome's default, trusted contexts only) */
@@ -350,6 +354,7 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
   } as World['opts'];
   const world: World = {
     log: [],
+    reloads: 0,
     external: [],
     tabs: new Map(),
     storage: { local: {}, session: {} },
@@ -933,6 +938,16 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
     onConnect: ev(),
     onInstalled: ev(),
     onStartup: ev(),
+    // 23.0.0
+    onUpdateAvailable: ev(),
+    requestUpdateCheck: async () => {
+      L('runtime.requestUpdateCheck');
+      return world.updateCheck ?? { status: 'no_update' };
+    },
+    reload: () => {
+      L('runtime.reload');
+      world.reloads++;
+    },
     openOptionsPage: async () => {
       L('runtime.openOptionsPage');
     },
@@ -1081,7 +1096,7 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
   function stopWorkerImpl() {
     L('the service worker stopped');
     const c = world.chrome;
-    const events = [c.runtime.onMessage, c.runtime.onConnect, c.runtime.onInstalled, c.runtime.onStartup, c.storage.onChanged, c.alarms.onAlarm, c.tabs.onUpdated, c.tabs.onRemoved, c.tabs.onActivated, c.action.onUserSettingsChanged, permAdded, permRemoved];
+    const events = [c.runtime.onMessage, c.runtime.onConnect, c.runtime.onInstalled, c.runtime.onStartup, c.runtime.onUpdateAvailable, c.storage.onChanged, c.alarms.onAlarm, c.tabs.onUpdated, c.tabs.onRemoved, c.tabs.onActivated, c.action.onUserSettingsChanged, permAdded, permRemoved];
     for (const e of events) e.ls.length = 0;
     if (webRequest) for (const e of Object.values(webRequest)) e.ls.length = 0;
     // the pages' ports lose the worker's end of them

@@ -148,6 +148,15 @@ name and identifier carry no university name.
   2026-10-18 ("Statement only"): the agreement stays 15 and an acceptance in force stays in force,
   the change counted as not material since nothing is typed unless a lab lead presses; the
   statement's Changes says so.
+- **Beethoven restarts into a new version by itself (decided 2026-10-18, 23.0.0).** greg asked how
+  students get the newest version without doing anything; Chrome downloads it within hours but waits for
+  the extension to be idle, which a panel left open never is. The background listens for the downloaded
+  version (`runtime.onUpdateAvailable`, which stops Chrome installing it by itself), asks the store once
+  a day besides (`runtime.requestUpdateCheck`), and calls `runtime.reload` only while nothing a restart
+  would lose is under way (`core/update.ts`: no page of Beethoven's open, no press, no kept press, no
+  sitting, no stop, no gate press, no grid sign-in or one-shot password), asking again on every poll and
+  when the last page closes. The worker on the grid keeps running through it. No text changes: the
+  privacy statement already says the passkey's unlock is cleared when Beethoven updates or reloads.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
