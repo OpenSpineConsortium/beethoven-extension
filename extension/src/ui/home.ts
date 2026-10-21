@@ -68,8 +68,7 @@ function phoneView(h: HomeView, ctx: HomeCtx): HTMLElement {
   );
 }
 
-function footRow(h: HomeView, ctx: HomeCtx): HTMLElement {
-  const f = h.foot;
+export function footRow(f: HomeView['foot'], ctx: Pick<HomeCtx, 'confirm' | 'setConfirm' | 'onAct' | 'pending'>): HTMLElement {
   if (f.stopping) return el('div', { class: 'foot-row', role: 'status' }, el('span', { class: 'stopping' }, spinner(14), el('span', { text: WORDS.home.stopping })));
   if (ctx.confirm && f.right)
     return el(
@@ -162,7 +161,7 @@ export function renderHome(h: HomeView, ctx: HomeCtx): HTMLElement {
     { class: 'screen home', 'data-screen': 'home' },
     top,
     statusCard(h.rows, WORDS.home.rows, ctx.onAct, ctx.pending),
-    footRow(h, ctx),
+    footRow(h.foot, ctx),
     ctx.working ? el('p', { class: 'status', style: 'margin-top:8px' }, spinner(16), el('span', { text: ctx.working })) : null,
     tryAsking(h, ctx),
     ...cards(h, ctx),
