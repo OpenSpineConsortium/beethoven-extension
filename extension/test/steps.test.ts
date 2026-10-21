@@ -416,6 +416,8 @@ describe('home: the waiting and status table, one primary or none', () => {
     expect(toolbarView(f)).toEqual({ title: 'Beethoven · Online for 2 h 14 min', lit: true });
     expect(h.track).toBeUndefined();
     expect(home(facts({ ...f, stopping: true } as Over)).foot.stopping).toBe(true);
+    // the account the worker runs on, by the e-mail Claude Code gives
+    expect(home(facts({ run: run({ phase: 'online', link: LINK, onlineAt: ago(5 * MIN), claude: { loggedIn: true, plan: 'max', email: 'gr@med.wayne.edu' } }) })).rows.claude).toEqual({ state: 'signed-in', text: 'Signed in · Max · gr@med.wayne.edu' });
   });
 
   it('online just now: "You\'re online." with the burst, for 4 s', () => {
