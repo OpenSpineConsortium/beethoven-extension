@@ -126,4 +126,17 @@ describe('a shell is typed into only on evidence that it is up', () => {
     const p = runShellCommand({ origin: ORIGIN, host: 'default', command: 'true', net: net(script, b, (ws) => setTimeout(() => ws.emit('message', { data: 'Password: ' }), 20)), timeoutMs: 3000, settleMs: 50 });
     await expect(p).rejects.toMatchObject({ name: 'PasswordError' });
   });
+
+  it('runShellCommand: a command that runs longer than the time to open the shell is not cut off as unopened (greg\'s gate press, 2026-10-21)', async () => {
+    const script: Script = [[30, '[st1234@warrior ~]$ ']];
+    const b: string[] = [];
+    // the line runs: its begin marker at once, its end only after the shell's time to open has passed
+    const run = (ws: { emit(t: string, e: unknown): void }) => {
+      setTimeout(() => ws.emit('message', { data: '\nASHBRn1_BEGIN\nworking\n' }), 10);
+      setTimeout(() => ws.emit('message', { data: 'the gate is set up\nASHBRn1_END:0\n' }), 400);
+    };
+    const r = await runShellCommand({ origin: ORIGIN, host: 'default', command: 'true', nonce: 'n1', net: net(script, b, run), timeoutMs: 3000, settleMs: 50, connectTimeoutMs: 150 });
+    expect(r.exitCode).toBe(0);
+    expect(r.output).toContain('the gate is set up');
+  });
 });
