@@ -528,6 +528,9 @@ export const WORDS = {
       badClone: 'Type the folder under your grid home, like hpcworker.',
       noGrid: "Beethoven can't reach your grid's shell right now. Sign in to the grid and try again.",
       cutOff: "The grid stopped answering before the setup said it was done, so it may have run partway. Press it again: each run starts over.",
+      /** 23.0.0: what the cut-off was, so the lab lead need not open the debug log to learn it */
+      cutOffWhy: 'What Beethoven saw:',
+      cutOffLast: 'The last line on the grid:',
       notApproved: "This account isn't approved for Beethoven yet, so nothing was typed.",
       busy: 'Already working on the grid. Wait for that answer first.',
       noSite: "Beethoven doesn't know which grid profile this portal uses, so nothing was typed.",

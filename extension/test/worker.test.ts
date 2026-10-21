@@ -3,11 +3,12 @@
 // chrome-extension://). Connect is one line; Stop is `worker stop` alone; Mark restricted is `worker
 // restrict`; the scheduler's reason comes from `worker status --json`. A refused floor is waited out
 // silently and retried, never shown. And a queued worker is live.
+import { ShellError } from '../src/core/shell';
 import { describe, expect, it } from 'vitest';
 import { classifyCommand, FloorError } from '../src/core/audit';
 import { commands, paths } from '../src/core/contract';
 import type { PortalApi } from '../src/core/portal';
-import { clusterContext, connectLine, gateByShell, gateSentence, recordConsentByShell, restrictByShell, restrictedReason, statusByShell, stopByShell, withFloor, workerLive } from '../src/core/worker';
+import { clusterContext, connectLine, cutOffDetail, gateByShell, gateSentence, recordConsentByShell, restrictByShell, restrictedReason, statusByShell, stopByShell, withFloor, workerLive } from '../src/core/worker';
 
 const STATE = '/rs/rs_grp_oschome/ab1234/hpcworker';
 const SHARED = '/rs/rs_grp_oschome/shared/beethoven/hpcworker/current';
@@ -152,5 +153,20 @@ describe('22.0.0: the grid\'s ssh gate, from the lab lead\'s own clone', () => {
     expect(typed).toEqual([`cd "$HOME"/'hpcworker' && bash tools/grid_runner.sh --gate-off --repo '${REPO}' --site 'wayne'`]);
     expect(classifyCommand(commands.gateSetup('hpcworker', REPO, 'wayne'))).toBe('shell');
     expect(classifyCommand(commands.gateOff('hpcworker', REPO, 'wayne'))).toBe('shell');
+  });
+});
+
+describe('cutOffDetail', () => {
+  it('names the shell\'s reason and the last line the grid printed', () => {
+    const e = new ShellError('the command did not finish within 240 s', 'grid_runner: pulling the clone\ngrid_runner: writing the key line\n');
+    expect(cutOffDetail(e, 'Saw:', 'Last:')).toBe('Saw: the command did not finish within 240 s. Last: writing the key line');
+  });
+  it('says only the reason when the grid printed nothing, and nothing for another error', () => {
+    expect(cutOffDetail(new ShellError('the connection to the portal shell failed.'), 'Saw:', 'Last:')).toBe('Saw: the connection to the portal shell failed.');
+    expect(cutOffDetail(new Error('x'), 'Saw:', 'Last:')).toBe('');
+    expect(cutOffDetail(undefined, 'Saw:', 'Last:')).toBe('');
+  });
+  it('stays short', () => {
+    expect(cutOffDetail(new ShellError('x'.repeat(900), 'y'.repeat(900)), 'Saw:', 'Last:').length).toBeLessThanOrEqual(500);
   });
 });

@@ -126,7 +126,7 @@ import { firstRunDone, heroOf, home, journey, lastKnownOf, momentOf, newSessionL
 import { sessionTabDecision, noteLoad, stillWhereLeft } from '../core/tabs';
 import { UPDATE_CHECK_PERIOD_MINUTES, updateMustWait } from '../core/update';
 import { bindAccount, recordInForce, TERMS_KEY, TERMS_REFUSAL, type TermsRecord } from '../core/terms';
-import { connectLine, gateByShell, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
+import { connectLine, cutOffDetail, gateByShell, restrictByShell, statusByShell, stopByShell, withFloor, clusterContext } from '../core/worker';
 import { accessFact, accessForced, ACCESS_PERIOD_MINUTES, checkAccess, NOT_ASKED_NO_ACCOUNT, NOT_ASKED_NO_PORTAL, NOT_ASKED_TERMS, requestUrl, type AccessRecord, type AccessTrigger, type StoredServices } from '../licensing/access';
 import { killListVerdict, KILLLIST_PERIOD_MINUTES, refreshKillList, type StoredKillList } from '../licensing/killlist';
 import { BUNDLED_KEYS } from '../licensing/signed';
@@ -3740,7 +3740,9 @@ async function pressGate(op: 'setup' | 'off', repo: string, clone: string): Prom
     } catch (e) {
       if (isPasswordError(e)) await setShellWord('password');
       // once the line may have reached the shell, a lost answer says nothing about how far it got
-      return { ok: false, text: typed && !isPasswordError(e) && (e as Error)?.name !== 'FloorError' ? G.cutOff : G.noGrid };
+      if (!typed || isPasswordError(e) || (e as Error)?.name === 'FloorError') return { ok: false, text: G.noGrid };
+      const why = cutOffDetail(e, G.cutOffWhy, G.cutOffLast);
+      return { ok: false, text: why ? `${G.cutOff} ${why}` : G.cutOff };
     }
   } finally {
     mem.gateBusy = false;
