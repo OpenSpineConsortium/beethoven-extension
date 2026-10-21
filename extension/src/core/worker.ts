@@ -155,6 +155,19 @@ export async function gateByShell(portal: PortalApi, line: string, sleep?: (ms: 
 }
 
 /**
+ * Why a gate press was cut off, for the lab lead to read beside the cut-off sentence: the shell's own
+ * reason (a time limit, a closed connection) and the last thing the grid printed before it, which until
+ * now sat only in the debug log. Nothing for an error that is no ShellError, at most 500 characters.
+ */
+export function cutOffDetail(e: unknown, saw: string, last: string): string {
+  if ((e as Error)?.name !== 'ShellError') return '';
+  const why = String((e as Error).message ?? '').trim().replace(/\.$/, '');
+  const transcript = String((e as { transcript?: unknown }).transcript ?? '');
+  const line = transcript.trim() ? gateSentence(transcript, false) : '';
+  return [why && `${saw} ${why}.`, line && `${last} ${line}`].filter(Boolean).join(' ').slice(0, 500);
+}
+
+/**
  * The one sentence of the gate's output a lab lead reads, at most 400 characters. A refusal is the last
  * `grid_runner:` line, or, where that says only that nothing was changed, the line before it, which
  * says why (a public repository, gh unable to read it; cli.json's `reads`). Done, it is the tool's own
