@@ -858,6 +858,8 @@ export interface QueueMoment {
   track: TrackView;
   /** "Your worker couldn't start." [Try again]; "Can't reach the grid. Is GlobalProtect on? Your worker keeps its place in line." */
   problem?: ProblemView;
+  /** the home's foot row (Cancel, with its confirm), so a first run can give up its place in line too */
+  foot?: HomeView['foot'];
 }
 
 /** moment 11 */
@@ -871,6 +873,8 @@ export interface StartingMoment {
   track: TrackView;
   /** after 3 min with no registration: "Still connecting. This is taking longer than usual." [Show log]; needs sign-in: "Sign in to Claude to finish." [Sign in to Claude]; "Reconnecting…" */
   problem?: ProblemView;
+  /** the home's foot row (Stop, with its confirm): a worker that never comes online stops from here, not only from the home */
+  foot?: HomeView['foot'];
 }
 
 /** moment 12: then the view settles into the home after 4 s */

@@ -627,6 +627,7 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
 
     case 'queue': {
       const r = f.run;
+      const foot = journeyFoot(f, 'cancel');
       const hero = r.reason === 'share' ? WORDS.queue.shareHero : r.reason === 'maintenance' ? WORDS.queue.maintenanceHero : WORDS.queue.hero;
       const sub: string[] = [r.reason === 'share' ? WORDS.queue.shareSub : r.reason === 'maintenance' ? WORDS.queue.maintenanceSub : WORDS.queue.sub];
       const extra = queueExtra(f);
@@ -646,6 +647,7 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
         reason: r.reason,
         track: ended && r.phase === 'error' ? track(1, true) : track(1),
         ...(problem ? { problem } : {}),
+        ...(foot && !ended ? { foot } : {}),
       };
     }
 
@@ -657,7 +659,8 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
       else if (r.phase === 'needs-consent') problem = { body: WORDS.home.needsConsentSub, button: button(WORDS.home.connect, 'ink', { kind: 'connect' }) };
       else if (r.phase === 'reconnecting' || r.phase === 'renewing') problem = { body: WORDS.starting.reconnectingMoment };
       const got = r.phase === 'got-computer' && !!r.gotComputerAt;
-      return { moment: 'starting', hero: WORDS.starting.hero, sub: got ? WORDS.starting.gotComputer : WORDS.starting.connecting, ...(got ? { timer: { since: r.gotComputerAt! } } : {}), track: track(2), ...(problem ? { problem } : {}) };
+      const foot = journeyFoot(f, 'stop');
+      return { moment: 'starting', hero: WORDS.starting.hero, sub: got ? WORDS.starting.gotComputer : WORDS.starting.connecting, ...(got ? { timer: { since: r.gotComputerAt! } } : {}), track: track(2), ...(problem ? { problem } : {}), ...(foot ? { foot } : {}) };
     }
 
     case 'online': {
@@ -1211,6 +1214,19 @@ export function toolbarView(f: Facts): ToolbarView {
     default:
       return { title: T.plain, lit: false };
   }
+}
+
+/**
+ * The home's Stop row for the first run's waiting moments: until this browser has seen the worker online
+ * the panel never reaches the home, so a worker that never came online (go2432, 2026-10-20: thirteen
+ * 8 h jobs) had no Stop anywhere. Only for a live run, as on the home.
+ */
+function journeyFoot(f: Facts, kind: 'stop' | 'cancel'): HomeView['foot'] | undefined {
+  if (!f.run.live) return undefined;
+  const H = WORDS.home;
+  return kind === 'cancel'
+    ? { right: button(H.cancel, 'text', { kind: 'stop' }), confirm: { text: H.confirmCancel, stop: button(H.confirmCancelButton, 'text', { kind: 'stop' }), keep: H.keep }, stopping: f.stopping }
+    : { right: button(H.stop, 'text', { kind: 'stop' }), confirm: { text: H.confirm, stop: button(H.confirmStop, 'text', { kind: 'stop' }), keep: H.keep }, stopping: f.stopping };
 }
 
 /** the first run is over once this browser has seen the worker online (ONCE_KEY.first_online_at) */

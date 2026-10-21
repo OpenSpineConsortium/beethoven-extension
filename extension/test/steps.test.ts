@@ -325,6 +325,16 @@ describe('journey: the first run, moment by moment', () => {
     expect(s({ phase: 'reconnecting' }).problem).toEqual({ body: 'Reconnecting…' });
   });
 
+  it('a first run that never comes online can still stop: Stop on starting, Cancel in line, none for a run not live', () => {
+    const J2 = (r: Partial<RunFacts>, m: 'starting' | 'queue') => J(facts({ ...firstRun, connect: { queued: true }, run: run(r) }), m) as { foot?: { right?: { label: string; action?: { kind: string } }; confirm: { text: string } } };
+    const slow = J2({ phase: 'slow', live: true }, 'starting');
+    expect(slow.foot?.right).toMatchObject({ label: 'Stop', action: { kind: 'stop' } });
+    expect(slow.foot?.confirm.text).toBe('Stop your worker? Open sessions end.');
+    const line = J2({ phase: 'queued', live: true, submittedAt: ago(MIN) }, 'queue');
+    expect(line.foot?.right).toMatchObject({ label: 'Cancel', action: { kind: 'stop' } });
+    expect(J2({ phase: 'slow', live: false, stale: true }, 'starting').foot).toBeUndefined();
+  });
+
   it('online: "You\'re online." with the minutes since the press, the teal "Open my session", the burst, and the pin tip', () => {
     const f = facts({ ...firstRun, run: run({ phase: 'online', link: LINK, readyMinutes: 7, onlineAt: ago(5_000) }), onlineAnnouncedAt: NOW - 1_000, pinned: false });
     expect(momentOf(f)).toBe('online');

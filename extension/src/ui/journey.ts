@@ -13,6 +13,7 @@ import { el, svg } from './dom';
 import { codeBox, type CodeBoxState } from './codebox';
 import { drawnCheck, icon, spinner, type IconName } from './icons';
 import { LABELS } from './labels';
+import { footRow } from './home';
 import { logFold, type LogWords } from './log';
 import { button, checklist, fold, foldToggle, glyph, liveSub, orb, problem, tickBox, type OnAct } from './parts';
 import type { LogLine } from '../core/model';
@@ -41,6 +42,9 @@ export interface JourneyCtx {
   allowAgain?: (origin: string) => void;
   /** 19.0.0: the sign-in sheet's page-local half; without it the grid moment is drawn as 18.0.0 drew it */
   grid?: GridSheetCtx;
+  /** the Stop row's confirm, as the home keeps it */
+  confirm?: boolean;
+  setConfirm?: (on: boolean) => void;
 }
 
 /**
@@ -584,8 +588,14 @@ function queue(m: QueueMoment, ctx: JourneyCtx): HTMLElement {
       ...m.sub.map((s, i) => el('p', { class: 'm-sub', key: `s${i}`, text: s })),
       m.problem ? el('div', { class: 'm-problem' }, problem(m.problem, ctx.onAct, { pending: ctx.pending })) : null,
     ],
-    [workingLine(ctx.working), logFold(ctx.log.open, ctx.log.lines, ctx.log.words, ctx.log)],
+    [workingLine(ctx.working), logFold(ctx.log.open, ctx.log.lines, ctx.log.words, ctx.log), stopRow(m.foot, ctx)],
   );
+}
+
+/** the home's Stop (or Cancel) row with its confirm, at a waiting moment's foot */
+function stopRow(foot: QueueMoment['foot'], ctx: JourneyCtx): HTMLElement | null {
+  if (!foot || (!foot.right && !foot.stopping)) return null;
+  return footRow(foot, { confirm: !!ctx.confirm, setConfirm: ctx.setConfirm ?? (() => {}), onAct: ctx.onAct, pending: ctx.pending });
 }
 
 function starting(m: StartingMoment, ctx: JourneyCtx): HTMLElement {
@@ -601,7 +611,7 @@ function starting(m: StartingMoment, ctx: JourneyCtx): HTMLElement {
       m.problem ? el('div', { class: 'm-problem' }, problem(logHere ? { body: m.problem.body } : m.problem, onLogAware(ctx), { pending: ctx.pending, tone: 'wait' })) : null,
       logHere ? log : null,
     ],
-    [logHere ? null : log],
+    [logHere ? null : log, stopRow(m.foot, ctx)],
   );
 }
 

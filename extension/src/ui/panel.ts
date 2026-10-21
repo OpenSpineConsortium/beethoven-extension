@@ -435,6 +435,8 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
       node: renderMoment(j, {
         onAct,
         pending: local.pending,
+        confirm: local.confirmStop,
+        setConfirm: (on) => set({ confirmStop: on }),
         statementTicked: local.statementTicked,
         setStatementTicked: (on) => set({ statementTicked: on }),
         moreOpen: local.moreOpen,
