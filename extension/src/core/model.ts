@@ -405,7 +405,8 @@ export const WORDS = {
     gridUnreachable: "Can't reach",
     /** before the first check of this browser session (decision D22) */
     checking: 'Checking…',
-    claudeSignedIn: (plan: string) => `Signed in · ${plan}`,
+    /** the e-mail Claude Code says it is signed in as, so the student sees which account the worker runs on (greg, 2026-10-21) */
+    claudeSignedIn: (plan: string, email?: string) => `Signed in · ${plan}` + (email ? ` · ${email}` : ''),
     claudeNeeds: 'Needs sign-in',
     claudeSignIn: 'Sign in',
     /** no claude_login under 5 minutes old (decision D22; was "—", which read as a fault) */
