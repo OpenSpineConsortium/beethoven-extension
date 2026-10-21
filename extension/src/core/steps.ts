@@ -1034,7 +1034,7 @@ function rowsOf(f: Facts, hero: HeroView & { live: boolean }): StatusRows {
   const claude: StatusRows['claude'] =
     c && hero.live
       ? c.loggedIn
-        ? { state: 'signed-in', text: planWord(c.plan) ? H.claudeSignedIn(planWord(c.plan)!) : H.claudeSignedIn('Claude') }
+        ? { state: 'signed-in', text: H.claudeSignedIn(planWord(c.plan) ?? 'Claude', c.email) }
         : { state: 'needs', text: H.claudeNeeds, link: button(H.claudeSignIn, 'link', { kind: 'sign-in-claude' }) }
       : f.run.phase === 'needs-claude' && hero.live
         ? { state: 'needs', text: H.claudeNeeds, link: button(H.claudeSignIn, 'link', { kind: 'sign-in-claude' }) }
