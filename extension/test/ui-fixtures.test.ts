@@ -752,8 +752,8 @@ describe('the pages of 19.0.0, drawn', () => {
     page.show(f.view);
     const repo = live<HTMLInputElement>(root, '#gate-repo')!;
     expect(live<HTMLInputElement>(root, '#gate-clone')?.value).toBe('hpcworker');
-    repo.value = 'OpenSpineConsortium/symphony-template';
-    fire(repo, 'input');
+    // the lab's repository is filled in, so the press needs no typing
+    expect(repo.value).toBe('OpenSpineConsortium/symphony-template');
     fire(live(root, '#gate-setup')!, 'click');
     fire(live(root, '#gate-setup')!, 'click');
     expect(acts).toEqual([{ kind: 'gate', op: 'setup', repo: 'OpenSpineConsortium/symphony-template', clone: 'hpcworker' }]);

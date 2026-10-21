@@ -546,7 +546,12 @@ export async function runShellCommand(o: ShellRunOpts): Promise<ShellResult> {
       settleTimer = setTimeout(tryType, o.settleMs ?? 400);
     };
 
-    later(() => finish(new ShellError('the portal shell did not open in time', transcript.cleaned)), o.connectTimeoutMs ?? 15_000);
+    // a shell whose line was typed has opened: from then on only the command's own time limit holds,
+    // or a command running longer than this (the lab lead's gate setup, a git pull and several gh
+    // calls) was cut off as a shell that never opened (greg's press, 2026-10-21)
+    later(() => {
+      if (!typed) finish(new ShellError('the portal shell did not open in time', transcript.cleaned));
+    }, o.connectTimeoutMs ?? 15_000);
 
     ws.addEventListener('open', () => {
       try {

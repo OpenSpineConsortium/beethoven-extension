@@ -8,7 +8,7 @@
 // itself): what is saved and how it opens, and Forget behind its confirm row. Nothing typed is ever on
 // this page; Forget hands the passkey's public credential id to the browser's own "unknown credential"
 // signal, best-effort and never awaited, then asks the background to forget.
-import { DEFAULT_CLONE } from '../core/contract';
+import { DEFAULT_CLONE, DEFAULT_GATE_REPO } from '../core/contract';
 import type { Appearance } from '../core/keys';
 import { WORDS, type Action, type SettingsView } from '../core/model';
 import { signalUnknownPasskey } from '../ext/gridSignin';
@@ -117,7 +117,7 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
   // 22.0.0: one press at a time; the answer stays under the buttons until the next press
   const pressGate = (op: 'setup' | 'off') => {
     if (local.gateBusy) return;
-    const repo = byId<HTMLInputElement>('gate-repo')?.value ?? local.gateRepo ?? '';
+    const repo = byId<HTMLInputElement>('gate-repo')?.value ?? local.gateRepo ?? DEFAULT_GATE_REPO;
     const clone = byId<HTMLInputElement>('gate-clone')?.value ?? local.gateClone ?? DEFAULT_CLONE;
     set({ gateRepo: repo, gateClone: clone, gateBusy: true, gateResult: undefined });
     void opts.act({ kind: 'gate', op, repo, clone }).then(
@@ -140,7 +140,7 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
       { class: 's-gate', key: 'gate', style: 'padding:0 0 14px' },
       el('p', { class: 's-label', text: G.title }),
       el('p', { class: 'fine', text: G.note }),
-      gateField('gate-repo', G.repo, local.gateRepo ?? '', (v) => {
+      gateField('gate-repo', G.repo, local.gateRepo ?? DEFAULT_GATE_REPO, (v) => {
         // an answer belongs to the repository it was for
         local.gateRepo = v;
         delete local.gateResult;

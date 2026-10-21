@@ -156,6 +156,8 @@ export const REPO_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,38}\/[A-Za-z0-9_.][A-Za-z0-
 /** 22.0.0: the lab lead's own hpcworker clone, a path under the home with no `..` and no leading dot (cli.json `clone`) */
 export const CLONE_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}(\/[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}){0,7}$/;
 export const DEFAULT_CLONE = 'hpcworker';
+/** the repository whose grid-gate.yml the lab's gate answers to, filled in so the press needs no typing (greg, 2026-10-21) */
+export const DEFAULT_GATE_REPO = 'OpenSpineConsortium/symphony-template';
 export const MODES: readonly PermissionMode[] = ['default', 'acceptEdits', 'plan'];
 export const LOGINS: readonly ConnectLogin[] = ['auto', 'always', 'never'];
 
