@@ -12,6 +12,7 @@
 import type { ChannelNote, KnownState, LastKnown, OnceNotes, PendingPress, Prefs, TourSeen } from './keys';
 import { formatAgo, formatClock, LOG_WORDS, placeOf, WORDS, type Action, type WelcomeMoment, type ButtonView, type ChecklistRow, type ConnectFailure, type GridSheet, type HeroState, type HeroView, type HomePrimary, type HomeView, type JourneyView, type LoginSetupMoment, type LogLine, type Orb, type PanelView, type ProblemView, type StatusRows, type ToolbarView, type TourView, type TrackView, type WelcomeView } from './model';
 import { isEnvironmentUrl, isProjectUrl, planWord, type ReasonClass, type StopReason } from './contract';
+import { offerOf, type WorkerList } from './workers';
 import { PLAN_CLASS_DISCLOSURE, SHORT_STATEMENT, STATEMENT_BUTTON, STATEMENT_TICK } from './disclosure';
 import { SUMMARY, TERMS_REFUSAL, ticks } from './terms';
 import type { AccessFact } from '../licensing/access';
@@ -200,6 +201,8 @@ export interface Facts {
   once: OnceNotes;
   tourSeen?: TourSeen;
   prefs: Prefs;
+  /** 24.0.0: every worker of the student's on the grid, as the last read of their status files found them (core/workers.ts) */
+  workers?: WorkerList;
   /** action.getUserSettings().isOnToolbar; undefined where the browser cannot say */
   pinned?: boolean;
   /** Stop was pressed and the job is not gone yet */
@@ -1160,7 +1163,40 @@ export function home(f: Facts): HomeView {
     ...(tryAsking ? { tryAsking } : {}),
     cards,
     log: { show: H.showLog, hide: H.hideLog, copy: H.copyLog, ...(f.log ? { lines: f.log } : {}) },
+    ...(() => {
+      const w = workersOf(f);
+      return w ? { workers: w } : {};
+    })(),
     ...(f.toast ? { toast: f.toast } : {}),
+  };
+}
+
+/**
+ * 24.0.0: Your workers, while there is something to choose: more than one worker, or the student's one worker on another
+ * Claude account than the one Settings names for this browser (as when auto mode moved it). The student's own worker
+ * (Prefs.worker_name) comes first; the rest in name order, as workers.ts runFolders lists them.
+ */
+export function workersOf(f: Facts): HomeView['workers'] {
+  const all = f.workers?.workers ?? [];
+  const mine = f.prefs.claude_account;
+  const away = all.some((w) => offerOf(w, mine) === 'elsewhere');
+  if (all.length < 2 && !away) return undefined;
+  const H = WORDS.home;
+  const own = f.prefs.worker_name;
+  const ordered = [...all.filter((w) => w.name === own), ...all.filter((w) => w.name !== own)];
+  return {
+    title: H.workers,
+    copyLink: H.copyLink,
+    rows: ordered.map((w) => {
+      const offer = offerOf(w, mine);
+      return {
+        name: w.name,
+        state: H.workerStates[w.state],
+        ...(w.account ? { account: w.account } : {}),
+        ...(offer === 'show' ? { show: button(H.workerShow, 'outline', { kind: 'show-worker', name: w.name }) } : {}),
+        ...(offer === 'elsewhere' && w.account ? { elsewhere: H.workerElsewhere(w.account), ...(w.link ? { link: w.link } : {}) } : {}),
+      };
+    }),
   };
 }
 

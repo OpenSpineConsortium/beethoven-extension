@@ -8,7 +8,7 @@ import { el } from './dom';
 import { drawnCheck, icon, spinner } from './icons';
 import { LABELS } from './labels';
 import { logFold, type LogWords } from './log';
-import { button, hero, statusCard, type OnAct } from './parts';
+import { button, fold, foldToggle, hero, statusCard, type OnAct } from './parts';
 import { qrSvg } from './qr';
 
 export interface HomeCtx {
@@ -22,6 +22,8 @@ export interface HomeCtx {
   log: { open: boolean; lines?: LogLine[]; words: LogWords; toggle: () => void; copy: (text: string) => void };
   tryIndex: number;
   setTryIndex: (i: number) => void;
+  /** 24.0.0: Your workers' fold (page-local) */
+  workers?: { open: boolean; toggle: () => void };
   working?: string;
 }
 
@@ -151,6 +153,38 @@ function cards(h: HomeView, ctx: HomeCtx): Array<HTMLElement> {
   });
 }
 
+/**
+ * 24.0.0: Your workers, folded: one row per worker with its state and Claude account, and Show where this browser can show
+ * it (the Claude tab Beethoven opened moves to it), or the profile to open it in, with Copy link to carry its address there.
+ */
+function workersFold(h: HomeView, ctx: HomeCtx): HTMLElement | null {
+  const w = h.workers;
+  if (!w) return null;
+  const open = !!ctx.workers?.open;
+  return el(
+    'section',
+    { class: 'workers' },
+    foldToggle('workers-fold', open, w.title, () => ctx.workers?.toggle(), 'btn-text log-toggle'),
+    fold(
+      'workers-fold',
+      open,
+      el(
+        'ul',
+        { class: 'workers-list', 'aria-label': w.title },
+        ...w.rows.map((r) =>
+          el(
+            'li',
+            { class: 'worker-row', key: `w:${r.name}` },
+            el('span', { class: 's-label' }, el('span', { class: 'mono', text: r.name }), el('span', { class: 's-sub', text: r.account ? `${r.state} \u00b7 ${r.account}` : r.state }), r.elsewhere ? el('span', { class: 's-sub', text: r.elsewhere }) : null),
+            r.show ? button(r.show, ctx.onAct, { pending: ctx.pending, block: false }) : null,
+            r.elsewhere && r.link ? el('button', { type: 'button', class: 'btn btn-outline', onClick: () => ctx.copy(r.link!, WORDS.home.linkCopied) }, el('span', { class: 'btn-label', text: w.copyLink })) : null,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 export function renderHome(h: HomeView, ctx: HomeCtx): HTMLElement {
   // the hero, its primary and the secondary row leave and arrive together on a change of state (data-swap)
   const top = ctx.phone && h.link
@@ -165,6 +199,7 @@ export function renderHome(h: HomeView, ctx: HomeCtx): HTMLElement {
     ctx.working ? el('p', { class: 'status', style: 'margin-top:8px' }, spinner(16), el('span', { text: ctx.working })) : null,
     tryAsking(h, ctx),
     ...cards(h, ctx),
+    workersFold(h, ctx),
     logFold(ctx.log.open, ctx.log.lines ?? h.log.lines, { show: h.log.show, hide: h.log.hide, copy: h.log.copy }, ctx.log),
   );
 }

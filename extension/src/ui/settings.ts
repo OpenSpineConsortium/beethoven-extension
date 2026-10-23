@@ -322,6 +322,14 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         switchRow('open-claude', WORDS.settings.openClaude, w.openClaude, (on) => pref({ open_claude_on_connect: on })),
       ),
       card(WORDS.settings.project, projectRow),
+      // 24.0.0: which account this browser uses on claude.ai, so Your workers can say where a worker on another one opens
+      w.claudeAccount
+        ? card(
+            WORDS.settings.claudeAccount,
+            el('div', { class: 's-row stack' }, seg(WORDS.settings.claudeAccount, w.claudeAccount.value ?? '', [{ value: '', label: WORDS.settings.claudeAccountAny }, ...w.claudeAccount.options.map((o) => ({ value: o, label: o }))], (v2) => pref({ claude_account: v2 }))),
+            el('p', { class: 'fine', text: WORDS.settings.claudeAccountNote }),
+          )
+        : null,
       card(
         WORDS.settings.appearance,
         el('div', { class: 's-row' }, seg(LABELS.appearance, v.appearance.value, v.appearance.options, (a) => { opts.onAppearance?.(a); pref({ appearance: a }); })),

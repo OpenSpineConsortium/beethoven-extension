@@ -47,6 +47,7 @@ export const CLICK_KEY = 'bridge.click'; //         {tabId, origin, path, looksL
 // 11.0.0:
 export const SIGNIN_TAB_KEY = 'bridge.signinTab'; //  OpenedTab: the grid sign-in tab Beethoven opened or navigated (the welcome tab, or one opened for a press)
 export const ANTHROPIC_TAB_KEY = 'bridge.anthropicTab'; // AnthropicTab: Anthropic's sign-in tab Beethoven opened, and whether it has started a new load since the paste
+export const WORKERS_KEY = 'bridge.workers'; //  core/workers.ts WorkerList: every worker of the student's on the grid, as their status.json files said (session storage)
 export const CLAUDE_TAB_KEY = 'bridge.claudeTab'; //  OpenedTab: the claude.ai tab Beethoven opened for "Open my session" (session storage: a tab id means nothing after a restart)
 export const PROJECT_TAB_KEY = 'bridge.projectTab'; // OpenedTab: the claude.ai tab Beethoven opened for the project's page (21.0.0, "Open my project"), its own record so each address keeps one tab
 export const TERMINAL_TAB_KEY = 'bridge.terminalTab'; // OpenedTab: the grid's terminal tab Beethoven opened for the one-time key step (AM2)
@@ -101,6 +102,12 @@ export interface Prefs {
    * New session, Copy link and Phone keep the worker's link.
    */
   project_url?: string;
+  /**
+   * 24.0.0: Settings, "Your Claude account in this browser": the e-mail of the Claude account this Chrome profile is signed
+   * in to on claude.ai, picked from the accounts the student's workers report (core/workers.ts accountsOf); absent while
+   * none is picked, and then every worker is offered in this browser. Beethoven never reads claude.ai to learn it.
+   */
+  claude_account?: string;
   // 12.0.0 to 15.0.0 stored `connection: 'direct' | 'vpn'` here; 16.0.0 has one way, ignores a stored value and removes it on its first run (background.ts cleanupDirectWay).
 }
 

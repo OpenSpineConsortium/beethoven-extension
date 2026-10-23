@@ -76,6 +76,8 @@ export function detailsView(i: DetailsInput): DetailsView {
 
 export interface SettingsInput {
   prefs: Prefs;
+  /** 24.0.0: the Claude accounts the student's workers report (core/workers.ts accountsOf), for Your Claude account in this browser */
+  accounts?: string[];
   settings?: PortalSettings;
   terms?: TermsRecord;
   auditCount: number;
@@ -124,6 +126,12 @@ export function settingsView(i: SettingsInput): SettingsView {
       keepRunning: i.prefs.auto_start,
       openClaude: i.prefs.open_claude_on_connect,
       ...(i.prefs.project_url ? { project: i.prefs.project_url } : {}),
+      // 24.0.0: offered once a worker reports an account; one picked before stays among the options when no worker reports it now
+      ...(() => {
+        const options = [...(i.accounts ?? [])];
+        if (i.prefs.claude_account && !options.includes(i.prefs.claude_account)) options.push(i.prefs.claude_account);
+        return options.length ? { claudeAccount: { ...(i.prefs.claude_account ? { value: i.prefs.claude_account } : {}), options } } : {};
+      })(),
     },
     appearance: { value: appearance, options: (['cream', 'system'] as const).map((value) => ({ value, label: S.appearances[value] })) },
     // address says a portal IS stored (the label, and Disconnect's enabled state); the bundled

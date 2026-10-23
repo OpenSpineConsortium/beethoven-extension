@@ -30,8 +30,10 @@ describe('the terms version', () => {
   // 22.0.0 raised the statement alone (version 17, 2026-10-18), greg's choice of that day ("Statement only"): its one
   // change is the lab lead's two buttons, which type nothing unless a lab lead presses them, so the agreement and the
   // acceptance in force stay as they were
-  it('names PRIVACY.md version 17, of 2026-10-18, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['17', '2026-10-18']);
+  // 24.0.0 raised it alone again (version 18, 2026-10-23): Your workers and this browser's Claude account, read and kept
+  // in the browser only, with no new recipient
+  it('names PRIVACY.md version 18, of 2026-10-23, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['18', '2026-10-23']);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {
