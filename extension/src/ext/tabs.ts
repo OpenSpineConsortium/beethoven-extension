@@ -53,6 +53,20 @@ export async function focusTab(tabId: number, windowId?: number): Promise<boolea
   }
 }
 
+/**
+ * 24.0.0: load another address in a tab Beethoven opened itself, in front (Your workers' Show: the Claude tab goes to the
+ * chosen worker). tabs.update with a url needs no permission; only the claude.ai tab Beethoven recorded is ever moved.
+ */
+export async function moveTab(tabId: number, windowId: number | undefined, url: string): Promise<boolean> {
+  try {
+    await browser.tabs.update(tabId, { url, active: true });
+    if (windowId !== undefined) await browser.windows.update(windowId, { focused: true }).catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** open a tab; never on an Anthropic address unless `anthropicOk` (Anthropic's own sign-in page, the claude.ai environment link and, 21.0.0, the project's page, opened as a bookmark would) */
 export async function openTab(url: string, o: { windowId?: number; active: boolean; anthropicOk?: boolean }): Promise<{ tabId: number; windowId: number } | undefined> {
   if (isAnthropicAddress(url) && !o.anthropicOk) return undefined;

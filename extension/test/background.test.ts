@@ -203,6 +203,62 @@ describe('the background, run whole', () => {
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(PROJECT))).toHaveLength(1);
   }, 40_000);
 
+  // 24.0.0: Your workers: every worker's status file is read on the panel's tick; Show moves the Claude tab Beethoven opened
+  // to another worker on the same account, and a worker on another account than Settings names is not shown here
+  it('24.0.0: Your workers lists every worker; Show moves the Claude tab to one on this account and never to one on another', async () => {
+    await boot(world);
+    world.opts.claudeSignedIn = true;
+    const panel = openPort(world, 'panel');
+    await send(world, { type: 'panel.opened', windowId: 1 });
+    await sleep(800);
+    const ticker = setInterval(() => panel.tick(), 250);
+    await send(world, { type: 'action', action: { kind: 'connect' } });
+    await sleep(2_500);
+    const at = new Date().toISOString();
+    const login = (email: string) => ({ loggedIn: true, email, subscriptionType: 'max', checked_at: at });
+    const sj = `${STATE}/worker/status.json`;
+    const prev = JSON.parse(world.fs.get(sj)!);
+    world.fs.set(sj, JSON.stringify({ ...prev, state: 'online', node: 'asx1', got_computer_at: at, online_at: at, updated_at: at, environment_url: LINK, environment_id: 'env_01XzAN32jsbL8W1PAFSvitBt', claude_login: login('Student@Wayne.edu') }));
+    const OTHER = 'https://claude.ai/code?environment=env_01OtherWorkerOnSameAcct';
+    const AWAY = 'https://claude.ai/code?environment=env_01WorkerOnAnotherAccount';
+    for (const [name, link, email] of [['second', OTHER, 'student@wayne.edu'], ['account2', AWAY, 'second@example.com']] as const) {
+      world.dirs.add(`${STATE}/${name}`);
+      world.fs.set(`${STATE}/${name}/status.json`, JSON.stringify({ version: 1, run: name, job: '900', state: 'online', updated_at: at, environment_url: link, claude_login: login(email) }));
+    }
+    world.dirs.add(`${STATE}/workspaces`);
+    await sleep(8_000);
+    // Your workers opened reads every worker's file again, at most once in five seconds
+    const count = () => (world.storage.session['bridge.workers'] as { workers?: unknown[] } | undefined)?.workers?.length ?? 0;
+    for (let i = 0; i < 12 && count() < 3; i++) {
+      await send(world, { type: 'action', action: { kind: 'workers-fold', open: true } });
+      await sleep(1_000);
+    }
+    // the tab opened when the worker came online is the one Show moves
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
+    const listed = world.storage.session['bridge.workers'] as { workers: Array<{ name: string; account?: string }> };
+    expect(listed.workers.map((w) => [w.name, w.account])).toEqual([['account2', 'second@example.com'], ['second', 'student@wayne.edu'], ['worker', 'student@wayne.edu']]);
+    let h = JSON.stringify(panel.last()?.view);
+    expect(h).toContain('"kind":"show-worker","name":"second"');
+    expect(await send(world, { type: 'action', action: { kind: 'show-worker', name: 'second' } })).toMatchObject({ ok: true, value: { moved: true, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.update') && l.includes(`-> ${OTHER}`))).toHaveLength(1);
+    // and back: the same tab again, still no second tab
+    expect(await send(world, { type: 'action', action: { kind: 'show-worker', name: 'worker' } })).toMatchObject({ ok: true, value: { moved: true, opened: false } });
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes('claude.ai/code'))).toHaveLength(1);
+    // Settings names this browser's account: the worker on the other one is not shown here, and the home says where it opens
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: 'not an address' } } })).toMatchObject({ ok: true, value: { saved: false } });
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: ' Student@Wayne.edu ' } } })).toMatchObject({ ok: true, value: { saved: true } });
+    expect((world.storage.local['bridge.prefs'] as { claude_account?: string }).claude_account).toBe('student@wayne.edu');
+    expect(await send(world, { type: 'action', action: { kind: 'show-worker', name: 'account2' } })).toMatchObject({ ok: true, value: { moved: false, opened: false } });
+    expect(world.log.filter((l) => l.includes(AWAY))).toHaveLength(0);
+    await sleep(1_000);
+    h = JSON.stringify(panel.last()?.view);
+    expect(h).toContain('Open it in the Chrome profile signed in to claude.ai as second@example.com');
+    expect(h).not.toContain('"kind":"show-worker","name":"account2"');
+    clearInterval(ticker);
+    expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: '' } } })).toMatchObject({ ok: true, value: { saved: true } });
+    expect((world.storage.local['bridge.prefs'] as { claude_account?: string }).claude_account).toBeUndefined();
+  }, 40_000);
+
   it("21.0.0: the project's tab Beethoven opened before the worker was ready is brought forward when the worker is ready, never a second one", async () => {
     await boot(world);
     world.opts.claudeSignedIn = true;

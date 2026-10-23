@@ -36,6 +36,8 @@ export interface PanelLocal {
   phone: boolean;
   logOpen: boolean;
   logLines?: LogLine[];
+  /** 24.0.0: Your workers, folded every time the panel opens */
+  workersOpen?: boolean;
   detailsOpen: boolean;
   /** the tour started from ⋯ or the one-time card */
   tourMenu?: TourView;
@@ -423,6 +425,14 @@ export function mountPanel(root: HTMLElement, opts: PanelOptions): { show: (v: P
           log: logCtx,
           tryIndex: local.tryIndex,
           setTryIndex: (i) => set({ tryIndex: i }),
+          workers: {
+            open: !!local.workersOpen,
+            toggle: () => {
+              const open = !local.workersOpen;
+              set({ workersOpen: open });
+              void opts.act({ kind: 'workers-fold', open }).catch(() => undefined);
+            },
+          },
           working,
         }),
       };

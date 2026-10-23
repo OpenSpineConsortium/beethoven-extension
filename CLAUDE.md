@@ -157,6 +157,18 @@ name and identifier carry no university name.
   sitting, no stop, no gate press, no grid sign-in or one-shot password), asking again on every poll and
   when the last page closes. The worker on the grid keeps running through it. No text changes: the
   privacy statement already says the passkey's unlock is cleared when Beethoven updates or reloads.
+- **Your workers, and the claude.ai account of this browser (decided 2026-10-23, 24.0.0).** greg asked to switch
+  which worker the claude.ai tab shows, at once, and to reach workers on his other Claude accounts (hpcworker framework
+  22 runs several workers, each kept to one account by `accounts start N`). A claude.ai tab shows one account's workers
+  and an extension cannot open a tab in another Chrome profile, so the design is one Chrome profile per Claude account,
+  each with Beethoven: the panel reads every run folder's `status.json` under the state directory (`core/workers.ts`,
+  once a minute while a page is open, and when the fold opens) and lists them under the folded *Your workers*, with
+  the account Claude Code reports (`claude_login.email`). *Show* loads a worker's link in the claude.ai tab Beethoven
+  opened (`tabs.update`, no permission; a new tab only when none is open). Settings' *Your Claude account in this
+  browser* (`Prefs.claude_account`, picked from the accounts the workers report) marks a worker on another account
+  with the profile to open it in and *Copy link*, and no *Show*. Beethoven still never reads claude.ai. The same
+  worker moving accounts on its own (auto mode, `accounts use`) shows in the fold as its account changes. Privacy 18
+  alone, as 22.0.0 did; the agreement stays 15.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the

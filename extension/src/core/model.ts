@@ -392,6 +392,16 @@ export const WORDS = {
     newSession: 'New session',
     newSessionTip: 'Start a new session there. It runs on your worker.',
     copyLink: 'Copy link',
+    /**
+     * 24.0.0: Your workers, a fold under the status card while the student has more than one worker, or the one runs on
+     * another Claude account than this browser's. Show points the Claude tab Beethoven opened at that worker; a worker on
+     * another account is opened in the Chrome profile signed in to it, since a claude.ai tab shows one account's workers.
+     */
+    workers: 'Your workers',
+    workerShow: 'Show',
+    workerStates: { online: 'Online', starting: 'Starting', queued: 'In line', stopped: 'Stopped', unknown: 'Not known yet' },
+    workerElsewhere: (account: string) => `Open it in the Chrome profile signed in to claude.ai as ${account}.`,
+    workerShown: (name: string) => `Showing ${name} in your Claude tab.`,
     linkCopied: 'Link copied.',
     phone: 'Phone',
     phoneTitle: 'Open on your phone',
@@ -487,6 +497,10 @@ export const WORDS = {
     projectAdd: 'Add',
     projectUse: 'Use',
     projectClear: 'Clear',
+    /** 24.0.0: which Claude account this browser is signed in to on claude.ai, picked from the accounts the workers report */
+    claudeAccount: 'Your Claude account in this browser',
+    claudeAccountAny: 'Not set',
+    claudeAccountNote: "Workers on another account are shown with the Chrome profile to open them in. Beethoven doesn't read claude.ai; pick the account you're signed in to there.",
     appearance: 'Appearance',
     appearances: { cream: 'Cream', system: 'Match system' },
     grid: 'Your grid',
@@ -987,6 +1001,16 @@ export interface FootRow {
   stopping: boolean;
 }
 
+/** 24.0.0: one worker in Your workers: Show (show-worker) where this browser can show it, else the sentence that names its account's profile, with Copy link */
+export interface WorkerRow {
+  name: string;
+  state: string;
+  account?: string;
+  show?: ButtonView;
+  elsewhere?: string;
+  link?: string;
+}
+
 export interface HomeView {
   /** "Beethoven" and the "⋯" menu (aria-label "More") */
   header: { wordmark: string; moreLabel: string; menu: Array<{ label: string; action: Action }> };
@@ -1012,6 +1036,8 @@ export interface HomeView {
   cards: Array<{ id: 'pin-tip' | 'tour-card' | 'project-tip'; text: string; done?: boolean; open?: Action; dismiss: Action }>;
   /** Show log: closed every time the panel opens (page-local); the lines arrive when it is opened */
   log: { show: string; hide: string; copy: string; lines?: LogLine[] };
+  /** 24.0.0: Your workers (core/workers.ts), folded; the fold's state is page-local */
+  workers?: { title: string; rows: WorkerRow[]; copyLink: string };
   /** a toast the core asks for once ("Start a new session there. It runs on your worker.") */
   toast?: string;
 }
@@ -1149,6 +1175,8 @@ export interface SettingsView {
     openClaude: boolean;
     /** 21.0.0: the project's address as stored (keys.ts Prefs.project_url); absent while none is named */
     project?: string;
+    /** 24.0.0: the accounts the workers report, and the one picked for this browser (keys.ts Prefs.claude_account); shown only once a worker reports one */
+    claudeAccount?: { value?: string; options: string[] };
   };
   appearance: { value: Appearance; options: Array<{ value: Appearance; label: string }> };
   grid: { address?: string; suggested?: string; change: string; disconnect: string };
@@ -1247,6 +1275,10 @@ export type Action =
   | { kind: 'open-session' }
   /** 21.0.0: "Open my project": the page named in Settings */
   | { kind: 'open-project' }
+  /** 24.0.0: Your workers, "Show": the Claude tab Beethoven opened goes to that worker's link (one new tab when none is open); never needs the grid */
+  | { kind: 'show-worker'; name: string }
+  /** 24.0.0: Your workers opened: every worker's status file is read again now (at most once in WORKERS_AGAIN_MS) */
+  | { kind: 'workers-fold'; open: boolean }
   /** "New session": opens the environment link in a new tab (the first time, the toast) */
   | { kind: 'new-session' }
   /** "Your files": the worker's folder in the portal's Files app, in a tab (needs the grid sign-in) */
@@ -1272,7 +1304,7 @@ export type Action =
   | { kind: 'check-compute-node' }
   // Settings
   /** 21.0.0: project_url is what the student typed; the background keeps it in the one shape it opens (contract.ts projectLinkOf), an empty one clears it, and refuses anything else (saved: false) */
-  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance; project_url: string }> }
+  | { kind: 'set-pref'; prefs: Partial<{ worker_name: string; permission_mode: 'default' | 'acceptEdits' | 'plan'; auto_start: boolean; open_claude_on_connect: boolean; appearance: Appearance; project_url: string; claude_account: string }> }
   /** "Change" (Your grid): the welcome page's portal field, in Settings */
   | { kind: 'change-portal'; origin: string; granted: boolean }
   /** "Disconnect": forgets the portal and removes the origin grant */
@@ -1322,6 +1354,9 @@ export interface ActionResults {
   'open-session': { focused: boolean; opened: boolean };
   /** 21.0.0: the project's page, brought forward or opened; neither when no project is named */
   'open-project': { focused: boolean; opened: boolean };
+  /** 24.0.0: the worker's link, in the Claude tab Beethoven opened (moved) or in a new one (opened); neither when that worker is not offered here */
+  'show-worker': { moved: boolean; opened: boolean };
+  'workers-fold': { read: boolean };
   'new-session': { opened: boolean; firstTime: boolean };
   'open-files': { opened: boolean };
   'open-settings': { opened: boolean };

@@ -64,6 +64,7 @@ import {
   CHECKS_KEY,
   CLAUDE_TAB_KEY,
   PROJECT_TAB_KEY,
+  WORKERS_KEY,
   DEFAULT_PREFS,
   GRID_KEY,
   IDENTITY_KEY,
@@ -134,7 +135,8 @@ import { indexedDbRecords, openPassword, unbase64 } from '../core/vault';
 import { connectApi, disconnectPortal, dropAnthropicLeftovers, forgetGridSignin, savePortal } from '../ext/connectApi';
 import { hasPanel } from '../ext/gesture';
 import { assetUrl, installId, local, prefs as loadPrefs, session, version } from '../ext/storage';
-import { activeTabIn, closeUnderGuards, focusTab, openTab, tabHost, tabNow } from '../ext/tabs';
+import { activeTabIn, closeUnderGuards, focusTab, moveTab, openTab, tabHost, tabNow } from '../ext/tabs';
+import { accountOf, accountsOf, runFolders, showable, workerSeen, WORKERS_AGAIN_MS, WORKERS_EVERY_MS, WORKERS_RETRY_MS, type WorkerList, type WorkerSeen } from '../core/workers';
 
 export type { RunState } from '../core/facts';
 
@@ -277,8 +279,8 @@ const mem = {
   welcomeSite: undefined as string | undefined,
   client: undefined as { key: string; client: PortalClient } | undefined,
   failDetail: '',
-  last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0, keep: 0 },
-  busy: { list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false, keep: false },
+  last: { list: 0, statusJson: 0, grid: 0, reach: 0, signin: 0, lastKnownAt: 0, pressAccess: 0, pressSetup: 0, carry: 0, keep: 0, workers: 0 },
+  busy: { workers: false, list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false, keep: false },
   lastToolbar: '',
   lastKnownJson: '',
   pollEvery: 0,
@@ -821,7 +823,7 @@ function toast(text: string): void {
 async function buildFacts(): Promise<Facts> {
   const now = Date.now();
   const L = await local.many([TERMS_KEY, PORTAL_KEY, PREFS_KEY, ACCESS_KEY, SERVICES_KEY, IDENTITY_KEY, STATEMENTS_KEY, LAST_KNOWN_KEY, CHANNEL_KEY, WAIT_HISTORY_KEY, TOUR_SEEN_KEY, ONCE_KEY, KILLLIST_KEY]);
-  const S = await session.many([GRID_KEY, PRESS_KEY, RUN_KEY, ANTHROPIC_TAB_KEY, WELCOME_PRESS_KEY, ...(mem.logOpen ? [ACTIVITY_KEY] : [])]);
+  const S = await session.many([GRID_KEY, PRESS_KEY, RUN_KEY, ANTHROPIC_TAB_KEY, WELCOME_PRESS_KEY, WORKERS_KEY, ...(mem.logOpen ? [ACTIVITY_KEY] : [])]);
   const settings = acceptedSettings(L[PORTAL_KEY] as PortalSettings | undefined);
   const prefs: Prefs = { ...DEFAULT_PREFS, ...((L[PREFS_KEY] as Partial<Prefs> | undefined) ?? {}) };
   const granted = settings ? await connectApi.containsOrigin(settings.origin).catch(() => false) : false;
@@ -871,6 +873,7 @@ async function buildFacts(): Promise<Facts> {
     once: (L[ONCE_KEY] as OnceNotes | undefined) ?? {},
     ...(L[TOUR_SEEN_KEY] ? { tourSeen: L[TOUR_SEEN_KEY] as TourSeen } : {}),
     prefs,
+    ...(S[WORKERS_KEY] ? { workers: S[WORKERS_KEY] as WorkerList } : {}),
     ...(mem.pinned !== undefined ? { pinned: mem.pinned } : {}),
     stopping: mem.stopping,
     workingInTab: mem.workingInTab > 0,
@@ -931,7 +934,7 @@ async function viewFor(surface: Surface, f: Facts): Promise<SurfaceView> {
       const note = own && own.saved !== 'none' ? mem.gridAuth.note : undefined;
       // "didn't work last time" only for the saved password itself (a typed one turned down says so on the sheet)
       const signin = own ? { ...(note ? { note } : {}), unlockWith: own.unlockWith, refused: mem.gridAuth.state.refused?.source === 'saved' } : undefined;
-      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}), ...(signin ? { signin } : {}) });
+      const sv = settingsView({ prefs: f.prefs, ...(settings ? { settings } : {}), ...(settingsDef ? { defaultHostname: settingsDef.hostname } : {}), ...(recordInForce(terms) ? { terms } : {}), auditCount: audit.length, driveConnected: drive, accounts: accountsOf(f.workers), hashes: recordInForce(terms) ? [`LICENSE.txt ${terms.license_sha256}`, `PRIVACY.md ${terms.privacy_sha256}`] : [], installId: await installId(), ...(oldKey ? { oldKey } : {}), ...(signin ? { signin } : {}) });
       return { surface: 'settings', view: sv };
     }
   }
@@ -1055,6 +1058,8 @@ async function tick(): Promise<void> {
   const rf = runFacts(run, now);
   const starting = mem.connect.inFlight || ['queued', 'got-computer', 'connecting', 'slow', 'reconnecting', 'needs-claude', 'needs-consent', 'renewing'].includes(rf.phase);
   if (grid?.session === 'signed-in' && now - mem.last.list >= (starting ? LIST_STARTING_MS : LIST_IDLE_MS)) void pollRun();
+  // 24.0.0: every worker's status file, at the 60 s floor, only while a page is open (Your workers is the panel's alone)
+  if (grid?.session === 'signed-in' && now - mem.last.workers >= WORKERS_EVERY_MS) void pollWorkers();
   const pressWaiting = !!(await session.get<PendingPress>(PRESS_KEY));
   // the scheduler's reason, once a minute while in line; never while a press of the student's waits or runs.
   // 13.0.0: while renewing too: framework 13's `worker status` asks about the successor a job that ended named,
@@ -1282,6 +1287,13 @@ async function actInner(a: Action): Promise<unknown> {
       return openSession();
     case 'open-project':
       return openProject();
+    case 'show-worker':
+      return showWorker(a.name);
+    case 'workers-fold': {
+      if (!a.open || Date.now() - mem.last.workers < WORKERS_AGAIN_MS) return { read: false } satisfies ActionResults['workers-fold'];
+      await pollWorkers();
+      return { read: true } satisfies ActionResults['workers-fold'];
+    }
     case 'new-session': {
       const f = await buildFacts();
       // 14.0.0: a new session needs an environment link, the one the home's button was offered for (newSessionLinkOf): any
@@ -1360,6 +1372,13 @@ async function actInner(a: Action): Promise<unknown> {
         if (String(a.prefs.project_url ?? '').trim() && !link) return { saved: false } satisfies ActionResults['set-pref'];
         if (link) next.project_url = link;
         else delete next.project_url;
+      }
+      // 24.0.0: an e-mail address, kept lower-cased; an empty one clears it
+      if ('claude_account' in a.prefs) {
+        const account = accountOf(a.prefs.claude_account);
+        if (String(a.prefs.claude_account ?? '').trim() && !account) return { saved: false } satisfies ActionResults['set-pref'];
+        if (account) next.claude_account = account;
+        else delete next.claude_account;
       }
       await local.set(PREFS_KEY, next);
       return { saved: true } satisfies ActionResults['set-pref'];
@@ -4101,6 +4120,67 @@ async function openProject(): Promise<ActionResults['open-project']> {
   return focusOrOpen(link, 'open my project');
 }
 
+
+/**
+ * 24.0.0: Your workers' "Show": the claude.ai tab Beethoven opened goes to that worker's link, whatever it has loaded since,
+ * since showing another worker there is what the student asked for; with no such tab, one new tab. Only a worker the
+ * home offers here (workers.ts showable: online, a Claude Code link, on this browser's account or none named).
+ */
+async function showWorker(name: string): Promise<ActionResults['show-worker']> {
+  const w = showable(await session.get<WorkerList>(WORKERS_KEY), name, (await loadPrefs()).claude_account);
+  if (!w?.link || !isClaudeCodeLink(w.link)) {
+    dbg('open', `show worker ${name}: not offered here`);
+    return { moved: false, opened: false };
+  }
+  const rec = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
+  if (rec && rec.purpose === 'session' && (await tabNow(rec.tabId)) && (await moveTab(rec.tabId, rec.windowId, w.link))) {
+    // counted as Beethoven's own load again, so Open my session brings this tab forward rather than opening another
+    await session.set(CLAUDE_TAB_KEY, { ...rec, opened_at: nowIso(), loaded: false, loads_after: 0 } satisfies OpenedTab);
+    dbg('open', `show worker ${name}: the Claude tab moved to it (link ${linkWord(w.link)})`);
+    toast(WORDS.home.workerShown(name));
+    return { moved: true, opened: false };
+  }
+  const opened = await openSessionTab(w.link);
+  if (opened) toast(WORDS.home.workerShown(name));
+  return { moved: false, opened };
+}
+
+/**
+ * 24.0.0: every worker's status.json, for Your workers: one listing of the state directory and one download per run folder
+ * (at most workers.ts WORKERS_MAX), read on the panel's tick at the 60 s floor. The student's own worker is read here
+ * too, so its account is beside the others'; its run record stays pollRun's alone.
+ */
+async function pollWorkers(): Promise<void> {
+  if (mem.busy.workers) return;
+  const c = await directClient();
+  if (!c || !(await termsInForce())) return;
+  mem.busy.workers = true;
+  mem.last.workers = Date.now();
+  try {
+    // the run record names the state folder; only with none is the profile read for it
+    const stateDir = (await session.get<RunState>(RUN_KEY))?.stateDir ?? (await clusterContext(c)).stateDir;
+    const names = runFolders((await c.listDir(stateDir)).files);
+    const seen: WorkerSeen[] = [];
+    for (const name of names) {
+      const text = await c.readFileIfExists(paths.status(stateDir, name)).catch(() => undefined);
+      if (!text) continue;
+      try {
+        const w = workerSeen(name, JSON.parse(text) as StatusFile);
+        if (w) seen.push(w);
+      } catch {
+        /* a file caught mid-write; the next read takes it */
+      }
+    }
+    await session.set(WORKERS_KEY, { checked_at: nowIso(), workers: seen } satisfies WorkerList);
+    dbg('read', `workers: ${seen.length} (${seen.map((w) => `${w.name} ${w.state}`).join(', ') || 'none'})`);
+    schedulePush();
+  } catch (e) {
+    mem.last.workers = Date.now() - WORKERS_EVERY_MS + WORKERS_RETRY_MS;
+    dbg('read', `workers: the state folder could not be read: ${(e as Error).message}`);
+  } finally {
+    mem.busy.workers = false;
+  }
+}
 
 /** what a read of the run's files found, for the debug log */
 function noteRead(run: RunState, status: StatusFile | undefined, statusThere: boolean, connection: ConnectionFile | undefined): void {

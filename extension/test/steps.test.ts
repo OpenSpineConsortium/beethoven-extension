@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_PREFS, type LastKnown } from '../src/core/keys';
 import { formatClock, WORDS, type HomeView, type JourneyView, type PanelView } from '../src/core/model';
 import { SHORT_STATEMENT, STATEMENT_TICK, PLAN_CLASS_DISCLOSURE } from '../src/core/disclosure';
-import { home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, type Facts, type RunFacts } from '../src/core/steps';
+import { home, journey, lastKnownOf, momentOf, newSessionLinkOf, panelView, toolbarView, workersOf, type Facts, type RunFacts } from '../src/core/steps';
 import { TERMS_REFUSAL } from '../src/core/terms';
 import { accessFact, type AccessRecord } from '../src/licensing/access';
 import type { StatusFile } from '../src/core/contract';
@@ -880,5 +880,37 @@ describe("14.0.0: a worker online on a resumed session's own link", () => {
   it("More has Copy debug log on the home (the first run's menu is the panel's own, ui/panel.ts journeyMenu)", () => {
     const h = home(facts({ run: runFacts(record(sessionFile()), NOW) }));
     expect(h.header.menu.find((m) => m.label === 'Copy debug log')?.action).toEqual({ kind: 'copy-debug-log' });
+  });
+});
+
+// 24.0.0: Your workers (core/workers.ts), the fold on the home
+describe('Your workers', () => {
+  const OTHER = 'https://claude.ai/code?environment=env_01Other';
+  const list = (...workers: Array<{ name: string; state: 'online' | 'stopped'; link?: string; account?: string }>) => ({ checked_at: ago(MIN), workers });
+
+  it('is left out with one worker on this account, or none named', () => {
+    expect(workersOf(facts({}))).toBeUndefined();
+    expect(workersOf(facts({ workers: list({ name: 'worker', state: 'online', link: LINK, account: 'a@x.edu' }) }))).toBeUndefined();
+    expect(workersOf(facts({ workers: list({ name: 'worker', state: 'online', link: LINK, account: 'a@x.edu' }), prefs: { ...DEFAULT_PREFS, claude_account: 'a@x.edu' } }))).toBeUndefined();
+  });
+
+  it("lists the student's own worker first, with Show for each online worker this browser can show", () => {
+    const w = workersOf(facts({ workers: list({ name: 'account2', state: 'online', link: OTHER, account: 'a@x.edu' }, { name: 'idle', state: 'stopped', account: 'a@x.edu' }, { name: 'worker', state: 'online', link: LINK, account: 'a@x.edu' }) }))!;
+    expect(w.rows.map((r) => r.name)).toEqual(['worker', 'account2', 'idle']);
+    expect(w.rows[1]).toMatchObject({ state: 'Online', account: 'a@x.edu', show: { action: { kind: 'show-worker', name: 'account2' } } });
+    expect(w.rows[2]).toMatchObject({ state: 'Stopped' });
+    expect(w.rows[2]!.show).toBeUndefined();
+    expect(home(facts({ workers: list({ name: 'worker', state: 'online', link: LINK }, { name: 'b', state: 'online', link: OTHER }) })).workers?.title).toBe('Your workers');
+  });
+
+  it("names the profile for a worker on another account than this browser's, with its link for Copy link and no Show", () => {
+    const prefs = { ...DEFAULT_PREFS, claude_account: 'a@x.edu' };
+    const w = workersOf(facts({ prefs, workers: list({ name: 'worker', state: 'online', link: LINK, account: 'a@x.edu' }, { name: 'account2', state: 'online', link: OTHER, account: 'b@x.edu' }) }))!;
+    expect(w.rows[1]).toMatchObject({ name: 'account2', elsewhere: WORDS.home.workerElsewhere('b@x.edu'), link: OTHER });
+    expect(w.rows[1]!.show).toBeUndefined();
+    // one worker that moved to another account (auto mode) is reason enough for the fold
+    const moved = workersOf(facts({ prefs, workers: list({ name: 'worker', state: 'online', link: LINK, account: 'b@x.edu' }) }))!;
+    expect(moved.rows).toHaveLength(1);
+    expect(moved.rows[0]!.elsewhere).toContain('b@x.edu');
   });
 });
