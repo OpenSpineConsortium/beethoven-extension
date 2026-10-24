@@ -169,6 +169,12 @@ name and identifier carry no university name.
   with the profile to open it in and *Copy link*, and no *Show*. Beethoven still never reads claude.ai. The same
   worker moving accounts on its own (auto mode, `accounts use`) shows in the fold as its account changes. Privacy 18
   alone, as 22.0.0 did; the agreement stays 15.
+- **Add account (decided 2026-10-24, 24.1.0).** greg found no way to name an account no worker reports yet ("i dont
+  have an add account button on the beethoven extension settings page"). *Your Claude account in this browser* is now
+  always in Settings, and *Add account* opens an e-mail field, kept through the same `set-pref` and `accountOf` as a
+  picked one, refused with the reason when it is not an address; it stays among the options while picked, and
+  picking another drops it unless a worker reports it. Still one account per browser and Beethoven never reads
+  claude.ai. Privacy 19 alone; the agreement stays 15.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the

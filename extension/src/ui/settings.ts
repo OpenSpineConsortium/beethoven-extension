@@ -27,6 +27,10 @@ export interface SettingsLocal {
   projectEditing: boolean;
   projectValue?: string;
   projectError?: string;
+  /** 24.1.0: an account being added by hand (Your Claude account in this browser), and the refusal when it is not an address */
+  accountEditing?: boolean;
+  accountValue?: string;
+  accountError?: string;
   changeOpen: boolean;
   portalInput?: string;
   portalError?: string;
@@ -111,6 +115,17 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         setTimeout(() => byId('project-change')?.focus(), 0);
       } else if (r?.saved === false) set({ projectValue: value, projectError: WORDS.settings.projectBad });
       else set({ projectValue: value });
+    });
+  };
+  // 24.1.0: an account typed by hand is kept as the account picked for this browser, in the one shape the background
+  // keeps (workers.ts accountOf); a refused one stays in the field with the reason, as the project's address does
+  const useAccount = (value: string) => {
+    void opts.act({ kind: 'set-pref', prefs: { claude_account: value } }).then((r) => {
+      if (r?.saved) {
+        set({ accountEditing: false, accountValue: undefined, accountError: undefined });
+        setTimeout(() => byId('account-add')?.focus(), 0);
+      } else if (r?.saved === false) set({ accountValue: value, accountError: WORDS.settings.claudeAccountBad });
+      else set({ accountValue: value });
     });
   };
 
@@ -309,6 +324,55 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         : // Add sits where Change will be, in the same group, so the redraw that names the project keeps the very button
           // the caret is on (the morph pairs children by tag and place)
           el('div', { class: 's-row', key: 'project' }, el('span', { class: 's-label' }, el('span', { class: 's-sub', text: WORDS.settings.projectNone })), el('div', { class: 'btns' }, el('button', { type: 'button', class: 'btn btn-outline', id: 'project-change', text: WORDS.settings.projectAdd, onClick: editProject })));
+    // 24.1.0: Add account opens a field for an address no worker reports yet; Escape closes it, Enter or Use keeps it
+    const editAccount = () => { set({ accountEditing: true, accountValue: '', accountError: undefined }); setTimeout(() => byId<HTMLInputElement>('account-email')?.focus(), 0); };
+    const closeAccount = () => { set({ accountEditing: false, accountValue: undefined, accountError: undefined }); setTimeout(() => byId('account-add')?.focus(), 0); };
+    const accounts = w.claudeAccount;
+    const accountChoice = accounts.options.length
+      ? el('div', { class: 's-row stack', key: 'account-choice' }, seg(WORDS.settings.claudeAccount, accounts.value ?? '', [{ value: '', label: WORDS.settings.claudeAccountAny }, ...accounts.options.map((o) => ({ value: o, label: o }))], (v2) => pref({ claude_account: v2 })))
+      : null;
+    const accountRow = local.accountEditing
+      ? el(
+          'div',
+          { class: 's-row stack', key: 'account-add' },
+          el(
+            'div',
+            { class: 'field-row' },
+            el('input', {
+              type: 'email',
+              class: 'field',
+              id: 'account-email',
+              value: local.accountValue ?? '',
+              placeholder: LABELS.claudeAccountExample,
+              'aria-label': LABELS.claudeAccountAddress,
+              'aria-invalid': local.accountError ? 'true' : undefined,
+              'aria-describedby': local.accountError ? 'account-email-error' : undefined,
+              autocomplete: 'email',
+              spellcheck: 'false',
+              inputmode: 'email',
+              'data-autofocus': '',
+              onInput: (e: Event) => {
+                local.accountValue = (e.currentTarget as HTMLInputElement).value;
+              },
+              onKeydown: (e: Event) => {
+                const k = e as KeyboardEvent;
+                if (k.key === 'Escape') closeAccount();
+                if (k.key === 'Enter') {
+                  k.preventDefault();
+                  useAccount((k.currentTarget as HTMLInputElement).value);
+                }
+              },
+            }),
+            el('button', { type: 'button', class: 'btn btn-ink', text: WORDS.settings.claudeAccountUse, onClick: () => useAccount(byId<HTMLInputElement>('account-email')?.value ?? local.accountValue ?? '') }),
+          ),
+          local.accountError ? el('p', { class: 'field-error', id: 'account-email-error', key: 'account-error', role: 'alert', text: local.accountError }) : null,
+        )
+      : el(
+          'div',
+          { class: 's-row', key: 'account-add' },
+          el('span', { class: 's-label' }, accounts.options.length ? null : el('span', { class: 's-sub', text: WORDS.settings.claudeAccountNone })),
+          el('div', { class: 'btns' }, el('button', { type: 'button', class: 'btn btn-outline', id: 'account-add', text: WORDS.settings.claudeAccountAdd, onClick: editAccount })),
+        );
     const next = el(
       'main',
       { class: 'settings' },
@@ -322,14 +386,9 @@ export function mountSettings(root: HTMLElement, opts: { act: Act; gestures: Ges
         switchRow('open-claude', WORDS.settings.openClaude, w.openClaude, (on) => pref({ open_claude_on_connect: on })),
       ),
       card(WORDS.settings.project, projectRow),
-      // 24.0.0: which account this browser uses on claude.ai, so Your workers can say where a worker on another one opens
-      w.claudeAccount
-        ? card(
-            WORDS.settings.claudeAccount,
-            el('div', { class: 's-row stack' }, seg(WORDS.settings.claudeAccount, w.claudeAccount.value ?? '', [{ value: '', label: WORDS.settings.claudeAccountAny }, ...w.claudeAccount.options.map((o) => ({ value: o, label: o }))], (v2) => pref({ claude_account: v2 }))),
-            el('p', { class: 'fine', text: WORDS.settings.claudeAccountNote }),
-          )
-        : null,
+      // 24.0.0: which account this browser uses on claude.ai, so Your workers can say where a worker on another one opens;
+      // 24.1.0: shown before any worker reports one, with Add account for an address typed by hand
+      card(WORDS.settings.claudeAccount, accountChoice, accountRow, el('p', { class: 'fine', key: 'account-note', text: WORDS.settings.claudeAccountNote })),
       card(
         WORDS.settings.appearance,
         el('div', { class: 's-row' }, seg(LABELS.appearance, v.appearance.value, v.appearance.options, (a) => { opts.onAppearance?.(a); pref({ appearance: a }); })),

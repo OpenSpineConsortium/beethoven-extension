@@ -733,6 +733,63 @@ describe('the pages of 19.0.0, drawn', () => {
     root.remove();
   });
 
+  it("24.1.0: Settings' Add account: offered before any worker reports an account, a refused address stays typed with the reason, an address closes the field, Escape closes it, and the caret stays on Add account", async () => {
+    const f = fixture('settings');
+    if (f?.surface !== 'settings') throw new Error('no fixture');
+    const acts: Action[] = [];
+    const answers: Array<{ saved: boolean }> = [];
+    const root = doc.createElement('div');
+    doc.body.append(root);
+    const gestures = { hasPanel: true, openPanel: () => Promise.resolve(true), request: () => Promise.resolve(true), openTab: () => undefined, url: (p: string) => p, productVersion: () => '24.1.0', host: () => 'Chrome', installId: () => Promise.resolve('x'), save: () => Promise.resolve(), unknownPasskey: () => undefined };
+    const page = settings.mountSettings(root as unknown as HTMLElement, {
+      act: (a: Action) => {
+        acts.push(a);
+        return Promise.resolve((a.kind === 'set-pref' ? answers.shift() : undefined) as never);
+      },
+      gestures,
+    });
+    page.show(f.view);
+    const row = () => live(root, '[data-key="account-add"]')!;
+    const field = () => live<HTMLInputElement>(root, '#account-email');
+    // no worker reports an account and none is picked: the card is there, with Add account and no choice
+    expect(row().textContent).toContain(WORDS.settings.claudeAccountNone);
+    expect(live(root, '[data-key="account-choice"]')).toBeUndefined();
+    fire(row().querySelector('#account-add')!, 'click');
+    expect(field()?.getAttribute('type')).toBe('email');
+    // not an address: the background refuses it; it stays in the field, with the reason
+    answers.push({ saved: false });
+    field()!.value = 'st1234';
+    fire(field()!, 'input');
+    fire(field()!, 'keydown', { key: 'Enter' });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { claude_account: 'st1234' } });
+    expect(field()?.value).toBe('st1234');
+    expect(field()?.getAttribute('aria-invalid')).toBe('true');
+    expect(live(root, '#account-email-error')?.textContent).toBe(WORDS.settings.claudeAccountBad);
+    // an address: kept, and the field closes with the caret on Add account
+    answers.push({ saved: true });
+    field()!.value = 'Second@Example.com';
+    fire(field()!, 'input');
+    fire(row().querySelector('.btn-ink')!, 'click');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(acts.at(-1)).toEqual({ kind: 'set-pref', prefs: { claude_account: 'Second@Example.com' } });
+    expect(field()).toBeUndefined();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(focused.at(-1)?.id).toBe('account-add');
+    // the background's next view picks it, among the options, with Add account still there for another
+    page.show({ ...f.view, worker: { ...f.view.worker, claudeAccount: { value: 'second@example.com', options: ['second@example.com'] } } });
+    expect(live(root, '[data-key="account-choice"]')?.textContent).toContain('second@example.com');
+    expect(row().textContent).not.toContain(WORDS.settings.claudeAccountNone);
+    const before = acts.length;
+    fire(row().querySelector('#account-add')!, 'click');
+    fire(field()!, 'keydown', { key: 'Escape' });
+    expect(field()).toBeUndefined();
+    expect(acts.length).toBe(before);
+    root.remove();
+  });
+
   it("22.0.0: For your lab lead, Connect GitHub Actions sends the two fields as typed, waits one press at a time, and shows the grid's answer with the workflow's link", async () => {
     const f = fixture('settings-open');
     if (f?.surface !== 'settings') throw new Error('no fixture');

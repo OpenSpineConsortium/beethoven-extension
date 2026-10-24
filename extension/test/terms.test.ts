@@ -32,8 +32,10 @@ describe('the terms version', () => {
   // acceptance in force stay as they were
   // 24.0.0 raised it alone again (version 18, 2026-10-23): Your workers and this browser's Claude account, read and kept
   // in the browser only, with no new recipient
-  it('names PRIVACY.md version 18, of 2026-10-23, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['18', '2026-10-23']);
+  // 24.1.0 raised it alone (version 19, 2026-10-24): the same account typed by hand with Add account, kept in the
+  // browser only
+  it('names PRIVACY.md version 19, of 2026-10-24, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['19', '2026-10-24']);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {
