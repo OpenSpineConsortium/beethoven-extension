@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 18, 2026-10-23. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 19, 2026-10-24. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -29,7 +29,7 @@ encrypted, only if you tick a box.
 | Data | Where | Why | You control it by |
 |---|---|---|---|
 | The portal address (your university's, filled in from the site profile, or one you typed), and the one website you granted the extension access to | the extension's own storage (`storage.local`) | to reach your portal | Settings (in the panel's *More* menu); removing the site permission in your browser; uninstalling |
-| Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched), the address of a project of yours on claude.ai if you gave one in Settings (version 16: the page that opens when your worker is ready, if that is on, and the page *Open my project* opens, is then that project's page in place of your session's link; *Clear* in Settings forgets it), the e-mail address of the Claude account you said this browser is signed in to on claude.ai, if you picked one in Settings from the accounts your workers report (version 18; *Not set* forgets it), and your appearance choice | `storage.local` | convenience | Settings |
+| Your preferences: the shell host and site profile name, the worker's name and permission mode, whether your worker is kept running, whether claude.ai opens when a worker you started is ready (in this build both are on until you turn them off; Settings says so where each is switched), the address of a project of yours on claude.ai if you gave one in Settings (version 16: the page that opens when your worker is ready, if that is on, and the page *Open my project* opens, is then that project's page in place of your session's link; *Clear* in Settings forgets it), the e-mail address of the Claude account you said this browser is signed in to on claude.ai, if you picked one in Settings from the accounts your workers report (version 18) or typed it there with *Add account* (version 19; *Not set* forgets it), and your appearance choice | `storage.local` | convenience | Settings |
 | The account name your portal's dashboard showed for the session you signed in to, and the answer of the last approval check: yes or no, the time it was given, the portal it was given for and, when it was no, the address of the page where you can ask for access and the reason the service gave, if it gave one (this installation is set up for another account; this version is too old) | `storage.local` | to know which account to ask about, and to keep working for a day without asking again | *Disconnect* in Settings; uninstalling |
 | Only if an earlier version of Beethoven added a key for this computer to your grid account: a note of that, kept once from that version's record on the first run after the update: the account name it recorded, the key's fingerprint, when the key was added, and when the note was written (never the key itself, which is deleted unread) | `storage.local` | so Settings can tell you once that the key is there and that your lab lead can remove it | *Forget* beside that note in Settings (which removes the note and nothing on the grid); uninstalling |
 | Only if you tick *Remember it on this computer* on the grid sign-in sheet (it is never ticked for you): your saved grid sign-in: the account name you typed, your portal's address, your passkey's credential identifier (not secret), two random salts, a random value used once, and your password encrypted with AES-GCM under a 256-bit key derived (HKDF-SHA-256) from what your passkey releases, which is never written to disk; with when it was saved | the extension's own database in this browser profile on this computer (IndexedDB, `beethoven-signin`), which no website can read | so the extension can sign you in to your portal by itself once you have unlocked it with your passkey | *Forget* beside *Grid sign-in* in Settings; *Disconnect*; changing to another portal; uninstalling. Someone who can use this browser profile while it is unlocked, or who can unlock your passkey, could sign in to your portal with it, and so could the extension's own code |
@@ -533,6 +533,15 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 19 (2026-10-24, Beethoven 24.1.0): Settings' *Your Claude account in this browser* is
+shown before any worker reports an account and gains *Add account*, where you can type the e-mail
+address of the Claude account this browser is signed in to on claude.ai yourself. It is kept as the
+account picked in version 18 is, in `storage.local` in this browser, and *Not set* forgets it; it is
+never sent to Licensor or anyone else, and Beethoven still never reads claude.ai. Licensor treats
+this change as not material to the agreement, since it adds no recipient and keeps nothing version
+18 did not already keep, so the agreement stays at version 15 and an acceptance of it stays in
+force. Version 18's other terms are unchanged.
 
 Version 18 (2026-10-23, Beethoven 24.0.0): with more than one worker in your cluster account, the
 panel's *Your workers* lists each one with its state, its claude.ai link and the e-mail address of

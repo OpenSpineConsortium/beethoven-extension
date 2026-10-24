@@ -497,10 +497,17 @@ export const WORDS = {
     projectAdd: 'Add',
     projectUse: 'Use',
     projectClear: 'Clear',
-    /** 24.0.0: which Claude account this browser is signed in to on claude.ai, picked from the accounts the workers report */
+    /**
+     * 24.0.0: which Claude account this browser is signed in to on claude.ai, picked from the accounts the workers report;
+     * 24.1.0: or added by typing its address, for an account no worker reports yet
+     */
     claudeAccount: 'Your Claude account in this browser',
     claudeAccountAny: 'Not set',
-    claudeAccountNote: "Workers on another account are shown with the Chrome profile to open them in. Beethoven doesn't read claude.ai; pick the account you're signed in to there.",
+    claudeAccountNone: 'None named. Every worker is offered in this browser.',
+    claudeAccountNote: "Workers on another account are shown with the Chrome profile to open them in. Beethoven doesn't read claude.ai; pick or add the account you're signed in to there.",
+    claudeAccountAdd: 'Add account',
+    claudeAccountUse: 'Use',
+    claudeAccountBad: "That isn't an e-mail address. Type the address you sign in to claude.ai with in this browser.",
     appearance: 'Appearance',
     appearances: { cream: 'Cream', system: 'Match system' },
     grid: 'Your grid',
@@ -1175,8 +1182,11 @@ export interface SettingsView {
     openClaude: boolean;
     /** 21.0.0: the project's address as stored (keys.ts Prefs.project_url); absent while none is named */
     project?: string;
-    /** 24.0.0: the accounts the workers report, and the one picked for this browser (keys.ts Prefs.claude_account); shown only once a worker reports one */
-    claudeAccount?: { value?: string; options: string[] };
+    /**
+     * 24.0.0: the accounts the workers report, and the one picked for this browser (keys.ts Prefs.claude_account);
+     * 24.1.0: always there, with no options while no worker reports one and none is picked, so Add account is offered
+     */
+    claudeAccount: { value?: string; options: string[] };
   };
   appearance: { value: Appearance; options: Array<{ value: Appearance; label: string }> };
   grid: { address?: string; suggested?: string; change: string; disconnect: string };

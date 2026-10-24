@@ -126,11 +126,12 @@ export function settingsView(i: SettingsInput): SettingsView {
       keepRunning: i.prefs.auto_start,
       openClaude: i.prefs.open_claude_on_connect,
       ...(i.prefs.project_url ? { project: i.prefs.project_url } : {}),
-      // 24.0.0: offered once a worker reports an account; one picked before stays among the options when no worker reports it now
-      ...(() => {
+      // 24.0.0: the accounts the workers report; one picked before, or added by hand (24.1.0), stays among the options
+      // when no worker reports it now
+      claudeAccount: (() => {
         const options = [...(i.accounts ?? [])];
         if (i.prefs.claude_account && !options.includes(i.prefs.claude_account)) options.push(i.prefs.claude_account);
-        return options.length ? { claudeAccount: { ...(i.prefs.claude_account ? { value: i.prefs.claude_account } : {}), options } } : {};
+        return { ...(i.prefs.claude_account ? { value: i.prefs.claude_account } : {}), options };
       })(),
     },
     appearance: { value: appearance, options: (['cream', 'system'] as const).map((value) => ({ value, label: S.appearances[value] })) },

@@ -22,6 +22,9 @@ export const LABELS = {
   /** 21.0.0: the project field in Settings and what it shows while empty */
   projectAddress: 'Project address',
   projectExample: 'https://claude.ai/code/project/...',
+  /** 24.1.0: the account field in Settings and what it shows while empty */
+  claudeAccountAddress: 'Claude account e-mail',
+  claudeAccountExample: 'you@example.edu',
   codeBox: 'Code from the Claude tab',
   tick: 'Required',
   newTab: 'Opens in a new tab',
