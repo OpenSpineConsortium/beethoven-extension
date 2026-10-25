@@ -23,6 +23,11 @@
 // The events reach only the origin the student granted; a tab's challenge is left to Chrome's own box.
 // The Firefox build gets neither and keeps the box (the 18.0.0 way).
 //
+// 25.0.0 (greg, 2026-10-25: "edit the right click options to even add an Open in Beethoven option"): contextMenus, for
+// the right-click entry on a worker's claude.ai link (core/workers.ts menuEntriesOf). It reads no page: Chrome shows the
+// entry only on links that match a worker's own address and hands Beethoven the link only when the entry is pressed. No
+// install warning, and no host permission, so nothing on claude.ai is reached by it.
+//
 // What is deliberately absent, and must stay absent: any host_permissions at install time (Decision 2),
 // the cookies, tabs, notifications, webRequestBlocking, declarativeNetRequest, offscreen, tabGroups,
 // debugger, identity and nativeMessaging permissions, and any origin on claude.ai, anthropic.com or
@@ -68,7 +73,7 @@ export default defineConfig({
       homepage_url: 'https://openspineconsortium.com/beethoven/',
       // sidePanel on the Chromium builds only: Firefox's sidebar is declared below; webRequest and
       // webRequestAuthProvider (19.0.0) there only too: Firefox MV2 would need webRequestBlocking, never asked for
-      permissions: ['storage', 'alarms', 'scripting', ...(chromium ? ['sidePanel', 'webRequest', 'webRequestAuthProvider'] : [])],
+      permissions: ['storage', 'alarms', 'scripting', 'contextMenus', ...(chromium ? ['sidePanel', 'webRequest', 'webRequestAuthProvider'] : [])],
       ...(manifestVersion === 3 ? { optional_host_permissions: hosts } : { optional_permissions: hosts }),
       // no default_popup: the toolbar button toggles the window-wide panel (the background sets
       // openPanelOnActionClick); its badge, tooltip and lit icon report while the panel is closed.

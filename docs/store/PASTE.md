@@ -14,7 +14,8 @@ way: no `nativeMessaging`, no helper, no installer, and Authentication informati
 as in 11.0.0. 19.0.0, in which Beethoven signs in to the grid with the AccessID and password typed
 into its own sheet, adds the `webRequest` and `webRequestAuthProvider` permissions (two more
 justification fields) and ticks Authentication information again; it adds no helper and no
-installer.
+installer. 25.0.0 adds the `contextMenus` permission, for *Open in Beethoven*: one more justification
+field, and no data type.
 
 **Everything in one folder.** `release/20.0.0/store-kit/` (also zipped, as
 `release/20.0.0/store-kit-20.0.0.zip`) holds a copy of every file this sheet names, with the number
@@ -197,7 +198,7 @@ The texts are in `LISTING.md`, "Permission justifications"; each block below is 
 The dashboard shows one field per permission in the uploaded manifest: six for 19.0.0 (`storage`,
 `alarms`, `scripting`, `sidePanel`, `webRequest`, `webRequestAuthProvider`) and the host
 permission's. `nativeMessaging`, a required permission from 12.0.0 to 15.0.0, has no field any more.
-`webRequest` and `webRequestAuthProvider` are new in 19.0.0.
+`webRequest` and `webRequestAuthProvider` are new in 19.0.0, and `contextMenus`, a seventh, in 25.0.0.
 
 `storage`
 
@@ -233,6 +234,12 @@ Lets the extension learn, on the one portal site you allowed, of sign-in request
 
 ```
 Lets the extension answer that one sign-in request, once per check, with the AccessID and password you typed into its own sign-in sheet (or saved behind your passkey), so the grid signs you in without a separate tab. If the portal asks again after that answer, the extension declines instead of sending the password twice. It never answers a sign-in that a tab, a proxy or another site asks for, redirects or rewrites no request, and after the first refusal it sends nothing until you type the password again.
+```
+
+`contextMenus` (new in 25.0.0); 623 characters:
+
+```
+Adds "Open in Beethoven" to the menu Chrome shows when you right-click a link to the Claude Code session of one of your own workers, so the link opens in the claude.ai tab the extension already keeps. For a worker signed in to another Claude account, a greyed line names that account instead, for you to pick under Chrome's own "Open link as". Each entry shows only on its own worker's links, is built from what the extension last read from your cluster account, so it works without a VPN or a grid sign-in, and reads no page; when you choose it, the extension uses only the link, to open it, and keeps nothing of the page.
 ```
 
 Host permission (`https://*/*`, optional, requested at a click for one origin); 681 characters:

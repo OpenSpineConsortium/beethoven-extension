@@ -183,6 +183,20 @@ name and identifier carry no university name.
   a press made out of reach waits on the sheet rather than on the GlobalProtect moment; the check itself runs as
   before (every 3 s with a page open, once a minute without). The box path (Chrome's box chosen, or the build that
   cannot answer the sign-in) keeps GlobalProtect first, since its tab cannot load without the VPN. No text changes.
+- **Open in Beethoven (decided 2026-10-25, 25.0.0).** greg asked for "a profile selection suggester based on the
+  session id" and "an Open in Beethoven option which automatically starts on the right account", needing no VPN
+  and no grid sign-in. An extension cannot open a tab in another Chrome profile (only a native helper could, and
+  `nativeMessaging` stays off the list), so the menu does what one profile can: `contextMenus` (no install warning)
+  puts an entry on the links of each worker last read online, through match patterns built from its link, so
+  Chrome shows it only on that worker's links (`linkPatterns` in `core/workers.ts`; Chrome matches a pattern
+  against the path and the query, measured on 2026-10-25). For a worker on this browser's account, or any worker
+  while Settings names none, the entry is *Open in Beethoven*, which loads the link in the claude.ai tab Beethoven
+  keeps, as *Show* does, or in a new tab of the window it was clicked in; for a worker on another account it is a
+  greyed line naming that account, beside Chrome's own *Open link as*. The workers are kept in `storage.local`
+  (`bridge.menu`, replaced at each read, removed when a read finds none online, by *Disconnect* and by another
+  portal), and the entries are rebuilt from them at install, at browser start and when Settings names another
+  account, so neither the grid nor the VPN is needed to use or rebuild them. A pattern is a filter, not a grant: no
+  claude.ai origin and no code there. Privacy 20 alone; the agreement stays 15.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the

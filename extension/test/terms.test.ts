@@ -34,8 +34,10 @@ describe('the terms version', () => {
   // in the browser only, with no new recipient
   // 24.1.0 raised it alone (version 19, 2026-10-24): the same account typed by hand with Add account, kept in the
   // browser only
-  it('names PRIVACY.md version 19, of 2026-10-24, at the repository root', () => {
-    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['19', '2026-10-24']);
+  // 25.0.0 raised it alone (version 20, 2026-10-25): the workers kept for Open in Beethoven, in the browser only,
+  // and the contextMenus permission
+  it('names PRIVACY.md version 20, of 2026-10-25, at the repository root', () => {
+    expect(/^Version (\d+), (\d{4}-\d{2}-\d{2})\./m.exec(read('../../PRIVACY.md'))!.slice(1, 3)).toEqual(['20', '2026-10-25']);
   });
 
   it('ships the root texts byte for byte (scripts/sync-profiles.mjs copies them before every build)', () => {

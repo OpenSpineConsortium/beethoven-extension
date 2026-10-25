@@ -237,6 +237,12 @@ describe('the background, run whole', () => {
     expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(LINK))).toHaveLength(1);
     const listed = world.storage.session['bridge.workers'] as { workers: Array<{ name: string; account?: string }> };
     expect(listed.workers.map((w) => [w.name, w.account])).toEqual([['account2', 'second@example.com'], ['second', 'student@wayne.edu'], ['worker', 'student@wayne.edu']]);
+    // 25.0.0: the read is kept for the right-click entries, one Open in Beethoven per worker while no account is named
+    expect((world.storage.local['bridge.menu'] as { workers: Array<{ name: string; link: string }> }).workers.map((w) => [w.name, w.link])).toEqual([['account2', AWAY], ['second', OTHER], ['worker', LINK]]);
+    const entries = () => [...world.menus.values()].map((m) => [m.id, m.title, m.enabled]);
+    await sleep(300);
+    expect(entries()).toEqual([['open:account2', 'Open in Beethoven', true], ['open:second', 'Open in Beethoven', true], ['open:worker', 'Open in Beethoven', true]]);
+    expect(world.menus.get('open:second')).toMatchObject({ contexts: ['link'], targetUrlPatterns: [OTHER, `${OTHER}&*`, OTHER.replace('claude.ai', 'claude.com'), `${OTHER.replace('claude.ai', 'claude.com')}&*`] });
     let h = JSON.stringify(panel.last()?.view);
     expect(h).toContain('"kind":"show-worker","name":"second"');
     expect(await send(world, { type: 'action', action: { kind: 'show-worker', name: 'second' } })).toMatchObject({ ok: true, value: { moved: true, opened: false } });
@@ -248,6 +254,8 @@ describe('the background, run whole', () => {
     expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: 'not an address' } } })).toMatchObject({ ok: true, value: { saved: false } });
     expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: ' Student@Wayne.edu ' } } })).toMatchObject({ ok: true, value: { saved: true } });
     expect((world.storage.local['bridge.prefs'] as { claude_account?: string }).claude_account).toBe('student@wayne.edu');
+    await sleep(300);
+    expect(entries()).toEqual([['elsewhere:account2', 'Open link as: the profile signed in as second@example.com', false], ['open:second', 'Open in Beethoven', true], ['open:worker', 'Open in Beethoven', true]]);
     expect(await send(world, { type: 'action', action: { kind: 'show-worker', name: 'account2' } })).toMatchObject({ ok: true, value: { moved: false, opened: false } });
     expect(world.log.filter((l) => l.includes(AWAY))).toHaveLength(0);
     await sleep(1_000);
@@ -258,6 +266,37 @@ describe('the background, run whole', () => {
     expect(await send(world, { type: 'action', action: { kind: 'set-pref', prefs: { claude_account: '' } } })).toMatchObject({ ok: true, value: { saved: true } });
     expect((world.storage.local['bridge.prefs'] as { claude_account?: string }).claude_account).toBeUndefined();
   }, 40_000);
+
+  // 25.0.0 (greg, 2026-10-25: "this sholdnt require logging into the VPN or grid"): the entries are made again from what
+  // this computer keeps when the browser starts, and a press opens the worker's link with no request to the portal
+  it('25.0.0: Open in Beethoven works from what is kept, with the grid out of reach, after the browser starts again', async () => {
+    const OTHER = 'https://claude.ai/code?environment=env_01OtherWorkerOnSameAcct';
+    const AWAY = 'https://claude.ai/code?environment=env_01WorkerOnAnotherAccount';
+    world.storage.local['bridge.menu'] = { saved_at: new Date().toISOString(), workers: [{ name: 'second', link: OTHER, account: 'student@wayne.edu' }, { name: 'account2', link: AWAY, account: 'second@example.com' }] };
+    world.opts.reach = false;
+    await boot(world);
+    world.storage.local['bridge.prefs'] = { ...(world.storage.local['bridge.prefs'] as object), claude_account: 'student@wayne.edu' };
+    await Promise.all(world.chrome.runtime.onStartup.fire());
+    expect([...world.menus.values()].map((m) => [m.id, m.enabled])).toEqual([['open:second', true], ['elsewhere:account2', false]]);
+    await sleep(1_000);
+    const asked = () => world.log.filter((l) => l.startsWith('fetch ')).length;
+    const before = asked();
+    // pressed on the link with more after it: the link kept for that worker opens, in the window the press came from
+    await Promise.all(world.chrome.contextMenus.onClicked.fire({ menuItemId: 'open:second', linkUrl: `${OTHER}&from=panel` }, { id: 99, windowId: 1 }));
+    await sleep(300);
+    expect(world.log.filter((l) => l.includes('tabs.create') && l.includes(OTHER))).toHaveLength(1);
+    expect(world.log.filter((l) => l.includes(AWAY))).toHaveLength(0);
+    // the greyed line cannot be pressed in Chrome; were it to come, nothing opens
+    await Promise.all(world.chrome.contextMenus.onClicked.fire({ menuItemId: 'elsewhere:account2', linkUrl: AWAY }, { id: 99, windowId: 1 }));
+    await sleep(300);
+    expect(world.log.filter((l) => l.includes(AWAY))).toHaveLength(0);
+    expect(asked()).toBe(before);
+    // Disconnect forgets the workers with the portal, and the entries go with them
+    expect(await send(world, { type: 'action', action: { kind: 'disconnect' } })).toMatchObject({ ok: true });
+    await sleep(300);
+    expect(world.storage.local['bridge.menu']).toBeUndefined();
+    expect(world.menus.size).toBe(0);
+  }, 20_000);
 
   it("21.0.0: the project's tab Beethoven opened before the worker was ready is brought forward when the worker is ready, never a second one", async () => {
     await boot(world);

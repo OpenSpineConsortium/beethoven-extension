@@ -297,7 +297,8 @@ permission `https://*/*`; `activeTab` left with 11.0.0, and `nativeMessaging`, w
 15.0.0 asked for, left with 16.0.0. `webRequest` and `webRequestAuthProvider` are new in 19.0.0 and
 show no line in Chrome's install dialog, so an installed copy updates without being disabled; a
 `webRequest` permission invites a closer review. The Firefox build, which is not submitted anywhere,
-has neither of them and no `sidePanel`.
+has neither of them and no `sidePanel`. 25.0.0 adds `contextMenus`, for *Open in Beethoven*, which
+shows no line in Chrome's install dialog either.
 
 | Permission | Justification |
 |---|---|
@@ -307,6 +308,7 @@ has neither of them and no `sidePanel`.
 | `sidePanel` | Opens the extension's panel at the side of the window when you click the toolbar button; there is no popup. |
 | `webRequest` | Lets the extension learn, on the one portal site you allowed, of sign-in requests and of when requests end, your tabs' included, so it knows whether the grid accepted the password it gave its own background request and stops at the first refusal. It acts on no request but that one and reads no page; a tab's sign-in goes straight back to Chrome's own box. Of your tabs' requests it keeps one mark only, and only while its own answer awaits its outcome: that a portal tab asked for a sign-in or had a request answered without a refusal meanwhile (you may have signed in in Chrome's box), after which it holds a saved password until you type one. |
 | `webRequestAuthProvider` | Lets the extension answer that one sign-in request, once per check, with the AccessID and password you typed into its own sign-in sheet (or saved behind your passkey), so the grid signs you in without a separate tab. If the portal asks again after that answer, the extension declines instead of sending the password twice. It never answers a sign-in that a tab, a proxy or another site asks for, redirects or rewrites no request, and after the first refusal it sends nothing until you type the password again. |
+| `contextMenus` | Adds "Open in Beethoven" to the menu Chrome shows when you right-click a link to the Claude Code session of one of your own workers, so the link opens in the claude.ai tab the extension already keeps. For a worker signed in to another Claude account, a greyed line names that account instead, for you to pick under Chrome's own "Open link as". Each entry shows only on its own worker's links, is built from what the extension last read from your cluster account, so it works without a VPN or a grid sign-in, and reads no page; when you choose it, the extension uses only the link, to open it, and keeps nothing of the page. |
 | Optional host permission `https://*/*` (requested at runtime for one origin) | Your university's Open OnDemand portal has an address the extension cannot know in advance, so no site is granted at install. The extension asks the browser for one origin at a time, and only inside a click: "Agree and continue" on its welcome page (your university's portal, filled in from the site profile, or the address you typed under "Use another portal"), "Allow again" in its panel if the grant was removed, or "Change" in its Settings. It refuses to work through a portal until that one site is granted. An address on claude.ai, claude.com or anthropic.com, or on any of their subdomains, is refused before any request, so the extension never requests an Anthropic origin. |
 
 `nativeMessaging` was asked for by 12.0.0 to 15.0.0, for the helper, and was a required permission,

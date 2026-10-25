@@ -133,6 +133,8 @@ export interface World {
   files: Map<string, string>;
   /** 19.0.0: Chrome's HTTP auth cache for the portal (in memory, shared by the worker and the tabs); undefined when empty */
   authCache?: AuthCacheEntry;
+  /** 25.0.0: the right-click entries Chrome holds, by id, as contextMenus.create made them (they outlive the worker, as Chrome's do) */
+  menus: Map<string, { id: string; title: string; contexts: string[]; targetUrlPatterns: string[]; enabled: boolean }>;
   /** every merged answer to onAuthRequired, in order */
   authAnswers: AuthAnswer[];
   /** credentials a listener gave that the grid turned down */
@@ -355,6 +357,7 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
   const world: World = {
     log: [],
     reloads: 0,
+    menus: new Map(),
     external: [],
     tabs: new Map(),
     storage: { local: {}, session: {} },
@@ -928,7 +931,7 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
   };
   const alarms = new Map<string, any>();
   /** the manifest's permissions as the Chrome build declares them (the build without webRequest declares neither of its two) */
-  const manifestPermissions = ['storage', 'alarms', 'scripting', 'sidePanel', ...(withWebRequest ? ['webRequest', 'webRequestAuthProvider'] : [])];
+  const manifestPermissions = ['storage', 'alarms', 'scripting', 'contextMenus', 'sidePanel', ...(withWebRequest ? ['webRequest', 'webRequestAuthProvider'] : [])];
   const runtime = {
     id: 'ext',
     lastError: undefined,
@@ -1080,6 +1083,22 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
       },
     },
     sidePanel: { setPanelBehavior: async () => {}, open: async () => {} },
+    // 25.0.0: the right-click entries Chrome holds (world.menus), made and dropped as Chrome would, a duplicate id refused
+    contextMenus: {
+      create: (p: any, done?: () => void) => {
+        if (world.menus.has(p.id)) (runtime as any).lastError = { message: `Cannot create item with duplicate id ${p.id}` };
+        else world.menus.set(p.id, { ...p });
+        L(`contextMenus.create ${p.id}`);
+        done?.();
+        (runtime as any).lastError = undefined;
+        return p.id;
+      },
+      removeAll: async () => {
+        world.menus.clear();
+        L('contextMenus.removeAll');
+      },
+      onClicked: ev(),
+    },
     ...(webRequest ? { webRequest } : {}),
   };
   async function fireAlarmImpl(name: string): Promise<boolean> {
@@ -1096,7 +1115,7 @@ export function install(o: { webRequest?: boolean; indexedDB?: boolean } = {}): 
   function stopWorkerImpl() {
     L('the service worker stopped');
     const c = world.chrome;
-    const events = [c.runtime.onMessage, c.runtime.onConnect, c.runtime.onInstalled, c.runtime.onStartup, c.runtime.onUpdateAvailable, c.storage.onChanged, c.alarms.onAlarm, c.tabs.onUpdated, c.tabs.onRemoved, c.tabs.onActivated, c.action.onUserSettingsChanged, permAdded, permRemoved];
+    const events = [c.runtime.onMessage, c.runtime.onConnect, c.runtime.onInstalled, c.runtime.onStartup, c.runtime.onUpdateAvailable, c.storage.onChanged, c.alarms.onAlarm, c.tabs.onUpdated, c.tabs.onRemoved, c.tabs.onActivated, c.action.onUserSettingsChanged, c.contextMenus.onClicked, permAdded, permRemoved];
     for (const e of events) e.ls.length = 0;
     if (webRequest) for (const e of Object.values(webRequest)) e.ls.length = 0;
     // the pages' ports lose the worker's end of them

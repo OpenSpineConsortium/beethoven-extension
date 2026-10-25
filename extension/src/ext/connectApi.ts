@@ -9,7 +9,7 @@
 // tab of the one-time key step). A registration an earlier build left is removed at start.
 import { browser } from 'wxt/browser';
 import { acceptedSettings, ANTHROPIC_REFUSAL, connectSequence, dropAnthropicGrants, guardedRequest, isAnthropicAddress, SCRIPT_FILE, SCRIPT_ID, type ConnectApi, type ConnectOutcome } from '../core/connect';
-import { ACCESS_KEY, CHANNEL_KEY, GRID_KEY, IDENTITY_KEY, LAST_KNOWN_KEY, PORTAL_KEY, PORTAL_TAB_KEY, PRESS_KEY, RUN_KEY, SIGNIN_NOPRF_KEY, SIGNIN_NOTE_KEY, SIGNIN_ONCE_KEY, SIGNIN_STATE_KEY, SIGNIN_TAB_KEY, SIGNIN_UNLOCK_KEY, type PortalSettings } from '../core/keys';
+import { ACCESS_KEY, CHANNEL_KEY, GRID_KEY, IDENTITY_KEY, LAST_KNOWN_KEY, MENU_KEY, PORTAL_KEY, PORTAL_TAB_KEY, PRESS_KEY, RUN_KEY, SIGNIN_NOPRF_KEY, SIGNIN_NOTE_KEY, SIGNIN_ONCE_KEY, SIGNIN_STATE_KEY, SIGNIN_TAB_KEY, SIGNIN_UNLOCK_KEY, type PortalSettings } from '../core/keys';
 import type { Answer } from '../core/messages';
 import { indexedDbRecords } from '../core/vault';
 import { local, portalSettings, session } from './storage';
@@ -80,6 +80,8 @@ export async function disconnectPortal(): Promise<void> {
   // how this browser reaches the portal, and the worker last seen there, belong to that portal
   await local.remove(CHANNEL_KEY);
   await local.remove(LAST_KNOWN_KEY);
+  // 25.0.0: and so do the workers the right-click entries were built from (the background drops the entries with them)
+  await local.remove(MENU_KEY);
   await session.remove(PORTAL_TAB_KEY);
   await session.remove(RUN_KEY);
   await session.remove(GRID_KEY);
@@ -99,6 +101,7 @@ export async function savePortal(s: PortalSettings): Promise<{ changed: boolean 
     await local.remove(ACCESS_KEY);
     await local.remove(CHANNEL_KEY);
     await local.remove(LAST_KNOWN_KEY);
+    await local.remove(MENU_KEY);
     await session.remove(RUN_KEY);
     await session.remove(GRID_KEY);
     await forgetGridSignin();
