@@ -1,6 +1,6 @@
 # Beethoven privacy statement
 
-Version 19, 2026-10-24. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
+Version 20, 2026-10-25. Part of the Beethoven Trial Edition License Agreement (LICENSE.txt) and of
 any Full Edition agreement that names it. You can save and print this text; it is also at
 `https://openspineconsortium.com/beethoven/privacy.html`.
 
@@ -41,6 +41,7 @@ encrypted, only if you tick a box.
 | Your tick on the optional step *Connect Google Drive in claude.ai*: a yes or no. The step opens that claude.ai settings page in a new tab; the extension does nothing on it | `storage.local` | so Settings remembers what you finished | untick it; uninstalling |
 | The last good copy of the withdrawn-versions list, the address of Licensor's access service as read once a day from a small file on Licensor's website, and a random installation identifier the extension makes for itself when you accept the agreement, from the browser's random number generator and from nothing about your device | `storage.local` | to keep working when Licensor's website cannot be reached; to know where the approval check goes; to name your acceptance record and the marker below without naming you; and, sent in the approval check, so that Licensor sees which installations ask about your account (see *What Licensor receives*) | uninstalling (a reinstallation makes a new identifier) |
 | Your worker's last known state, kept across browser restarts so the panel can show it, and *Open my session* can work, before you sign in to the grid again: the worker's name, its claude.ai link and session title, its state and when it was seen, since when it has been online and when it renews itself, and the account name the portal showed with it | `storage.local` | so the panel is never blank and your session's link works without the grid or the VPN | uninstalling |
+| From version 20, the workers the last read of your cluster account found online, each one's name, its claude.ai link and the e-mail address of the Claude account its own status file reports, with when they were read; and the right-click entries made from them, one for each worker's link | `storage.local`, and your browser's own list of this extension's right-click entries | so *Open in Beethoven* works on your workers' links, and names the account to open another worker's link as, without the grid or the VPN and after the browser restarts | replaced at each read, and removed when a read finds none online; *Disconnect*; changing to another portal; uninstalling |
 | How the extension reaches your portal (directly from its background, or through a tab it opens), and whether the portal's shell opened without asking for a password, with the time this was last tested | `storage.local` | so it uses the way that works without testing again before every action | uninstalling |
 | Small notes for the panel: how long your last five waits for a computer took, in minutes ("Last time: 6 min."); whether the tour was seen, and to its end; when your worker was first seen online in this browser (*Try asking* shows for three days from then), whether the tour began playing below your first wait, and which one-time tips you have seen or dismissed (pinning the toolbar button, *Try asking*, the tour card, the *New session* tip, the card that offers Settings for your project's address), with when | `storage.local` | so the panel can tell you what to expect and does not repeat itself | uninstalling |
 | Connection state during this browser session: the worker's name and its folder on the cluster, the job number, what the worker's files last said (its state, its one-line message, the node, the account and plan Claude Code reports, whether your Remote Control answer is on record, the grid's reason for the wait and its estimate, and when it was asked for, got a computer and came online), the session name and its claude.ai link, the last 4,000 characters of the worker's own log (Claude Code's registration output as the job printed it) and the last lines of its progress log; whether your portal answers and whether you are signed in to it, with the account name it showed and when this was checked; a press that waits until the grid can carry it; the tabs the extension opened itself (the grid sign-in tab, Anthropic's sign-in tab, your claude.ai tab and, if you named a project in Settings, your project's tab, the portal's terminal tab for the one-time step, and, on a portal that does not share its sign-in, the portal tab it works through), so it can close them or bring them forward; that you pressed *Agree and continue* on the welcome page, for a few minutes, so the panel opening beside it can say what is happening; how far your computer's clock is from the grid's, so the panel's clocks agree with the grid's; with more than one worker (version 18), each worker's name, state, claude.ai link and the Claude account its status file reports, for *Your workers*; and the last results of its checks | `storage.session`, cleared when the browser closes | to talk to your portal during this session, to show you the link, and to show you under *Details* what your worker printed | closing the browser |
@@ -484,7 +485,11 @@ anthropic.com and never asks for one, requests no `activeTab`, `cookies`, `tabs`
 `webRequestBlocking`, `declarativeNetRequest`, `debugger`, `identity`, `clipboardRead` or
 `nativeMessaging` permission (so no program on your computer is started for it), requests
 `webRequest` and `webRequestAuthProvider` only to answer your portal's request for a sign-in, and to
-learn whether its answer worked, as *When your portal asks you to sign in* says, is granted no
+learn whether its answer worked, as *When your portal asks you to sign in* says, requests
+`contextMenus` only to add *Open in Beethoven* to the menu your browser shows when you right-click a
+link to one of your workers' sessions (when you choose it, your browser tells the extension that link
+and the address of the page you right-clicked it on; the extension opens the link, as *Show* under
+*Your workers* does, and keeps nothing of the page), is granted no
 website when it is installed (it asks for your portal's one website when you press *Agree and
 continue*, *Use this portal* or *Change* under Settings), and runs no code fetched from anywhere.
 
@@ -533,6 +538,22 @@ Beethoven is for adults, or minors with a parent's or guardian's consent (LICENS
 
 A new version of this statement ships with the Beethoven version it applies to and is shown for
 acceptance when it changes materially.
+
+Version 20 (2026-10-25, Beethoven 25.0.0): Beethoven adds *Open in Beethoven* to the menu your
+browser shows when you right-click a link to one of your workers' sessions on claude.ai, wherever
+the link is shown, and asks your browser for the `contextMenus` permission to do it, which comes
+with no warning. On the link of a worker on this browser's Claude account (Settings' *Your Claude
+account in this browser*), or of any worker while none is named there, it opens the link in the
+claude.ai tab Beethoven keeps; on the link of a worker on another account, a greyed line names that
+account, to pick under your browser's own *Open link as*, since no extension can open a tab in
+another Chrome profile. So that both work without the grid or the VPN and after the browser
+restarts, the workers the last read found online, each one's name, claude.ai link and account, are
+kept in `storage.local` beside your worker's last known state, and your browser keeps the entries
+made from them; both are replaced at each read and removed by *Disconnect* or another portal.
+Nothing of this reaches Licensor, and Beethoven still never reads claude.ai. Licensor treats this
+change as not material to the agreement, since it adds no recipient and keeps across restarts, in
+this browser only, what version 18 kept until the browser closed, so the agreement stays at
+version 15 and an acceptance of it stays in force. Version 19's other terms are unchanged.
 
 Version 19 (2026-10-24, Beethoven 24.1.0): Settings' *Your Claude account in this browser* is
 shown before any worker reports an account and gains *Add account*, where you can type the e-mail

@@ -213,7 +213,7 @@ The item (about thirty minutes):
    `https://openspineconsortium.com/beethoven/support.html`; Mature content No. Save draft.
 6. **Privacy practices** tab, from `PASTE.md`: the single-purpose statement; one justification per
    permission, six of them (`storage`, `alarms`, `scripting`, `sidePanel`, `webRequest`,
-   `webRequestAuthProvider`), and the host-permission justification for `https://*/*`; "Are you
+   `webRequestAuthProvider`), seven from 25.0.0, which adds `contextMenus`, and the host-permission justification for `https://*/*`; "Are you
    using remote code?" No; Data usage: tick "Personally identifiable information" and
    "Authentication information", each with its sentence from `PASTE.md`, and leave every other
    category unticked; tick the three certifications; Privacy policy URL
@@ -253,7 +253,10 @@ updated from one of them loses the `nativeMessaging` permission without a prompt
 direct way left in the browser on its first run, and notes once in Settings a key an earlier version
 added to the grid account). An update to 19.0.0 adds `webRequest` and `webRequestAuthProvider`,
 neither of which shows a line in Chrome's install dialog, so Chrome does not disable the installed
-copy or ask the student anything; an update to 20.0.0 or 21.0.0 changes no permission at all. The
+copy or ask the student anything; an update to 20.0.0 or 21.0.0 changes no permission at all. An
+update to 25.0.0 adds `contextMenus`, which shows no line in the install dialog either; its
+justification (`PASTE.md`) is a new field on the Privacy practices tab, which the dashboard shows
+once a 25.0.0 zip is uploaded: fill it before that draft is submitted. The
 changed agreement (version 15 since 21.0.0) is shown again on the first run and accepted again
 before Beethoven does anything.
 

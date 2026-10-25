@@ -35,6 +35,8 @@ export const OLD_KEY_KEY = 'bridge.oldKey'; //          OldKeyNote: a key an ear
 // the portal page's script can read. Not one of these names is in OLD_DIRECT_LOCAL_KEYS, OLD_DIRECT_SESSION_KEYS or OLD_KEY_DB.
 export const SIGNIN_NOTE_KEY = 'bridge.signin'; //       SigninNote: a saved grid sign-in exists, for whom, and how its last tries went
 export const SIGNIN_NOPRF_KEY = 'bridge.signinNoPrf'; // SigninNoPrf: a passkey on this computer could not lock a password, so the sheet offers no Remember
+// 25.0.0: the right-click entry (PRIVACY.md version 20). Kept across restarts so Open in Beethoven works with no grid and no VPN.
+export const MENU_KEY = 'bridge.menu'; //               core/workers.ts MenuWorkers: the workers the last read found online, with each one's link and the account its status file reports
 // TERMS_KEY ('bridge.terms') and TERMS_HISTORY_KEY ('bridge.termsHistory', the earlier acceptance records, kept out of force) are in terms.ts; AUDIT_KEY ('bridge.audit') in audit.ts.
 //
 // storage.session (cleared when the browser closes):

@@ -9,6 +9,7 @@
 // (Prefs.claude_account), and while none is chosen every worker is offered here, as before 24.0.0.
 import { isClaudeCodeLink, WORKER_NAME_RE, type ConnectionFile, type StatusFile } from './contract';
 import { claudeLinkOf } from './facts';
+import { WORDS } from './model';
 
 /** the most workers listed; hpcworker allows 32 accounts, and a student with more workers than this is not a case yet */
 export const WORKERS_MAX = 12;
@@ -106,4 +107,86 @@ export function offerOf(w: WorkerSeen, mine: string | undefined): WorkerOffer {
 export function showable(list: WorkerList | undefined, name: string, mine: string | undefined): WorkerSeen | undefined {
   const w = list?.workers.find((x) => x.name === name);
   return w && offerOf(w, mine) === 'show' ? w : undefined;
+}
+
+// ---- 25.0.0: the right-click entry, Open in Beethoven -------------------------------------------------------------------
+//
+// greg, 2026-10-25: "can it add a profile selection suggester based on the session id? ... add an Open in Beethoven option
+// which automatically starts on the right account, also this sholdnt require logging into the VPN or grid". An extension
+// cannot open a tab in another Chrome profile, so the entry does what one profile can: on the link of a worker this
+// browser can show, Open in Beethoven opens it in the Claude tab Beethoven keeps; on the link of a worker on another
+// account, a greyed line names that account beside Chrome's own Open link as, which opens a link in another profile.
+// Chrome matches an entry's patterns against a link's path and query, so each worker's entry shows only on its own links,
+// and Chrome keeps the entries across restarts; what they are built from is kept too (MENU_KEY), so neither the grid nor
+// the VPN is needed to use them or to rebuild them when Settings names another account for this browser.
+
+/** MENU_KEY (local): the workers the last read of the grid found online with a link, replaced at each read */
+export interface MenuWorkers {
+  saved_at: string;
+  workers: MenuWorker[];
+}
+
+export interface MenuWorker {
+  name: string;
+  link: string;
+  account?: string;
+}
+
+/** one right-click entry, on the links of one worker */
+export interface MenuEntry {
+  id: string;
+  title: string;
+  /** Chrome's match patterns for the worker's link (linkPatterns) */
+  patterns: string[];
+  /** Open in Beethoven can be pressed; the line that names another account cannot, since only Chrome's Open link as reaches another profile */
+  enabled: boolean;
+}
+
+/** the id prefixes of the two kinds of entry; a worker's name follows (WORKER_NAME_RE) */
+export const MENU_OPEN = 'open:';
+export const MENU_ELSEWHERE = 'elsewhere:';
+
+/** what a read found that can take an entry: online with a Claude Code link, one worker per link, in the read's order */
+export function menuWorkersOf(list: WorkerList): MenuWorker[] {
+  const out: MenuWorker[] = [];
+  for (const w of list.workers) {
+    if (w.state !== 'online' || !isClaudeCodeLink(w.link) || out.some((m) => m.link === w.link)) continue;
+    out.push({ name: w.name, link: w.link, ...(w.account ? { account: w.account } : {}) });
+  }
+  return out;
+}
+
+/**
+ * The match patterns of a worker's link: the link itself on claude.ai and on claude.com, and the link with more after it
+ * (more parameters after an environment's id, a query after a session's). The id's characters are letters, digits, _ and
+ * -, none of them special in a pattern, so a pattern names that one worker.
+ */
+export function linkPatterns(link: string): string[] {
+  const u = new URL(link);
+  const rest = `${u.pathname}${u.search}`;
+  const more = u.search ? '&*' : '?*';
+  return ['claude.ai', 'claude.com'].flatMap((host) => [`https://${host}${rest}`, `https://${host}${rest}${more}`]);
+}
+
+/** the entries for the workers kept, as Settings' account for this browser places each one (offerOf's rule) */
+export function menuEntriesOf(workers: readonly MenuWorker[], mine: string | undefined): MenuEntry[] {
+  return workers.map((w) => {
+    const patterns = linkPatterns(w.link);
+    return mine && w.account && w.account !== mine
+      ? { id: `${MENU_ELSEWHERE}${w.name}`, title: WORDS.menu.elsewhere(w.account), patterns, enabled: false }
+      : { id: `${MENU_OPEN}${w.name}`, title: WORDS.menu.open, patterns, enabled: true };
+  });
+}
+
+/**
+ * What an Open in Beethoven press opens: the link the student right-clicked when it is a worker's link exactly, else the
+ * link kept for the worker the entry names; nothing for any other entry, or for a worker no longer kept.
+ */
+export function menuTarget(id: string, clicked: string | undefined, kept: MenuWorkers | undefined): string | undefined {
+  if (!id.startsWith(MENU_OPEN)) return undefined;
+  const name = id.slice(MENU_OPEN.length);
+  if (!WORKER_NAME_RE.test(name)) return undefined;
+  if (isClaudeCodeLink(clicked)) return clicked;
+  const w = kept?.workers.find((x) => x.name === name);
+  return w && isClaudeCodeLink(w.link) ? w.link : undefined;
 }

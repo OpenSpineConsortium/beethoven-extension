@@ -70,6 +70,7 @@ import {
   IDENTITY_KEY,
   KILLLIST_KEY,
   LAST_KNOWN_KEY,
+  MENU_KEY,
   OLD_DIRECT_LOCAL_KEYS,
   OLD_DIRECT_SESSION_KEYS,
   OLD_KEY_DB,
@@ -136,7 +137,7 @@ import { connectApi, disconnectPortal, dropAnthropicLeftovers, forgetGridSignin,
 import { hasPanel } from '../ext/gesture';
 import { assetUrl, installId, local, prefs as loadPrefs, session, version } from '../ext/storage';
 import { activeTabIn, closeUnderGuards, focusTab, moveTab, openTab, tabHost, tabNow } from '../ext/tabs';
-import { accountOf, accountsOf, runFolders, showable, workerSeen, WORKERS_AGAIN_MS, WORKERS_EVERY_MS, WORKERS_RETRY_MS, type WorkerList, type WorkerSeen } from '../core/workers';
+import { accountOf, accountsOf, menuEntriesOf, menuTarget, menuWorkersOf, MENU_OPEN, runFolders, showable, workerSeen, WORKERS_AGAIN_MS, WORKERS_EVERY_MS, WORKERS_RETRY_MS, type MenuWorkers, type WorkerList, type WorkerSeen } from '../core/workers';
 
 export type { RunState } from '../core/facts';
 
@@ -283,6 +284,9 @@ const mem = {
   busy: { workers: false, list: false, grid: false, reach: false, statusJson: false, setup: false, push: false, signedIn: false, press: false, keep: false },
   lastToolbar: '',
   lastKnownJson: '',
+  /** 25.0.0: the right-click entries Chrome holds now, as syncMenu last set them, and the rebuilds queued one after another */
+  menuKey: undefined as string | undefined,
+  menuChain: Promise.resolve(),
   pollEvery: 0,
   /**
    * the start of a connect line under way (its sitting id), 0 when none: claimed before the first await
@@ -464,6 +468,8 @@ export default defineBackground({
         void checkAccessNow('terms');
       }
       if (area === 'local' && (changes[PREFS_KEY] || changes[PORTAL_KEY] || changes[TERMS_KEY] || changes[STATEMENTS_KEY])) schedulePush();
+      // 25.0.0: a read that found other workers, Settings naming another account for this browser, or Disconnect
+      if (area === 'local' && (changes[MENU_KEY] || changes[PREFS_KEY])) void syncMenu();
       // the welcome page's press, written inside its click: the panel opening beside it says "Almost there."
       if (area === 'session' && changes[WELCOME_PRESS_KEY]) schedulePush();
       // 19.0.0: what a page wrote for the grid sign-in, kept current for the listener; never a secret value
@@ -495,12 +501,16 @@ export default defineBackground({
       await dropLeftoversOnce();
       await unregisterOldScripts();
       await cleanupDirectWay();
+      await syncMenu({ again: true });
     });
     browser.runtime.onStartup?.addListener(async () => {
       await ensureAlarms();
       await dropLeftoversOnce();
       await cleanupDirectWay();
+      await syncMenu({ again: true });
     });
+    // 25.0.0: Open in Beethoven, registered at once so a click that wakes the worker is not lost
+    browser.contextMenus?.onClicked.addListener((info, tab) => void openFromMenu(String(info.menuItemId), info.linkUrl, tab?.windowId));
     void ensureAlarms();
 
     // a browser with no side panel: the toolbar opens the panel page another way
@@ -4069,13 +4079,13 @@ function tabKeyOf(link: string): string {
   return isProjectUrl(link) ? PROJECT_TAB_KEY : CLAUDE_TAB_KEY;
 }
 
-/** open the worker's link, or the project's page, in one new tab and remember it (claude.ai's tab is never closed by Beethoven); 14.0.0: either form of link; 21.0.0: the project's page too, under its own record */
-async function openSessionTab(link: string): Promise<boolean> {
+/** open the worker's link, or the project's page, in one new tab and remember it (claude.ai's tab is never closed by Beethoven); 14.0.0: either form of link; 21.0.0: the project's page too, under its own record; 25.0.0: in the window a right-click came from, when it came from one */
+async function openSessionTab(link: string, windowId?: number): Promise<boolean> {
   if (!isClaudeCodeLink(link) && !isProjectUrl(link)) {
     dbg('open', `session tab: not opened (link ${linkWord(link)})`);
     return false;
   }
-  const win = mem.panelWindowId;
+  const win = windowId ?? mem.panelWindowId;
   const t = await openTab(link, { active: true, anthropicOk: true, ...(win !== undefined ? { windowId: win } : {}) });
   dbg('open', `session tab: ${t ? 'opened' : 'the browser opened no tab'} (link ${linkWord(link)})`);
   if (!t) return false;
@@ -4132,17 +4142,72 @@ async function showWorker(name: string): Promise<ActionResults['show-worker']> {
     dbg('open', `show worker ${name}: not offered here`);
     return { moved: false, opened: false };
   }
+  return showLink(w.link, name);
+}
+
+/** the Claude tab Beethoven opened, moved to a worker's link (Show, Open in Beethoven); with no such tab, one new tab */
+async function showLink(link: string, name: string, windowId?: number): Promise<{ moved: boolean; opened: boolean }> {
   const rec = await session.get<OpenedTab>(CLAUDE_TAB_KEY);
-  if (rec && rec.purpose === 'session' && (await tabNow(rec.tabId)) && (await moveTab(rec.tabId, rec.windowId, w.link))) {
+  if (rec && rec.purpose === 'session' && (await tabNow(rec.tabId)) && (await moveTab(rec.tabId, rec.windowId, link))) {
     // counted as Beethoven's own load again, so Open my session brings this tab forward rather than opening another
     await session.set(CLAUDE_TAB_KEY, { ...rec, opened_at: nowIso(), loaded: false, loads_after: 0 } satisfies OpenedTab);
-    dbg('open', `show worker ${name}: the Claude tab moved to it (link ${linkWord(w.link)})`);
+    dbg('open', `show worker ${name}: the Claude tab moved to it (link ${linkWord(link)})`);
     toast(WORDS.home.workerShown(name));
     return { moved: true, opened: false };
   }
-  const opened = await openSessionTab(w.link);
+  const opened = await openSessionTab(link, windowId);
   if (opened) toast(WORDS.home.workerShown(name));
   return { moved: false, opened };
+}
+
+/**
+ * 25.0.0: Open in Beethoven, pressed on a worker's link in any page: that link in the Claude tab Beethoven keeps, as Show
+ * does, from what is kept on this computer alone, so no grid, no VPN and no sign-in is asked for. Only an entry this
+ * browser offers can be pressed (the line that names another account is greyed), and only a worker's link opens.
+ */
+async function openFromMenu(id: string, clicked: string | undefined, windowId?: number): Promise<void> {
+  const link = menuTarget(id, clicked, await local.get<MenuWorkers>(MENU_KEY));
+  if (!link) {
+    dbg('open', `right-click ${id}: no worker's link to open`);
+    return;
+  }
+  await showLink(link, id.slice(MENU_OPEN.length), windowId);
+}
+
+/**
+ * 25.0.0: the right-click entries, made again from the workers kept (MENU_KEY) and the account Settings names for this
+ * browser, only when they would change, one rebuild at a time; `again` makes them whatever Chrome holds (install, update,
+ * browser start). A browser with no contextMenus (Safari's packager may drop it) has no entries and nothing breaks.
+ */
+function syncMenu(o: { again?: boolean } = {}): Promise<void> {
+  mem.menuChain = mem.menuChain.then(() => syncMenuNow(o)).catch(() => undefined);
+  return mem.menuChain;
+}
+
+async function syncMenuNow(o: { again?: boolean }): Promise<void> {
+  const menus = browser.contextMenus;
+  if (!menus) return;
+  const kept = await local.get<MenuWorkers>(MENU_KEY);
+  const entries = menuEntriesOf(kept?.workers ?? [], (await loadPrefs()).claude_account);
+  const key = JSON.stringify(entries);
+  if (!o.again && key === mem.menuKey) return;
+  mem.menuKey = undefined;
+  await menus.removeAll();
+  for (const e of entries) {
+    // an entry Chrome refuses is reported in lastError, read here so the console carries no unchecked error
+    menus.create({ id: e.id, title: e.title, contexts: ['link'], targetUrlPatterns: e.patterns, enabled: e.enabled }, () => void browser.runtime.lastError);
+  }
+  mem.menuKey = key;
+  dbg('menu', `right-click entries: ${entries.map((e) => e.id).join(', ') || 'none'}`);
+}
+
+/** 25.0.0: what a read found online, kept for the right-click entries when it differs from what is kept */
+async function keepMenuWorkers(list: WorkerList): Promise<void> {
+  const workers = menuWorkersOf(list);
+  const kept = await local.get<MenuWorkers>(MENU_KEY);
+  if (JSON.stringify(kept?.workers ?? []) === JSON.stringify(workers)) return;
+  if (workers.length) await local.set(MENU_KEY, { saved_at: nowIso(), workers } satisfies MenuWorkers);
+  else await local.remove(MENU_KEY);
 }
 
 /**
@@ -4171,7 +4236,9 @@ async function pollWorkers(): Promise<void> {
         /* a file caught mid-write; the next read takes it */
       }
     }
-    await session.set(WORKERS_KEY, { checked_at: nowIso(), workers: seen } satisfies WorkerList);
+    const list: WorkerList = { checked_at: nowIso(), workers: seen };
+    await session.set(WORKERS_KEY, list);
+    await keepMenuWorkers(list);
     dbg('read', `workers: ${seen.length} (${seen.map((w) => `${w.name} ${w.state}`).join(', ') || 'none'})`);
     schedulePush();
   } catch (e) {

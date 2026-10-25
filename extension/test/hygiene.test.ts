@@ -42,7 +42,8 @@ describe('what the source must not contain', () => {
   // 16.0.0: nativeMessaging went with the bridge (12.0.0 to 15.0.0); the one way to the grid is the portal.
   // 19.0.0: webRequest and webRequestAuthProvider on the Chromium builds, for the one onAuthRequired listener
   // (Beethoven signs in); the Firefox build gets neither, and nothing ever asks for webRequestBlocking.
-  it('asks for exactly storage, alarms, scripting, and on Chromium sidePanel, webRequest and webRequestAuthProvider (no activeTab since 11.0.0, no nativeMessaging since 16.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
+  // 25.0.0: contextMenus on every build, for the right-click entry on a worker's link (no install warning, no host).
+  it('asks for exactly storage, alarms, scripting, contextMenus, and on Chromium sidePanel, webRequest and webRequestAuthProvider (no activeTab since 11.0.0, no nativeMessaging since 16.0.0), optional https hosts only, and nothing on an Anthropic domain', () => {
     const cfg = read(path.join(ROOT, 'wxt.config.ts'));
     // the one manifest line: the list every build gets, then the Chromium builds' spread, then nothing for Firefox
     const line = /^\s*permissions:\s*\[(.*)\],\s*$/m.exec(cfg)?.[1] ?? '';
@@ -51,8 +52,8 @@ describe('what the source must not contain', () => {
     const quoted = (t: string) => [...t.matchAll(/'([^']+)'/g)].map((m) => m[1]);
     const every = quoted(split?.[1] ?? '');
     const chromium = quoted(split?.[2] ?? '');
-    expect(every.sort()).toEqual(['alarms', 'scripting', 'storage']);
-    expect([...every, ...chromium].sort()).toEqual(['alarms', 'scripting', 'sidePanel', 'storage', 'webRequest', 'webRequestAuthProvider']);
+    expect(every.sort()).toEqual(['alarms', 'contextMenus', 'scripting', 'storage']);
+    expect([...every, ...chromium].sort()).toEqual(['alarms', 'contextMenus', 'scripting', 'sidePanel', 'storage', 'webRequest', 'webRequestAuthProvider']);
     // nothing else in the line, and no other permissions list anywhere in the config
     expect(line.replace(/'[^']+'/g, '').replace(/[\s,]/g, '')).toBe('...(chromium?[]:[])');
     expect([...cfg.matchAll(/permissions:\s*\[/g)].length).toBe(1);

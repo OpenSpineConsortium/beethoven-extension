@@ -461,6 +461,16 @@ export const WORDS = {
     error: "Beethoven · Couldn't start",
   },
 
+  /**
+   * 25.0.0: the right-click entry on a worker's link (core/workers.ts menuEntriesOf). Chrome puts the extension's icon
+   * beside it, so the words need not say Beethoven twice; the second names the account whose Chrome profile Chrome's own
+   * "Open link as" should open, since an extension cannot open another profile itself.
+   */
+  menu: {
+    open: 'Open in Beethoven',
+    elsewhere: (account: string) => `Open link as: the profile signed in as ${account}`,
+  },
+
   /** Details for your lab lead (exempt from the hygiene test) */
   details: {
     title: 'Details for your lab lead',
