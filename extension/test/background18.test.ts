@@ -91,7 +91,14 @@ describe('18.0.0: the grid sign-in in front', () => {
 });
 
 describe('18.0.0: the GlobalProtect wait', () => {
-  it('a press made while the grid is known to be out of reach waits on GlobalProtect at once, without asking the dashboard first', async () => {
+  // 24.2.0: where the browser answers the grid's sign-in itself the press waits on the sheet, which says the grid is
+  // out of reach in its own line and is never replaced (greg, 2026-10-25: "dont steal the login screen"); the box path
+  // (no webRequest, the Firefox build, or Chrome's box chosen) keeps waiting on GlobalProtect
+  it.each([
+    { path: 'the box path', webRequest: false, waitsOn: 'globalprotect' },
+    { path: 'the sheet path', webRequest: true, waitsOn: 'grid' },
+  ])('$path: a press made while the grid is known to be out of reach waits at once, without asking the dashboard first', async ({ webRequest, waitsOn }) => {
+    world = install({ webRequest });
     await boot(world, { ready: true });
     world.opts.reach = false;
     const panel = openPort(world, 'panel');
@@ -112,7 +119,8 @@ describe('18.0.0: the GlobalProtect wait', () => {
     await sleep(300);
     panel.tick();
     await sleep(300);
-    expect(panel.last()?.view?.journey?.moment).toBe('globalprotect');
+    expect(panel.last()?.view?.journey?.moment).toBe(waitsOn);
+    if (waitsOn === 'grid') expect(panel.last()?.view?.journey?.problem?.body).toMatch(/^Can't reach the grid\. Is .+ on\?$/);
     // and it goes ahead by itself once the grid answers
     world.opts.reach = true;
     for (let i = 0; i < 8; i++) {
@@ -120,6 +128,7 @@ describe('18.0.0: the GlobalProtect wait', () => {
       await sleep(500);
     }
     expect(panel.last()?.view?.journey?.moment).not.toBe('globalprotect');
+    expect(panel.last()?.view?.journey?.problem?.body ?? '').not.toMatch(/^Can't reach the grid/);
   }, 30_000);
 });
 

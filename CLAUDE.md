@@ -175,6 +175,14 @@ name and identifier carry no university name.
   picked one, refused with the reason when it is not an address; it stays among the options while picked, and
   picking another drops it unless a worker reports it. Still one account per browser and Beethoven never reads
   claude.ai. Privacy 19 alone; the agreement stays 15.
+- **The sign-in stays on screen (decided 2026-10-25, 24.2.0).** greg: the panel "offers a login screen, the screen
+  will be preempted by "trying to connect to the grid" and that is annoying, it can run in the background but dont
+  steal the login screen". Where the grid moment is Beethoven's own sheet (`sheetUp` in `core/steps.ts`: the browser
+  answers the grid's sign-in itself and no box tab is watched), the reach check never replaces it: the sheet stays,
+  with "Can't reach the grid. Is GlobalProtect on?" and *Try again* in its problem line while there is no route, and
+  a press made out of reach waits on the sheet rather than on the GlobalProtect moment; the check itself runs as
+  before (every 3 s with a page open, once a minute without). The box path (Chrome's box chosen, or the build that
+  cannot answer the sign-in) keeps GlobalProtect first, since its tab cannot load without the VPN. No text changes.
 - **One store, one public listing (decided 2026-10-13, 20.0.0; private from 8.0.0 to 19.0.0).**
   Beethoven is offered only on the Chrome Web Store, as a Public item since 20.0.0 (greg,
   2026-10-13: "i want to release 20 and public"): installing it needs no invitation, and the
