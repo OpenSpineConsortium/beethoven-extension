@@ -307,6 +307,21 @@ function needsGridSignin(f: Facts): boolean {
 }
 
 /**
+ * 24.2.0: Beethoven's own sheet is what the grid moment shows (the browser answers the grid's sign-in itself and no
+ * box tab is watched). The sheet then stays on screen while the grid is out of reach, with the reach in a line of its
+ * own, and the reach check goes on in the background: greg, 2026-10-25, "it can run in the background but dont steal
+ * the login screen". Before, the GlobalProtect moment took the sheet's place as soon as the first check found no route.
+ */
+function sheetUp(f: Facts): boolean {
+  return !!f.signin.own && !f.signin.waiting;
+}
+
+/** the grid does not answer: no route (the VPN off), or the dashboard check could not reach it */
+function gridOutOfReach(f: Facts): boolean {
+  return f.grid.reach === 'no-route' || f.grid.session === 'unreachable';
+}
+
+/**
  * 19.0.0: the saved grid sign-in waits only for the computer's unlock: saved, locked, not turned down, and the
  * grid not signed in. Then Overlays.unlock is set, the Grid row's link is Unlock and the hero's as-of line says so.
  */
@@ -410,7 +425,8 @@ function studentMoment(f: Facts): JourneyView['moment'] | undefined {
   // 16.0.0: a press that waits while the grid is out of reach (the VPN off, or the portal not answering) shows the
   // GlobalProtect moment again, as the first run did, and carries on by itself once the grid answers (15.0.0 dropped
   // such a press at once with "Can't reach the grid", which left the student to press again after turning the VPN on)
-  if (f.press && needsGridSignin(f) && (f.grid.session === 'unreachable' || f.grid.reach === 'no-route')) return 'globalprotect';
+  // 24.2.0: not over the sheet, which keeps the press's place and says the grid is out of reach in a line of its own
+  if (f.press && needsGridSignin(f) && gridOutOfReach(f) && !sheetUp(f)) return 'globalprotect';
   // 19.0.0: also when the student asked for the sheet (the Grid row's Sign in)
   if (f.signin.waiting || (f.press && needsGridSignin(f)) || (f.signin.asked !== undefined && needsGridSignin(f))) return 'grid';
   if (claudeNeedsStudent(f)) return 'claude';
@@ -445,9 +461,11 @@ export function momentOf(f: Facts): JourneyView['moment'] {
   if (!f.portal || !f.granted) return 'welcome';
   if (f.loginSetup) return 'login-setup';
   if (needsGridSignin(f)) {
+    // 24.2.0: the sheet is never taken away by the reach check (sheetUp); the box path keeps GlobalProtect first
+    if (sheetUp(f)) return 'grid';
     // "Connected." is held 700 ms before the sign-in moment
     if (f.grid.answeredAt !== undefined && f.now - f.grid.answeredAt < CONNECTED_HOLD_MS) return 'globalprotect';
-    if (f.grid.reach === 'no-route' || f.grid.session === 'unreachable') return 'globalprotect';
+    if (gridOutOfReach(f)) return 'globalprotect';
     return 'grid';
   }
   // the drawn check holds a moment after the sign-in
@@ -538,7 +556,8 @@ export function journey(f: Facts, moment: JourneyView['moment'] = momentOf(f)): 
       // on the box path "Sign in again" opens the box again; without the sheet at all it is 18.0.0's sign-in-grid
       const again: Action = own ? { kind: 'sign-in-grid-box' } : { kind: 'sign-in-grid' };
       let problem: ProblemView | undefined;
-      if (f.grid.session === 'unreachable') problem = { body: WORDS.grid.unreachable(vpnApp(f)), button: button(WORDS.grid.tryAgain, 'ink', { kind: 'retry-grid' }) };
+      // 24.2.0: no route counts too, since the sheet now stays up while the reach check finds none
+      if (gridOutOfReach(f)) problem = { body: WORDS.grid.unreachable(vpnApp(f)), button: button(WORDS.grid.tryAgain, 'ink', { kind: 'retry-grid' }) };
       else if (f.grid.session === 'not-ood') problem = { body: WORDS.grid.notOod, button: button(WORDS.grid.useAnother, 'ink', { kind: 'open-settings' }) };
       else if (sheetOn) problem = undefined;
       // a second load of the sign-in tab with no sign-in: Cancel in Chrome's box, or a wrong password

@@ -98,7 +98,8 @@ describe('Start over', () => {
     expect(world.storage.local['bridge.terms']).toBeDefined();
     expect(world.storage.local['bridge.portal']).toMatchObject({ site: 'wayne' });
     expect(world.storage.local['bridge.prefs']).toMatchObject({ worker_name: 'alpha' });
-    // and the panel walks the journey from its start again: out of reach, that is GlobalProtect
-    await until(panel, () => view(panel)?.journey?.moment === 'globalprotect');
+    // and the panel walks the journey from its start again: out of reach, that is the sign-in sheet saying so in its own
+    // line (24.2.0; GlobalProtect took the sheet's place before, and still comes first on the box path)
+    await until(panel, () => view(panel)?.journey?.moment === 'grid' && /^Can't reach the grid/.test((view(panel)?.journey?.problem as { body?: string } | undefined)?.body ?? ''));
   });
 });

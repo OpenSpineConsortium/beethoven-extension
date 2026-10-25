@@ -613,6 +613,28 @@ describe('the panel', () => {
     const v = panelView(facts({ grid: { reach: 'no-route', session: 'unreachable' }, press: { kind: 'connect', at: ago(1) } }));
     expect(v.kind === 'journey' && v.journey.moment === 'globalprotect' ? v.journey.note : undefined).toBe('Beethoven carries on by itself as soon as the grid answers.');
   });
+
+  // greg, 2026-10-25: "it can run in the background but dont steal the login screen"
+  it('24.2.0: the sheet stays on screen while the grid is out of reach, with the reach in its own line; the box path keeps GlobalProtect first', () => {
+    const own = { saved: 'none', refused: false, held: false, refusals: 0, working: false, unlockWith: 'Windows Hello', origin: ORIGIN, later: undefined } as const;
+    const unreachable = { body: "Can't reach the grid. Is GlobalProtect on?", button: { label: 'Try again', tone: 'ink', action: { kind: 'retry-grid' } } };
+    for (const grid of [{ reach: 'no-route', session: 'unknown' }, { reach: 'answers', session: 'unreachable' }] as const) {
+      const first = facts({ ...firstRun, grid: { ...grid, account: undefined, lookingSince: NOW - 5_000 }, signin: { waiting: false, own } });
+      expect(momentOf(first)).toBe('grid');
+      expect(J(first, 'grid')).toMatchObject({ sheet: { phase: 'type' }, problem: unreachable });
+      // the same facts with no sheet (Chrome's box, or the build that cannot answer the grid's sign-in) are 16.0.0's
+      expect(momentOf(facts({ ...firstRun, grid: { ...grid, account: undefined }, signin: { waiting: false } }))).toBe('globalprotect');
+      expect(momentOf(facts({ ...firstRun, grid: { ...grid, account: undefined }, signin: { waiting: true, own } }))).toBe('globalprotect');
+      // after the first run a press waits on the sheet, not on GlobalProtect
+      const pressed = panelView(facts({ grid: { ...grid, account: undefined }, press: { kind: 'connect', at: ago(1) }, signin: { waiting: false, own: { ...own, later: 'press' } } }));
+      expect(pressed.kind === 'journey' ? pressed.journey.moment : pressed.kind).toBe('grid');
+      expect(pressed.kind === 'journey' && pressed.journey.moment === 'grid' ? pressed.journey.problem : undefined).toEqual(unreachable);
+    }
+    // the grid answering again takes the line away, and holds no "Connected." over the sheet
+    const back = facts({ ...firstRun, grid: { reach: 'answers', session: 'signed-out', account: undefined, answeredAt: NOW - 300 }, signin: { waiting: false, own } });
+    expect(momentOf(back)).toBe('grid');
+    expect(J(back, 'grid').problem).toBeUndefined();
+  });
 });
 
 // The words a student never reads (spec: hygiene). The allow-list is the spec's own sentences that
